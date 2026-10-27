@@ -96,7 +96,8 @@ remove_hermes() {
   sudo rm -rf "$agent_home" "$(dirname "$secrets")" "$(dirname "$launcher")" \
     /var/db/hermes-freeze /var/db/hermes-read-acl /var/log/hermes-freeze.log
   ok "Hermes is gone. The files it made that froze stay yours."
-  warn "Revoke its GitHub token and its API keys (OpenCode Zen, RunPod) where you created them."
+  warn "Revoke its GitHub token and its API keys (OpenCode Zen, RunPod) where you created them,"
+  warn "and its Telegram bot: send @BotFather /revoke (new token) or /deletebot."
 }
 
 remove_everything() {
