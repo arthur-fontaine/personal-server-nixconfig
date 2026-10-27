@@ -1,10 +1,8 @@
 { pkgs, username, ... }:
 {
   imports = [
-    ./server.nix
+    ../options
   ];
-
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   system.primaryUser = username;
   users.users.${username}.shell = pkgs.zsh;
