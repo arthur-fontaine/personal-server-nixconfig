@@ -1,0 +1,5 @@
+result
+result-*
+hosts/local.nix
+__pycache__/
+.pytest_cache/

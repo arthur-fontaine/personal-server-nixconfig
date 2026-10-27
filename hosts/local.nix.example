@@ -1,0 +1,10 @@
+{
+  My-Server = {
+    system = "aarch64-darwin";
+    username = "alice";
+
+    # Optional overrides:
+    # homeDirectory = "/Users/alice";
+    # nixconfigDir = "/Users/alice/personal-server-nixconfig"; # where this repo is checked out
+  };
+}
