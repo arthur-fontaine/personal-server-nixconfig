@@ -60,5 +60,22 @@
       packages.aarch64-darwin = builtins.intersectAttrs (overlay { } { }) (pkgsFor "aarch64-darwin");
 
       checks.aarch64-darwin = import ./checks { inherit inputs; pkgs = pkgsFor "aarch64-darwin"; };
+
+      # Two real Hermes turns on a scripted model, outside the build sandbox
+      # (checks/hermes-turns/run.sh): `nix run .#hermes-turns`.
+      apps.aarch64-darwin.hermes-turns =
+        let
+          pkgs = pkgsFor "aarch64-darwin";
+          hermes = inputs.hermes-agent.packages.aarch64-darwin.default;
+          run = pkgs.writeShellScript "hermes-turns" ''
+            exec ${pkgs.bash}/bin/bash ${./checks/hermes-turns}/run.sh \
+              ${hermes}/bin/hermes ${hermes.hermesVenv}/bin/python3 ${./modules/hermes/plugins/unii} "$@"
+          '';
+        in
+        {
+          type = "app";
+          program = "${run}";
+          meta.description = "Run two real Hermes turns through the unii memory against a scripted model";
+        };
     };
 }
