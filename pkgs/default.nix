@@ -13,4 +13,6 @@ in
   };
   # Hermes' pinned computer-use driver (its pm/lock.json).
   cua-driver = inputs.hermes-agent.packages.${system}.pm-cua-driver;
+  # uzu's CLI, with its OpenAI-compatible `server`.
+  mirai = inputs.uzu.packages.${system}.mirai;
 }
