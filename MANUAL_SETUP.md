@@ -5,18 +5,18 @@ at its own screen and keyboard (the permission dialogs show there), and let it
 reboot. Nothing is left to run afterwards. Every step checks whether it is done,
 so running it again from the clone
 (`~/personal-server-nixconfig/scripts/bootstrap-macos.sh`) only redoes what is
-missing, for example a WhatsApp pairing that expired.
+missing, for example the BotFather settings you skipped.
 
 | Step | What the script does | What only you can do |
 | --- | --- | --- |
 | Nix | installs it (multi-user) | |
 | Repository | clones it to `~/personal-server-nixconfig` | |
 | This host | writes the git-ignored `hosts/local.nix`: host name, your user, the SSH keys allowed to log in (from your GitHub account, pasted, or this Mac's `~/.ssh/*.pub`) | choose the keys |
-| Secrets | writes `/etc/hermes/secrets.env` (root, then Hermes only, mode 0400): the OpenCode Zen and RunPod API keys, your WhatsApp number | paste the keys |
+| Secrets | writes `/etc/hermes/secrets.env` (root, then Hermes only, mode 0400): the OpenCode Zen and RunPod API keys | paste the keys |
+| Telegram bot | walks you through @BotFather's `/newbot`, checks the token, reads your user id from your first message to the bot, sets its description, then checks Threaded Mode (topics as sub-chats) and privacy mode (groups as sub-chats) | create the bot; switch Threaded Mode on in BotFather's Mini App; send `/setprivacy` → your bot → `Disable` |
 | System | runs `darwin-rebuild switch` | |
 | Auto-login | gives the `hermes` account a random password and writes `/etc/kcpassword`, so macOS logs it in at boot (the login user itself is in Nix) | confirm turning FileVault off, which auto-login needs |
 | GitHub | `gh auth login` for Hermes, with a token you create for this repository only (Contents: read and write) | create the token |
-| WhatsApp | runs `hermes whatsapp` as Hermes and restarts the gateway | scan the QR code with the bot number's phone |
 | Permissions | runs `cua-driver permissions grant`; macOS keeps them system-wide, so they cover the Hermes account | click Allow for Accessibility and Screen Recording |
 | Full Disk Access | opens the list and shows `/Library/Hermes/hermes-launcher` in Finder | add it, once: Hermes updates keep it |
 | Reboot | reboots, so macOS logs Hermes in and starts it | |
@@ -36,6 +36,8 @@ reaches Hermes and everything it runs, across updates.
 - DigUp downloads its embedding model at the first `digup index`.
 - Keep the lid open: the backlight is off, but a closed lid turns the display
   off and computer use sees a black screen. The Mac never sleeps either way.
+- Talk to the bot in its DM: that is the main chat. Tap **+** for a topic, a
+  sub-chat, and `/sub` there for its rules.
 - Whoever can push to the repository can change the whole Mac through
   `sudo server-rebuild`, Hermes included: keep its GitHub token to this
   repository.
