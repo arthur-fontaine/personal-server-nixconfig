@@ -5,5 +5,6 @@
   imports = [
     ./power.nix
     ./ssh.nix
+    ./quiet.nix
   ];
 }
