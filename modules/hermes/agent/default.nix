@@ -14,6 +14,7 @@ in
     ./whatsapp.nix
     ./mcp.nix
     ./tools.nix
+    ./computer-use.nix
   ];
 
   home.username = cfg.user;
