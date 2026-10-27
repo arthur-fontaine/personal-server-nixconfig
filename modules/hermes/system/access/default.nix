@@ -7,6 +7,7 @@
 { ... }:
 {
   imports = [
+    ./read.nix
     ./secrets.nix
   ];
 }
