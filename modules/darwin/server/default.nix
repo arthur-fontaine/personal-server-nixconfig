@@ -3,6 +3,7 @@
 { ... }:
 {
   imports = [
+    ./power.nix
     ./ssh.nix
   ];
 }
