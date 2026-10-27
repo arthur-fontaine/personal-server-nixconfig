@@ -14,7 +14,7 @@ let
     roots = [
       {
         path = cfg.home;
-        exclude = map (d: "${cfg.home}/${d}") cfg.access.mutableDirs;
+        exclude = map (d: "${cfg.home}/${d}") cfg.access.mutablePaths;
       }
       { path = "/Users/Shared"; }
       { path = "/private/tmp"; }
