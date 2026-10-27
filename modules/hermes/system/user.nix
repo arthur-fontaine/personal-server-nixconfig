@@ -27,6 +27,10 @@ in
     description = "Hermes";
   };
 
+  # macOS logs this account in at boot. The password that goes with it,
+  # /etc/kcpassword, is a secret: scripts/bootstrap-macos.sh writes it.
+  system.defaults.loginwindow.autoLoginUser = cfg.user;
+
   home-manager.users.${cfg.user} = {
     imports = [
       inputs.hermes-agent.homeManagerModules.default
