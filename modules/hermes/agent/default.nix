@@ -9,6 +9,7 @@ let
 in
 {
   imports = [
+    ./model.nix
   ];
 
   home.username = cfg.user;
