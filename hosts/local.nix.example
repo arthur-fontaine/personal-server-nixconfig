@@ -6,5 +6,13 @@
     # Optional overrides:
     # homeDirectory = "/Users/alice";
     # nixconfigDir = "/Users/alice/personal-server-nixconfig"; # where this repo is checked out
+
+    # Any option under server.* (see modules/*/options), for example:
+    server = {
+      ssh.authorizedKeys = [ "ssh-ed25519 AAAA... alice@laptop" ];
+      # hermes.model.name = "deepseek-v4.1-flash-free";
+      # uzu.model = "alibaba:qwen3.5:0.8b:mirai:mirai-m:4";
+      # energy.lowPowerMode = false;
+    };
   };
 }
