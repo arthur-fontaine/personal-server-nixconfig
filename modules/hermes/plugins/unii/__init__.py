@@ -95,6 +95,7 @@ def register(ctx) -> None:
         hooks = state["hooks"]
         ctx.register_hook("pre_gateway_dispatch", hooks.pre_gateway_dispatch)
         ctx.register_hook("pre_tool_call", hooks.pre_tool_call)
+        ctx.register_hook("on_session_reset", hooks.on_session_reset)
         ctx.register_command(
             "sub",
             SubCommand(runtime),

@@ -107,6 +107,17 @@ class Hooks:
             return "Wrong passphrase."
         return f"🔓 Unlocked `{own}` until `/sub lock` or the next restart. You can delete your message."
 
+    # ── on_session_reset ─────────────────────────────────────────────────
+
+    def on_session_reset(self, session_id: str = "", old_session_id: str = "", new_session_id: str = "", **kwargs):
+        """A /new or /reset in a sub-chat whose ttl is "session" wipes it. The gateway
+        fires this once the replacement session exists, so that one is kept."""
+        chat = self.runtime.sessions.get(old_session_id or session_id)
+        if chat is None or chat.is_main:
+            return
+        if self.runtime.policies.policy(chat).ttl == "session":
+            self.runtime.wipe_chat(chat, reset_routes=False, keep=tuple(s for s in (new_session_id,) if s))
+
     # ── pre_tool_call ────────────────────────────────────────────────────
 
     def pre_tool_call(self, tool_name: str, args: dict, task_id: str = "", **kwargs):

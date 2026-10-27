@@ -125,9 +125,10 @@ class Runtime:
         except Exception:
             logger.warning("unii: could not set the model of %s", chat.key, exc_info=True)
 
-    def wipe_chat(self, chat: Chat) -> None:
+    def wipe_chat(self, chat: Chat, *, reset_routes: bool = True, keep: tuple[str, ...] = ()) -> None:
         """Delete everything a temporary sub-chat left: its private volume, its Hermes
-        sessions, its key. A shared named volume is kept."""
+        sessions (but `keep`), its key. A shared named volume is kept. `reset_routes`
+        moves the chat to a fresh session; a /new already did."""
         _, own, _ = self.chat_volumes(chat)
         if own == own_volume(chat):
             with self._lock:
@@ -135,14 +136,14 @@ class Runtime:
                 self.keys.pop(own, None)
             shutil.rmtree(os.path.join(self.volumes_dir, own), ignore_errors=True)
         store = self.session_store
-        if store is not None:
+        if store is not None and reset_routes:
             try:
                 for entry in store.list_sessions():
                     if f":{chat.key}" in entry.session_key:
                         store.reset_session(entry.session_key)
             except Exception:
                 logger.warning("unii: could not reset the sessions of %s", chat.key, exc_info=True)
-        delete_sessions(self.policies.forget_sessions(chat))
+        delete_sessions([sid for sid in self.policies.forget_sessions(chat) if sid not in keep])
         for sid, value in list(self.sessions.items()):
             if value == chat:
                 self.sessions.pop(sid, None)

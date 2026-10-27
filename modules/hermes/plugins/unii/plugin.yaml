@@ -5,3 +5,4 @@ author: "personal-server-nixconfig, after Victor Taelin's UniiChat design"
 provides_hooks:
   - pre_gateway_dispatch
   - pre_tool_call
+  - on_session_reset

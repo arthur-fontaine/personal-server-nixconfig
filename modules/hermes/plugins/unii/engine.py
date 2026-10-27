@@ -131,17 +131,12 @@ class UniiEngine(ContextEngine):
 
     def on_session_reset(self) -> None:
         super().on_session_reset()
-        self._end_if_temporary()
         self._logged.clear()
 
-    def on_session_end(self, session_id: str, messages: list[dict[str, Any]]) -> None:
-        self._end_if_temporary()
-
-    def _end_if_temporary(self) -> None:
-        if self.chat is None or self.passive or self.chat.is_main:
-            return
-        if self.runtime.policies.policy(self.chat).ttl == "session":
-            self.runtime.wipe_chat(self.chat)
+    # A sub-chat with ttl "session" is wiped by the plugin's on_session_reset
+    # hook (hooks.py), which fires on an explicit /new or /reset only. The
+    # engine's on_session_end also fires when the gateway shuts down or evicts
+    # an idle agent, which must not wipe anything.
 
     # ── the view ─────────────────────────────────────────────────────────
 
