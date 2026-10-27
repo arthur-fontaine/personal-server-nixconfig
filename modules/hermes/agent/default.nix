@@ -11,6 +11,7 @@ in
   imports = [
     ./model.nix
     ./memory.nix
+    ./whatsapp.nix
   ];
 
   home.username = cfg.user;
