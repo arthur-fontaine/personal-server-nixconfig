@@ -1,7 +1,8 @@
 # unii
 
-A Hermes plugin that makes the WhatsApp DM **one chat that never ends**, and
-every WhatsApp group with the bot a **sub-chat** with its own rules.
+A Hermes plugin that makes the Telegram DM with the bot **one chat that never
+ends**, and every topic of it, and every group with the bot, a **sub-chat**
+with its own rules.
 
 ## The single chat
 
@@ -30,9 +31,9 @@ Where it departs from the design:
 
 ## Sub-chats
 
-Every group, channel or thread with the bot is a sub-chat. Its policy comes from
-a preset (set in Nix, `server.hermes.subchats.presets`) plus `/sub set`
-changes:
+Every topic of the DM, and every group, group topic or channel with the bot, is
+a sub-chat. Its policy comes from a preset (set in Nix,
+`server.hermes.subchats.presets`) plus `/sub set` changes:
 
 | Setting | Effect |
 | --- | --- |
