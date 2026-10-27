@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Sets the server up from a fresh Mac, including everything Nix cannot do:
 # SSH keys, secrets, the Hermes account's login, GitHub access, WhatsApp
-# pairing and the macOS permissions. Safe to run again: each step checks
-# whether it is done first. Run it once, reboot when it asks, then run it again
-# for the permissions, which need the Hermes session.
+# pairing and the macOS permissions. Run it once, at the Mac's own screen (the
+# permission dialogs show there), and let it reboot: nothing is left to run
+# afterwards. Each step checks whether it is done first, so running it again
+# from the clone (~/personal-server-nixconfig/scripts/bootstrap-macos.sh)
+# only redoes what is missing, e.g. a WhatsApp pairing that expired.
 #
 # Modelled on https://github.com/arthur-fontaine/nixconfig/blob/main/scripts/bootstrap-macos.sh,
 # with gum (https://github.com/charmbracelet/gum) for the prompts and no Homebrew.
@@ -217,44 +219,63 @@ else
   fi
 fi
 
-# ── Permissions, in the Hermes session ──────────────────────────────────────
-
-if ! gui_session; then
-  step "The Hermes session"
-  note "Computer use needs Accessibility and Screen Recording, granted in $agent's session,"
-  note "which exists once macOS has logged it in."
-  if sudo test -e /etc/kcpassword && gum confirm "Reboot now? Run this script again afterwards."; then
-    sudo shutdown -r now
-  fi
-  warn "Run this script again once $agent is logged in, for the permissions."
-  exit 0
-fi
+# ── Permissions ─────────────────────────────────────────────────────────────
+# Accessibility, Screen Recording and Full Disk Access live in macOS' system
+# database, so granting them from this session covers the Hermes account too.
+# The dialogs need a screen: this session's if it has one, else Hermes'.
 
 cua="$(setting home-manager.users.$agent.services.hermes-agent.environment.HERMES_CUA_DRIVER_CMD)"
-brightness="$(nix build --no-link --print-out-paths "path:$REPO_DIR#display-brightness")/bin/display-brightness"
-in_session() { sudo launchctl asuser "$agent_uid" sudo -u "$agent" -H env CUA_DRIVER_RS_TELEMETRY_ENABLED=0 "$@"; }
-
-# "unknown" until Hermes has started the driver's daemon once.
-permissions="$(in_session "$cua" permissions status --json 2>/dev/null | sed -n 's/.*"status": *"\([a-z_]*\)".*/\1/p')"
-if [ "$permissions" != granted ] && gum confirm "Grant computer use its permissions now? (status: ${permissions:-unknown})"; then
-  step "Accessibility and Screen Recording for CuaDriver"
-  note "Dialogs open on this Mac's screen (lit up for now): click Allow / Open System Settings,"
-  note "turn CuaDriver on in each list, then come back here."
-  in_session "$brightness" 1 || true
-  in_session "$cua" permissions grant || true
-  gum confirm --affirmative "Done" --negative "" "Granted both in System Settings?" || true
-  in_session "$brightness" "$(setting server.energy.displayBrightness)" || true
-  sudo launchctl kickstart -k "gui/$agent_uid/org.nix-community.home.hermes-agent" || true
+launcher="$(setting server.hermes.access.launcher)"
+if launchctl print "gui/$(id -u)" >/dev/null 2>&1; then
+  in_gui() { env CUA_DRIVER_RS_TELEMETRY_ENABLED=0 "$@"; }
+  lit() { :; }
+elif gui_session; then
+  in_gui() { sudo launchctl asuser "$agent_uid" sudo -u "$agent" -H env CUA_DRIVER_RS_TELEMETRY_ENABLED=0 "$@"; }
+  # Hermes' session keeps the backlight off: light it while you click.
+  brightness="$(nix build --no-link --print-out-paths "path:$REPO_DIR#display-brightness")/bin/display-brightness"
+  lit() { in_gui "$brightness" "$1" || true; }
+else
+  in_gui() { return 1; }
+  lit() { :; }
 fi
-ok "Computer use permissions checked"
 
-if gum confirm --default=false "Should Hermes read your Desktop, Documents and Downloads? (Full Disk Access)"; then
-  note "In the list that opens, add: $(as_agent sh -c 'command -v hermes')"
-  note "macOS ties it to that file, so grant it again after a Hermes update."
-  in_session "$brightness" 1 || true
-  in_session /usr/bin/open "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles"
-  gum confirm --affirmative "Done" --negative "" "Added?" || true
-  in_session "$brightness" "$(setting server.energy.displayBrightness)" || true
+if in_gui true; then
+  # "unknown" until the driver's daemon has run once.
+  permissions="$(in_gui "$cua" permissions status --json 2>/dev/null | sed -n 's/.*"status": *"\([a-z_]*\)".*/\1/p')"
+  if [ "$permissions" != granted ] && gum confirm "Grant computer use its permissions now? (status: ${permissions:-unknown})"; then
+    step "Accessibility and Screen Recording for CuaDriver"
+    note "Dialogs open on this Mac's screen: click Allow / Open System Settings,"
+    note "turn CuaDriver on in each list, then come back here."
+    lit 1
+    in_gui "$cua" permissions grant || true
+    gum confirm --affirmative "Done" --negative "" "Granted both?" || true
+    lit "$(setting server.energy.displayBrightness)"
+  fi
+
+  if gum confirm "Give Hermes Full Disk Access? (to read Desktop, Documents, Downloads, Mail, iCloud...)"; then
+    step "Full Disk Access for $launcher"
+    note "In the list that opens, click +, then drag in the file Finder shows (or ⇧⌘G and paste its path)."
+    note "It is granted once: Hermes updates keep it."
+    lit 1
+    in_gui /usr/bin/open "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles"
+    in_gui /usr/bin/open -R "$launcher"
+    gum confirm --affirmative "Done" --negative "" "Added?" || true
+    lit "$(setting server.energy.displayBrightness)"
+  fi
+  ok "Permissions handled"
+else
+  warn "No screen here (SSH?): run this script at the Mac itself to grant the permissions."
+fi
+
+# ── Start ───────────────────────────────────────────────────────────────────
+
+if gui_session; then
+  sudo launchctl kickstart -k "gui/$agent_uid/org.nix-community.home.hermes-agent" || true
+  ok "Hermes is running"
+elif sudo test -e /etc/kcpassword && gum confirm "Reboot now? macOS then logs Hermes in and starts it; nothing else to run."; then
+  sudo shutdown -r now
+else
+  warn "Hermes starts once macOS logs $agent in: reboot when you are ready."
 fi
 
 gum style --border rounded --padding "0 2" --foreground 42 "The server is set up." \
