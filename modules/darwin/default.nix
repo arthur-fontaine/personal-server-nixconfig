@@ -3,6 +3,7 @@
   imports = [
     ../options
     ./nix.nix
+    ./server
   ];
 
   system.primaryUser = username;
