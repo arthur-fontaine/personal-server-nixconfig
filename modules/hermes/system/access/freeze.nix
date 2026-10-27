@@ -24,7 +24,8 @@ let
 in
 {
   launchd.daemons.hermes-freeze.serviceConfig = {
-    ProgramArguments = [ "${pkgs.python3}/bin/python3" "-I" "${./freeze.py}" "${freezeConfig}" ];
+    # Under the launcher, so Full Disk Access lets it into Desktop, Documents and Downloads.
+    ProgramArguments = [ cfg.access.launcher "${pkgs.python3}/bin/python3" "-I" "${./freeze.py}" "${freezeConfig}" ];
     StartInterval = cfg.access.scanInterval;
     RunAtLoad = true;
     LowPriorityIO = true;

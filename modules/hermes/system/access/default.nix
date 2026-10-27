@@ -3,7 +3,8 @@
 # - read.nix     it reads anything;
 # - freeze.nix   it writes or deletes only what it created in the last 24 hours;
 # - rebuild.nix  it changes the system only through this repository;
-# - secrets.nix  its API keys stay outside the Nix store.
+# - secrets.nix  its API keys stay outside the Nix store;
+# - full-disk.nix  Full Disk Access is granted once, not at each update.
 { ... }:
 {
   imports = [
@@ -11,5 +12,6 @@
     ./freeze.nix
     ./rebuild.nix
     ./secrets.nix
+    ./full-disk.nix
   ];
 }

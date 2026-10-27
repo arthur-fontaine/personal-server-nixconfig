@@ -9,6 +9,16 @@ in
       default = 24 * 60 * 60;
       description = "Seconds after which a file Hermes created can no longer be written or deleted by it.";
     };
+    launcher = mkOption {
+      type = types.str;
+      default = "/Library/Hermes/hermes-launcher";
+      description = ''
+        A fixed path for tcc-launcher (pkgs/tcc-launcher), the parent of the
+        gateway, fsearch and hermes-freeze. Full Disk Access is granted to it
+        once; it is rewritten only when its own version changes, never when
+        Hermes updates.
+      '';
+    };
     scanInterval = mkOption {
       type = types.ints.positive;
       default = 300;
