@@ -1,0 +1,19 @@
+# Telegram, through a bot of your own
+# (https://github.com/NousResearch/hermes-agent/blob/74885f997bece88c1393bd174b25b32338336cb6/website/docs/user-guide/messaging/telegram.md).
+# The root of your DM with the bot is the main chat; each topic of that DM
+# (BotFather → Threaded Mode), each group and each group topic is a sub-chat.
+# The bot token and your user id (TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS)
+# are in the secrets file, written by scripts/bootstrap-macos.sh.
+{ ... }:
+{
+  services.hermes-agent.settings = {
+    # One session per group or topic, not per participant: unii reads the
+    # sub-chat from the session key, which then never ends with a user id.
+    group_sessions_per_user = false;
+
+    telegram = {
+      # Groups are sub-chats with the owner only: answer every message.
+      require_mention = false;
+    };
+  };
+}

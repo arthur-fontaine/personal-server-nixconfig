@@ -11,7 +11,7 @@ in
   imports = [
     ./model.nix
     ./memory.nix
-    ./whatsapp.nix
+    ./telegram.nix
     ./mcp.nix
     ./tools.nix
     ./computer-use.nix
@@ -34,7 +34,7 @@ in
     environmentFiles = [ cfg.secretsFile ];
 
     settings = {
-      # Approvals arrive as WhatsApp messages; the guardian model decides the
+      # Approvals arrive as Telegram messages; the guardian model decides the
       # obvious ones.
       approvals.mode = "smart";
       # Nix pins and updates Hermes (flake.lock), not Hermes itself.

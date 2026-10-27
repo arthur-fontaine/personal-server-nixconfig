@@ -1,5 +1,5 @@
-# Sub-chats: every WhatsApp group with the bot is one, kept out of the main
-# chat according to its policy.
+# Sub-chats: every topic of your Telegram DM with the bot, and every group with
+# it, is one, kept out of the main chat according to its policy.
 { lib, ... }:
 let
   inherit (lib) mkOption types;

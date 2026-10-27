@@ -36,7 +36,8 @@ in
       default = "/etc/hermes/secrets.env";
       description = ''
         A dotenv file, outside the Nix store and readable by the Hermes user
-        only: OPENCODE_ZEN_API_KEY, RUNPOD_API_KEY, WHATSAPP_ALLOWED_USERS.
+        only: OPENCODE_ZEN_API_KEY, RUNPOD_API_KEY, TELEGRAM_BOT_TOKEN,
+        TELEGRAM_ALLOWED_USERS.
         See MANUAL_SETUP.md.
       '';
     };
