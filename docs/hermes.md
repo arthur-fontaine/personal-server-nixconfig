@@ -47,9 +47,11 @@ there makes every sub-chat using the volume encrypted.
 An encrypted volume's files hold only ciphertext; the key is derived from your
 passphrase and kept in memory until `/sub lock` or a restart, and `/sub unlock`
 is intercepted before Hermes stores or logs it. After each turn the plain
-transcript Hermes keeps of that chat is deleted. Still in clear: the WhatsApp
-copies on the phones, and the model provider for that turn, unless the
-sub-chat runs on `uzu:local`.
+transcript Hermes keeps of that chat is deleted (best effort: a failure is
+logged, not retried). Still in clear: the WhatsApp copies on the phones, the
+running gateway's memory until it restarts, fragments Hermes may write to
+`~/.hermes/logs`, and the model provider for that turn, unless the sub-chat
+runs on `uzu:local`.
 
 ## What Hermes may touch
 
@@ -65,7 +67,9 @@ Enforced by macOS, not by the model (`modules/hermes/system/access`):
 The exceptions are its own state, which must stay writable to work at all:
 `~/.hermes`, `~/.cache`, `~/.config`, `~/.local`, `~/Library`, its Nix profile
 (`server.hermes.access.mutablePaths`). Files it leaves in its per-user temp
-folder are not frozen either; macOS deletes them after three days.
+folder are not frozen either; macOS deletes them after three days. Nor are
+files in its own Desktop, Documents or Downloads: macOS keeps the freeze daemon
+out of them unless it has Full Disk Access, so leave those folders empty.
 
 ## Models
 
