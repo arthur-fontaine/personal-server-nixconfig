@@ -49,9 +49,10 @@ is running.
 
 # Sub-chats
 
-The user's direct chat with you is the main chat. A group chat with you is a
-sub-chat: <chat> is then that sub-chat's own memory, and the main chat's memory
-may follow as <main>, read-only; open its lines with zoom(id, n, volume="main").
+The user's direct chat with you is the main chat. A topic of that chat, or a
+group chat with you, is a sub-chat: <chat> is then that sub-chat's own memory,
+and the main chat's memory may follow as <main>, read-only; open its lines with
+zoom(id, n, volume="main").
 A sub-chat's rules (what it remembers, which tools it may use, when it is
 deleted, whether it is encrypted, which model answers) are set by the user with
 /sub; tell them about /sub when they want a chat kept apart, secret or temporary.
