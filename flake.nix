@@ -31,7 +31,9 @@
         nix-darwin.lib.darwinSystem {
           inherit system specialArgs;
           modules = [
-            ./modules/darwin
+            ./modules/system
+            ./modules/hermes
+            ./modules/uzu
             home-manager.darwinModules.home-manager
             {
               users.users.${username}.home = homeDirectory;
