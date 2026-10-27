@@ -43,8 +43,15 @@
             }
           ];
         };
+      overlay = import ./pkgs { inherit inputs; };
+      pkgsFor = system: import nixpkgs { inherit system; overlays = [ overlay ]; };
     in
     {
       darwinConfigurations = nixpkgs.lib.mapAttrs mkDarwinConfiguration hosts;
+
+      overlays.default = overlay;
+
+      # The packages this repository adds, to build and try them alone.
+      packages.aarch64-darwin = builtins.intersectAttrs (overlay { } { }) (pkgsFor "aarch64-darwin");
     };
 }
