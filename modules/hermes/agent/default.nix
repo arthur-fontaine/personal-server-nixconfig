@@ -13,6 +13,7 @@ in
     ./memory.nix
     ./whatsapp.nix
     ./mcp.nix
+    ./tools.nix
   ];
 
   home.username = cfg.user;
