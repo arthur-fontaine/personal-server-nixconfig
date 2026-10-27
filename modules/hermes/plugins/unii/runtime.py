@@ -35,7 +35,6 @@ class Runtime:
         self.session_store = None
         self._volumes: dict[str, Volume] = {}
         self._compactors: dict[str, Compactor] = {}
-        self._applied_models: dict[str, str | None] = {}
         self._lock = threading.RLock()
 
     # ── volumes ──────────────────────────────────────────────────────────
@@ -109,19 +108,25 @@ class Runtime:
         return {"provider": provider, "model": model}
 
     def apply_model(self, chat: Chat, policy: Policy) -> None:
-        """Pin the sub-chat's model on its gateway sessions, the way `/model` does."""
+        """Pin the sub-chat's model on its gateway sessions, the way `/model` does.
+
+        The gateway reads the persisted override back only when it holds none in
+        memory (gateway/run_agent_cache.py, _rehydrate_session_model_override),
+        so the in-memory one is dropped whenever the persisted one changes."""
         store = self.session_store
         if store is None or chat.is_main:
             return
         override = self.model_override(policy)
-        wanted = None if override is None else f"{override['provider']}:{override['model']}"
-        if self._applied_models.get(chat.key, None) == wanted and chat.key in self._applied_models:
-            return
         try:
             for entry in store.list_sessions():
-                if f":{chat.key}" in entry.session_key:
-                    store.set_model_override(entry.session_key, override)
-            self._applied_models[chat.key] = wanted
+                key = entry.session_key
+                if f":{chat.key}" not in key or store.get_model_override(key) == override:
+                    continue
+                store.set_model_override(key, override)
+                peek = getattr(self.gateway, "_peek_session_state", None)
+                state = peek(key) if peek else None
+                if state is not None:
+                    state.conversation.model_override = None
         except Exception:
             logger.warning("unii: could not set the model of %s", chat.key, exc_info=True)
 
