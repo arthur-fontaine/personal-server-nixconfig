@@ -5,8 +5,7 @@
     username = "arthur-fontaine";
     # homeDirectory defaults to /Users/<username> when omitted.
 
-    # SSH accepts keys only: list yours before the first switch, or nobody can
-    # log in remotely.
-    # server.ssh.authorizedKeys = [ "ssh-ed25519 AAAA... laptop" ];
+    # SSH keys and other per-machine values live in the git-ignored
+    # hosts/local.nix, which scripts/bootstrap-macos.sh writes.
   };
 }
