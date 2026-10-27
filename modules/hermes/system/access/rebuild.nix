@@ -14,7 +14,7 @@ in
 {
   environment.systemPackages = [ server-rebuild ];
 
-  security.sudo.extraConfig = ''
+  security.sudo.extraConfig = lib.mkIf config.server.hermes.enable ''
     ${config.server.hermes.user} ALL=(root) NOPASSWD: /run/current-system/sw/bin/server-rebuild
   '';
 }

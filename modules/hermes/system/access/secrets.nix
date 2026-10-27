@@ -7,7 +7,7 @@ let
   file = lib.escapeShellArg cfg.secretsFile;
   dir = lib.escapeShellArg (builtins.dirOf cfg.secretsFile);
 in
-{
+lib.mkIf cfg.enable {
   system.activationScripts.postActivation.text = lib.mkBefore ''
     mkdir -p ${dir}
     chown root:wheel ${dir}

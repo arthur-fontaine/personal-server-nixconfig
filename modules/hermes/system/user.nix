@@ -5,11 +5,13 @@
 # Computer use needs a GUI session, so this is the account macOS logs in
 # automatically at boot (MANUAL_SETUP.md), and Hermes' services are launchd
 # agents of that session (../agent).
-{ config, pkgs, inputs, ... }:
+{ config, lib, pkgs, inputs, ... }:
 let
   cfg = config.server.hermes;
 in
-{
+# Disabled, the account is no longer managed (not in knownUsers), so
+# nix-darwin leaves it and its data as they are.
+lib.mkIf cfg.enable {
   users.knownUsers = [ cfg.user ];
   users.knownGroups = [ cfg.user ];
 

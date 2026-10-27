@@ -19,7 +19,7 @@ let
     esac
   '';
 in
-{
+lib.mkIf config.server.hermes.enable {
   environment.systemPackages = [ hermes-read ];
 
   security.sudo.extraConfig = ''

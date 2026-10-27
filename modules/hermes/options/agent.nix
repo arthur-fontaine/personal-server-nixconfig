@@ -4,6 +4,16 @@ let
 in
 {
   options.server.hermes = {
+    enable = mkOption {
+      type = types.bool;
+      default = true;
+      description = ''
+        Run Hermes. false stops it and everything it runs (gateway, uzu,
+        fsearch, the freeze daemon, its sudo rights, the auto-login) and leaves
+        its account and memory alone, so turning it back on restores it as it
+        was. docs/uninstall.md has the details and the full removal.
+      '';
+    };
     user = mkOption {
       type = types.str;
       default = "hermes";
