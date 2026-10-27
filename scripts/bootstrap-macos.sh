@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Sets the server up from a fresh Mac, including everything Nix cannot do:
-# SSH keys, secrets, the Hermes account's login, GitHub access, WhatsApp
-# pairing and the macOS permissions. Run it once, at the Mac's own screen (the
+# SSH keys, secrets, the Telegram bot, the Hermes account's login, GitHub
+# access and the macOS permissions. Run it once, at the Mac's own screen (the
 # permission dialogs show there), and let it reboot: nothing is left to run
 # afterwards. Each step checks whether it is done first, so running it again
 # from the clone (~/personal-server-nixconfig/scripts/bootstrap-macos.sh)
-# only redoes what is missing, e.g. a WhatsApp pairing that expired.
+# only redoes what is missing, e.g. BotFather settings left for later.
 #
 # Modelled on https://github.com/arthur-fontaine/nixconfig/blob/main/scripts/bootstrap-macos.sh,
 # with gum (https://github.com/charmbracelet/gum) for the prompts and no Homebrew.
@@ -117,21 +117,98 @@ setting() { nix eval --raw "$flake.config.$1" --apply toString; }
 # Write stdin to a root-owned file that is never readable by anyone else, even briefly.
 write_secret() { sudo sh -c 'umask 077 && cat > "$1"' _ "$1"; }
 
-# ── Secrets ─────────────────────────────────────────────────────────────────
+# ── Telegram ────────────────────────────────────────────────────────────────
+
+JQ="$(nix build --no-link --print-out-paths nixpkgs#jq.bin)/bin/jq"
+# A Bot API call: tg <token> <method> [query string].
+tg() { curl -fsS "https://api.telegram.org/bot$1/$2${3:+?$3}"; }
+
+new_bot_token() {
+  local token me
+  note "In Telegram, open @BotFather (https://t.me/BotFather) and send:" >&2
+  note "  /newbot" >&2
+  note "then a display name (e.g. Hermes), then a username ending in \"bot\" (e.g. myname_hermes_bot)." >&2
+  note "BotFather answers with the bot's token." >&2
+  while :; do
+    token="$(gum input --password --header "Bot token from BotFather")"
+    if me="$(tg "$token" getMe 2>/dev/null)" && [ "$("$JQ" -r .ok <<< "$me")" = true ]; then
+      printf '%s' "$token"
+      return
+    fi
+    warn "Telegram does not accept this token, try again." >&2
+  done
+}
+
+# Your user id, from the first private message the bot receives.
+owner_id() {
+  local token="$1" bot="$2" offset=0 updates id name last
+  note "Open https://t.me/$bot and send it any message (e.g. /start)." >&2
+  for _ in $(seq 12); do
+    updates="$(tg "$token" getUpdates "timeout=10&offset=$offset")" || continue
+    id="$("$JQ" -r '[.result[] | select(.message.chat.type == "private")] | last | .message.from.id // empty' <<< "$updates")"
+    name="$("$JQ" -r '[.result[] | select(.message.chat.type == "private")] | last | .message.from.first_name // empty' <<< "$updates")"
+    last="$("$JQ" -r '.result | last | .update_id // empty' <<< "$updates")"
+    [ -n "$last" ] && offset=$((last + 1))
+    if [ -n "$id" ]; then
+      tg "$token" getUpdates "offset=$offset" >/dev/null || true
+      if gum confirm "Is $name ($id) you?" >&2; then
+        printf '%s' "$id"
+        return
+      fi
+    fi
+  done
+  gum input --header "Your Telegram user id (@userinfobot tells you)"
+}
+
+# What only BotFather can switch on, checked through getMe.
+botfather_settings() {
+  local token="$1" bot="$2" me
+  while :; do
+    me="$(tg "$token" getMe)"
+    if [ "$("$JQ" -r '.result.has_topics_enabled and .result.allows_users_to_create_topics' <<< "$me")" = true ]; then
+      ok "Topics are on: each topic of your chat with @$bot is a sub-chat"
+      break
+    fi
+    step "Topics, for sub-chats in your chat with @$bot"
+    note "In @BotFather, tap Open (its Mini App): My bots → @$bot → Bot Settings → Threads Settings,"
+    note "turn on Threaded Mode, and leave users allowed to create topics."
+    gum confirm --affirmative "Check again" --negative "Skip" "Done?" || break
+  done
+  while :; do
+    me="$(tg "$token" getMe)"
+    if [ "$("$JQ" -r .result.can_read_all_group_messages <<< "$me")" = true ]; then
+      ok "Privacy mode is off: groups with @$bot work as sub-chats too"
+      break
+    fi
+    step "Groups, for sub-chats outside your DM (optional)"
+    note "Send @BotFather, one message at a time:  /setprivacy   @$bot   Disable"
+    gum confirm --affirmative "Check again" --negative "Skip" "Done?" || break
+  done
+}
 
 secrets="$(setting server.hermes.secretsFile)"
 if sudo test -e "$secrets"; then
   ok "Secrets in $secrets"
+  bot_token="$(sudo sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$secrets")"
 else
   step "Secrets (stored in $secrets, readable by Hermes only)"
   opencode="$(gum input --password --header "OpenCode Zen API key (https://opencode.ai/auth)")"
   runpod="$(gum input --password --header "RunPod API key (https://www.runpod.io/console/user/settings)")"
-  owner="$(gum input --header "Your WhatsApp number, country code first, digits only" --placeholder "33612345678")"
+  step "Your Telegram bot"
+  bot_token="$(new_bot_token)"
+  bot="$(tg "$bot_token" getMe | "$JQ" -r .result.username)"
+  owner="$(owner_id "$bot_token" "$bot")"
   sudo mkdir -p "$(dirname "$secrets")"
-  printf 'OPENCODE_ZEN_API_KEY=%s\nRUNPOD_API_KEY=%s\nWHATSAPP_ALLOWED_USERS=%s\n' "$opencode" "$runpod" "${owner//[^0-9]/}" \
-    | write_secret "$secrets"
+  printf 'OPENCODE_ZEN_API_KEY=%s\nRUNPOD_API_KEY=%s\nTELEGRAM_BOT_TOKEN=%s\nTELEGRAM_ALLOWED_USERS=%s\n' \
+    "$opencode" "$runpod" "$bot_token" "${owner//[^0-9]/}" | write_secret "$secrets"
   unset opencode runpod
   ok "Secrets written"
+  # What people see before their first message; BotFather's /setdescription does the same.
+  tg "$bot_token" setMyShortDescription "short_description=Hermes%2C%20a%20personal%20agent%20on%20a%20home%20server" >/dev/null || true
+  tg "$bot_token" setMyDescription "description=Hermes%20answers%20only%20its%20owner." >/dev/null || true
+fi
+if [ -n "${bot_token:-}" ]; then
+  botfather_settings "$bot_token" "$(tg "$bot_token" getMe | "$JQ" -r .result.username)"
 fi
 
 # ── The system ──────────────────────────────────────────────────────────────
@@ -148,7 +225,6 @@ if ! id "$agent" >/dev/null 2>&1 || gum confirm --default=false "Apply the confi
   ok "Configuration applied"
 fi
 agent_uid="$(id -u "$agent")"
-agent_home="$(setting server.hermes.home)"
 as_agent() { sudo -u "$agent" -H env PATH="/etc/profiles/per-user/$agent/bin:$PATH" "$@"; }
 gui_session() { sudo launchctl print "gui/$agent_uid" >/dev/null 2>&1; }
 
@@ -196,26 +272,6 @@ else
     ok "Hermes can push to GitHub"
   else
     warn "Skipped: Hermes cannot push configuration changes yet."
-  fi
-fi
-
-# ── WhatsApp ────────────────────────────────────────────────────────────────
-
-creds="$agent_home/.hermes/platforms/whatsapp/session/creds.json"
-if sudo test -e "$creds"; then
-  ok "WhatsApp is paired"
-else
-  step "WhatsApp"
-  note "Use the bot's own number. On its phone: WhatsApp → Settings → Linked Devices → Link a Device,"
-  note "then scan the QR code below. Choose the bot mode."
-  if gum confirm "Pair WhatsApp now?"; then
-    as_agent env HERMES_HOME="$agent_home/.hermes" hermes whatsapp
-    if gui_session; then
-      sudo launchctl kickstart -k "gui/$agent_uid/org.nix-community.home.hermes-agent" || true
-    fi
-    ok "WhatsApp paired: message the bot from your own number"
-  else
-    warn "Skipped: run this script again to pair."
   fi
 fi
 
@@ -279,4 +335,4 @@ else
 fi
 
 gum style --border rounded --padding "0 2" --foreground 42 "The server is set up." \
-  "$(gum style --faint 'Message the bot on WhatsApp. Later changes: edit, push, sudo server-rebuild.')"
+  "$(gum style --faint 'Message your bot on Telegram. Later changes: edit, push, sudo server-rebuild.')"
