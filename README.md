@@ -57,4 +57,5 @@ as its own settings. Host-specific values (SSH keys, the model, ...) go under
 
 - [`docs/hermes.md`](./docs/hermes.md): the single chat, sub-chats, what Hermes may touch
 - [`docs/repository-layout.md`](./docs/repository-layout.md): where things are, and the checks
+- [`docs/uninstall.md`](./docs/uninstall.md): disabling Hermes, removing it, or uninstalling everything (`scripts/uninstall-macos.sh`)
 - [`modules/hermes/plugins/unii/README.md`](./modules/hermes/plugins/unii/README.md): the memory plugin and its sources
