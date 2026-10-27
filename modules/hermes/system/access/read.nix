@@ -30,7 +30,8 @@ in
     home=${lib.escapeShellArg home}
     if ! /bin/ls -led "$home" | grep -q "user:${agent} allow"; then
       echo "granting ${agent} read access to $home..." >&2
-      /bin/chmod +a ${lib.escapeShellArg readAce} "$home"
+      /bin/chmod +a ${lib.escapeShellArg readAce} "$home" \
+        || echo "warning: could not grant ${agent} read access to $home" >&2
     fi
     # New files inherit the grant; what is already there is walked once.
     marker=/var/db/hermes-read-acl
