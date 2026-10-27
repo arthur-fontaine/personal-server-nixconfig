@@ -79,11 +79,21 @@ class Hooks:
     # ── pre_gateway_dispatch ─────────────────────────────────────────────
 
     async def _reply(self, gateway, event, text: str) -> None:
+        """Answer in the chat, and in its topic when it has one."""
+        thread = getattr(event.source, "thread_id", None)
         try:
             adapter = gateway.adapters[event.source.platform]
-            await adapter.send(event.source.chat_id, text)
+            await adapter.send(event.source.chat_id, text, metadata={"thread_id": thread} if thread else None)
         except Exception:
             logger.warning("unii: could not reply in %s", event.source.chat_id, exc_info=True)
+
+    async def _delete(self, gateway, event) -> bool:
+        """Delete the user's message (Telegram lets a bot delete incoming messages in its DMs)."""
+        try:
+            adapter = gateway.adapters[event.source.platform]
+            return bool(await adapter.delete_message(event.source.chat_id, str(event.message_id)))
+        except Exception:
+            return False
 
     def maybe_sweep(self) -> None:
         now = time.monotonic()
@@ -109,7 +119,10 @@ class Hooks:
             return None
         chat = Chat.from_source(event.source)
         passphrase = text[len("/sub unlock"):].strip()
-        await self._reply(gateway, event, await asyncio.to_thread(self.unlock, chat, passphrase))
+        answer = await asyncio.to_thread(self.unlock, chat, passphrase)
+        if await self._delete(gateway, event):
+            answer = answer.replace(" You can delete your message.", " Your message was deleted.")
+        await self._reply(gateway, event, answer)
         return {"action": "skip", "reason": "unii-unlock"}
 
     def post_gateway_admission(self, session_key: str = "", platform: str = "", source=None,

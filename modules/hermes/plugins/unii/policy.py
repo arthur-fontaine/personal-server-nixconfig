@@ -1,9 +1,10 @@
 """Which chat a session belongs to, and what that chat may do.
 
-The main chat is every direct conversation with the owner (a WhatsApp DM, the
-CLI over SSH). Every group, channel or thread with the bot is a sub-chat, whose
-policy comes from a preset (config.json, written by Nix) plus the changes made
-with `/sub set`, kept in chats.json.
+The main chat is the owner's direct conversation with the bot (the root of the
+Telegram DM, the CLI over SSH). Every topic of that DM, and every group, group
+topic or channel with the bot, is a sub-chat, whose policy comes from a preset
+(config.json, written by Nix) plus the changes made with `/sub set`, kept in
+chats.json.
 """
 
 from __future__ import annotations
@@ -22,27 +23,45 @@ MAIN = "main"
 PASSIVE_PLATFORMS = {"subagent", "cron", "batch", "kanban", "webhook"}
 
 
+# Telegram's General topic arrives with no thread id or with "1": both are the root.
+ROOT_THREADS = {"", "1"}
+
+
 @dataclass(frozen=True)
 class Chat:
     platform: str
     chat_type: str
     chat_id: str
+    thread: str = ""
+
+    def __post_init__(self):
+        if self.thread in ROOT_THREADS:
+            object.__setattr__(self, "thread", "")
 
     @property
     def key(self) -> str:
-        return f"{self.platform}:{self.chat_type}:{self.chat_id}"
+        base = f"{self.platform}:{self.chat_type}:{self.chat_id}"
+        return f"{base}:{self.thread}" if self.thread else base
 
     @property
     def is_main(self) -> bool:
-        return self.platform == "cli" or self.chat_type == "dm"
+        return self.platform == "cli" or (self.chat_type == "dm" and not self.thread)
+
+    @classmethod
+    def from_key(cls, key: str) -> "Chat":
+        platform, chat_type, rest = key.split(":", 2)
+        chat_id, _, thread = rest.partition(":")
+        return cls(platform, chat_type, chat_id, thread)
 
     @classmethod
     def from_session_key(cls, session_key: str | None, platform: str | None) -> "Chat | None":
-        """Parse ``agent:<ns>:<platform>:<chat_type>:<chat_id>[:...]`` (gateway/session.py)."""
+        """Parse ``agent:<ns>:<platform>:<chat_type>:<chat_id>[:<thread_id>]`` (gateway/session.py,
+        build_session_key). Group keys carry no participant: the agent sets
+        group_sessions_per_user to false, so a sixth part is always a thread."""
         if session_key:
             parts = session_key.split(":")
             if len(parts) >= 5 and parts[0] == "agent":
-                return cls(parts[2], parts[3], parts[4])
+                return cls(parts[2], parts[3], parts[4], parts[5] if len(parts) > 5 else "")
             if len(parts) == 4 and parts[0] == "agent":
                 return cls(parts[2], parts[3], "")
         if platform == "cli":
@@ -52,7 +71,7 @@ class Chat:
     @classmethod
     def from_source(cls, source) -> "Chat":
         platform = getattr(source.platform, "value", source.platform)
-        return cls(str(platform), source.chat_type or "dm", source.chat_id or "")
+        return cls(str(platform), source.chat_type or "dm", source.chat_id or "", str(source.thread_id or ""))
 
 
 @dataclass(frozen=True)
@@ -212,8 +231,7 @@ class Policies:
         out = []
         with self._lock:
             for key, record in self._chats.items():
-                platform, chat_type, chat_id = key.split(":", 2)
-                chat = Chat(platform, chat_type, chat_id)
+                chat = Chat.from_key(key)
                 try:
                     seconds = ttl_seconds(self.policy(chat).ttl)
                 except ValueError:

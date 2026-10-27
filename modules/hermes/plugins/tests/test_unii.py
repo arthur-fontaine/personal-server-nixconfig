@@ -53,12 +53,26 @@ class Temp(unittest.TestCase):
 class PolicyTest(Temp):
     def test_chats_from_session_keys(self):
         dm = P.Chat.from_session_key("agent:main:whatsapp:dm:33612345678", "whatsapp")
-        group = P.Chat.from_session_key("agent:main:whatsapp:group:1203@g.us:33612345678", "whatsapp")
+        group = P.Chat.from_session_key("agent:main:whatsapp:group:1203@g.us", "whatsapp")
         self.assertTrue(dm.is_main)
         self.assertFalse(group.is_main)
         self.assertEqual(group.key, "whatsapp:group:1203@g.us")
         self.assertTrue(P.Chat.from_session_key(None, "cli").is_main)
         self.assertIsNone(P.Chat.from_session_key(None, "subagent"))
+
+    def test_telegram_topics(self):
+        root = P.Chat.from_session_key("agent:main:telegram:dm:123456789", "telegram")
+        general = P.Chat.from_session_key("agent:main:telegram:dm:123456789:1", "telegram")
+        topic = P.Chat.from_session_key("agent:main:telegram:dm:123456789:42", "telegram")
+        group_topic = P.Chat.from_session_key("agent:main:telegram:group:-1001234567890:7", "telegram")
+        self.assertTrue(root.is_main)
+        self.assertTrue(general.is_main)
+        self.assertEqual(root, general)
+        self.assertFalse(topic.is_main)
+        self.assertEqual(topic.key, "telegram:dm:123456789:42")
+        self.assertEqual(P.Chat.from_key(topic.key), topic)
+        self.assertEqual(group_topic.thread, "7")
+        self.assertNotEqual(group_topic, P.Chat.from_session_key("agent:main:telegram:group:-1001234567890", "telegram"))
 
     def test_presets_overrides_and_ttl(self):
         policies = P.Policies(CONFIG, self.root)
@@ -105,7 +119,8 @@ class FakeStore:
 
 
 MAIN_KEY = "agent:main:whatsapp:dm:336"
-GROUP_KEY = "agent:main:whatsapp:group:g3@g.us:336"
+# The agent sets group_sessions_per_user to false: no participant in group keys.
+GROUP_KEY = "agent:main:whatsapp:group:g3@g.us"
 
 
 def turn(user, reply, tool=None):
@@ -225,6 +240,18 @@ class HooksTest(Temp):
         self.assertEqual(hooks.unlock(chat, "other"), "Wrong passphrase.")
 
         self.assertIn("main chat", SubCommand(rt).run("", P.Chat("whatsapp", "dm", "336")))
+
+
+class TelegramTopicTest(Temp):
+    def test_a_dm_topic_is_a_sub_chat_with_its_own_model(self):
+        rt = Runtime(self.root, CONFIG, fake_complete)
+        root_key, topic_key = "agent:main:telegram:dm:123", "agent:main:telegram:dm:123:42"
+        rt.session_store = FakeStore([root_key, topic_key])
+        topic = P.Chat("telegram", "dm", "123", "42")
+        SubCommand(rt).run("preset temp", topic)
+        self.assertEqual(rt.session_store.overrides[topic_key]["provider"], "uzu")
+        self.assertNotIn(root_key, rt.session_store.overrides)
+        self.assertIn("main chat", SubCommand(rt).run("", P.Chat("telegram", "dm", "123")))
 
 
 class GatewayHooksTest(Temp):
