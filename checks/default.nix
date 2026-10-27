@@ -16,4 +16,12 @@ in
     done
     touch $out
   '';
+
+  # What hermes-freeze picks; the chown and ACLs themselves need root.
+  freeze = pkgs.runCommand "hermes-freeze-tests" { } ''
+    cp ${../modules/hermes/system/access/freeze.py} freeze.py
+    cp ${../modules/hermes/system/access/test_freeze.py} test_freeze.py
+    ${pkgs.python3}/bin/python3 -I test_freeze.py
+    touch $out
+  '';
 }
