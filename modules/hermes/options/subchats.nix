@@ -22,7 +22,8 @@ let
         description = ''
           A memory volume (server.hermes.memory.volumes) the sub-chat reads
           and writes. Sub-chats naming the same volume share it, without
-          touching the main memory. null: no memory beyond its session.
+          touching the main memory. null: a private volume of its own, wiped
+          with the sub-chat.
         '';
       };
       tools = mkOption {
