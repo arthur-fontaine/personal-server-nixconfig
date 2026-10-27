@@ -97,6 +97,9 @@ class FakeStore:
     def set_model_override(self, key, override):
         self.overrides[key] = override
 
+    def get_model_override(self, key):
+        return self.overrides.get(key)
+
     def reset_session(self, key):
         self.resets.append(key)
 
@@ -204,6 +207,13 @@ class HooksTest(Temp):
         self.assertIn("unlock", out)
         self.assertEqual(rt.session_store.overrides[GROUP_KEY],
                          {"provider": "uzu", "model": "alibaba:qwen3.5:4b:mirai:mirai-m:4"})
+        # Back to a preset without a model: the pin goes, in memory too.
+        state = type("S", (), {"conversation": type("C", (), {"model_override": {"provider": "uzu"}})()})()
+        rt.gateway = type("G", (), {"_peek_session_state": lambda self, key: state})()
+        SubCommand(rt).run("preset project", chat)
+        self.assertIsNone(rt.session_store.overrides[GROUP_KEY])
+        self.assertIsNone(state.conversation.model_override)
+        SubCommand(rt).run("preset secret", chat)
         self.assertEqual(hooks.pre_tool_call("terminal", {}, task_id="g")["action"], "block")
         self.assertIsNone(hooks.pre_tool_call("read_file", {}, task_id="g"))
         self.assertIsNone(hooks.pre_tool_call("zoom", {}, task_id="g"))
