@@ -2,7 +2,7 @@
 
 ## One chat that never ends
 
-Your WhatsApp DM with the bot is the main chat, for daily use, forever. There
+Your Telegram DM with the bot is the main chat, for daily use, forever. There
 is no session to reset and nothing to compact by hand: the unii plugin
 (`modules/hermes/plugins/unii`) logs every message and keeps a view of the whole
 chat, recent messages word for word and older ones as merged summaries, so each
@@ -16,8 +16,11 @@ main chat too. Subagents and cron jobs read the main memory but never write it.
 
 ## Sub-chats
 
-Each WhatsApp group with the bot is a sub-chat, kept out of the main chat by
-its policy. Type `/sub` in the group to see it.
+Each topic of your DM with the bot is a sub-chat, kept out of the main chat by
+its policy: tap **+** in the chat to start one (it needs Threaded Mode, which
+the setup script asks you to turn on in BotFather). A group with the bot, or a
+topic of a group, is a sub-chat too. Type `/sub` in it to see its policy; the
+root of the DM stays the main chat.
 
 | Setting | Values | Effect |
 | --- | --- | --- |
@@ -48,7 +51,8 @@ An encrypted volume's files hold only ciphertext; the key is derived from your
 passphrase and kept in memory until `/sub lock` or a restart, and `/sub unlock`
 is intercepted before Hermes stores or logs it. After each turn the plain
 transcript Hermes keeps of that chat is deleted (best effort: a failure is
-logged, not retried). Still in clear: the WhatsApp copies on the phones, the
+logged, not retried). Still in clear: Telegram's copy of the chat (bot chats are not end-to-end
+encrypted; delete the topic in Telegram to remove it), the
 running gateway's memory until it restarts, fragments Hermes may write to
 `~/.hermes/logs`, and the model provider for that turn, unless the sub-chat
 runs on `uzu:local`.

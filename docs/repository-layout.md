@@ -24,7 +24,7 @@ modules/
       access/             read.nix, freeze.nix (+ freeze.py), rebuild.nix, secrets.nix
     agent/                its home-manager configuration
       default.nix         the upstream module, from scratch, managed mode
-      model.nix memory.nix whatsapp.nix mcp.nix tools.nix computer-use.nix
+      model.nix memory.nix telegram.nix mcp.nix tools.nix computer-use.nix
       prompt/             SOUL.md (UniiChat's prompt), AGENTS.md (this server's rules)
       session/            its GUI session: launchd agents, display, fsearch, defaults
     plugins/unii/         the single-chat memory and sub-chats (Python)

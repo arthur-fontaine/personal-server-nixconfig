@@ -3,16 +3,16 @@
 A declarative macOS server for an old M1 Pro MacBook: nix-darwin and
 home-manager, nothing installed by hand. It runs one thing well, a
 [Hermes Agent](https://github.com/NousResearch/hermes-agent) you talk to on
-WhatsApp, with local models served by [uzu](https://github.com/trymirai/uzu).
+Telegram, with local models served by [uzu](https://github.com/trymirai/uzu).
 The layout follows [arthur-fontaine/nixconfig](https://github.com/arthur-fontaine/nixconfig).
 
 ## What it sets up
 
 - **Hermes, configured from scratch** (no `hermes setup`), as its own macOS
   account, on `deepseek-v4.1-flash-free` from OpenCode Zen.
-- **One chat that never ends**: your WhatsApp DM is the main chat, with
+- **One chat that never ends**: your Telegram DM with the bot is the main chat, with
   UniiChat-style memory instead of sessions and compaction.
-- **Sub-chats**: every WhatsApp group with the bot, with its own rules for
+- **Sub-chats**: every topic of that DM, or group with the bot, with its own rules for
   memory access, shared memory volumes, tools, expiry, encryption and model.
 - **Access rules enforced by macOS**: it reads anything, writes only what it
   created in the last 24 hours, and changes the machine only by pushing to this
@@ -36,7 +36,7 @@ chmod +x "$tmp" && "$tmp"
 
 It installs Nix, clones this repository to `~/personal-server-nixconfig`, asks
 for your SSH keys and API keys, switches to the configuration, then sets up the
-Hermes account's login, GitHub access, WhatsApp and the macOS permissions, then
+Hermes account's login, GitHub access, your Telegram bot and the macOS permissions, then
 reboots: nothing is left to run. [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) lists
 each step and the few clicks only you can make.
 

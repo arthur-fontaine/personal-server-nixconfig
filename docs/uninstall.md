@@ -12,7 +12,7 @@ Below is what it does, to do it by hand or to know what it touches.
 ## Disable Hermes, keep everything
 
 Hermes stops and nothing of it runs any more, but its account, its memory, its
-WhatsApp pairing and its GitHub login stay, so enabling it again brings it back
+bot token and its GitHub login stay, so enabling it again brings it back
 as it was.
 
 1. Under your host in `hosts/local.nix`, set `server.hermes.enable = false;`,
@@ -41,13 +41,14 @@ Disable it as above, then:
    see `modules/hermes/system/access/freeze.py`) in your home, `/Users/Shared`
    and `/private/tmp`. Removing an entry by its text also removes the copies
    files inherited, and leaves other entries alone.
-2. Delete the account and its home (memory, sessions, WhatsApp pairing):
+2. Delete the account and its home (memory, sessions):
    `sudo sysadminctl -deleteUser hermes`, then `sudo dscl . -delete /Groups/hermes`.
 3. Delete the rest: `/etc/hermes` (the secrets), `/Library/Hermes` (the
    launcher), `/var/db/hermes-freeze`, `/var/db/hermes-read-acl`,
    `/var/log/hermes-freeze.log`.
 4. Revoke what it held elsewhere: its GitHub token, the OpenCode Zen and RunPod
-   API keys, and unlink the bot's WhatsApp device on its phone.
+   API keys, and the bot (send @BotFather `/revoke` for a new token, or
+   `/deletebot`).
 
 Files Hermes made that froze belong to you and stay. Keep
 `server.hermes.enable = false;`, or the next rebuild creates an empty Hermes
