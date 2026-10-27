@@ -55,5 +55,7 @@
 
       # The packages this repository adds, to build and try them alone.
       packages.aarch64-darwin = builtins.intersectAttrs (overlay { } { }) (pkgsFor "aarch64-darwin");
+
+      checks.aarch64-darwin = import ./checks { inherit inputs; pkgs = pkgsFor "aarch64-darwin"; };
     };
 }
