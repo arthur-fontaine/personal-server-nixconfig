@@ -124,7 +124,7 @@ class Runtime:
         try:
             for entry in store.list_sessions():
                 key = entry.session_key
-                if f":{chat.key}" not in key or store.get_model_override(key) == override:
+                if Chat.from_session_key(key, None) != chat or store.get_model_override(key) == override:
                     continue
                 store.set_model_override(key, override)
                 peek = getattr(self.gateway, "_peek_session_state", None)
@@ -148,7 +148,7 @@ class Runtime:
         if store is not None and reset_routes:
             try:
                 for entry in store.list_sessions():
-                    if f":{chat.key}" in entry.session_key:
+                    if Chat.from_session_key(entry.session_key, None) == chat:
                         store.reset_session(entry.session_key)
             except Exception:
                 logger.warning("unii: could not reset the sessions of %s", chat.key, exc_info=True)
