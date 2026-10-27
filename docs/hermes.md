@@ -67,9 +67,11 @@ Enforced by macOS, not by the model (`modules/hermes/system/access`):
 The exceptions are its own state, which must stay writable to work at all:
 `~/.hermes`, `~/.cache`, `~/.config`, `~/.local`, `~/Library`, its Nix profile
 (`server.hermes.access.mutablePaths`). Files it leaves in its per-user temp
-folder are not frozen either; macOS deletes them after three days. Nor are
-files in its own Desktop, Documents or Downloads: macOS keeps the freeze daemon
-out of them unless it has Full Disk Access, so leave those folders empty.
+folder are not frozen either; macOS deletes them after three days. Hermes, its
+commands and the freeze daemon reach Desktop, Documents and Downloads through
+the Full Disk Access granted once to their launcher
+(`modules/hermes/system/access/full-disk.nix`); without it, files in those
+folders are neither readable nor frozen.
 
 ## Models
 
