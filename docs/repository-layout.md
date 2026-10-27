@@ -8,7 +8,7 @@ new folder next to them.
 flake.nix                 darwinConfigurations, packages, checks
 hosts/                    machine definitions (shared.nix, git-ignored local.nix)
 pkgs/                     what nixpkgs lacks, as an overlay
-checks/                   `nix flake check`: the plugin and freeze tests
+checks/                   `nix flake check`: the plugin and freeze tests; hermes-turns/, end to end
 scripts/                  bootstrap-macos.sh, first-time setup
 modules/
   system/                 the Mac itself (nix-darwin)
@@ -39,6 +39,7 @@ nix flake check                                   # everything below
 nix build .#checks.aarch64-darwin.unii            # the plugin's tests
 nix build .#checks.aarch64-darwin.freeze          # what hermes-freeze picks
 nix build .#darwinConfigurations.Personal-Server.system   # the whole system, without switching
+nix run .#hermes-turns                            # two real Hermes turns through the memory, on a scripted model
 ```
 
 ## Applying
