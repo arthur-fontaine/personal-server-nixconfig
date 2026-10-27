@@ -184,6 +184,31 @@ botfather_settings() {
     note "Send @BotFather, one message at a time:  /setprivacy   @$bot   Disable"
     gum confirm --affirmative "Check again" --negative "Skip" "Done?" || break
   done
+  bot_picture "$token" "$bot" "$("$JQ" -r .result.id <<< "$me")"
+}
+
+# The Hermes logo as the bot's picture. Only BotFather sets it; the image comes
+# from the Hermes source flake.lock pins (its desktop app's icon).
+bot_picture() {
+  local token="$1" bot="$2" id="$3" src rev picture
+  while :; do
+    if [ "$(tg "$token" getUserProfilePhotos "user_id=$id&limit=1" | "$JQ" -r .result.total_count)" != 0 ]; then
+      ok "@$bot has its picture"
+      return
+    fi
+    if [ -z "${picture:-}" ]; then
+      src="$(nix eval --raw --impure --expr "(builtins.getFlake $(nix_string "path:$REPO_DIR")).inputs.hermes-agent.outPath")"
+      rev="$("$JQ" -r '.nodes["hermes-agent"].locked.rev' "$REPO_DIR/flake.lock")"
+      picture="$HOME/Downloads/hermes-bot-picture.png"
+      install -m 0644 "$src/apps/desktop/assets/icon.png" "$picture"
+    fi
+    step "The bot's picture: the Hermes logo"
+    note "Send @BotFather:  /setuserpic   then  @$bot   then the image as a photo:"
+    note "  on this Mac: $picture (shown in Finder)"
+    note "  on your phone: https://raw.githubusercontent.com/NousResearch/hermes-agent/$rev/apps/desktop/assets/icon.png"
+    /usr/bin/open -R "$picture" 2>/dev/null || true
+    gum confirm --affirmative "Check again" --negative "Skip" "Done?" || return
+  done
 }
 
 secrets="$(setting server.hermes.secretsFile)"
