@@ -1,9 +1,12 @@
+# The macOS server itself: Nix, power, SSH and the features it turns off.
 { pkgs, username, ... }:
 {
   imports = [
-    ../options
+    ./options
     ./nix.nix
-    ./server
+    ./power.nix
+    ./ssh.nix
+    ./quiet.nix
   ];
 
   system.primaryUser = username;
