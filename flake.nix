@@ -26,7 +26,8 @@
         ...
       }:
         let
-          specialArgs = hostConfig // { inherit inputs hostName homeDirectory nixconfigDir; };
+          # `server` goes through the module system (below), not as an argument.
+          specialArgs = removeAttrs hostConfig [ "server" ] // { inherit inputs hostName homeDirectory nixconfigDir; };
         in
         nix-darwin.lib.darwinSystem {
           inherit system specialArgs;
@@ -35,6 +36,8 @@
             ./modules/hermes
             ./modules/uzu
             home-manager.darwinModules.home-manager
+            # A host's `server = { ... };` sets the options under server.*.
+            { server = hostConfig.server or { }; }
             {
               users.users.${username}.home = homeDirectory;
               home-manager.useGlobalPkgs = true;
