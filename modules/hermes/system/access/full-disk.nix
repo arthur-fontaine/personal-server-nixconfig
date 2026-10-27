@@ -9,7 +9,7 @@ let
   launcher = config.server.hermes.access.launcher;
   version = pkgs.tcc-launcher.version;
 in
-{
+lib.mkIf config.server.hermes.enable {
   system.activationScripts.postActivation.text = lib.mkBefore ''
     launcher=${lib.escapeShellArg launcher}
     if [ "$("$launcher" --version 2>/dev/null)" != ${lib.escapeShellArg version} ]; then

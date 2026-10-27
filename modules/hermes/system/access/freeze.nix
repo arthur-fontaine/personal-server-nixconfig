@@ -2,7 +2,7 @@
 # account cannot write the administrator's files, and hermes-freeze hands every
 # file it created to the administrator, behind a deny ACL, once it is old
 # enough (freeze.py explains how).
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 let
   cfg = config.server.hermes;
 
@@ -22,7 +22,7 @@ let
     ];
   });
 in
-{
+lib.mkIf config.server.hermes.enable {
   launchd.daemons.hermes-freeze.serviceConfig = {
     # Under the launcher, so Full Disk Access lets it into Desktop, Documents and Downloads.
     ProgramArguments = [ cfg.access.launcher "${pkgs.python3}/bin/python3" "-I" "${./freeze.py}" "${freezeConfig}" ];

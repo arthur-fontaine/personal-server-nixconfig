@@ -6,7 +6,9 @@ in
   options.server.uzu = {
     enable = mkOption {
       type = types.bool;
-      default = true;
+      # It runs in the Hermes account's session, which is gone with Hermes.
+      default = config.server.hermes.enable;
+      defaultText = lib.literalExpression "config.server.hermes.enable";
     };
     user = mkOption {
       type = types.str;
