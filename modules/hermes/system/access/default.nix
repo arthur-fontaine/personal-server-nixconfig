@@ -9,6 +9,7 @@
   imports = [
     ./read.nix
     ./freeze.nix
+    ./rebuild.nix
     ./secrets.nix
   ];
 }
