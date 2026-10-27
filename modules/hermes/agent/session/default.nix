@@ -4,5 +4,6 @@
 {
   imports = [
     ./display.nix
+    ./search.nix
   ];
 }
