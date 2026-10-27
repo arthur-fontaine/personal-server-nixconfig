@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +23,26 @@ def _config(home: str) -> dict:
         return {}
 
 
-def _complete(ctx, config: dict):
-    """The compaction call: the main model, or `compaction_model` ("provider:model")."""
+def _shared_state() -> dict:
+    """One runtime per process. Hermes imports this package twice: as a general
+    plugin, and again under another module name when it resolves
+    `context.engine` (plugins/context_engine/__init__.py, load_context_engine,
+    with a no-op context). Module globals would give each its own volumes,
+    keys and gateway handles, so the state hangs off `sys` instead."""
+    return sys.__dict__.setdefault("_hermes_unii_state", {"runtime": None, "llm_ctx": None})
+
+
+def _is_real_context(ctx) -> bool:
+    """The engine loader's context only collects the engine; its llm and hooks do nothing."""
+    try:
+        from plugins.plugin_loader import NoopPluginContext
+    except Exception:
+        return True
+    return not isinstance(ctx, NoopPluginContext)
+
+
+def _complete(state: dict, config: dict):
+    """The compaction call, on the main model or `compaction_model` ("provider:model")."""
     pinned = {}
     if model := config.get("compaction_model"):
         provider, _, name = model.partition(":")
@@ -32,6 +51,9 @@ def _complete(ctx, config: dict):
         pinned = {"provider": provider, "model": name}
 
     def complete(messages):
+        ctx = state["llm_ctx"]
+        if ctx is None:
+            raise RuntimeError("unii: no plugin context with LLM access yet")
         result = ctx.llm.complete(
             messages=messages,
             max_tokens=600,
@@ -52,19 +74,30 @@ def register(ctx) -> None:
     from .hooks import Hooks, register_sweeper
     from .runtime import Runtime
 
-    home = str(get_hermes_home())
-    config = _config(home)
-    runtime = Runtime(home, config, _complete(ctx, config))
-    hooks = Hooks(runtime)
+    state = _shared_state()
+    real = _is_real_context(ctx)
+    if real:
+        state["llm_ctx"] = ctx
+
+    runtime = state["runtime"]
+    first = runtime is None
+    if first:
+        home = str(get_hermes_home())
+        config = _config(home)
+        runtime = Runtime(home, config, _complete(state, config))
+        state["runtime"] = runtime
+        state["hooks"] = Hooks(runtime)
+        register_sweeper(state["hooks"])
+        logger.info("unii: memory in %s", runtime.root)
 
     ctx.register_context_engine(UniiEngine(runtime))
-    ctx.register_hook("pre_gateway_dispatch", hooks.pre_gateway_dispatch)
-    ctx.register_hook("pre_tool_call", hooks.pre_tool_call)
-    ctx.register_command(
-        "sub",
-        SubCommand(runtime),
-        description="Sub-chat policy: memory, volume, tools, expiry, encryption, model",
-        args_hint="[preset|set|unlock|lock|end|presets] …",
-    )
-    register_sweeper(hooks)
-    logger.info("unii: memory in %s", runtime.root)
+    if real:
+        hooks = state["hooks"]
+        ctx.register_hook("pre_gateway_dispatch", hooks.pre_gateway_dispatch)
+        ctx.register_hook("pre_tool_call", hooks.pre_tool_call)
+        ctx.register_command(
+            "sub",
+            SubCommand(runtime),
+            description="Sub-chat policy: memory, volume, tools, expiry, encryption, model",
+            args_hint="[preset|set|unlock|lock|end|presets] …",
+        )
