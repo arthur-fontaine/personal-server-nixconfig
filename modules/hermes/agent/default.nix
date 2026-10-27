@@ -15,6 +15,7 @@ in
     ./mcp.nix
     ./tools.nix
     ./computer-use.nix
+    ./prompt
   ];
 
   home.username = cfg.user;
