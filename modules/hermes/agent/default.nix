@@ -16,6 +16,7 @@ in
     ./tools.nix
     ./computer-use.nix
     ./prompt
+    ./session
   ];
 
   home.username = cfg.user;
