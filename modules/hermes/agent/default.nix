@@ -10,6 +10,7 @@ in
 {
   imports = [
     ./model.nix
+    ./memory.nix
   ];
 
   home.username = cfg.user;
