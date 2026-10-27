@@ -18,8 +18,8 @@ in
     echo "tuning power settings for a server..." >&2
     # disablesleep: closing the lid does not sleep the server either.
     # powernap/standby/autopoweroff/hibernatemode: no background wake-ups and
-    # no RAM image written to disk. womp/tcpkeepalive: SSH and the WhatsApp
-    # socket keep working.
+    # no RAM image written to disk. womp/tcpkeepalive: SSH and the Telegram
+    # connection keep working.
     /usr/bin/pmset -a \
       disablesleep 1 \
       powernap 0 \
