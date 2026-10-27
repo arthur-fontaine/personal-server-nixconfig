@@ -1,5 +1,5 @@
 # The macOS server itself: Nix, power, SSH and the features it turns off.
-{ pkgs, username, ... }:
+{ pkgs, username, inputs, ... }:
 {
   imports = [
     ./options
@@ -8,6 +8,8 @@
     ./ssh.nix
     ./quiet.nix
   ];
+
+  nixpkgs.overlays = [ (import ../../pkgs { inherit inputs; }) ];
 
   system.primaryUser = username;
   users.users.${username}.shell = pkgs.zsh;
