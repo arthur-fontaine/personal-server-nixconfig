@@ -175,9 +175,12 @@ class EngineTest(Temp):
         sub.on_turn_complete([{"role": "system", "content": "S"}] + turn("temp", "t"))
         own = P.own_volume(P.Chat("whatsapp", "group", "g3@g.us"))
         self.assertTrue(os.path.isdir(os.path.join(rt.volumes_dir, own)))
-        sub.on_session_reset()
+        # A gateway shutdown ends the session but wipes nothing.
+        sub.on_session_end("s", [])
+        self.assertTrue(os.path.isdir(os.path.join(rt.volumes_dir, own)))
+        Hooks(rt).on_session_reset(session_id="s2", old_session_id="s", new_session_id="s2")
         self.assertFalse(os.path.isdir(os.path.join(rt.volumes_dir, own)))
-        self.assertEqual(rt.session_store.resets, [GROUP_KEY])
+        self.assertEqual(rt.session_store.resets, [])
 
     def test_subagent_is_passive(self):
         rt = self.runtime()
