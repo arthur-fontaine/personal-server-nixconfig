@@ -2,6 +2,7 @@
 {
   imports = [
     ../options
+    ./nix.nix
   ];
 
   system.primaryUser = username;
