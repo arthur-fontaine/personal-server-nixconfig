@@ -1,0 +1,7 @@
+name: unii
+version: 1.0.0
+description: "One chat that never ends (UniiChat's memory), with policy-driven sub-chats: memory access, shared volumes, tools, expiry, encryption, model."
+author: "personal-server-nixconfig, after Victor Taelin's UniiChat design"
+provides_hooks:
+  - pre_gateway_dispatch
+  - pre_tool_call
