@@ -5,7 +5,7 @@
 # Computer use needs a GUI session, so this is the account macOS logs in
 # automatically at boot (MANUAL_SETUP.md), and Hermes' services are launchd
 # agents of that session (../agent).
-{ config, pkgs, ... }:
+{ config, pkgs, inputs, ... }:
 let
   cfg = config.server.hermes;
 in
@@ -25,5 +25,13 @@ in
     createHome = true;
     shell = pkgs.zsh;
     description = "Hermes";
+  };
+
+  home-manager.users.${cfg.user} = {
+    imports = [
+      inputs.hermes-agent.homeManagerModules.default
+      ../agent
+    ];
+    _module.args.server = config.server;
   };
 }
