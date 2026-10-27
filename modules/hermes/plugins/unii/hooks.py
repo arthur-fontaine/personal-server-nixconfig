@@ -61,6 +61,15 @@ def _resolve_tools(names) -> set[str]:
     return tools
 
 
+def bound_chat() -> Chat | None:
+    """The chat of the gateway session this thread serves, when the session id is unknown."""
+    try:
+        from gateway.session_context import bound_session_key
+    except Exception:
+        return None
+    return Chat.from_session_key(bound_session_key(), None)
+
+
 class Hooks:
     def __init__(self, runtime: Runtime):
         self.runtime = runtime
@@ -148,7 +157,7 @@ class Hooks:
         if tool_name in ALWAYS_BLOCKED:
             return {"action": "block", "message": ALWAYS_BLOCKED[tool_name]}
         session_id = kwargs.get("session_id") or task_id
-        chat = self.runtime.sessions.get(session_id)
+        chat = self.runtime.sessions.get(session_id) or bound_chat()
         if chat is None or chat.is_main or tool_name in ALWAYS_ALLOWED:
             return None
         policy = self.runtime.policies.policy(chat)
