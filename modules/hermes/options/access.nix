@@ -13,7 +13,7 @@ in
       type = types.ints.positive;
       default = 300;
     };
-    mutableDirs = mkOption {
+    mutablePaths = mkOption {
       type = types.listOf types.str;
       default = [
         ".hermes"
@@ -25,11 +25,15 @@ in
         ".npm"
         ".cua-driver"
         "Library"
+        # home-manager links the agent's apps here.
+        "Applications"
+        # Generated from this repository at each activation.
+        "workspace/AGENTS.md"
       ];
       description = ''
-        Directories of the Hermes home (relative paths) that hold its own
-        runtime state and stay writable: memory, sessions, caches, installed
-        software. Everything else it creates freezes.
+        Paths in the Hermes home (relative) that hold its own runtime state,
+        or files activation regenerates, and stay writable: memory, sessions,
+        caches, installed software. Everything else it creates freezes.
       '';
     };
   };
