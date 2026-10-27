@@ -29,6 +29,10 @@ class Runtime:
         self.view_bytes = int(config.get("view_bytes", 64_000))
         self.line_bytes = int(config.get("line_bytes", 512))
         self.uzu_model = config.get("uzu_model", "")
+        # A turn waits this long for the last messages' summaries, then goes on
+        # with "(not summarized yet: zoom it)" lines.
+        self.summary_wait = float(config.get("summary_wait_seconds", 20))
+        self.workers = int(config.get("compaction_workers", 4))
         self.keys: dict[str, bytes] = {}
         self.sessions: dict[str, Chat] = {}
         self.gateway = None
@@ -56,7 +60,7 @@ class Runtime:
             encrypted = self.encrypted(name, policy)
             volume = Volume(self.volumes_dir, name, encrypted=encrypted, key=self.keys.get(name))
             self._volumes[name] = volume
-            self._compactors[name] = Compactor(volume, self.complete, self.line_bytes)
+            self._compactors[name] = Compactor(volume, self.complete, self.line_bytes, self.workers)
             return volume
 
     def is_locked(self, name: str, policy: Policy | None = None) -> bool:

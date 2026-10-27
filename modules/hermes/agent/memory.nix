@@ -17,6 +17,8 @@ in
     hermesHomeFiles."unii/config.json" = builtins.toJSON {
       view_bytes = cfg.memory.viewBytes;
       line_bytes = cfg.memory.lineBytes;
+      summary_wait_seconds = cfg.memory.summaryWait;
+      compaction_workers = cfg.memory.compactionWorkers;
       compaction_model = compactionModel;
       uzu_model = server.uzu.model;
       volumes = cfg.memory.volumes;

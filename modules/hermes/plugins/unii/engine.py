@@ -27,8 +27,6 @@ from .volume import VolumeLocked
 
 logger = logging.getLogger(__name__)
 
-WAIT_FOR_SUMMARIES = 90.0
-
 ZOOM = {
     "name": "zoom",
     "description": (
@@ -151,7 +149,7 @@ class UniiEngine(ContextEngine):
         blocks = []
         for name in names:
             volume = self.runtime.volume(name, policy if name != MAIN else None)
-            if not volume.wait_built(volume.count, WAIT_FOR_SUMMARIES):
+            if not volume.wait_built(volume.count, self.runtime.summary_wait):
                 logger.warning("unii: %s still has unsummarized messages", name)
             tag = tags.get(name, "chat")
             blocks.append(f"<{tag}>\n{volume.render()}\n</{tag}>")
