@@ -1,9 +1,11 @@
 # Setup
 
-`scripts/bootstrap-macos.sh` does all of it. Run it on the server, at its own
-screen and keyboard the first time, reboot when it asks, then run it again:
-every step checks whether it is done, so a second run picks up where the first
-stopped.
+`scripts/bootstrap-macos.sh` does all of it, in one run: run it on the server,
+at its own screen and keyboard (the permission dialogs show there), and let it
+reboot. Nothing is left to run afterwards. Every step checks whether it is done,
+so running it again from the clone
+(`~/personal-server-nixconfig/scripts/bootstrap-macos.sh`) only redoes what is
+missing, for example a WhatsApp pairing that expired.
 
 | Step | What the script does | What only you can do |
 | --- | --- | --- |
@@ -15,11 +17,17 @@ stopped.
 | Auto-login | gives the `hermes` account a random password and writes `/etc/kcpassword`, so macOS logs it in at boot (the login user itself is in Nix) | confirm turning FileVault off, which auto-login needs |
 | GitHub | `gh auth login` for Hermes, with a token you create for this repository only (Contents: read and write) | create the token |
 | WhatsApp | runs `hermes whatsapp` as Hermes and restarts the gateway | scan the QR code with the bot number's phone |
-| Reboot | reboots, so macOS logs Hermes in | |
-| Permissions | lights the screen, runs `cua-driver permissions grant` in Hermes' session, dims it again | click Allow for Accessibility and Screen Recording |
-| Full Disk Access (optional) | opens the list in Hermes' session | add the `hermes` binary, again after each Hermes update |
+| Permissions | runs `cua-driver permissions grant`; macOS keeps them system-wide, so they cover the Hermes account | click Allow for Accessibility and Screen Recording |
+| Full Disk Access | opens the list and shows `/Library/Hermes/hermes-launcher` in Finder | add it, once: Hermes updates keep it |
+| Reboot | reboots, so macOS logs Hermes in and starts it | |
 
-macOS reserves those last clicks for a person: no script can grant them.
+macOS reserves those clicks for a person: no script can grant them.
+
+Full Disk Access lets Hermes read the folders macOS keeps even from root
+(Desktop, Documents, Downloads, Mail, Messages, iCloud). macOS ties the grant
+to one binary, and every Hermes update is a new one, so the gateway runs under
+a small launcher that never changes (`pkgs/tcc-launcher`): the grant made to it
+reaches Hermes and everything it runs, across updates.
 
 ## After the setup
 

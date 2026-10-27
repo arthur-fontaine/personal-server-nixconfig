@@ -36,9 +36,9 @@ chmod +x "$tmp" && "$tmp"
 
 It installs Nix, clones this repository to `~/personal-server-nixconfig`, asks
 for your SSH keys and API keys, switches to the configuration, then sets up the
-Hermes account's login, GitHub access, WhatsApp and the macOS permissions.
-Reboot when it asks and run it again to finish. [`MANUAL_SETUP.md`](./MANUAL_SETUP.md)
-lists each step and the few clicks only you can make.
+Hermes account's login, GitHub access, WhatsApp and the macOS permissions, then
+reboots: nothing is left to run. [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) lists
+each step and the few clicks only you can make.
 
 ## Changing it
 
