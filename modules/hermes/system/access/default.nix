@@ -8,6 +8,7 @@
 {
   imports = [
     ./read.nix
+    ./freeze.nix
     ./secrets.nix
   ];
 }
