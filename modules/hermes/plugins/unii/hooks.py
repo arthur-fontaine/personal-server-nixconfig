@@ -28,7 +28,7 @@ SWEEP_EVERY = 60.0
 
 
 def allowed_sender(source) -> bool:
-    """Whether the sender is on the platform's allowlist (e.g. WHATSAPP_ALLOWED_USERS, from
+    """Whether the sender is on the platform's allowlist (e.g. TELEGRAM_ALLOWED_USERS, from
     the secrets file), compared on digits so phone and JID forms match. No list: allowed,
     as for Hermes itself."""
     platform = str(getattr(source.platform, "value", source.platform)).upper()
