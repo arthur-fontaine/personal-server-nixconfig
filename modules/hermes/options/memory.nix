@@ -15,6 +15,16 @@ in
       default = 512;
       description = "The size of one summary line.";
     };
+    summaryWait = mkOption {
+      type = types.ints.positive;
+      default = 20;
+      description = "Seconds a turn waits for the newest messages' summaries before it goes on without them.";
+    };
+    compactionWorkers = mkOption {
+      type = types.ints.positive;
+      default = 4;
+      description = "Compactions run at once (UniiChat uses 8; free models rate-limit sooner).";
+    };
     compactionModel = mkOption {
       type = types.nullOr types.str;
       default = null;
