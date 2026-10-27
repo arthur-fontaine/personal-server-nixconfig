@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import re
 import threading
 import time
 
@@ -23,6 +25,22 @@ ALWAYS_BLOCKED = {"session_search": "Past sessions are not searchable: the view 
 ALWAYS_ALLOWED = {"zoom", "date", "clarify"}
 
 SWEEP_EVERY = 60.0
+
+
+def allowed_sender(source) -> bool:
+    """Whether the sender is on the platform's allowlist (e.g. WHATSAPP_ALLOWED_USERS, from
+    the secrets file), compared on digits so phone and JID forms match. No list: allowed,
+    as for Hermes itself."""
+    platform = str(getattr(source.platform, "value", source.platform)).upper()
+    raw = os.environ.get(f"{platform}_ALLOWED_USERS", "").strip()
+    if not raw or raw == "*":
+        return True
+    allowed = {re.sub(r"\D", "", item) for item in raw.split(",")} - {""}
+    for sender in (getattr(source, "user_id", None), getattr(source, "user_id_alt", None)):
+        digits = re.sub(r"\D", "", str(sender or "").split("@")[0].split(":")[0])
+        if digits and digits in allowed:
+            return True
+    return False
 
 
 def _resolve_tools(names) -> set[str]:
@@ -69,27 +87,33 @@ class Hooks:
             self._sweep_lock.release()
 
     async def pre_gateway_dispatch(self, event, gateway=None, session_store=None, **kwargs):
+        """Runs before authorization, for every sender: it only keeps the gateway
+        handles, and takes `/sub unlock` from an allowed sender before Hermes
+        stores or logs it, since it holds a passphrase."""
         runtime = self.runtime
         runtime.gateway = gateway or runtime.gateway
         runtime.session_store = session_store or runtime.session_store
         await asyncio.to_thread(self.maybe_sweep)
 
         text = (getattr(event, "text", None) or "").strip()
-        chat = Chat.from_source(event.source)
-
-        # Handled here, before anything stores or logs the message: it holds a passphrase.
-        if text.startswith("/sub unlock"):
-            passphrase = text[len("/sub unlock"):].strip()
-            await self._reply(gateway, event, await asyncio.to_thread(self.unlock, chat, passphrase))
-            return {"action": "skip", "reason": "unii-unlock"}
-
-        if chat.is_main:
+        if not text.startswith("/sub unlock") or not allowed_sender(event.source):
             return None
+        chat = Chat.from_source(event.source)
+        passphrase = text[len("/sub unlock"):].strip()
+        await self._reply(gateway, event, await asyncio.to_thread(self.unlock, chat, passphrase))
+        return {"action": "skip", "reason": "unii-unlock"}
+
+    def post_gateway_admission(self, session_key: str = "", platform: str = "", source=None,
+                               message_id: str = "", text: str = "", **kwargs):
+        """After authorization: pin the sub-chat's model, and hold its messages while it is locked."""
+        chat = Chat.from_session_key(session_key, platform)
+        if chat is None or chat.is_main:
+            return None
+        runtime = self.runtime
         policy, own, _ = runtime.chat_volumes(chat)
         runtime.apply_model(chat, policy)
-        if runtime.is_locked(own, policy) and not text.startswith("/sub"):
-            await self._reply(gateway, event, "🔒 This chat is encrypted and locked. Send `/sub unlock <passphrase>`.")
-            return {"action": "skip", "reason": "unii-locked"}
+        if runtime.is_locked(own, policy) and not (text or "").strip().startswith("/sub"):
+            return {"action": "handled", "reply": "🔒 This chat is encrypted and locked. Send `/sub unlock <passphrase>`."}
         return None
 
     def unlock(self, chat: Chat, passphrase: str) -> str:

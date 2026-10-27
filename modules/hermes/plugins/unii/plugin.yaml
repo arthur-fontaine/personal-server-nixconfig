@@ -4,5 +4,6 @@ description: "One chat that never ends (UniiChat's memory), with policy-driven s
 author: "personal-server-nixconfig, after Victor Taelin's UniiChat design"
 provides_hooks:
   - pre_gateway_dispatch
+  - post_gateway_admission
   - pre_tool_call
   - on_session_reset

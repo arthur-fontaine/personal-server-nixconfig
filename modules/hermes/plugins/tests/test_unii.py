@@ -227,5 +227,32 @@ class HooksTest(Temp):
         self.assertIn("main chat", SubCommand(rt).run("", P.Chat("whatsapp", "dm", "336")))
 
 
+class GatewayHooksTest(Temp):
+    def source(self, user, chat_type="group", chat_id="g3@g.us"):
+        return type("Src", (), {"platform": "whatsapp", "chat_type": chat_type, "chat_id": chat_id,
+                                "user_id": user, "user_id_alt": None})()
+
+    def test_only_allowed_senders_unlock(self):
+        from unii.hooks import allowed_sender
+
+        os.environ["WHATSAPP_ALLOWED_USERS"] = "33612345678"
+        try:
+            self.assertTrue(allowed_sender(self.source("33612345678@s.whatsapp.net")))
+            self.assertFalse(allowed_sender(self.source("4479000000@s.whatsapp.net")))
+        finally:
+            del os.environ["WHATSAPP_ALLOWED_USERS"]
+        self.assertTrue(allowed_sender(self.source("anyone")))
+
+    def test_a_locked_sub_chat_holds_messages_after_admission(self):
+        rt = Runtime(self.root, CONFIG, fake_complete)
+        hooks = Hooks(rt)
+        chat = P.Chat("whatsapp", "group", "g3@g.us")
+        rt.policies.set_preset(chat, "secret")
+        held = hooks.post_gateway_admission(session_key=GROUP_KEY, platform="whatsapp", text="hello")
+        self.assertEqual(held["action"], "handled")
+        self.assertIsNone(hooks.post_gateway_admission(session_key=GROUP_KEY, platform="whatsapp", text="/sub"))
+        self.assertIsNone(hooks.post_gateway_admission(session_key=MAIN_KEY, platform="whatsapp", text="hi"))
+
+
 if __name__ == "__main__":
     unittest.main()
