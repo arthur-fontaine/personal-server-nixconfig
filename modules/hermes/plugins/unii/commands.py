@@ -6,10 +6,14 @@ hook takes it first, so the passphrase is not stored anywhere.
 
 from __future__ import annotations
 
+import threading
+
 from .policy import Chat, Policy, parse_setting, ttl_seconds
 from .runtime import Runtime
+from .telegram import BotAPIError
 
 HELP = """\
+/sub new [preset] [name]  open a sub-chat: a new topic (in the main chat)
 /sub                      this sub-chat's policy
 /sub presets              the presets and volumes
 /sub preset <name>        apply a preset
@@ -60,9 +64,11 @@ class SubCommand:
             return "\n".join(lines + [f"Volumes: {volumes or 'none'}"])
         if chat is None:
             return "Run /sub in a chat."
+        if words and words[0] == "new":
+            return self.new(chat, words[1:])
         if chat.is_main:
-            return ("This is the main chat. A sub-chat is any other topic of this chat, or a group "
-                    "with the bot: use /sub there.\n\n" + HELP)
+            return ("This is the main chat. Its topics are the sub-chats, opened with /sub new; a group "
+                    "with the bot is one too. Use /sub in them.\n\n" + HELP)
 
         if not words:
             return f"Sub-chat ({policies.preset_name(chat)}): {describe(policies.policy(chat))}\n\n{HELP}"
@@ -83,6 +89,10 @@ class SubCommand:
                 if policy.ttl is None:
                     return "This sub-chat is permanent (ttl none); /new starts a fresh session instead."
                 self.runtime.wipe_chat(chat)
+                if chat.chat_type == "dm" and chat.thread:
+                    # After this reply is delivered into the topic.
+                    threading.Timer(5, self.runtime.close_topic, (chat,)).start()
+                    return "This sub-chat was wiped; its topic closes in a few seconds."
                 return "This sub-chat was wiped."
             else:
                 return HELP
@@ -90,8 +100,35 @@ class SubCommand:
             return f"⚠️ {err}"
         ttl_seconds(policy.ttl)
         self.runtime.apply_model(chat, policy)
-        note = ""
+        return f"✅ {describe(policy)}{self.lock_note(chat, policy)}"
+
+    def lock_note(self, chat: Chat, policy: Policy) -> str:
         _, own, _ = self.runtime.chat_volumes(chat)
         if self.runtime.is_locked(own, policy):
-            note = "\n🔒 Encrypted: send `/sub unlock <passphrase>` (a new passphrase sets it)."
-        return f"✅ {describe(policy)}{note}"
+            return "\n🔒 Encrypted: send `/sub unlock <passphrase>` (a new passphrase sets it)."
+        return ""
+
+    def new(self, chat: Chat, words: list[str]) -> str:
+        """Open a sub-chat as a topic of the DM, which only the bot can create."""
+        if not (chat.platform == "telegram" and chat.is_main):
+            return "/sub new opens a topic of the main chat: send it there."
+        presets = self.runtime.policies.presets
+        preset = self.runtime.policies.default_preset
+        if words and words[0] in presets:
+            preset, words = words[0], words[1:]
+        name = " ".join(words) or preset.capitalize()
+        bot = self.runtime.telegram
+        try:
+            thread = bot.create_topic(chat.chat_id, name)
+        except BotAPIError as err:
+            return (f"⚠️ Telegram could not create the topic: {err}. In @BotFather's Mini App, "
+                    "Bot Settings → Threads Settings, turn Threaded Mode on.")
+        sub = Chat(chat.platform, "dm", chat.chat_id, thread)
+        policy = self.runtime.policies.set_preset(sub, preset)
+        try:
+            bot.send(chat.chat_id, thread,
+                     f"Sub-chat ({preset}): {describe(policy)}\n/sub shows or changes it."
+                     f"{self.lock_note(sub, policy)}")
+        except BotAPIError:
+            pass
+        return f"✅ Opened the topic “{name}”, a sub-chat ({preset})."

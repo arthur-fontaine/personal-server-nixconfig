@@ -242,19 +242,6 @@ class HooksTest(Temp):
         self.assertIn("main chat", SubCommand(rt).run("", P.Chat("whatsapp", "dm", "336")))
 
 
-class MainTopicTest(Temp):
-    def test_the_main_topic_is_the_main_chat(self):
-        Runtime(self.root, {**CONFIG, "main_topics": {"telegram:123": 77}}, fake_complete)
-        try:
-            self.assertTrue(P.Chat.from_session_key("agent:main:telegram:dm:123:77", "telegram").is_main)
-            self.assertFalse(P.Chat.from_session_key("agent:main:telegram:dm:123:78", "telegram").is_main)
-            self.assertFalse(P.Chat.from_session_key("agent:main:telegram:dm:999:77", "telegram").is_main)
-            # A group topic with the same number is a sub-chat still.
-            self.assertFalse(P.Chat.from_session_key("agent:main:telegram:group:123:77", "telegram").is_main)
-        finally:
-            P.main_topics().clear()
-
-
 class TelegramTopicTest(Temp):
     def test_a_dm_topic_is_a_sub_chat_with_its_own_model(self):
         rt = Runtime(self.root, CONFIG, fake_complete)
@@ -265,6 +252,47 @@ class TelegramTopicTest(Temp):
         self.assertEqual(rt.session_store.overrides[topic_key]["provider"], "uzu")
         self.assertNotIn(root_key, rt.session_store.overrides)
         self.assertIn("main chat", SubCommand(rt).run("", P.Chat("telegram", "dm", "123")))
+
+    def test_sub_new_opens_a_topic_with_its_preset(self):
+        rt = Runtime(self.root, CONFIG, fake_complete)
+        rt.telegram = bot = FakeBot()
+        root = P.Chat("telegram", "dm", "123")
+        self.assertIn("Taxes 2026", SubCommand(rt).run("new secret Taxes 2026", root))
+        self.assertEqual(bot.topics, [("123", "Taxes 2026")])
+        topic = P.Chat("telegram", "dm", "123", "100")
+        self.assertEqual(rt.policies.preset_name(topic), "secret")
+        self.assertIn("/sub unlock", bot.sent[0][2])
+        # No preset named: the default one, named after it.
+        SubCommand(rt).run("new", root)
+        self.assertEqual(bot.topics[-1], ("123", "Aside"))
+        self.assertEqual(rt.policies.preset_name(P.Chat("telegram", "dm", "123", "101")), "aside")
+        self.assertIn("main chat", SubCommand(rt).run("new", topic))
+        self.assertEqual(len(bot.topics), 2)
+
+    def test_an_expired_dm_topic_is_deleted(self):
+        rt = Runtime(self.root, CONFIG, fake_complete)
+        rt.telegram = bot = FakeBot()
+        topic, group_topic = P.Chat("telegram", "dm", "123", "42"), P.Chat("telegram", "group", "-100", "7")
+        for chat in (topic, group_topic):
+            rt.policies.set_preset(chat, "temp")
+            rt.policies.touch(chat, "s-" + chat.thread)
+        self.assertEqual(set(rt.sweep(time.time() + 7200)), {topic, group_topic})
+        self.assertEqual(bot.deleted, [("123", "42")])
+
+
+class FakeBot:
+    def __init__(self):
+        self.topics, self.sent, self.deleted = [], [], []
+
+    def create_topic(self, chat_id, name):
+        self.topics.append((chat_id, name))
+        return str(99 + len(self.topics))
+
+    def send(self, chat_id, thread, text):
+        self.sent.append((chat_id, thread, text))
+
+    def delete_topic(self, chat_id, thread):
+        self.deleted.append((chat_id, thread))
 
 
 class GatewayHooksTest(Temp):

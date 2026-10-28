@@ -27,15 +27,6 @@ PASSIVE_PLATFORMS = {"subagent", "cron", "batch", "kanban", "webhook"}
 ROOT_THREADS = {"", "1"}
 
 
-def main_topics() -> dict:
-    """The DM topic that is the main chat, per chat ("<platform>:<chat_id>" -> thread),
-    from config.json. On `sys`, not a module global: Hermes imports this package
-    twice (see __init__._shared_state)."""
-    import sys
-
-    return sys.__dict__.setdefault("_hermes_unii_main_topics", {})
-
-
 @dataclass(frozen=True)
 class Chat:
     platform: str
@@ -44,9 +35,7 @@ class Chat:
     thread: str = ""
 
     def __post_init__(self):
-        # The main topic of a DM is the DM's main chat, like its root.
-        main = main_topics().get(f"{self.platform}:{self.chat_id}") if self.chat_type == "dm" else None
-        if self.thread in ROOT_THREADS or (main and self.thread == main):
+        if self.thread in ROOT_THREADS:
             object.__setattr__(self, "thread", "")
 
     @property
