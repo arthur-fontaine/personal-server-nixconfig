@@ -9,7 +9,7 @@ The layout follows [arthur-fontaine/nixconfig](https://github.com/arthur-fontain
 ## What it sets up
 
 - **Hermes, configured from scratch** (no `hermes setup`), as its own macOS
-  account, on `deepseek-v4.1-flash-free` from OpenCode Zen.
+  account, on `deepseek-v4.1-flash` from OpenCode Zen (pay-as-you-go).
 - **One chat that never ends**: your Telegram DM with the bot is the main chat, with
   UniiChat-style memory instead of sessions and compaction.
 - **Sub-chats**: every group with the bot, with its own rules for
