@@ -23,7 +23,7 @@ from hermes_events.core import Chat, Message, Pipeline, Seen  # noqa: E402
 from hermes_events.hermes import HermesSink  # noqa: E402
 from hermes_events.sources import imessage_message, whatsapp_app, whatsapp_message  # noqa: E402
 from hermes_events.triage import UzuTriage  # noqa: E402
-from hermes_events.instagram import instagram_message  # noqa: E402
+from hermes_events.browser import instagram_message, notification_message  # noqa: E402
 from hermes_events import pollers  # noqa: E402
 import sqlite3  # noqa: E402
 
@@ -82,11 +82,13 @@ class ParseTest(unittest.TestCase):
 
 class InstagramTest(unittest.TestCase):
     def test_notifications(self):
-        chat, message = instagram_message({"title": "zoe.martin", "body": "on se voit ?", "tag": "t"}, NOW)
+        chat, message = instagram_message({"title": "zoe.martin", "body": "on se voit ?", "tag": "t", "host": "www.instagram.com"}, NOW)
         self.assertEqual((chat.key, message.text), ("instagram:zoe.martin", "on se voit ?"))
-        chat, _ = instagram_message({"title": "Instagram", "body": "zoe.martin: ce soir", "tag": ""}, NOW)
+        chat, _ = instagram_message({"title": "Instagram", "body": "zoe.martin: ce soir", "tag": "", "host": "www.instagram.com"}, NOW)
         self.assertEqual(chat.name, "zoe.martin")
         self.assertIsNone(instagram_message({"title": "", "body": ""}, NOW))
+        chat, message = notification_message({"title": "Zoé (#général, Les copains)", "body": "on se voit ?", "host": "discord.com"}, NOW)
+        self.assertEqual((chat.source, chat.name, message.text), ("discord", "Zoé (#général, Les copains)", "on se voit ?"))
 
 
 class PipelineTest(unittest.IsolatedAsyncioTestCase):
