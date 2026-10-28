@@ -131,11 +131,22 @@ new_bot_token() {
   note "BotFather answers with the bot's token." >&2
   while :; do
     token="$(gum input --password --header "Bot token from BotFather")"
-    if me="$(tg "$token" getMe 2>/dev/null)" && [ "$("$JQ" -r .ok <<< "$me")" = true ]; then
+    # A paste can bring spaces or a line break along.
+    token="$(printf '%s' "$token" | tr -d '[:space:]')"
+    if ! [[ "$token" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]]; then
+      warn "That is not a bot token: digits, a colon, then letters, digits, - and _ (${#token} characters read)." >&2
+      continue
+    fi
+    # Not through tg: its -f would hide why Telegram says no.
+    if ! me="$(curl -sS "https://api.telegram.org/bot$token/getMe" 2>&1)"; then
+      warn "Could not reach Telegram: $me" >&2
+      continue
+    fi
+    if [ "$("$JQ" -r .ok <<< "$me" 2>/dev/null)" = true ]; then
       printf '%s' "$token"
       return
     fi
-    warn "Telegram does not accept this token, try again." >&2
+    warn "Telegram refused the token: $("$JQ" -r '.description // empty' <<< "$me" 2>/dev/null || printf '%s' "$me")" >&2
   done
 }
 
