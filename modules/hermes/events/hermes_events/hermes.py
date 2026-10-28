@@ -19,8 +19,10 @@ def sign(secret: str, body: bytes, timestamp: str) -> str:
 
 
 class HermesSink:
+    """`url` is the routes' base: .../webhooks, then /events or /system."""
+
     def __init__(self, url: str, secret: str, owner: str, clock=time.time):
-        self.url, self.secret, self.owner, self.clock = url, secret, owner, clock
+        self.url, self.secret, self.owner, self.clock = url.rstrip("/"), secret, owner, clock
 
     def request(self, event: dict) -> tuple[bytes, dict]:
         # The owner's id is the main chat's (their DM with the bot): deliver_extra.chat_id.
@@ -32,12 +34,12 @@ class HermesSink:
             "X-Webhook-Signature-V2": sign(self.secret, body, timestamp),
         }
 
-    async def post(self, event: dict) -> bool:
+    async def post(self, event: dict, route: str = "events") -> bool:
         body, headers = self.request(event)
         try:
             timeout = aiohttp.ClientTimeout(total=30)
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(self.url, data=body, headers=headers) as response:
+                async with session.post(f"{self.url}/{route}", data=body, headers=headers) as response:
                     if response.status >= 300:
                         log.warning("hermes refused %s: %s %s", event["key"], response.status, await response.text())
                         return False
