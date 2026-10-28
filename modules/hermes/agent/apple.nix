@@ -23,9 +23,10 @@ let
     set_default co.dododo.iMCP remindersEnabled -bool false
     set_default co.dododo.iMCP notesEnabled -bool false
     set_default co.dododo.iMCP messagesEnabled -bool false
-    # Hermes connects without the approval dialog: ["hermes-agent"] as JSON,
-    # its MCP client name (tools/mcp_tool_transport.py in Hermes' source).
-    set_default co.dododo.iMCP trustedClients -data 5b226865726d65732d6167656e74225d
+    # Hermes and the events daemon connect without the approval dialog:
+    # ["hermes-agent","hermes-events"] as JSON, their MCP client names (Hermes':
+    # tools/mcp_tool_transport.py in its source; the daemon's: events/pollers.py).
+    set_default co.dododo.iMCP trustedClients -data 5b226865726d65732d6167656e74222c226865726d65732d6576656e7473225d
     # Nix pins the version, and the copy in /Applications is root's anyway.
     set_default co.dododo.iMCP SUEnableAutomaticChecks -bool false
     # HomeClaw's MCP over HTTP, off by default.

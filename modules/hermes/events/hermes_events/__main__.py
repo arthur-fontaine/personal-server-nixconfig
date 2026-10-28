@@ -57,7 +57,7 @@ async def main(config: dict) -> None:
         tasks.append(asyncio.create_task(instagram_watch(pipeline, sources["instagram"]["devtools"])))
 
     state = pollers.State(os.path.join(config["state_dir"], "pollers.json"))
-    imcp = pollers.MCP(sources.get("imcp_command", []))
+    imcp = pollers.MCP(config.get("imcp_command", []))
     polls = {
         "calendar": lambda c: pollers.calendar(pipeline, state, imcp, c.get("lead_minutes", 30)),
         "mail": lambda c: pollers.mail(pipeline, state, imcp),
