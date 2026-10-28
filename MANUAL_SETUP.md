@@ -2,7 +2,9 @@
 
 `scripts/bootstrap-macos.sh` does all of it, in one run: run it on the server,
 at its own screen and keyboard (the permission dialogs show there), and let it
-reboot. Nothing is left to run afterwards. Every step checks whether it is done,
+reboot. Then run it once more over SSH while you look at the Mac, which shows
+Hermes' desktop: that run signs Hermes in to your Apple Account and allows its
+Apple apps, which only work in its own session. Every step checks whether it is done,
 so running it again from the clone
 (`~/personal-server-nixconfig/scripts/bootstrap-macos.sh`) only redoes what is
 missing, for example the BotFather settings you skipped.
@@ -20,6 +22,8 @@ missing, for example the BotFather settings you skipped.
 | Permissions | runs `cua-driver permissions grant`; macOS keeps them system-wide, so they cover the Hermes account | click Allow for Accessibility and Screen Recording |
 | Full Disk Access | opens the list and shows `/Library/Hermes/hermes-launcher` in Finder | add it, once: Hermes updates keep it |
 | Reboot | reboots, so macOS logs Hermes in and starts it | |
+| Apple Account (second run, over SSH) | opens Hermes' System Settings → Apple Account on the Mac's screen, and waits until it is signed in | sign in with your Apple Account; in iCloud turn on Messages, Notes, Reminders, Contacts, Calendars, Find My Mac |
+| Apple apps | runs a check of Reminders, Notes, Contacts, Calendar and Messages the way the gateway runs (launchd starting the launcher in Hermes' session), so each dialog is the gateway's own; opens Messages until Hermes can read your conversations; for Find My, shows the launcher to add to Screen Recording and Accessibility | click Allow in each dialog; in Messages, Settings → iMessage → "Enable Messages in iCloud" |
 
 macOS reserves those clicks for a person: no script can grant them.
 
