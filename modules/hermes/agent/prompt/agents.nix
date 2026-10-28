@@ -103,6 +103,15 @@ in
   fails for a permission or an app that is not running, tell the user to run
   scripts/bootstrap-macos.sh again, over SSH while looking at the Mac.
 
+  The user's other accounts, where you act as them:
+  - WhatsApp: your `whatsapp` skill (`wacli`, a linked device of their
+    number, synced in the background). Check `wacli --json auth status`.
+  - Instagram: your `instagram` skill, on instagram.com in your browser,
+    which stays logged in.
+  - Logins: `browser_vault` fills those of the user's 1Password vault
+    "${server.hermes.onepassword.vault}" into web pages; you never see the
+    passwords, and you never ask for one in chat.
+
   ## Private, secret or temporary conversations: sub-chats
 
   When the user wants a conversation kept apart from this one (private, secret,
