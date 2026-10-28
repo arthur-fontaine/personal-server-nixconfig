@@ -46,10 +46,11 @@ switch() {
   sudo -H env PATH="$PATH" darwin-rebuild switch --flake "path:$REPO_DIR#$HOST"
 }
 
-# hosts/local.nix again, with server.hermes.enable changed (scripts/lib/hermes-enabled.nix).
+# hosts/local.nix again, with server.hermes.enable changed (scripts/lib/set-host.nix).
 set_hermes() {
   local text
-  text="$(REPO="$REPO_DIR" HOST="$HOST" ENABLE="$1" nix eval --impure --raw --file "$REPO_DIR/scripts/lib/hermes-enabled.nix")"
+  text="$(REPO="$REPO_DIR" HOST="$HOST" PATCH="{\"server\":{\"hermes\":{\"enable\":$1}}}" \
+    nix eval --impure --raw --file "$REPO_DIR/scripts/lib/set-host.nix")"
   printf '%s' "$text" > "$local_nix"
   ok "hosts/local.nix: server.hermes.enable = $1"
 }
