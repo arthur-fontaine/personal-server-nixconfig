@@ -16,11 +16,13 @@ main chat too. Subagents and cron jobs read the main memory but never write it.
 
 ## Sub-chats
 
-Each topic of your DM with the bot is a sub-chat, kept out of the main chat by
-its policy: tap **+** in the chat to start one (it needs Threaded Mode, which
-the setup script asks you to turn on in BotFather). A group with the bot, or a
-topic of a group, is a sub-chat too. Type `/sub` in it to see its policy; the
-root of the DM stays the main chat.
+Each group with the bot is a sub-chat, kept out of the main chat by its
+policy: create a group in Telegram, add the bot, and type `/sub` there to see
+the policy. Each topic of a group with topics is a sub-chat of its own.
+
+Threaded Mode (BotFather) stays off: with it, Telegram turns every message in
+the bot's DM into a topic of its own, which would leave no main chat. The
+plugin still treats DM topics as sub-chats, should that change.
 
 | Setting | Values | Effect |
 | --- | --- | --- |
@@ -52,7 +54,7 @@ passphrase and kept in memory until `/sub lock` or a restart, and `/sub unlock`
 is intercepted before Hermes stores or logs it. After each turn the plain
 transcript Hermes keeps of that chat is deleted (best effort: a failure is
 logged, not retried). Still in clear: Telegram's copy of the chat (bot chats are not end-to-end
-encrypted; delete the topic in Telegram to remove it), the
+encrypted; delete the group in Telegram to remove it), the
 running gateway's memory until it restarts, fragments Hermes may write to
 `~/.hermes/logs`, and the model provider for that turn, unless the sub-chat
 runs on `uzu:local`.
