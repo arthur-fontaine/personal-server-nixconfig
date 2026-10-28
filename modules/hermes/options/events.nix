@@ -18,6 +18,7 @@ in
     whatsapp = source "Incoming WhatsApp messages (wacli's webhook)." true;
     imessage = source "Incoming iMessages and SMS (imsg watch)." true;
     instagram = source "Instagram's notifications, in Hermes' always-open Chrome." true;
+    discord = source "Discord's notifications, from a Discord tab kept open in that Chrome." true;
     homekit = source "HomeKit accessory changes HomeClaw is set to report (its triggers)." true;
     calendar = source "New events in the calendar, and events starting soon (iMCP)." true;
     mail = source "New unread mail (iMCP, once its Mail folder access is granted)." true;
