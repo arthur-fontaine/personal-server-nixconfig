@@ -8,5 +8,6 @@
     ./access.nix
     ./telegram.nix
     ./onepassword.nix
+    ./events.nix
   ];
 }

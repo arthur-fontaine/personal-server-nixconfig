@@ -20,6 +20,7 @@ in
     ./whatsapp.nix
     ./instagram.nix
     ./onepassword.nix
+    ./events.nix
     ./prompt
     ./session
   ];
