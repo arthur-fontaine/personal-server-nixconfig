@@ -42,6 +42,11 @@ in
       '';
     };
 
+    browserPort = mkOption {
+      type = types.port;
+      default = 9222;
+      description = "The DevTools port of Hermes' always-open browser, on loopback.";
+    };
     disabledSkills = mkOption {
       type = types.listOf types.str;
       default = [

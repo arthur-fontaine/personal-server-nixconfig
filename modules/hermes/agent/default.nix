@@ -18,6 +18,7 @@ in
     ./computer-use.nix
     ./apple.nix
     ./whatsapp.nix
+    ./browser.nix
     ./instagram.nix
     ./onepassword.nix
     ./events.nix
