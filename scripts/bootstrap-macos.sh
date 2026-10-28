@@ -261,15 +261,41 @@ fi
 
 # ── The system ──────────────────────────────────────────────────────────────
 
-agent="$(setting server.hermes.user)"
-if ! id "$agent" >/dev/null 2>&1 || gum confirm --default=false "Apply the configuration again?"; then
-  step "Applying the configuration (nix-darwin)"
+switch_system() {
   if [ -x /run/current-system/sw/bin/darwin-rebuild ]; then
     sudo -H env PATH="$PATH" darwin-rebuild switch --flake "path:$REPO_DIR#$HOST"
   else
     sudo -H env PATH="$PATH" nix --extra-experimental-features 'nix-command flakes' \
       run github:LnL7/nix-darwin#darwin-rebuild -- switch --flake "path:$REPO_DIR#$HOST"
   fi
+}
+
+# nix-darwin will not overwrite an /etc file it does not recognise (often
+# /etc/shells on a first switch): it lists them and asks to rename them
+# <file>.before-nix-darwin. Do that, with your go-ahead, and switch again.
+apply() {
+  local log files
+  log="$(mktemp)"
+  if switch_system 2>&1 | tee "$log"; then
+    rm -f "$log"
+    return 0
+  fi
+  files="$(sed -n '/would be overwritten:/,/^Please check/p' "$log" | sed -n 's|^[[:space:]]*\(/etc/[^[:space:]]*\)$|\1|p')"
+  rm -f "$log"
+  [ -n "$files" ] || return 1
+  warn "nix-darwin wants to manage these files, which macOS or an installer already wrote:"
+  printf '  %s\n' $files
+  gum confirm "Rename them to <file>.before-nix-darwin and apply again?" || return 1
+  for file in $files; do
+    sudo mv "$file" "$file.before-nix-darwin"
+  done
+  switch_system
+}
+
+agent="$(setting server.hermes.user)"
+if ! id "$agent" >/dev/null 2>&1 || gum confirm --default=false "Apply the configuration again?"; then
+  step "Applying the configuration (nix-darwin)"
+  apply
   ok "Configuration applied"
 fi
 agent_uid="$(id -u "$agent")"
