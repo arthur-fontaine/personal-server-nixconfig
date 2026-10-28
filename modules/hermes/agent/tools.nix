@@ -7,6 +7,11 @@ let
   tools = with pkgs; [
     fsearch
     digup
+    # Hermes' Apple skills: iMessage, Reminders, Notes, Find My.
+    imsg
+    remindctl
+    memo
+    peekaboo
     git
     gh
     jq
