@@ -374,6 +374,47 @@ else
   fi
 fi
 
+# ── 1Password, for the logins Hermes may use ───────────────────────────────
+# A service account that reads one vault: browser_vault fills its logins into
+# web pages (Instagram) without the model seeing them.
+
+op_vault="$(setting server.hermes.onepassword.vault)"
+if sudo grep -q '^OP_SERVICE_ACCOUNT_TOKEN=' "$secrets"; then
+  ok "Hermes reads 1Password's \"$op_vault\" vault"
+else
+  step "1Password for Hermes (optional)"
+  note "In 1Password: create a vault named \"$op_vault\", then Developer → Service Accounts → New,"
+  note "with read access to \"$op_vault\" only. Put there the logins Hermes may use."
+  op_token="$(gum input --password --header "Service account token (ops_…, empty to skip)")"
+  if [ -n "$op_token" ]; then
+    op="$(nix build --no-link --print-out-paths "$flake.pkgs._1password-cli")/bin/op"
+    if OP_SERVICE_ACCOUNT_TOKEN="$op_token" "$op" vault list --format json 2>/dev/null \
+      | "$JQ" -e --arg v "$op_vault" 'any(.[]; .name == $v)' >/dev/null; then
+      printf 'OP_SERVICE_ACCOUNT_TOKEN=%s\n' "$op_token" | sudo sh -c 'umask 077 && cat >> "$1"' _ "$secrets"
+      ok "Hermes reads 1Password's \"$op_vault\" vault"
+    else
+      warn "That token cannot read a vault named \"$op_vault\": skipped. Run this script again to retry."
+    fi
+    unset op_token
+  fi
+fi
+
+# ── WhatsApp, as a linked device of your number ────────────────────────────
+
+wa() { as_agent env WACLI_STORE_DIR="$(setting "home-manager.users.$agent.services.hermes-agent.environment.WACLI_STORE_DIR")" wacli "$@"; }
+if wa --json auth status 2>/dev/null | grep -q '"authenticated":true'; then
+  ok "Hermes reads your WhatsApp"
+elif gum confirm "Link your WhatsApp, so Hermes can read and send your messages?"; then
+  step "WhatsApp"
+  note "On your phone: WhatsApp → Settings → Linked devices → Link a device, then scan this code."
+  if wa auth --idle-exit 30s; then
+    ok "WhatsApp linked: its chats keep syncing in the background"
+    gui_session && sudo launchctl kickstart -k "gui/$agent_uid/org.nix-community.home.wacli" || true
+  else
+    warn "Not linked. Run this script again to retry."
+  fi
+fi
+
 # ── Permissions ─────────────────────────────────────────────────────────────
 # Accessibility, Screen Recording and Full Disk Access live in macOS' system
 # database, so granting them from this session covers the Hermes account too.
@@ -597,15 +638,51 @@ homeclaw_app() {
   ok "HomeClaw serves HomeKit to Hermes"
 }
 
+# ── Instagram, in Hermes' browser ───────────────────────────────────────────
+# Its first login is yours, on the Mac's screen, in the browser profile Hermes
+# keeps (modules/hermes/agent/instagram.nix): Instagram trusts a login made by
+# hand, and later ones come from 1Password.
+
+browser_profile="$agent_home/.hermes/browser-profile"
+instagram_logged_in() {
+  sudo -u "$agent" /usr/bin/sqlite3 "file:$browser_profile/Default/Cookies?mode=ro&immutable=1" \
+    "select count(*) from cookies where host_key like '%instagram.com' and name = 'sessionid';" 2>/dev/null \
+    | grep -qx '[1-9][0-9]*'
+}
+
+instagram_login() {
+  local chrome
+  chrome="$(setting "home-manager.users.$agent.services.hermes-agent.settings.browser.executable_path")"
+  step "Instagram"
+  while ! instagram_logged_in; do
+    note "On the Mac's screen, log in to Instagram in the browser that opens, and save the login info."
+    note "Then quit that browser (⌘Q) and come back here."
+    # The flags Hermes starts it with (instagram.nix), so it reads the same cookies.
+    hermes_gui "$chrome" --user-data-dir="$browser_profile" --use-mock-keychain --password-store=basic \
+      --no-first-run --no-default-browser-check https://www.instagram.com/accounts/login/ >/dev/null 2>&1 &
+    gum confirm --affirmative "Check" --negative "Skip" "Logged in, and the browser quit?" || return 0
+    sudo pkill -TERM -u "$agent" -f -- "--user-data-dir=$browser_profile" 2>/dev/null || true
+    sleep 3
+  done
+  ok "Hermes is logged in to Instagram"
+}
+
 if gui_session && [ "$(stat -f %Su /dev/console)" = "$agent" ]; then
   if gum confirm "Set up Hermes' Apple apps (iMessage, Notes, Reminders, Contacts, Calendar, Find My)?"; then
     hermes_lit 1
     apple_apps
     hermes_lit "$(setting server.energy.displayBrightness)"
   fi
+  if instagram_logged_in; then
+    ok "Hermes is logged in to Instagram"
+  elif gum confirm "Log Hermes in to your Instagram?"; then
+    hermes_lit 1
+    instagram_login
+    hermes_lit "$(setting server.energy.displayBrightness)"
+  fi
 else
-  warn "Hermes' Apple apps need its desktop on the Mac's screen, which it is after a reboot:"
-  note "then run this script again over SSH, looking at the Mac, for its Apple Account and apps."
+  warn "Hermes' Apple apps and Instagram need its desktop on the Mac's screen, which it is after a reboot:"
+  note "then run this script again over SSH, looking at the Mac, for its Apple Account, apps and Instagram."
 fi
 
 # ── Start ───────────────────────────────────────────────────────────────────
