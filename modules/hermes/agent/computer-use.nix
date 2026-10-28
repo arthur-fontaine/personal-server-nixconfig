@@ -5,7 +5,7 @@
 { ... }:
 {
   services.hermes-agent = {
-    # The copy in /Applications (modules/hermes/system/computer-use.nix), which
+    # The copy in /Applications (modules/hermes/system/applications.nix), which
     # macOS can launch by name.
     environment.HERMES_CUA_DRIVER_CMD = "/Applications/CuaDriver.app/Contents/MacOS/cua-driver";
 

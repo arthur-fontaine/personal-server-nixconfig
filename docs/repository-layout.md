@@ -22,6 +22,7 @@ modules/
     system/               what it is to macOS (nix-darwin)
       user.nix            its own account, with home-manager
       access/             read.nix, freeze.nix (+ freeze.py), rebuild.nix, secrets.nix
+      applications.nix    the apps it uses, copied into /Applications
     agent/                its home-manager configuration
       default.nix         the upstream module, from scratch, managed mode
       model.nix memory.nix telegram.nix mcp.nix tools.nix computer-use.nix
