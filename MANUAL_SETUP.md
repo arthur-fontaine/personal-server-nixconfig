@@ -36,9 +36,9 @@ reaches Hermes and everything it runs, across updates.
 - DigUp downloads its embedding model at the first `digup index`.
 - Keep the lid open: the backlight is off, but a closed lid turns the display
   off and computer use sees a black screen. The Mac never sleeps either way.
-- Talk to the bot in its DM's **Main** topic (or the DM itself, without
-  Threaded Mode): that is the main chat. Any other topic, or a group with the
-  bot, is a sub-chat: send `/sub` there for its rules.
+- Talk to the bot in its DM, outside any topic: that is the main chat.
+  `/sub new [preset] [name]` there opens a sub-chat as a topic; a group with
+  the bot is one too. Send `/sub` in a sub-chat for its rules.
 - Whoever can push to the repository can change the whole Mac through
   `sudo server-rebuild`, Hermes included: keep its GitHub token to this
   repository.
