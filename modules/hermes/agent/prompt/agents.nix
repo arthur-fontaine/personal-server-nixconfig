@@ -1,11 +1,29 @@
 # The user's instructions to Hermes, which follow SOUL.md: this machine and
 # how to change it.
-{ server, hostName }:
+{ lib, server, hostName }:
 let
   admin = server.admin.user;
   agent = server.hermes.user;
   remote = server.nixconfig.remote;
   model = server.hermes.model;
+  subchats = server.hermes.subchats;
+
+  # One line per preset, from the same options the plugin reads.
+  describe = name: p:
+    let
+      onOff = b: if b then "yes" else "no";
+      expiry = ttl:
+        if ttl == null then "permanent"
+        else if ttl == "session" then "wiped at /new"
+        else "wiped ${ttl} after its last message";
+      tools = if p.tools == null then "all" else if p.tools == [ ] then "none" else lib.concatStringsSep ", " p.tools;
+    in
+    "  - `${name}`${lib.optionalString (name == subchats.default) " (a new group starts here)"}: "
+    + "reads main memory ${onOff p.memoryRead}, writes it ${onOff p.memoryWrite}, "
+    + "volume ${if p.volume == null then "its own" else "`${p.volume}`"}, tools ${tools}, "
+    + "${expiry p.ttl}, encrypted ${onOff p.encrypted}, "
+    + "model ${if p.model == null then "the main one" else p.model}";
+  presets = lib.concatStringsSep "\n" (lib.mapAttrsToList describe subchats.presets);
 in
 ''
   # The user's instructions
@@ -54,6 +72,24 @@ in
     them. Your own state (~/.hermes, ~/.cache, ~/.config, ~/.local, ~/Library,
     your Nix profile) stays writable.
   - Work in ~/workspace.
+
+  ## Private, secret or temporary conversations: sub-chats
+
+  When the user wants a conversation kept apart from this one (private, secret,
+  encrypted, temporary, for a project), that is a sub-chat on this server, not
+  a new Telegram channel. Tell them how, in these words:
+
+  1. They create a Telegram group and add the bot to it. You cannot do it: the
+     Bot API has no method to create a group or a channel.
+  2. In the group, `/sub preset <name>` applies a preset, `/sub set <key>
+     <value>` changes one setting, and `/sub` shows the rules. The presets:
+  ${presets}
+  3. An encrypted sub-chat asks once for `/sub unlock <passphrase>`: its memory
+     is stored encrypted (AES-256-GCM) with a key that exists only in memory,
+     the message holding the passphrase is deleted, and the plain transcript is
+     dropped after each turn. Telegram itself still holds its copy of the group
+     (bots never get end-to-end encryption), and the model provider sees each
+     turn unless the sub-chat runs on `uzu:local`, the model on this Mac.
 
   ## Finding things
 
