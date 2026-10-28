@@ -239,42 +239,40 @@ else
   tg "$bot_token" setMyShortDescription "short_description=Hermes%2C%20a%20personal%20agent%20on%20a%20home%20server" >/dev/null || true
   tg "$bot_token" setMyDescription "description=Hermes%20answers%20only%20its%20owner." >/dev/null || true
 fi
-# With topics on, a "Main" topic the bot creates in your DM is the main chat;
-# its id goes into hosts/local.nix (server.hermes.telegram.mainTopic).
-main_topic() {
-  local token="$1" owner="$2" bot created thread text
-  if setting server.hermes.telegram.mainTopic.threadId >/dev/null 2>&1; then
-    ok "The Main topic is the main chat"
-    return 0
-  fi
+# Topics: your DM's root is the main chat, and its topics are sub-chats only
+# the bot opens (/sub new), so a message sent outside a topic stays in the main
+# chat. That takes BotFather's Threaded Mode, with users kept from creating
+# topics themselves.
+topics() {
+  local token="$1" owner="$2" bot probe thread
   bot="$(tg "$token" getMe | "$JQ" -r .result.username)"
   step "Topics, for sub-chats in your chat with @$bot (optional)"
-  note "With topics, the bot creates a Main topic, the main chat, and every other topic is a sub-chat."
   note "In @BotFather, tap Open (its Mini App): My bots → @$bot → Bot Settings → Threads Settings:"
-  note "\"Threaded Mode\" ON, \"Disallow users to create new threads\" OFF."
-  note "Without topics, your chat with @$bot is one main chat, and groups with it are the sub-chats."
-  # getMe's has_topics_enabled is not a test: Telegram updates it only once
-  # topics are used, not when BotFather's switch changes. Creating the topic is.
-  while gum confirm --affirmative "Create the Main topic" --negative "No topics" "Threaded Mode on?"; do
-    if created="$(curl -sS "https://api.telegram.org/bot$token/createForumTopic" \
-      --data-urlencode "chat_id=$owner" --data-urlencode "name=Main")" \
-      && [ "$("$JQ" -r .ok <<< "$created")" = true ]; then
-      thread="$("$JQ" -r .result.message_thread_id <<< "$created")"
-      text="$(REPO="$REPO_DIR" HOST="$HOST" PATCH="{\"server\":{\"hermes\":{\"telegram\":{\"mainTopic\":{\"chatId\":\"$owner\",\"threadId\":$thread}}}}}" \
-        nix eval --impure --raw --file "$REPO_DIR/scripts/lib/set-host.nix")"
-      printf '%s' "$text" > "$local_nix"
-      tg_post "$token" sendMessage "chat_id=$owner" "message_thread_id=$thread" \
-        "text=This topic is the main chat. Every other topic is a sub-chat: send /sub in it for its rules." >/dev/null || true
-      ok "Created the Main topic (hosts/local.nix: server.hermes.telegram.mainTopic)"
-      return 0
+  note "\"Threaded Mode\" ON, \"Disallow users to create new threads\" ON."
+  note "Without topics, groups with @$bot are the sub-chats."
+  # getMe's topic fields are not a test on their own: Telegram updates them
+  # once topics are used, not when BotFather's switches change. Creating a
+  # topic is, and getMe is right after it.
+  while gum confirm --affirmative "Check" --negative "No topics" "Both switches on?"; do
+    if probe="$(curl -sS "https://api.telegram.org/bot$token/createForumTopic" \
+      --data-urlencode "chat_id=$owner" --data-urlencode "name=Setup check")" \
+      && [ "$("$JQ" -r .ok <<< "$probe")" = true ]; then
+      thread="$("$JQ" -r .result.message_thread_id <<< "$probe")"
+      tg_post "$token" deleteForumTopic "chat_id=$owner" "message_thread_id=$thread" >/dev/null || true
+      if [ "$(tg "$token" getMe | "$JQ" -r .result.allows_users_to_create_topics)" = false ]; then
+        ok "Topics are on: send /sub new in your chat with @$bot to open a sub-chat"
+        return 0
+      fi
+      warn "Threaded Mode is on, but you can still create topics: switch \"Disallow users to create new threads\" on."
+      continue
     fi
-    warn "Telegram refused: $("$JQ" -r '.description // empty' <<< "$created" 2>/dev/null || printf '%s' "$created")"
+    warn "Telegram refused a topic: $("$JQ" -r '.description // empty' <<< "$probe" 2>/dev/null || printf '%s' "$probe")"
   done
 }
 
 if [ -n "${bot_token:-}" ]; then
   botfather_settings "$bot_token" "$(tg "$bot_token" getMe | "$JQ" -r .result.username)"
-  main_topic "$bot_token" "${owner:-$(sudo sed -n 's/^TELEGRAM_ALLOWED_USERS=//p' "$secrets" | cut -d, -f1)}"
+  topics "$bot_token" "${owner:-$(sudo sed -n 's/^TELEGRAM_ALLOWED_USERS=//p' "$secrets" | cut -d, -f1)}"
 fi
 
 # ── The system ──────────────────────────────────────────────────────────────
