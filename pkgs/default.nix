@@ -16,8 +16,6 @@ in
   wacli = final.callPackage ./wacli.nix { };
   # Hermes' pinned computer-use driver (its pm/lock.json).
   cua-driver = inputs.hermes-agent.packages.${system}.pm-cua-driver;
-  # And its pinned Chromium (Chrome for Testing), for its browser tools.
-  hermes-chromium = inputs.hermes-agent.packages.${system}.pm-chromium;
   # uzu's CLI, with its OpenAI-compatible `server`.
   mirai = inputs.uzu.packages.${system}.mirai;
 }

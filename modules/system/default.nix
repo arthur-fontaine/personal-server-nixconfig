@@ -13,6 +13,7 @@
   # Free software only, but for these, by name.
   nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
     "1password-cli" # Hermes' 1Password integration (modules/hermes/agent/onepassword.nix)
+    "google-chrome" # Hermes' browser, which gets sites' Web Push (modules/hermes/agent/browser.nix)
   ];
 
   system.primaryUser = username;
