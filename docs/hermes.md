@@ -81,6 +81,24 @@ the Full Disk Access granted once to their launcher
 (`modules/hermes/system/access/full-disk.nix`); without it, files in those
 folders are neither readable nor frozen.
 
+## Apple apps
+
+The Hermes account signs in to your Apple Account (the bootstrap's second run),
+so Hermes works with your iMessages, Notes, Reminders, Contacts, Calendar and
+Find My, through its bundled Apple skills and their CLIs (`pkgs/apple`):
+
+| App | Through | macOS permission (to the launcher) |
+| --- | --- | --- |
+| Messages | `imsg` ([steipete/imsg](https://github.com/steipete/imsg)) | Full Disk Access (reading), Automation (sending) |
+| Reminders | `remindctl` ([steipete/remindctl](https://github.com/steipete/remindctl)) | Reminders |
+| Notes | `memo` ([antoniorodr/memo](https://github.com/antoniorodr/memo)) | Automation |
+| Find My | FindMy.app's window, `peekaboo` ([steipete/Peekaboo](https://github.com/steipete/Peekaboo)) | Screen Recording, Accessibility |
+| Contacts, Calendar, others | AppleScript (`osascript`), `shortcuts`, computer use | Contacts, Calendars, Automation |
+
+Every permission belongs to `/Library/Hermes/hermes-launcher`, which starts the
+gateway, so it holds across Hermes updates. A revoked one: run the bootstrap
+again over SSH, looking at the Mac.
+
 ## Models
 
 - Main: `deepseek-v4.1-flash` on OpenCode Zen, paid as you go (`server.hermes.model`).
