@@ -7,7 +7,7 @@ there, so a restart never replays the past.
 - reminders: `remindctl show --json`
 - calls: macOS' call history database (Full Disk Access)
 - files: new files in the folders given
-- github: `gh api notifications`
+- github: `gh api notifications`, with GITHUB_NOTIFICATIONS_TOKEN
 - runpod: pods left running (money), from its REST API
 - system: this Mac's disk, power, services and SSH logins (trusted, no model)
 """
@@ -62,9 +62,10 @@ class State:
         return [] if first else fresh
 
 
-async def run(*command: str, timeout: float = 60) -> str:
+async def run(*command: str, timeout: float = 60, env: dict | None = None) -> str:
     process = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.PIPE,
-                                                   stderr=asyncio.subprocess.PIPE)
+                                                   stderr=asyncio.subprocess.PIPE,
+                                                   env={**os.environ, **env} if env else None)
     try:
         out, err = await asyncio.wait_for(process.communicate(), timeout)
     except asyncio.TimeoutError:
@@ -248,8 +249,10 @@ async def files(pipeline: Pipeline, state: State, folders: list[str]) -> None:
         pipeline.notice("files", path, f"New file: {found[path]}", f"{path}", id=path)
 
 
-async def github(pipeline: Pipeline, state: State, gh: str) -> None:
-    listed = items(json.loads(await run(gh, "api", "notifications")))
+async def github(pipeline: Pipeline, state: State, gh: str, token: str) -> None:
+    """With its own classic token (the notifications scope): the fine-grained
+    one Hermes pushes with cannot read notifications."""
+    listed = items(json.loads(await run(gh, "api", "notifications", env={"GH_TOKEN": token})))
     by_id = {f"{n.get('id')}@{n.get('updated_at')}": n for n in listed}
     for key in state.new("github", list(by_id)):
         n = by_id[key]

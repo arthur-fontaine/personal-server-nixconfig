@@ -64,9 +64,12 @@ async def main(config: dict) -> None:
         "reminders": lambda c: pollers.reminders(pipeline, state, c["command"]),
         "calls": lambda c: pollers.calls(pipeline, state, os.path.expanduser(c["database"])),
         "files": lambda c: pollers.files(pipeline, state, c["folders"]),
-        "github": lambda c: pollers.github(pipeline, state, c["command"]),
+        "github": lambda c: pollers.github(pipeline, state, c["command"], secrets["GITHUB_NOTIFICATIONS_TOKEN"]),
         "runpod": lambda c: pollers.runpod(pipeline, state, secrets.get("RUNPOD_API_KEY", "")),
     }
+    if on("github") and not secrets.get("GITHUB_NOTIFICATIONS_TOKEN"):
+        logging.getLogger("hermes_events").info("github: no GITHUB_NOTIFICATIONS_TOKEN in the secrets file, skipped")
+        sources["github"]["enabled"] = False
     for name, poll in polls.items():
         if on(name):
             c = sources[name]

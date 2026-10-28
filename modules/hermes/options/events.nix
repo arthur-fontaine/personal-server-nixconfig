@@ -24,9 +24,10 @@ in
     reminders = source "Reminders falling due (remindctl)." true;
     calls = source "Missed calls (the call history iCloud syncs to this Mac)." true;
     github = source ''
-      GitHub notifications (gh). Off: the fine-grained token the bootstrap asks
-      for cannot read them; a classic token with the notifications scope can.
-    '' false;
+      GitHub notifications, with their own classic token (the notifications
+      scope; fine-grained tokens cannot read them), GITHUB_NOTIFICATIONS_TOKEN
+      in the secrets file: the bootstrap asks for it. Without it, skipped.
+    '' true;
     runpod = source "RunPod pods left running (2, 6, 12, 24, 48 hours)." true;
     system = source "This Mac: low disk, power cuts, a service down, new logins. Sent as is." true;
 

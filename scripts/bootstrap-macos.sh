@@ -355,14 +355,29 @@ else
 fi
 
 # ── GitHub, so Hermes can push changes to this repository ──────────────────
+# Both tokens from pre-filled pages: a fine-grained template URL (documented in
+# https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
+# and the classic form's scopes parameter.
+
+# owner/repo of the remote, https or ssh.
+repo_slug="$(setting server.nixconfig.remote | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
+
+# Opened in a browser when this session has a screen, always printed.
+show_link() {
+  note "$1"
+  launchctl print "gui/$(id -u)" >/dev/null 2>&1 && /usr/bin/open "$1" 2>/dev/null || true
+}
 
 if as_agent gh auth status >/dev/null 2>&1; then
   ok "Hermes can push to GitHub"
 else
   step "GitHub access for Hermes"
-  note "A fine-grained token for this repository only, with Contents: read and write."
-  note "Whoever can push here can change the whole Mac through sudo server-rebuild."
-  token="$(gum input --password --header "GitHub token (empty to skip)")"
+  note "A fine-grained token with Contents: read and write, pre-filled on this page:"
+  show_link "https://github.com/settings/personal-access-tokens/new?name=Hermes%20(personal%20server)&description=Hermes%20pushes%20changes%20to%20${repo_slug//\//%2F}%20and%20applies%20them&target_name=${repo_slug%%/*}&expires_in=366&contents=write"
+  note "Under Repository access, choose Only select repositories → ${repo_slug#*/} (a link cannot pick it)."
+  note "Whoever can push here can change the whole Mac through sudo server-rebuild. It lasts a year:"
+  note "run this script again to replace it."
+  token="$(gum input --password --header "GitHub token (github_pat_…, empty to skip)")"
   if [ -n "$token" ]; then
     # In gh's own file (~/.config/gh/hosts.yml, readable by the agent only), not
     # the keychain: the agent's runs unattended, and from here it has none.
@@ -371,6 +386,26 @@ else
     ok "Hermes can push to GitHub"
   else
     warn "Skipped: Hermes cannot push configuration changes yet."
+  fi
+fi
+
+# Notifications, for Hermes' events (docs/events.md): fine-grained tokens
+# cannot read them, so a classic token with that one scope, kept apart.
+if sudo grep -q '^GITHUB_NOTIFICATIONS_TOKEN=' "$secrets"; then
+  ok "Hermes reads your GitHub notifications"
+elif [ "$(setting server.hermes.events.github)" = 1 ]; then
+  step "GitHub notifications, as Hermes' events (optional)"
+  note "A classic token with only the notifications scope, pre-filled on this page:"
+  show_link "https://github.com/settings/tokens/new?description=Hermes%20notifications%20(personal%20server)&scopes=notifications"
+  token="$(gum input --password --header "Notifications token (ghp_…, empty to skip)")"
+  if [ -n "$token" ]; then
+    if [ "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" https://api.github.com/notifications)" = 200 ]; then
+      printf 'GITHUB_NOTIFICATIONS_TOKEN=%s\n' "$token" | sudo sh -c 'umask 077 && cat >> "$1"' _ "$secrets"
+      ok "Hermes reads your GitHub notifications"
+    else
+      warn "GitHub refused that token for notifications: skipped. Run this script again to retry."
+    fi
+    unset token
   fi
 fi
 
