@@ -19,6 +19,8 @@ missing, for example the BotFather settings you skipped.
 | System | runs `darwin-rebuild switch` | |
 | Auto-login | gives the `hermes` account a random password and writes `/etc/kcpassword`, so macOS logs it in at boot (the login user itself is in Nix) | confirm turning FileVault off, which auto-login needs |
 | GitHub | `gh auth login` for Hermes, with a token you create for this repository only (Contents: read and write) | create the token |
+| 1Password (optional) | checks that the service account token reads the "Hermes" vault, then adds it to the secrets file | create the vault, the service account (read access to that vault only) and its token; put in the vault the logins Hermes may use, Instagram's with the website `https://www.instagram.com` |
+| WhatsApp (optional) | `wacli auth` as Hermes: shows a QR code, then the first sync | scan it: WhatsApp → Settings → Linked devices → Link a device |
 | Permissions | runs `cua-driver permissions grant`; macOS keeps them system-wide, so they cover the Hermes account | click Allow for Accessibility and Screen Recording |
 | Full Disk Access | opens the list and shows `/Library/Hermes/hermes-launcher` in Finder | add it, once: Hermes updates keep it |
 | Reboot | reboots, so macOS logs Hermes in and starts it | |
@@ -26,6 +28,7 @@ missing, for example the BotFather settings you skipped.
 | Apple apps | runs a check of Reminders, Notes, Contacts, Calendar and Messages the way the gateway runs (launchd starting the launcher in Hermes' session), so each dialog is the gateway's own; opens Messages until Hermes can read your conversations; for Find My, shows the launcher to add to Screen Recording and Accessibility | click Allow in each dialog; in Messages, Settings → iMessage → "Enable Messages in iCloud" |
 | iMCP | starts it (Nix installs it in /Applications), trusts Hermes in it, waits until its services are on, then connects to it as Hermes | in its menu bar icon, click Calendar, Contacts, Location, Mail (choose `~/Library/Mail`), Music, Shortcuts, Voice Memos, Weather, allowing each dialog; allow Local Network |
 | HomeClaw | installs it from the App Store with `mas` (or opens its page), starts it, turns on its HTTP MCP endpoint and checks it answers | allow it your home data |
+| Instagram (second run) | opens Hermes' browser on instagram.com's login page, on the Mac's screen, until its profile holds a session | log in, save the login info, quit the browser |
 
 macOS reserves those clicks for a person: no script can grant them.
 
