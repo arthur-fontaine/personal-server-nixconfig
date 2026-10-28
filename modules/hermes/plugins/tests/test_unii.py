@@ -242,6 +242,19 @@ class HooksTest(Temp):
         self.assertIn("main chat", SubCommand(rt).run("", P.Chat("whatsapp", "dm", "336")))
 
 
+class MainTopicTest(Temp):
+    def test_the_main_topic_is_the_main_chat(self):
+        Runtime(self.root, {**CONFIG, "main_topics": {"telegram:123": 77}}, fake_complete)
+        try:
+            self.assertTrue(P.Chat.from_session_key("agent:main:telegram:dm:123:77", "telegram").is_main)
+            self.assertFalse(P.Chat.from_session_key("agent:main:telegram:dm:123:78", "telegram").is_main)
+            self.assertFalse(P.Chat.from_session_key("agent:main:telegram:dm:999:77", "telegram").is_main)
+            # A group topic with the same number is a sub-chat still.
+            self.assertFalse(P.Chat.from_session_key("agent:main:telegram:group:123:77", "telegram").is_main)
+        finally:
+            P.main_topics().clear()
+
+
 class TelegramTopicTest(Temp):
     def test_a_dm_topic_is_a_sub_chat_with_its_own_model(self):
         rt = Runtime(self.root, CONFIG, fake_complete)

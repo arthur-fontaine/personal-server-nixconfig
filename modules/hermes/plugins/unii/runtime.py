@@ -12,7 +12,7 @@ import time
 from typing import Callable
 
 from .compactor import Compactor
-from .policy import MAIN, Chat, Policies, Policy, own_volume, readable_volumes, write_volume
+from .policy import MAIN, Chat, Policies, Policy, main_topics, own_volume, readable_volumes, write_volume
 from .volume import Volume, VolumeLocked, unlock_key
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,8 @@ class Runtime:
         self.view_bytes = int(config.get("view_bytes", 64_000))
         self.line_bytes = int(config.get("line_bytes", 512))
         self.uzu_model = config.get("uzu_model", "")
+        main_topics().clear()
+        main_topics().update({k: str(v) for k, v in config.get("main_topics", {}).items()})
         # A turn waits this long for the last messages' summaries, then goes on
         # with "(not summarized yet: zoom it)" lines.
         self.summary_wait = float(config.get("summary_wait_seconds", 20))
