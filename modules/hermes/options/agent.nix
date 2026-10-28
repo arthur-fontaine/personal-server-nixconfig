@@ -49,7 +49,9 @@ in
       };
       name = mkOption {
         type = types.str;
-        default = "deepseek-v4.1-flash-free";
+        # Paid (pay-as-you-go on opencode.ai): OpenCode's free models answer
+        # only its own app, and refuse API clients with HTTP 429.
+        default = "deepseek-v4.1-flash";
       };
     };
   };
