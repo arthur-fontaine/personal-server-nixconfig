@@ -25,6 +25,10 @@ in
       require_mention = false;
     };
 
+    # Hermes' core commands (69) overflow the 60-entry menu and come before
+    # plugin commands, which would leave /sub out of Telegram's completion.
+    platforms.telegram.extra.command_menu.priority = [ "sub" ];
+
     # The DM's main topic, declared so Hermes knows it and never renames it
     # (its id is set, so Hermes does not create it again).
     platforms.telegram.extra.dm_topics = lib.optional (main != null) {
