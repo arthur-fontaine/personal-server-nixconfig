@@ -66,7 +66,7 @@ can only write to you; acting takes your answer in the main chat.
 | Files | new files in `~/Downloads` and iCloud Drive's Downloads | polled every minute | done |
 | RunPod | pods left running for 2, 6, 12, 24, 48 h | its REST API | done (trusted: no model) |
 | This Mac | low disk, a power cut, Hermes or uzu down and back, new logins | `pmset`, `last`, health URLs | done (trusted: no model) |
-| GitHub | notifications | `gh api notifications` | off by default: needs a classic token with the notifications scope |
+| GitHub | notifications (reviews, mentions, failed runs) | `gh api notifications`, every 10 min, with its own classic token (the notifications scope): the bootstrap asks for it | done |
 | Telegram | | already the chat itself | not an event |
 | Find My | a device or person moving | FindMy.app's window only, no API | not planned |
 | iPhone | Shortcuts automations (arriving home, an alarm, a Focus) | would need the Mac reachable from outside (a tunnel) | not planned |
