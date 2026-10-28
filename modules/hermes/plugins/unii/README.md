@@ -45,7 +45,10 @@ a sub-chat. Its policy comes from a preset (set in Nix,
 | `encrypted` | AES-256-GCM log, key from `/sub unlock`, transcript scrubbed |
 | `model` | `provider:model`, e.g. `uzu:local`, pinned like `/model` |
 
-`/sub` in a group shows its policy and the commands.
+`/sub` in a sub-chat shows its policy and the commands. In the main chat,
+`/sub new [preset] [name]` opens one as a DM topic, which only the bot can
+create (`telegram.py`, `createForumTopic`); an expired temporary DM topic, or one
+ended with `/sub end`, is deleted (`deleteForumTopic`).
 
 ## Sources
 

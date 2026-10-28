@@ -12,7 +12,8 @@ import time
 from typing import Callable
 
 from .compactor import Compactor
-from .policy import MAIN, Chat, Policies, Policy, main_topics, own_volume, readable_volumes, write_volume
+from .policy import MAIN, Chat, Policies, Policy, own_volume, readable_volumes, write_volume
+from .telegram import BotAPI
 from .volume import Volume, VolumeLocked, unlock_key
 
 logger = logging.getLogger(__name__)
@@ -29,8 +30,6 @@ class Runtime:
         self.view_bytes = int(config.get("view_bytes", 64_000))
         self.line_bytes = int(config.get("line_bytes", 512))
         self.uzu_model = config.get("uzu_model", "")
-        main_topics().clear()
-        main_topics().update({k: str(v) for k, v in config.get("main_topics", {}).items()})
         # A turn waits this long for the last messages' summaries, then goes on
         # with "(not summarized yet: zoom it)" lines.
         self.summary_wait = float(config.get("summary_wait_seconds", 20))
@@ -38,6 +37,7 @@ class Runtime:
         self.keys: dict[str, bytes] = {}
         self.sessions: dict[str, Chat] = {}
         self.gateway = None
+        self.telegram = BotAPI()
         self.session_store = None
         self._volumes: dict[str, Volume] = {}
         self._compactors: dict[str, Compactor] = {}
@@ -164,7 +164,18 @@ class Runtime:
         for chat in expired:
             logger.info("unii: %s expired, wiping it", chat.key)
             self.wipe_chat(chat)
+            self.close_topic(chat)
         return expired
+
+    def close_topic(self, chat: Chat) -> None:
+        """Delete a wiped DM topic, Telegram's copy included. Group topics stay:
+        they belong to the group."""
+        if chat.platform != "telegram" or chat.chat_type != "dm" or not chat.thread:
+            return
+        try:
+            self.telegram.delete_topic(chat.chat_id, chat.thread)
+        except Exception:
+            logger.warning("unii: could not delete the topic of %s", chat.key, exc_info=True)
 
 
 def _session_db():

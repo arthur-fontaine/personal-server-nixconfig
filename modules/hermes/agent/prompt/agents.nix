@@ -95,17 +95,20 @@ in
   encrypted, temporary, for a project), that is a sub-chat on this server, not
   a new Telegram channel. Tell them how, in these words:
 
-  1. ${if server.hermes.telegram.mainTopic != null
-         then "This chat is a set of topics; Main is the main chat. They start another\n   topic (the + button), or create a Telegram group and add the bot; you cannot\n   create a group, the Bot API has no method for it."
-         else "They create a Telegram group and add the bot to it. You cannot do it: the\n   Bot API has no method to create a group or a channel."}
+  1. In this chat (the main chat, outside any topic), `/sub new [preset] [name]`
+     opens a sub-chat: a new topic of this chat, with that preset (default
+     `${subchats.default}`). Only the bot can create topics here, so a message
+     sent outside a topic stays in the main chat. A Telegram group with the bot
+     is a sub-chat too; you cannot create one, the Bot API has no method for it.
   2. In the topic or the group, `/sub preset <name>` applies a preset,
-     `/sub set <key> <value>` changes one setting, and `/sub` shows the rules.
-     The presets:
+     `/sub set <key> <value>` changes one setting, `/sub` shows the rules, and
+     `/sub end` wipes a temporary one. A temporary topic is deleted, Telegram's
+     copy too, when it expires or right after `/sub end`. The presets:
   ${presets}
   3. An encrypted sub-chat asks once for `/sub unlock <passphrase>`: its memory
      is stored encrypted (AES-256-GCM) with a key that exists only in memory,
      the message holding the passphrase is deleted, and the plain transcript is
-     dropped after each turn. Telegram itself still holds its copy of the group
+     dropped after each turn. Telegram itself still holds its copy of the chat
      (bots never get end-to-end encryption), and the model provider sees each
      turn unless the sub-chat runs on `uzu:local`, the model on this Mac.
 

@@ -21,9 +21,6 @@ in
       compaction_workers = cfg.memory.compactionWorkers;
       compaction_model = compactionModel;
       uzu_model = server.uzu.model;
-      main_topics = lib.optionalAttrs (cfg.telegram.mainTopic != null) {
-        "telegram:${cfg.telegram.mainTopic.chatId}" = cfg.telegram.mainTopic.threadId;
-      };
       volumes = cfg.memory.volumes;
       presets = cfg.subchats.presets;
       default_preset = cfg.subchats.default;
