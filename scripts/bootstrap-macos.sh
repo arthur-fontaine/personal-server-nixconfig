@@ -336,7 +336,9 @@ else
   note "Whoever can push here can change the whole Mac through sudo server-rebuild."
   token="$(gum input --password --header "GitHub token (empty to skip)")"
   if [ -n "$token" ]; then
-    printf '%s' "$token" | as_agent gh auth login --git-protocol https --with-token
+    # In gh's own file (~/.config/gh/hosts.yml, readable by the agent only), not
+    # the keychain: the agent's runs unattended, and from here it has none.
+    printf '%s' "$token" | as_agent gh auth login --git-protocol https --insecure-storage --with-token
     unset token
     ok "Hermes can push to GitHub"
   else
