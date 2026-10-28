@@ -6,5 +6,6 @@
     ./memory.nix
     ./subchats.nix
     ./access.nix
+    ./telegram.nix
   ];
 }
