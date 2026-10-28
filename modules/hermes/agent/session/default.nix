@@ -6,6 +6,7 @@
   imports = [
     ./launchd.nix
     ./full-disk.nix
+    ./restart.nix
     ./display.nix
     ./search.nix
     ./defaults.nix

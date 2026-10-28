@@ -8,7 +8,8 @@
 { lib, ... }:
 {
   home.activation.setupLaunchAgents = lib.mkForce (
-    lib.hm.dag.entryAfter [ "writeBoundary" "linkGeneration" ] ''
+    # After hermesAgentSetup, so a restarted gateway reads the new config.
+    lib.hm.dag.entryAfter [ "writeBoundary" "linkGeneration" "hermesAgentSetup" ] ''
       src="$newGenPath/LaunchAgents"
       dst="$HOME/Library/LaunchAgents"
       domain="gui/$UID"
