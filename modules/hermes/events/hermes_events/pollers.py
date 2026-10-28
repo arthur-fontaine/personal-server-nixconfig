@@ -49,8 +49,12 @@ class State:
             json.dump(self.data, f)
         os.replace(self.path + ".tmp", self.path)
 
-    def new(self, name: str, ids: list[str], keep: int = 5000) -> list[str]:
-        """The ids not seen before; the first time, none (it only records)."""
+    def new(self, name: str, ids: list[str], keep: int = 5000, wait_for_data: bool = False) -> list[str]:
+        """The ids not seen before; the first time, none (it only records).
+        `wait_for_data`: an empty first answer (a permission not granted yet)
+        records nothing, so what appears once granted is not all taken for new."""
+        if wait_for_data and not ids and name not in self.data:
+            return []
         first = name not in self.data
         known = set(self.data.get(name, []))
         fresh = [i for i in ids if i not in known]
@@ -163,7 +167,7 @@ async def calendar(pipeline: Pipeline, state: State, imcp: MCP, lead_minutes: in
         start = str(field(event, "startDate", "start"))
         ident = str(field(event, "identifier", "@id", "id", default=f"{field(event, 'name', 'title')}@{start}"))
         by_id[f"{ident}@{start}"] = event
-    for key in state.new("calendar", list(by_id)):
+    for key in state.new("calendar", list(by_id), wait_for_data=True):
         event = by_id[key]
         title, start = field(event, "name", "title", default="(untitled)"), str(field(event, "startDate", "start"))
         details = f"{title}, {when(start)}" + (f", {field(event, 'location')}" if field(event, "location") else "")
@@ -186,7 +190,7 @@ async def mail(pipeline: Pipeline, state: State, imcp: MCP) -> None:
     messages = items(await imcp.call("mail_messages_search", {"isRead": False, "start": iso(since), "limit": 30}))
     by_id = {str(field(m, "@id", "id", "identifier", default=hashlib.sha1(json.dumps(m, sort_keys=True).encode()).hexdigest())): m
              for m in messages}
-    for key in state.new("mail", list(by_id)):
+    for key in state.new("mail", list(by_id), wait_for_data=True):
         m = by_id[key]
         sender = field(m, "sender", "from", "author", default="someone")
         if isinstance(sender, dict):
@@ -261,20 +265,24 @@ async def runpod(pipeline: Pipeline, state: State, api_key: str, hours=(2, 6, 12
             r.raise_for_status()
             pods = items(await r.json())
     running = state.data.setdefault("runpod_since", {})
+    # Thresholds already reported, per pod: kept as long as it runs.
+    told = state.data.setdefault("runpod_told", {})
     now = time.time()
-    current = {}
+    current, still_told = {}, {}
     for pod in pods:
         if field(pod, "desiredStatus", "status") != "RUNNING":
             continue
         pid = str(pod.get("id"))
         current[pid] = running.get(pid, now)
         elapsed = (now - current[pid]) / 3600
-        for h in hours:
-            if elapsed >= h:
-                cost = pod.get("costPerHr")
-                pipeline.system(f"runpod:{pid}:{h}", f"RunPod: the pod {field(pod, 'name', default=pid)} has been running for "
-                                f"{h} h" + (f" (${cost}/h)" if cost else "") + ". Stop it if you are done.")
-    state.data["runpod_since"] = current
+        still_told[pid] = told.get(pid, [])
+        due = [h for h in hours if elapsed >= h and h not in still_told[pid]]
+        if due:
+            h, cost = max(due), pod.get("costPerHr")
+            still_told[pid] += due
+            pipeline.system(f"runpod:{pid}:{h}:{int(current[pid])}", f"RunPod: the pod {field(pod, 'name', default=pid)} has been running for "
+                            f"{h} h" + (f" (${cost}/h)" if cost else "") + ". Stop it if you are done.")
+    state.data["runpod_since"], state.data["runpod_told"] = current, still_told
 
 
 class Health:
@@ -309,11 +317,16 @@ async def system(pipeline: Pipeline, state: State, health: Health, services: dic
                     health.report(pipeline, name, r.status < 500)
             except Exception:
                 health.report(pipeline, name, False)
-    logins = [line for line in (await run("/usr/bin/last", "-20")).splitlines() if line and not line.startswith(("wtmp", "reboot", "shutdown"))]
-    for line in state.new("logins", [hashlib.sha1(l.encode()).hexdigest() for l in logins]):
-        text = next(l for l in logins if hashlib.sha1(l.encode()).hexdigest() == line)
-        if " ttys" in text or " ssh" in text:
-            pipeline.system(f"login:{line}", f"🔑 New login: {' '.join(text.split())}")
+    # A session's line changes when it ends ("still logged in", then its
+    # length): only its start (user, tty, host, date) names it.
+    logins = {}
+    for line in (await run("/usr/bin/last", "-20")).splitlines():
+        if not line or line.startswith(("wtmp", "reboot", "shutdown")) or not (" ttys" in line or " ssh" in line):
+            continue
+        start = " ".join(line.split("still logged in")[0].split(" - ")[0].split())
+        logins[hashlib.sha1(start.encode()).hexdigest()] = start
+    for key in state.new("logins", list(logins)):
+        pipeline.system(f"login:{key}", f"🔑 New login: {logins[key]}")
 
 
 async def every(seconds: float, name: str, poll, state: State) -> None:
