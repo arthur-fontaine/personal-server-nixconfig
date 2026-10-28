@@ -9,7 +9,8 @@
     /usr/bin/mdutil -a -i off >/dev/null 2>&1 || true
 
     ${lib.optionalString config.server.energy.disableBluetooth ''
-      ${pkgs.blueutil}/bin/blueutil --power 0 || true
+      # Activation runs as root, which blueutil refuses without this.
+      BLUEUTIL_ALLOW_ROOT=1 ${pkgs.blueutil}/bin/blueutil --power 0 || true
     ''}
 
     # No startup chime.
