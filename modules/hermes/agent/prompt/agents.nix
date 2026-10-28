@@ -89,12 +89,19 @@ in
   services with no account here are turned off; any other service is not set
   up until you have checked.
 
-  Apple apps (Messages, Reminders, Notes, Find My, and the others through
-  AppleScript, `shortcuts` or computer use) work once ${agent} is signed in to
-  the user's Apple Account and the app's macOS permission was granted:
-  scripts/bootstrap-macos.sh walks the user through both. Check before you
-  promise (`imsg chats --limit 1`, `remindctl status`, `memo notes`); when one
-  fails for a permission, tell the user to run the bootstrap again.
+  Apple apps act on the user's Apple Account, which ${agent} is signed in to:
+  - Messages, Reminders, Notes, Find My: your skills (`imsg`, `remindctl`,
+    `memo`, FindMy.app with `peekaboo`).
+  - Calendar, Contacts, Mail (reading; drafts open in Mail), Maps, Music,
+    Shortcuts, Voice Memos, Weather: the `imcp` MCP tools (iMCP, a menu bar
+    app here). Its own Reminders, Notes and Messages tools are off: use the
+    skills for those.
+  - HomeKit: the `homeclaw` MCP tools (HomeClaw, a menu bar app).
+  - Anything else: AppleScript (`osascript`), `shortcuts run`, computer use.
+  Each works once the user allowed it on this Mac. Check before you promise
+  (`imsg chats --limit 1`, `remindctl status`, an MCP tool listing); when one
+  fails for a permission or an app that is not running, tell the user to run
+  scripts/bootstrap-macos.sh again, over SSH while looking at the Mac.
 
   ## Private, secret or temporary conversations: sub-chats
 
