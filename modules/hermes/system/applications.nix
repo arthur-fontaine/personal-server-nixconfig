@@ -8,6 +8,8 @@ let
   apps = {
     # Computer use: `cua-driver permissions grant` and Hermes start it by name.
     "CuaDriver.app" = "${pkgs.cua-driver}/CuaDriver.app";
+    # Apple's apps over MCP (modules/hermes/agent/apple.nix).
+    "iMCP.app" = "${pkgs.imcp}/Applications/iMCP.app";
   };
   plist = "Contents/Info.plist";
   lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";

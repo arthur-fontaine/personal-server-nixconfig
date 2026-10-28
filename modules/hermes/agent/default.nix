@@ -16,6 +16,7 @@ in
     ./skills.nix
     ./tools.nix
     ./computer-use.nix
+    ./apple.nix
     ./prompt
     ./session
   ];
