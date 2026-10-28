@@ -84,8 +84,9 @@ folders are neither readable nor frozen.
 ## Apple apps
 
 The Hermes account signs in to your Apple Account (the bootstrap's second run),
-so Hermes works with your iMessages, Notes, Reminders, Contacts, Calendar and
-Find My, through its bundled Apple skills and their CLIs (`pkgs/apple`):
+so Hermes works with your Apple apps: through its bundled Apple skills and
+their CLIs (`pkgs/apple`), and two menu bar apps that serve MCP and hold their
+own permissions (`modules/hermes/agent/apple.nix`):
 
 | App | Through | macOS permission (to the launcher) |
 | --- | --- | --- |
@@ -93,10 +94,14 @@ Find My, through its bundled Apple skills and their CLIs (`pkgs/apple`):
 | Reminders | `remindctl` ([steipete/remindctl](https://github.com/steipete/remindctl)) | Reminders |
 | Notes | `memo` ([antoniorodr/memo](https://github.com/antoniorodr/memo)) | Automation |
 | Find My | FindMy.app's window, `peekaboo` ([steipete/Peekaboo](https://github.com/steipete/Peekaboo)) | Screen Recording, Accessibility |
-| Contacts, Calendar, others | AppleScript (`osascript`), `shortcuts`, computer use | Contacts, Calendars, Automation |
+| Calendar, Contacts, Mail (reading), Maps, Music, Shortcuts, Voice Memos, Weather | [iMCP](https://github.com/mattt/iMCP), MCP over stdio | each to iMCP itself, as you turn its services on; Local Network to the launcher |
+| HomeKit | [HomeClaw](https://github.com/omarshahine/HomeClaw) (Mac App Store), MCP over HTTP on 127.0.0.1:9090 | home data, to HomeClaw |
+| Anything else | AppleScript (`osascript`), `shortcuts run`, computer use | Automation |
 
-Every permission belongs to `/Library/Hermes/hermes-launcher`, which starts the
-gateway, so it holds across Hermes updates. A revoked one: run the bootstrap
+iMCP's own Reminders, Notes and Messages services stay off (Nix sets them, with
+Hermes trusted as a client and its self-updates off): the skills do more there.
+The skills' permissions belong to `/Library/Hermes/hermes-launcher`, which
+starts the gateway, so they hold across Hermes updates. A revoked one: run the bootstrap
 again over SSH, looking at the Mac.
 
 ## Models
