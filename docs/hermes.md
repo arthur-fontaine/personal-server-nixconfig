@@ -81,7 +81,9 @@ folders are neither readable nor frozen.
 
 ## Models
 
-- Main: `deepseek-v4.1-flash-free` on OpenCode Zen (`server.hermes.model`).
+- Main: `deepseek-v4.1-flash` on OpenCode Zen, paid as you go (`server.hermes.model`).
+  OpenCode's free models (`*-free`) answer only its own app: through the API
+  they return HTTP 429 "Free usage limit reached" from the first request.
 - Local: uzu serves Qwen 3.5 9B on the GPU at `127.0.0.1:8000`
   (`server.uzu`), for the sub-chats that pin `uzu:local`. Compactions can use it
   too: `server.hermes.memory.compactionModel = "uzu:local"`.
