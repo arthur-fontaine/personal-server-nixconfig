@@ -77,15 +77,17 @@ class Seen:
 @dataclass
 class Batch:
     chat: Chat
+    started: float
     messages: list[Message] = field(default_factory=list)
     task: asyncio.Task | None = None
 
 
 class Pipeline:
     def __init__(self, *, triage, sink, seen: Seen, batch_seconds: float, max_age_seconds: float,
-                 max_chars: int = 4000, clock=time.time):
+                 max_batch_seconds: float | None = None, max_chars: int = 4000, clock=time.time):
         self.triage, self.sink, self.seen = triage, sink, seen
         self.batch_seconds, self.max_age, self.max_chars = batch_seconds, max_age_seconds, max_chars
+        self.max_batch = max_batch_seconds if max_batch_seconds is not None else 5 * batch_seconds
         self.clock = clock
         self.batches: dict[str, Batch] = {}
 
@@ -95,11 +97,15 @@ class Pipeline:
         if self.clock() - message.time > self.max_age:
             log.debug("old message in %s, skipped", chat.key)
             return
-        batch = self.batches.setdefault(chat.key, Batch(chat))
+        batch = self.batches.setdefault(chat.key, Batch(chat, self.clock()))
         batch.messages.append(message)
-        # The window starts at the first message: a burst becomes one event.
-        if batch.task is None:
-            batch.task = asyncio.get_running_loop().create_task(self._flush_later(chat.key))
+        # A quiet window: each message pushes the flush back ("bubble tea?",
+        # then "ce soir"), up to max_batch after the first, so a chat that
+        # never stops still gets through.
+        if batch.task:
+            batch.task.cancel()
+        wait = min(self.batch_seconds, max(0.0, batch.started + self.max_batch - self.clock()))
+        batch.task = asyncio.get_running_loop().create_task(self._flush_later(chat.key, wait))
 
     def own_message(self, chat: Chat) -> None:
         """The user wrote in that chat: they are on it, so nothing to propose."""
@@ -108,21 +114,43 @@ class Pipeline:
             batch.task.cancel()
             log.info("%s: the user answered, dropped %d message(s)", chat.key, len(batch.messages))
 
-    async def _flush_later(self, key: str) -> None:
-        await asyncio.sleep(self.batch_seconds)
+    def notice(self, source: str, key: str, summary: str, details: str = "", *, id: str | None = None,
+               screen: bool = True, fail_open: bool = True) -> None:
+        """An event that is not a chat message (a HomeKit change, a calendar
+        event, a missed call...). `id` dedupes it; `screen` False skips the
+        triage (it always matters)."""
+        if id is not None and not self.seen.add(f"{source}:{id}"):
+            return
+        event = {"source": source, "key": f"{source}:{key}", "summary": summary,
+                 "messages": details[: self.max_chars], "reply_hint": "", "is_group": False}
+        asyncio.get_running_loop().create_task(self._send(event, screen, fail_open))
+
+    def system(self, key: str, text: str) -> None:
+        """This Mac's own news (disk, power, a service down): trusted and rare,
+        sent as written on the system route, with no model at all."""
+        if self.seen.add(f"system:{key}"):
+            asyncio.get_running_loop().create_task(self.sink.post({"key": f"system:{key}", "text": text}, route="system"))
+
+    async def _send(self, event: dict, screen: bool, fail_open: bool) -> None:
+        self.seen.save()
+        if screen:
+            verdict = await self.triage.decide(event, fail_open=fail_open)
+            if verdict is None:
+                log.info("%s: triage says nothing to propose", event["key"])
+                return
+            event["urgency"] = verdict["urgency"]
+        else:
+            event["urgency"] = "now"
+        await self.sink.post(event)
+
+    async def _flush_later(self, key: str, wait: float) -> None:
+        await asyncio.sleep(wait)
         batch = self.batches.pop(key, None)
         if batch:
             await self.flush(batch)
 
     async def flush(self, batch: Batch) -> None:
-        self.seen.save()
-        event = self.event(batch)
-        verdict = await self.triage.decide(event, fail_open=not batch.chat.is_group)
-        if verdict is None:
-            log.info("%s: triage says nothing to propose", batch.chat.key)
-            return
-        event["urgency"] = verdict["urgency"]
-        await self.sink.post(event)
+        await self._send(self.event(batch), True, not batch.chat.is_group)
 
     def event(self, batch: Batch) -> dict:
         chat, messages = batch.chat, batch.messages

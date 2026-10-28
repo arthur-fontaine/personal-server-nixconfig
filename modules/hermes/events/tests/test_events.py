@@ -23,6 +23,7 @@ from hermes_events.core import Chat, Message, Pipeline, Seen  # noqa: E402
 from hermes_events.hermes import HermesSink  # noqa: E402
 from hermes_events.sources import imessage_message, whatsapp_app, whatsapp_message  # noqa: E402
 from hermes_events.triage import UzuTriage  # noqa: E402
+from hermes_events.instagram import instagram_message  # noqa: E402
 
 SECRET = "s3cret"
 NOW = time.time()
@@ -47,14 +48,14 @@ class FakeSink:
     def __init__(self):
         self.events = []
 
-    async def post(self, event):
-        self.events.append(event)
+    async def post(self, event, route="events"):
+        self.events.append(event if route == "events" else {**event, "route": route})
         return True
 
 
-def pipeline(tmp, triage=None, sink=None, batch=0.05):
+def pipeline(tmp, triage=None, sink=None, batch=0.05, max_batch=None):
     return Pipeline(triage=triage or FakeTriage(), sink=sink or FakeSink(), seen=Seen(os.path.join(tmp, "seen.json")),
-                    batch_seconds=batch, max_age_seconds=600)
+                    batch_seconds=batch, max_age_seconds=600, max_batch_seconds=max_batch)
 
 
 class ParseTest(unittest.TestCase):
@@ -75,6 +76,15 @@ class ParseTest(unittest.TestCase):
         self.assertEqual((chat.key, chat.name, message.text, from_me), ("imessage:7", "Léa", "Tu es libre samedi ?", False))
         self.assertIsNone(imessage_message({**line, "is_reaction": True}))
         self.assertIsNone(imessage_message({**line, "edited_at": ISO_NOW}))
+
+
+class InstagramTest(unittest.TestCase):
+    def test_notifications(self):
+        chat, message = instagram_message({"title": "martin.d", "body": "bubble tea ?", "tag": "t"}, NOW)
+        self.assertEqual((chat.key, message.text), ("instagram:martin.d", "bubble tea ?"))
+        chat, _ = instagram_message({"title": "Instagram", "body": "martin.d: ce soir", "tag": ""}, NOW)
+        self.assertEqual(chat.name, "martin.d")
+        self.assertIsNone(instagram_message({"title": "", "body": ""}, NOW))
 
 
 class PipelineTest(unittest.IsolatedAsyncioTestCase):
@@ -99,6 +109,28 @@ class PipelineTest(unittest.IsolatedAsyncioTestCase):
         p2.message(chat, message)
         await asyncio.sleep(0.15)
         self.assertEqual(len(sink.events), 1)
+
+    async def test_a_quiet_window_with_a_cap(self):
+        sink = FakeSink()
+        p = pipeline(self.tmp, sink=sink, batch=0.1, max_batch=0.35)
+        for i in range(6):  # one message every 0.08 s: never quiet for 0.1 s
+            chat, message, _ = whatsapp_message(wa(f"m{i}", id=f"Q{i}"))
+            p.message(chat, message)
+            await asyncio.sleep(0.08)
+        # The cap flushed once mid-stream; the rest follows after the quiet window.
+        await asyncio.sleep(0.25)
+        self.assertEqual(len(sink.events), 2)
+        self.assertEqual(sum(e["messages"].count("Martin:") for e in sink.events), 6)
+
+    async def test_notices_and_system(self):
+        sink = FakeSink()
+        p = pipeline(self.tmp, sink=sink)
+        p.notice("homekit", "door", "Front door opened", "[Front Door] contact open", id="d1")
+        p.notice("homekit", "door", "Front door opened", "[Front Door] contact open", id="d1")
+        p.system("disk", "Disk almost full")
+        await asyncio.sleep(0.05)
+        self.assertEqual([e["key"] for e in sink.events], ["homekit:door", "system:disk"])
+        self.assertEqual(sink.events[1]["route"], "system")
 
     async def test_old_messages_and_answered_chats(self):
         sink = FakeSink()
@@ -171,7 +203,7 @@ class HermesTest(unittest.IsolatedAsyncioTestCase):
         server = TestServer(app)
         await server.start_server()
         self.addAsyncCleanup(server.close)
-        sink = HermesSink(str(server.make_url("/webhooks/events")), SECRET, "839917731")
+        sink = HermesSink(str(server.make_url("/webhooks")), SECRET, "839917731")
         self.assertTrue(await sink.post({"key": "k", "summary": "s"}))
         self.assertEqual(received[0][0], True)
         self.assertEqual(received[0][1]["owner"], "839917731")
