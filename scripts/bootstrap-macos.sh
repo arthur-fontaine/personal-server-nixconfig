@@ -266,6 +266,11 @@ topics() {
       warn "Threaded Mode is on, but you can still create topics: switch \"Disallow users to create new threads\" on."
       continue
     fi
+    if grep -q "not a forum" <<< "$probe"; then
+      # Your DM turns into a forum only with a message sent after Threaded Mode is on.
+      warn "Send @$bot any message, then check again (or turn Threaded Mode on first)."
+      continue
+    fi
     warn "Telegram refused a topic: $("$JQ" -r '.description // empty' <<< "$probe" 2>/dev/null || printf '%s' "$probe")"
   done
 }
