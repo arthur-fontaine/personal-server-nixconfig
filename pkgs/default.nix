@@ -12,6 +12,7 @@ in
   # The CLIs of Hermes' Apple skills (skills/apple in its source).
   inherit (final.callPackage ./apple/release.nix { }) imsg remindctl peekaboo;
   memo = final.callPackage ./apple/memo.nix { };
+  imcp = final.callPackage ./apple/imcp.nix { };
   # Hermes' pinned computer-use driver (its pm/lock.json).
   cua-driver = inputs.hermes-agent.packages.${system}.pm-cua-driver;
   # uzu's CLI, with its OpenAI-compatible `server`.
