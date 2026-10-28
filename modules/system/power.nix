@@ -10,7 +10,8 @@ in
     # A sleeping display hands computer use a black screen.
     sleep.display = "never";
     sleep.harddisk = "never";
-    restartAfterPowerFailure = true;
+    # No restartAfterPowerFailure: macOS offers it on desktop Macs only, and a
+    # MacBook rides out a power cut on its battery.
     restartAfterFreeze = true;
   };
 
