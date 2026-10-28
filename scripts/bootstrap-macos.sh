@@ -174,22 +174,17 @@ owner_id() {
 # What only BotFather can switch on, checked through getMe.
 botfather_settings() {
   local token="$1" bot="$2" me
+  # Threaded Mode turns every message in the bot's DM into a topic of its own,
+  # so the DM would have no main chat left: keep it off.
   while :; do
     me="$(tg "$token" getMe)"
-    if [ "$("$JQ" -r '.result.has_topics_enabled and .result.allows_users_to_create_topics' <<< "$me")" = true ]; then
-      ok "Topics are on: each topic of your chat with @$bot is a sub-chat"
+    if [ "$("$JQ" -r '.result.has_topics_enabled // false' <<< "$me")" != true ]; then
+      ok "Threaded Mode is off: your DM with @$bot is the main chat"
       break
     fi
-    step "Topics, for sub-chats in your chat with @$bot"
-    note "In @BotFather, tap Open (its Mini App): My bots → @$bot → Bot Settings → Threads Settings."
-    # getMe leaves these fields out while they are off.
-    if [ "$("$JQ" -r '.result.has_topics_enabled // false' <<< "$me")" != true ]; then
-      note "Off: Threaded Mode (getMe has_topics_enabled). Turn \"Threaded Mode\" ON."
-    fi
-    if [ "$("$JQ" -r '.result.allows_users_to_create_topics // false' <<< "$me")" != true ]; then
-      note "Users cannot create topics (getMe allows_users_to_create_topics): turn \"Disallow users to create new threads\" OFF,"
-      note "so you can tap + to start a sub-chat."
-    fi
+    step "Threaded Mode, which would split the main chat into topics"
+    note "In @BotFather, tap Open (its Mini App): My bots → @$bot → Bot Settings → Threads Settings,"
+    note "and turn \"Threaded Mode\" OFF. Sub-chats are groups with the bot instead."
     gum confirm --affirmative "Check again" --negative "Skip" "Done?" || break
   done
   while :; do
@@ -198,7 +193,7 @@ botfather_settings() {
       ok "Privacy mode is off: groups with @$bot work as sub-chats too"
       break
     fi
-    step "Groups, for sub-chats outside your DM (optional)"
+    step "Groups, which are the sub-chats"
     note "Send @BotFather, one message at a time:  /setprivacy   @$bot   Disable"
     gum confirm --affirmative "Check again" --negative "Skip" "Done?" || break
   done
