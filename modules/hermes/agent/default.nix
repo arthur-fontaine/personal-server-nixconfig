@@ -17,6 +17,7 @@ in
     ./tools.nix
     ./computer-use.nix
     ./apple.nix
+    ./whatsapp.nix
     ./prompt
     ./session
   ];
