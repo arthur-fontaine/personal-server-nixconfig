@@ -4,5 +4,6 @@
   imports = [
     ./user.nix
     ./access
+    ./computer-use.nix
   ];
 }
