@@ -6,6 +6,11 @@
 # are in the secrets file, written by scripts/bootstrap-macos.sh.
 { ... }:
 {
+  # Connect to api.telegram.org directly. The fallback-IP discovery (for
+  # networks that block Telegram) stalled the first connection here; the
+  # Telegram guide suggests this switch when that path is unhealthy.
+  services.hermes-agent.environment.HERMES_TELEGRAM_DISABLE_FALLBACK_IPS = "true";
+
   services.hermes-agent.settings = {
     # One session per group or topic, not per participant: unii reads the
     # sub-chat from the session key, which then never ends with a user id.
