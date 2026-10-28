@@ -16,13 +16,14 @@ main chat too. Subagents and cron jobs read the main memory but never write it.
 
 ## Sub-chats
 
-Each group with the bot is a sub-chat, kept out of the main chat by its
-policy: create a group in Telegram, add the bot, and type `/sub` there to see
-the policy. Each topic of a group with topics is a sub-chat of its own.
+With BotFather's Threaded Mode, your DM with the bot is a set of topics. The
+setup script has the bot create a **Main** topic and records it as
+`server.hermes.telegram.mainTopic`: that topic is the main chat. Every other
+topic is a sub-chat, kept out of the main chat by its policy: start one with
+**+** (a message sent from "All Messages" starts one too), and type `/sub` in it
+to see the policy. Without Threaded Mode, the DM itself is the main chat.
 
-Threaded Mode (BotFather) stays off: with it, Telegram turns every message in
-the bot's DM into a topic of its own, which would leave no main chat. The
-plugin still treats DM topics as sub-chats, should that change.
+Each group with the bot is a sub-chat too, and so is each topic of a group.
 
 | Setting | Values | Effect |
 | --- | --- | --- |
