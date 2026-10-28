@@ -184,10 +184,11 @@ botfather_settings() {
     note "In @BotFather, tap Open (its Mini App): My bots → @$bot → Bot Settings → Threads Settings."
     # getMe leaves these fields out while they are off.
     if [ "$("$JQ" -r '.result.has_topics_enabled // false' <<< "$me")" != true ]; then
-      note "Off: Threaded Mode (getMe has_topics_enabled). Turn it on."
+      note "Off: Threaded Mode (getMe has_topics_enabled). Turn \"Threaded Mode\" ON."
     fi
     if [ "$("$JQ" -r '.result.allows_users_to_create_topics // false' <<< "$me")" != true ]; then
-      note "Off: users creating topics (getMe allows_users_to_create_topics). Turn it on, so you can tap + to start a sub-chat."
+      note "Users cannot create topics (getMe allows_users_to_create_topics): turn \"Disallow users to create new threads\" OFF,"
+      note "so you can tap + to start a sub-chat."
     fi
     gum confirm --affirmative "Check again" --negative "Skip" "Done?" || break
   done
