@@ -5,6 +5,9 @@
   https://github.com/openclaw/wacli/blob/main/docs/sync.md#webhook-payloads.
 - iMessage and SMS: `imsg watch --json` streams one message per line (fields
   from imsg's Sources/imsg/OutputModels.swift, MessagePayload).
+- HomeKit: HomeClaw posts its triggered events to <url>/hooks/homeclaw as
+  {"text": "[Front Door] [Home] HomeKit: ...", "mode": "now" | "next-heartbeat"}
+  with a Bearer token (its openclaw/hooks/homeclaw-transform.js).
 """
 
 from __future__ import annotations
@@ -14,6 +17,7 @@ import hashlib
 import hmac
 import json
 import logging
+import time
 
 from aiohttp import web
 
@@ -63,8 +67,24 @@ def whatsapp_app(pipeline: Pipeline, secret: str) -> web.Application:
                 pipeline.message(chat, message)
         return web.Response(status=204)
 
+    async def homekit(request: web.Request) -> web.Response:
+        if not hmac.compare_digest(request.headers.get("Authorization", ""), f"Bearer {secret}"):
+            return web.Response(status=401)
+        try:
+            payload = await request.json()
+        except ValueError:
+            return web.Response(status=400)
+        text = str(payload.get("text", "")).strip()
+        if text and "Webhook test event" not in text:
+            # One accessory's change, deduped within the minute it happened.
+            accessory = text.split("]")[0].lstrip("[") or "home"
+            digest = hashlib.sha256(f"{text}{int(time.time() // 60)}".encode()).hexdigest()[:16]
+            pipeline.notice("homekit", accessory, f"HomeKit: {accessory}", text, id=digest)
+        return web.json_response({"ok": True})
+
     app = web.Application(client_max_size=1 << 20)
     app.router.add_post("/whatsapp", receive)
+    app.router.add_post("/hooks/homeclaw", homekit)
     return app
 
 

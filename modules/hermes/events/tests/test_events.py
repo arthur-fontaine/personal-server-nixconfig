@@ -24,6 +24,8 @@ from hermes_events.hermes import HermesSink  # noqa: E402
 from hermes_events.sources import imessage_message, whatsapp_app, whatsapp_message  # noqa: E402
 from hermes_events.triage import UzuTriage  # noqa: E402
 from hermes_events.instagram import instagram_message  # noqa: E402
+from hermes_events import pollers  # noqa: E402
+import sqlite3  # noqa: E402
 
 SECRET = "s3cret"
 NOW = time.time()
@@ -224,6 +226,90 @@ class WhatsAppEndpointTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(good.status, 204)
         await asyncio.sleep(0.15)
         self.assertEqual(len(sink.events), 1)
+
+
+class HomeKitEndpointTest(unittest.IsolatedAsyncioTestCase):
+    async def test_bearer_and_test_events(self):
+        sink = FakeSink()
+        p = pipeline(tempfile.mkdtemp(), sink=sink)
+        client = TestClient(TestServer(whatsapp_app(p, SECRET)))
+        await client.start_server()
+        self.addAsyncCleanup(client.close)
+        event = {"text": "[Front Door] [Home] HomeKit: Front Door contact state changed to open", "mode": "now"}
+        self.assertEqual((await client.post("/hooks/homeclaw", json=event)).status, 401)
+        auth = {"Authorization": f"Bearer {SECRET}"}
+        await client.post("/hooks/homeclaw", json={"text": "[HomeClaw] Webhook test event", "mode": "now"}, headers=auth)
+        self.assertEqual((await client.post("/hooks/homeclaw", json=event, headers=auth)).status, 200)
+        await asyncio.sleep(0.05)
+        self.assertEqual([e["summary"] for e in sink.events], ["HomeKit: Front Door"])
+
+
+class FakeMCP:
+    def __init__(self, answers):
+        self.answers = answers
+
+    async def call(self, tool, arguments):
+        return self.answers[tool]
+
+
+class PollersTest(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.sink = FakeSink()
+        self.p = pipeline(self.tmp, sink=self.sink)
+        self.state = pollers.State(os.path.join(self.tmp, "pollers.json"))
+
+    async def drain(self):
+        await asyncio.sleep(0.05)
+        return self.sink.events
+
+    def test_state_seeds_first(self):
+        self.assertEqual(self.state.new("x", ["a", "b"]), [])
+        self.assertEqual(self.state.new("x", ["a", "b", "c"]), ["c"])
+        self.state.save()
+        self.assertEqual(pollers.State(self.state.path).new("x", ["c", "d"]), ["d"])
+
+    async def test_calendar(self):
+        soon = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + 600))
+        later = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + 86400))
+        dinner = {"@type": "Event", "identifier": "E1", "name": "Dinner", "startDate": later}
+        imcp = FakeMCP({"events_fetch": [dinner]})
+        await pollers.calendar(self.p, self.state, imcp)  # seeds
+        imcp.answers["events_fetch"] = [dinner, {"identifier": "E2", "name": "Drink", "startDate": soon, "location": "Bobbolitas"}]
+        await pollers.calendar(self.p, self.state, imcp)
+        summaries = [e["summary"] for e in await self.drain()]
+        self.assertEqual(sorted(summaries), ["New event in the calendar: Drink", "Starting soon: Drink"])
+
+    async def test_calls(self):
+        db = os.path.join(self.tmp, "CallHistory.storedata")
+        with sqlite3.connect(db) as c:
+            c.execute("CREATE TABLE ZCALLRECORD (Z_PK INTEGER, ZDATE REAL, ZADDRESS TEXT, ZNAME TEXT, ZANSWERED INTEGER, ZORIGINATED INTEGER)")
+            c.execute("INSERT INTO ZCALLRECORD VALUES (1, 0, '+33611111111', 'Martin', 0, 0)")
+        await pollers.calls(self.p, self.state, db)
+        with sqlite3.connect(db) as c:
+            c.execute("INSERT INTO ZCALLRECORD VALUES (2, 0, '+33622222222', 'Léa', 0, 0)")
+            c.execute("INSERT INTO ZCALLRECORD VALUES (3, 0, '+33633333333', 'Out', 1, 1)")
+        await pollers.calls(self.p, self.state, db)
+        self.assertEqual([e["summary"] for e in await self.drain()], ["Missed call from Léa"])
+
+    async def test_files(self):
+        folder = os.path.join(self.tmp, "Downloads")
+        os.makedirs(folder)
+        await pollers.files(self.p, self.state, [folder])
+        for name in ("invoice.pdf", ".DS_Store", "big.crdownload"):
+            open(os.path.join(folder, name), "w").close()
+        await pollers.files(self.p, self.state, [folder])
+        self.assertEqual([e["summary"] for e in await self.drain()], ["New file: invoice.pdf"])
+
+    async def test_health_transitions(self):
+        health = pollers.Health()
+        for ok in (False, False, False, True, True):
+            health.report(self.p, "uzu", ok)
+        self.assertEqual([e["text"] for e in await self.drain()], ["⚠️ uzu is not answering.", "✅ uzu is back."])
+
+    def test_items(self):
+        self.assertEqual(pollers.items({"events": [{"id": 1}]}), [{"id": 1}])
+        self.assertEqual(pollers.items([{"id": 1}, "x"]), [{"id": 1}])
 
 
 if __name__ == "__main__":
