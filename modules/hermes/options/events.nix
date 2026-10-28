@@ -1,6 +1,7 @@
 { lib, ... }:
 let
   inherit (lib) mkOption types;
+  source = description: default: mkOption { type = types.bool; inherit default description; };
 in
 {
   options.server.hermes.events = {
@@ -8,29 +9,46 @@ in
       type = types.bool;
       default = true;
       description = ''
-        Let Hermes write first: when a message may call for you (an
+        Let Hermes write first: when something may call for you (an
         invitation, a question, a plan), it checks what it can (your calendar,
         the place) and proposes what to do in the main chat. docs/events.md.
       '';
     };
-    whatsapp = mkOption {
-      type = types.bool;
-      default = true;
-      description = "Screen incoming WhatsApp messages (wacli's webhook).";
+
+    whatsapp = source "Incoming WhatsApp messages (wacli's webhook)." true;
+    imessage = source "Incoming iMessages and SMS (imsg watch)." true;
+    instagram = source "Instagram's notifications, in Hermes' always-open Chrome." true;
+    homekit = source "HomeKit accessory changes HomeClaw is set to report (its triggers)." true;
+    calendar = source "New events in the calendar, and events starting soon (iMCP)." true;
+    mail = source "New unread mail (iMCP, once its Mail folder access is granted)." true;
+    reminders = source "Reminders falling due (remindctl)." true;
+    calls = source "Missed calls (the call history iCloud syncs to this Mac)." true;
+    github = source ''
+      GitHub notifications (gh). Off: the fine-grained token the bootstrap asks
+      for cannot read them; a classic token with the notifications scope can.
+    '' false;
+    runpod = source "RunPod pods left running (2, 6, 12, 24, 48 hours)." true;
+    system = source "This Mac: low disk, power cuts, a service down, new logins. Sent as is." true;
+
+    files = mkOption {
+      type = types.listOf types.str;
+      default = [ "~/Downloads" "~/Library/Mobile Documents/com~apple~CloudDocs/Downloads" ];
+      description = "Folders whose new files are events (Hermes' own ~, and its iCloud Drive). [] turns it off.";
     };
-    imessage = mkOption {
-      type = types.bool;
-      default = true;
-      description = "Screen incoming iMessages and SMS (imsg watch).";
-    };
+
     batchSeconds = mkOption {
       type = types.ints.positive;
-      default = 60;
+      default = 45;
       description = ''
-        How long a chat's messages are gathered into one event after its first
-        one: a burst is one proposal, and an answer you send in the meantime
-        means nothing to propose.
+        A chat's messages gather into one event until it has been quiet this
+        long ("bubble tea?", then "ce soir"); an answer you send in the
+        meantime means nothing to propose.
       '';
+    };
+    maxBatchSeconds = mkOption {
+      type = types.ints.positive;
+      default = 300;
+      description = "A chat that never goes quiet is still sent this long after its first message.";
     };
     maxAgeSeconds = mkOption {
       type = types.ints.positive;
@@ -40,7 +58,7 @@ in
     port = mkOption {
       type = types.port;
       default = 8645;
-      description = "The daemon's loopback port, where wacli posts.";
+      description = "The daemon's loopback port, where wacli and HomeClaw post.";
     };
     webhookPort = mkOption {
       type = types.port;

@@ -15,10 +15,13 @@ let
     cp -R ${../events/hermes_events} $out/hermes_events
   '';
 
+  imcp = "/Applications/iMCP.app/Contents/MacOS/imcp-server";
+  minutes = m: m * 60;
+
   daemonConfig = pkgs.writeText "hermes-events.json" (builtins.toJSON {
     secrets_file = server.hermes.secretsFile;
     state_dir = "${server.hermes.home}/.local/state/hermes-events";
-    hermes_url = "http://127.0.0.1:${toString cfg.webhookPort}/webhooks/events";
+    hermes_url = "http://127.0.0.1:${toString cfg.webhookPort}/webhooks";
     listen = { host = "127.0.0.1"; port = cfg.port; };
     triage = {
       url = "http://127.0.0.1:${toString server.uzu.port}/v1/chat/completions";
@@ -26,12 +29,38 @@ let
       timeout = 30;
     };
     batch_seconds = cfg.batchSeconds;
+    max_batch_seconds = cfg.maxBatchSeconds;
     max_age_seconds = cfg.maxAgeSeconds;
+    # Calendar and mail read iMCP as the trusted client "hermes-events" (apple.nix).
+    imcp_command = [ imcp ];
     sources = {
-      whatsapp.enabled = cfg.whatsapp;
+      # wacli and HomeClaw post to the daemon whatever these say.
       imessage = {
         enabled = cfg.imessage;
         command = [ (lib.getExe pkgs.imsg) "watch" "--json" "--attachments" ];
+      };
+      instagram = {
+        enabled = cfg.instagram;
+        devtools = "http://127.0.0.1:${toString server.hermes.browserPort}";
+      };
+      calendar = { enabled = cfg.calendar; every = minutes 5; lead_minutes = 30; };
+      mail = { enabled = cfg.mail; every = minutes 5; };
+      reminders = { enabled = cfg.reminders; every = 60; command = lib.getExe pkgs.remindctl; };
+      calls = {
+        enabled = cfg.calls;
+        every = 60;
+        database = "~/Library/Application Support/CallHistoryDB/CallHistory.storedata";
+      };
+      files = { enabled = cfg.files != [ ]; every = 60; folders = cfg.files; };
+      github = { enabled = cfg.github; every = minutes 10; command = lib.getExe pkgs.gh; };
+      runpod = { enabled = cfg.runpod; every = minutes 15; };
+      system = {
+        enabled = cfg.system;
+        every = minutes 5;
+        services = {
+          "Hermes" = "http://127.0.0.1:${toString cfg.webhookPort}/health";
+          "uzu, the local model" = "http://127.0.0.1:${toString server.uzu.port}/v1/models";
+        };
       };
     };
   });
@@ -91,9 +120,13 @@ lib.mkIf cfg.enable {
           they have at that time), their contacts, places on the map near them (a
           bar's name: where it is), the weather, a web search.
 
-          Then write them one short Telegram message, in their language: what
-          happened, what you found, and the two or three things you could do now,
-          as a question. For an invitation when they are free: book it and answer
+          These may be several things at once (two topics in one chat, or one
+          message answering another): handle each on its own, numbered, and keep
+          together what belongs together ("bubble tea?" then "ce soir" is one).
+
+          Then write them one short Telegram message, in their language: for
+          each, what happened, what you found, and the two or three things you
+          could do now, as a question. For an invitation when they are free: book it and answer
           yes, or ask for details. When they are busy: answer that they cannot,
           with or without the reason, or say nothing. When there is nothing worth
           their attention after all, answer exactly [SILENT].
@@ -105,6 +138,15 @@ lib.mkIf cfg.enable {
         deliver = "telegram";
         deliver_extra.chat_id = owner;
         # So the main chat knows what it proposed when the user answers.
+        mirror_to_session = true;
+      };
+      # This Mac's own alerts (disk, power, a service down): the daemon writes
+      # the text, sent as is, no model.
+      routes.system = {
+        prompt = "{text}";
+        deliver = "telegram";
+        deliver_extra.chat_id = owner;
+        deliver_only = true;
         mirror_to_session = true;
       };
     };
