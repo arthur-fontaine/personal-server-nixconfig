@@ -13,7 +13,7 @@ missing, for example the BotFather settings you skipped.
 | Repository | clones it to `~/personal-server-nixconfig` | |
 | This host | writes the git-ignored `hosts/local.nix`: host name, your user, the SSH keys allowed to log in (from your GitHub account, pasted, or this Mac's `~/.ssh/*.pub`) | choose the keys |
 | Secrets | writes `/etc/hermes/secrets.env` (root, then Hermes only, mode 0400): the OpenCode Zen and RunPod API keys | paste the keys |
-| Telegram bot | walks you through @BotFather's `/newbot`, checks the token, reads your user id from your first message to the bot, sets its description, then checks that Threaded Mode is off (it would split the DM into topics), privacy mode (groups as sub-chats) and its picture (the Hermes logo, from the pinned Hermes source) | create the bot; in BotFather's Mini App, Threads Settings: Threaded Mode off; send `/setprivacy` → your bot → `Disable`; send `/setuserpic` → your bot → the Hermes logo it saved to `~/Downloads` |
+| Telegram bot | walks you through @BotFather's `/newbot`, checks the token, reads your user id from your first message to the bot, sets its description, then checks Threaded Mode (with it, it creates a Main topic, the main chat, and every other topic is a sub-chat), privacy mode (groups as sub-chats) and its picture (the Hermes logo, from the pinned Hermes source) | create the bot; for topics, in BotFather's Mini App, Threads Settings: Threaded Mode on and "Disallow users to create new threads" off; send `/setprivacy` → your bot → `Disable`; send `/setuserpic` → your bot → the Hermes logo it saved to `~/Downloads` |
 | System | runs `darwin-rebuild switch` | |
 | Auto-login | gives the `hermes` account a random password and writes `/etc/kcpassword`, so macOS logs it in at boot (the login user itself is in Nix) | confirm turning FileVault off, which auto-login needs |
 | GitHub | `gh auth login` for Hermes, with a token you create for this repository only (Contents: read and write) | create the token |
@@ -36,8 +36,9 @@ reaches Hermes and everything it runs, across updates.
 - DigUp downloads its embedding model at the first `digup index`.
 - Keep the lid open: the backlight is off, but a closed lid turns the display
   off and computer use sees a black screen. The Mac never sleeps either way.
-- Talk to the bot in its DM: that is the main chat. For a sub-chat, create a
-  group with the bot, and send `/sub` there for its rules.
+- Talk to the bot in its DM's **Main** topic (or the DM itself, without
+  Threaded Mode): that is the main chat. Any other topic, or a group with the
+  bot, is a sub-chat: send `/sub` there for its rules.
 - Whoever can push to the repository can change the whole Mac through
   `sudo server-rebuild`, Hermes included: keep its GitHub token to this
   repository.
