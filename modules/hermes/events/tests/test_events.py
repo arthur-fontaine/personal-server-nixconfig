@@ -307,6 +307,33 @@ class PollersTest(unittest.IsolatedAsyncioTestCase):
             health.report(self.p, "uzu", ok)
         self.assertEqual([e["text"] for e in await self.drain()], ["⚠️ uzu is not answering.", "✅ uzu is back."])
 
+    def test_an_empty_first_answer_records_nothing(self):
+        self.assertEqual(self.state.new("mail", [], wait_for_data=True), [])
+        self.assertEqual(self.state.new("mail", ["m1"], wait_for_data=True), [])  # still the first real answer
+        self.assertEqual(self.state.new("mail", ["m1", "m2"], wait_for_data=True), ["m2"])
+
+    async def test_logins_do_not_repeat_at_logout(self):
+        lines = ["arthur  ttys000  192.168.1.20  Wed Oct 28 15:00   still logged in"]
+
+        async def fake_run(*command, timeout=60):
+            if command[0].endswith("last"):
+                return "\n".join(lines)
+            return "Now drawing from 'AC Power'"
+
+        original, pollers.run = pollers.run, fake_run
+        try:
+            health = pollers.Health()
+            await pollers.system(self.p, self.state, health, {})  # seeds
+            lines.insert(0, "arthur  ttys001  10.0.0.5  Wed Oct 28 16:00   still logged in")
+            lines[1] = "arthur  ttys000  192.168.1.20  Wed Oct 28 15:00 - 15:42  (00:42)"
+            await pollers.system(self.p, self.state, health, {})
+        finally:
+            pollers.run = original
+        # (The disk check is this machine's real one: count logins only.)
+        texts = [e["text"] for e in await self.drain() if e["key"].startswith("system:login:")]
+        self.assertEqual(len(texts), 1)
+        self.assertIn("10.0.0.5", texts[0])
+
     def test_items(self):
         self.assertEqual(pollers.items({"events": [{"id": 1}]}), [{"id": 1}])
         self.assertEqual(pollers.items([{"id": 1}, "x"]), [{"id": 1}])

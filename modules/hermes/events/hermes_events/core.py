@@ -90,6 +90,14 @@ class Pipeline:
         self.max_batch = max_batch_seconds if max_batch_seconds is not None else 5 * batch_seconds
         self.clock = clock
         self.batches: dict[str, Batch] = {}
+        # asyncio keeps only weak references to tasks.
+        self.tasks: set[asyncio.Task] = set()
+
+    def spawn(self, coroutine) -> asyncio.Task:
+        task = asyncio.get_running_loop().create_task(coroutine)
+        self.tasks.add(task)
+        task.add_done_callback(self.tasks.discard)
+        return task
 
     def message(self, chat: Chat, message: Message) -> None:
         if not self.seen.add(f"{chat.key}:{message.id}"):
@@ -105,7 +113,7 @@ class Pipeline:
         if batch.task:
             batch.task.cancel()
         wait = min(self.batch_seconds, max(0.0, batch.started + self.max_batch - self.clock()))
-        batch.task = asyncio.get_running_loop().create_task(self._flush_later(chat.key, wait))
+        batch.task = self.spawn(self._flush_later(chat.key, wait))
 
     def own_message(self, chat: Chat) -> None:
         """The user wrote in that chat: they are on it, so nothing to propose."""
@@ -123,13 +131,13 @@ class Pipeline:
             return
         event = {"source": source, "key": f"{source}:{key}", "summary": summary,
                  "messages": details[: self.max_chars], "reply_hint": "", "is_group": False}
-        asyncio.get_running_loop().create_task(self._send(event, screen, fail_open))
+        self.spawn(self._send(event, screen, fail_open))
 
     def system(self, key: str, text: str) -> None:
         """This Mac's own news (disk, power, a service down): trusted and rare,
         sent as written on the system route, with no model at all."""
         if self.seen.add(f"system:{key}"):
-            asyncio.get_running_loop().create_task(self.sink.post({"key": f"system:{key}", "text": text}, route="system"))
+            self.spawn(self.sink.post({"key": f"system:{key}", "text": text}, route="system"))
 
     async def _send(self, event: dict, screen: bool, fail_open: bool) -> None:
         self.seen.save()

@@ -4,9 +4,9 @@
 Instagram sends Web Push to that Chrome (a Google build: Chrome for Testing
 gets a push endpoint that Firebase rejects with 410). The push wakes its
 service worker, which calls `showNotification`. Every new target is attached
-paused (`Target.setAutoAttach`, `waitForDebuggerOnStart`), so the hook below is
-in place before Instagram's code runs, then it resumes; the hook hands each
-notification to a CDP binding, and still shows it.
+paused (`Target.setAutoAttach`, `waitForDebuggerOnStart`); a service worker
+gets the hook below before Instagram's code runs, then resumes. The hook hands
+each notification to a CDP binding, and still shows it.
 """
 
 from __future__ import annotations
@@ -74,6 +74,12 @@ def instagram_message(payload: dict, now: float) -> tuple[Chat, Message] | None:
 class CDP:
     def __init__(self, ws):
         self.ws, self.n, self.pending = ws, 0, {}
+        self.tasks: set[asyncio.Task] = set()
+
+    def spawn(self, coroutine) -> None:
+        task = asyncio.create_task(coroutine)
+        self.tasks.add(task)
+        task.add_done_callback(self.tasks.discard)
 
     async def call(self, method: str, params: dict | None = None, session: str | None = None) -> dict:
         self.n += 1
@@ -93,22 +99,17 @@ class CDP:
 
 
 async def attached(cdp: CDP, params: dict, host: str) -> None:
-    """Every page and service worker gets the hook (a tab opens on about:blank
-    and only then goes to Instagram); the hook itself checks the site. A page
-    takes it for each new document. A worker has no context until its script
-    starts, so it pauses right before (an instrumentation breakpoint) and
-    `paused` hooks it there."""
+    """Service workers only: a push wakes Instagram's even with no tab open,
+    and leaving pages alone keeps `Runtime.enable`, which anti-bot scripts
+    detect, out of the tab Hermes uses. A worker has no context until its
+    script starts, so it pauses right before (an instrumentation breakpoint)
+    and `paused` hooks it there; the hook itself checks the site."""
     session, info = params["sessionId"], params.get("targetInfo", {})
-    kind = info.get("type")
-    log.debug("attached %s %s", kind, info.get("url"))
+    log.debug("attached %s %s", info.get("type"), info.get("url"))
     try:
-        if kind in ("service_worker", "page"):
+        if info.get("type") == "service_worker":
             await cdp.call("Runtime.enable", {}, session)
             await cdp.call("Runtime.addBinding", {"name": BINDING}, session)
-        if kind == "page":
-            await cdp.call("Page.addScriptToEvaluateOnNewDocument", {"source": hook(host)}, session)
-            await cdp.call("Runtime.evaluate", {"expression": hook(host)}, session)
-        elif kind == "service_worker":
             await cdp.call("Debugger.enable", {}, session)
             await cdp.call("Debugger.setInstrumentationBreakpoint", {"instrumentation": "beforeScriptExecution"}, session)
     except Exception as err:
@@ -159,9 +160,9 @@ async def read(ws, cdp: CDP, pipeline: Pipeline, host: str) -> None:
             continue
         method, params = message.get("method"), message.get("params", {})
         if method == "Target.attachedToTarget":
-            asyncio.create_task(attached(cdp, params, host))
+            cdp.spawn(attached(cdp, params, host))
         elif method == "Debugger.paused" and message.get("sessionId"):
-            asyncio.create_task(paused(cdp, message["sessionId"], host))
+            cdp.spawn(paused(cdp, message["sessionId"], host))
         elif method == "Runtime.bindingCalled" and params.get("name") == BINDING:
             try:
                 parsed = instagram_message(json.loads(params.get("payload", "{}")), time.time())
