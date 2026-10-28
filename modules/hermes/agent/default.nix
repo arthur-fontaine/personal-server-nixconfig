@@ -37,6 +37,9 @@ in
       # Approvals arrive as Telegram messages; the guardian model decides the
       # obvious ones.
       approvals.mode = "smart";
+      # A cold start on this Mac (Low Power Mode, a first fsearch index, uzu's
+      # download) loaded the Telegram plugin past the default 10 seconds.
+      plugins.load_timeout_seconds = 60;
       # Nix pins and updates Hermes (flake.lock), not Hermes itself.
       updates = {
         check = false;
