@@ -7,5 +7,6 @@
     ./subchats.nix
     ./access.nix
     ./telegram.nix
+    ./onepassword.nix
   ];
 }
