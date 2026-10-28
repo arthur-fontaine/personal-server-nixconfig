@@ -122,6 +122,13 @@ write_secret() { sudo sh -c 'umask 077 && cat > "$1"' _ "$1"; }
 JQ="$(nix build --no-link --print-out-paths nixpkgs#jq.bin)/bin/jq"
 # A Bot API call: tg <token> <method> [query string].
 tg() { curl -fsS "https://api.telegram.org/bot$1/$2${3:+?$3}"; }
+# A Bot API call with form fields: tg_post <token> <method> <name=value>...
+tg_post() {
+  local token="$1" method="$2" field args=()
+  shift 2
+  for field in "$@"; do args+=(--data-urlencode "$field"); done
+  curl -fsS "https://api.telegram.org/bot$token/$method" "${args[@]}"
+}
 
 new_bot_token() {
   local token me
@@ -174,17 +181,24 @@ owner_id() {
 # What only BotFather can switch on, checked through getMe.
 botfather_settings() {
   local token="$1" bot="$2" me
-  # Threaded Mode turns every message in the bot's DM into a topic of its own,
-  # so the DM would have no main chat left: keep it off.
+  # Threaded Mode makes the DM a set of topics: one is the main chat (main_topic
+  # below), every other one a sub-chat. Without it, the DM's root is the main chat.
   while :; do
     me="$(tg "$token" getMe)"
-    if [ "$("$JQ" -r '.result.has_topics_enabled // false' <<< "$me")" != true ]; then
-      ok "Threaded Mode is off: your DM with @$bot is the main chat"
+    if [ "$("$JQ" -r '.result.has_topics_enabled and .result.allows_users_to_create_topics' <<< "$me")" = true ]; then
+      ok "Topics are on: a Main topic is the main chat, every other topic a sub-chat"
       break
     fi
-    step "Threaded Mode, which would split the main chat into topics"
-    note "In @BotFather, tap Open (its Mini App): My bots → @$bot → Bot Settings → Threads Settings,"
-    note "and turn \"Threaded Mode\" OFF. Sub-chats are groups with the bot instead."
+    step "Topics, for sub-chats in your chat with @$bot (optional)"
+    note "In @BotFather, tap Open (its Mini App): My bots → @$bot → Bot Settings → Threads Settings."
+    # getMe leaves these fields out while they are off.
+    if [ "$("$JQ" -r '.result.has_topics_enabled // false' <<< "$me")" != true ]; then
+      note "Off: Threaded Mode (getMe has_topics_enabled). Turn \"Threaded Mode\" ON."
+    fi
+    if [ "$("$JQ" -r '.result.allows_users_to_create_topics // false' <<< "$me")" != true ]; then
+      note "Users cannot create topics (getMe allows_users_to_create_topics): turn \"Disallow users to create new threads\" OFF."
+    fi
+    note "Skip to keep one plain chat, and use groups with @$bot as sub-chats."
     gum confirm --affirmative "Check again" --negative "Skip" "Done?" || break
   done
   while :; do
@@ -245,8 +259,29 @@ else
   tg "$bot_token" setMyShortDescription "short_description=Hermes%2C%20a%20personal%20agent%20on%20a%20home%20server" >/dev/null || true
   tg "$bot_token" setMyDescription "description=Hermes%20answers%20only%20its%20owner." >/dev/null || true
 fi
+# With topics on, a "Main" topic the bot creates in your DM is the main chat;
+# its id goes into hosts/local.nix (server.hermes.telegram.mainTopic).
+main_topic() {
+  local token="$1" owner="$2" created thread text
+  [ "$(tg "$token" getMe | "$JQ" -r '.result.has_topics_enabled // false')" = true ] || return 0
+  if setting server.hermes.telegram.mainTopic.threadId >/dev/null 2>&1; then
+    ok "The Main topic is the main chat"
+    return 0
+  fi
+  step "The Main topic"
+  created="$(tg_post "$token" createForumTopic "chat_id=$owner" "name=Main")" || { warn "Telegram did not create the topic."; return 0; }
+  thread="$("$JQ" -r .result.message_thread_id <<< "$created")"
+  text="$(REPO="$REPO_DIR" HOST="$HOST" PATCH="{\"server\":{\"hermes\":{\"telegram\":{\"mainTopic\":{\"chatId\":\"$owner\",\"threadId\":$thread}}}}}" \
+    nix eval --impure --raw --file "$REPO_DIR/scripts/lib/set-host.nix")"
+  printf '%s' "$text" > "$local_nix"
+  tg_post "$token" sendMessage "chat_id=$owner" "message_thread_id=$thread" \
+    "text=This topic is the main chat. Every other topic is a sub-chat: send /sub in it for its rules." >/dev/null || true
+  ok "Created the Main topic (hosts/local.nix: server.hermes.telegram.mainTopic)"
+}
+
 if [ -n "${bot_token:-}" ]; then
   botfather_settings "$bot_token" "$(tg "$bot_token" getMe | "$JQ" -r .result.username)"
+  main_topic "$bot_token" "${owner:-$(sudo sed -n 's/^TELEGRAM_ALLOWED_USERS=//p' "$secrets" | cut -d, -f1)}"
 fi
 
 # ── The system ──────────────────────────────────────────────────────────────
