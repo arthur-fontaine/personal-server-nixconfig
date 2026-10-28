@@ -18,6 +18,7 @@ in
     ./computer-use.nix
     ./apple.nix
     ./whatsapp.nix
+    ./onepassword.nix
     ./prompt
     ./session
   ];
