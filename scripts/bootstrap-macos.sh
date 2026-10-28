@@ -3,9 +3,9 @@
 # SSH keys, secrets, the Telegram bot, the Hermes account's login, GitHub
 # access and the macOS permissions. Run it once, at the Mac's own screen (the
 # permission dialogs show there), and let it reboot: nothing is left to run
-# afterwards. Each step checks whether it is done first, so running it again
-# from the clone (~/personal-server-nixconfig/scripts/bootstrap-macos.sh)
-# only redoes what is missing, e.g. BotFather settings left for later.
+# afterwards. Running it again pulls the clone, then redoes only what is
+# missing (each step checks whether it is done), e.g. BotFather settings left
+# for later.
 #
 # Modelled on https://github.com/arthur-fontaine/nixconfig/blob/main/scripts/bootstrap-macos.sh,
 # with gum (https://github.com/charmbracelet/gum) for the prompts and no Homebrew.
@@ -49,6 +49,11 @@ gum style --border rounded --padding "0 2" --bold "personal-server-nixconfig set
 if [ ! -d "$REPO_DIR/.git" ]; then
   step "Cloning $REPO_URL"
   nix run nixpkgs#git -- clone "$REPO_URL" "$REPO_DIR"
+elif [ -z "${BOOTSTRAP_PULLED:-}" ]; then
+  step "Pulling $REPO_URL"
+  nix run nixpkgs#git -- -C "$REPO_DIR" pull --ff-only
+  # Go on with the version just pulled, not the one already running.
+  BOOTSTRAP_PULLED=1 exec "$REPO_DIR/scripts/bootstrap-macos.sh" "$@"
 fi
 ok "Repository at $REPO_DIR"
 
