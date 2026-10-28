@@ -643,12 +643,26 @@ homeclaw_app() {
     gum confirm --affirmative "Check again" --negative "Skip" "On?" || return 0
   done
   ok "HomeClaw serves HomeKit to Hermes"
+
+  # Its events go to Hermes' events daemon (docs/events.md), with the secret
+  # the daemon checks as a Bearer token.
+  local cli=/Applications/HomeClaw.app/Contents/MacOS/homeclaw-cli token
+  token="$(sudo sed -n 's/^WEBHOOK_SECRET=//p' "$secrets")"
+  if hermes_gui "$cli" config --webhook-url "http://127.0.0.1:$(setting server.hermes.events.port)" \
+    --webhook-token "$token" --webhook-enabled true >/dev/null && hermes_gui "$cli" config --webhook-test >/dev/null; then
+    ok "HomeClaw reports to Hermes' events"
+    note "Choose what it reports: HomeClaw's menu bar icon → Settings → Webhook, turn on the doors, sensors…"
+    note "(Immediate for what matters now, Batched for the rest)."
+  else
+    warn "Could not point HomeClaw's webhook at Hermes: Settings → Webhook, URL http://127.0.0.1:$(setting server.hermes.events.port)"
+  fi
+  unset token
 }
 
 # ── Instagram, in Hermes' browser ───────────────────────────────────────────
-# Its first login is yours, on the Mac's screen, in the browser profile Hermes
-# keeps (modules/hermes/agent/instagram.nix): Instagram trusts a login made by
-# hand, and later ones come from 1Password.
+# Its first login is yours, on the Mac's screen, in Hermes' always-open Chrome
+# (modules/hermes/agent/browser.nix): Instagram trusts a login made by hand,
+# and later ones come from 1Password.
 
 browser_profile="$agent_home/.hermes/browser-profile"
 instagram_logged_in() {
@@ -658,18 +672,14 @@ instagram_logged_in() {
 }
 
 instagram_login() {
-  local chrome
-  chrome="$(setting "home-manager.users.$agent.services.hermes-agent.settings.browser.executable_path")"
   step "Instagram"
+  # Hermes' always-open Chrome (modules/hermes/agent/browser.nix) opens on it.
+  sudo launchctl kickstart "gui/$agent_uid/org.nix-community.home.chrome" 2>/dev/null || true
   while ! instagram_logged_in; do
-    note "On the Mac's screen, log in to Instagram in the browser that opens, and save the login info."
-    note "Then quit that browser (⌘Q) and come back here."
-    # The flags Hermes starts it with (instagram.nix), so it reads the same cookies.
-    hermes_gui "$chrome" --user-data-dir="$browser_profile" --use-mock-keychain --password-store=basic \
-      --no-first-run --no-default-browser-check https://www.instagram.com/accounts/login/ >/dev/null 2>&1 &
-    gum confirm --affirmative "Check" --negative "Skip" "Logged in, and the browser quit?" || return 0
-    sudo pkill -TERM -u "$agent" -f -- "--user-data-dir=$browser_profile" 2>/dev/null || true
-    sleep 3
+    note "On the Mac's screen, in the Chrome window on instagram.com: log in, and save the login info."
+    note "If Instagram offers notifications, turn them on: they become Hermes' events."
+    note "Chrome writes its cookies within half a minute."
+    gum confirm --affirmative "Check" --negative "Skip" "Logged in?" || return 0
   done
   ok "Hermes is logged in to Instagram"
 }
