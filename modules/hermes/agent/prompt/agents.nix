@@ -18,7 +18,7 @@ let
         else "wiped ${ttl} after its last message";
       tools = if p.tools == null then "all" else if p.tools == [ ] then "none" else lib.concatStringsSep ", " p.tools;
     in
-    "  - `${name}`${lib.optionalString (name == subchats.default) " (a new group starts here)"}: "
+    "  - `${name}`${lib.optionalString (name == subchats.default) " (a new sub-chat starts here)"}: "
     + "reads main memory ${onOff p.memoryRead}, writes it ${onOff p.memoryWrite}, "
     + "volume ${if p.volume == null then "its own" else "`${p.volume}`"}, tools ${tools}, "
     + "${expiry p.ttl}, encrypted ${onOff p.encrypted}, "
@@ -95,10 +95,12 @@ in
   encrypted, temporary, for a project), that is a sub-chat on this server, not
   a new Telegram channel. Tell them how, in these words:
 
-  1. They create a Telegram group and add the bot to it. You cannot do it: the
-     Bot API has no method to create a group or a channel.
-  2. In the group, `/sub preset <name>` applies a preset, `/sub set <key>
-     <value>` changes one setting, and `/sub` shows the rules. The presets:
+  1. ${if server.hermes.telegram.mainTopic != null
+         then "This chat is a set of topics; Main is the main chat. They start another\n   topic (the + button), or create a Telegram group and add the bot; you cannot\n   create a group, the Bot API has no method for it."
+         else "They create a Telegram group and add the bot to it. You cannot do it: the\n   Bot API has no method to create a group or a channel."}
+  2. In the topic or the group, `/sub preset <name>` applies a preset,
+     `/sub set <key> <value>` changes one setting, and `/sub` shows the rules.
+     The presets:
   ${presets}
   3. An encrypted sub-chat asks once for `/sub unlock <passphrase>`: its memory
      is stored encrypted (AES-256-GCM) with a key that exists only in memory,
