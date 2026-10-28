@@ -13,6 +13,7 @@ in
     ./memory.nix
     ./telegram.nix
     ./mcp.nix
+    ./skills.nix
     ./tools.nix
     ./computer-use.nix
     ./prompt

@@ -42,6 +42,34 @@ in
       '';
     };
 
+    disabledSkills = mkOption {
+      type = types.listOf types.str;
+      default = [
+        # The Hermes account is signed in to no Apple ID.
+        "apple-notes"
+        "apple-reminders"
+        "findmy"
+        "imessage"
+        # No account or key set up for these.
+        "himalaya"
+        "email-inbox-triage"
+        "google-workspace"
+        "notion"
+        "airtable"
+        "box"
+        "teams-meeting-pipeline"
+        "xurl"
+        # Not installed, and each needs its own account.
+        "claude-code"
+        "codex"
+        "opencode"
+      ];
+      description = ''
+        Bundled Hermes skills it should not offer, because what they drive is
+        not set up on this server. Remove a name once you set that up.
+      '';
+    };
+
     model = {
       provider = mkOption {
         type = types.str;
