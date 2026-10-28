@@ -7,6 +7,7 @@
     ./launchd.nix
     ./full-disk.nix
     ./restart.nix
+    ./setup-assistant.nix
     ./display.nix
     ./search.nix
     ./defaults.nix
