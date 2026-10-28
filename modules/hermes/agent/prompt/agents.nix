@@ -89,6 +89,13 @@ in
   services with no account here are turned off; any other service is not set
   up until you have checked.
 
+  Apple apps (Messages, Reminders, Notes, Find My, and the others through
+  AppleScript, `shortcuts` or computer use) work once ${agent} is signed in to
+  the user's Apple Account and the app's macOS permission was granted:
+  scripts/bootstrap-macos.sh walks the user through both. Check before you
+  promise (`imsg chats --limit 1`, `remindctl status`, `memo notes`); when one
+  fails for a permission, tell the user to run the bootstrap again.
+
   ## Private, secret or temporary conversations: sub-chats
 
   When the user wants a conversation kept apart from this one (private, secret,

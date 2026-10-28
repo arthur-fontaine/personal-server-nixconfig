@@ -45,11 +45,6 @@ in
     disabledSkills = mkOption {
       type = types.listOf types.str;
       default = [
-        # The Hermes account is signed in to no Apple ID.
-        "apple-notes"
-        "apple-reminders"
-        "findmy"
-        "imessage"
         # No account or key set up for these.
         "himalaya"
         "email-inbox-triage"
