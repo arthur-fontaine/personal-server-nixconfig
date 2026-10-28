@@ -17,6 +17,17 @@ in
     touch $out
   '';
 
+  # The events daemon's tests: fake uzu and Hermes servers on loopback, and
+  # Hermes' own signature check.
+  events = pkgs.runCommand "hermes-events-tests" { __darwinAllowLocalNetworking = true; } ''
+    cp -R ${../modules/hermes/events} events
+    chmod -R u+w events
+    cd events
+    export HOME=$TMPDIR
+    ${hermes.hermesVenv}/bin/python3 -I tests/test_events.py
+    touch $out
+  '';
+
   # What hermes-freeze picks; the chown and ACLs themselves need root.
   freeze = pkgs.runCommand "hermes-freeze-tests" { } ''
     cp ${../modules/hermes/system/access/freeze.py} freeze.py
