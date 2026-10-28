@@ -305,8 +305,10 @@ else
   step "Automatic login for $agent"
   if fdesetup isactive >/dev/null 2>&1; then
     warn "FileVault is on, and macOS logs nobody in automatically while it is."
-    if gum confirm "Turn FileVault off? (macOS asks for an administrator's credentials)"; then
-      sudo fdesetup disable
+    if gum confirm "Turn FileVault off? (macOS asks for your password, the one that unlocks the disk)"; then
+      # FileVault releases the disk's key only for a user allowed to unlock it,
+      # whatever sudo says: the password cannot be skipped, the user name can.
+      sudo fdesetup disable -user "$(id -un)"
     fi
   fi
   if fdesetup isactive >/dev/null 2>&1; then
