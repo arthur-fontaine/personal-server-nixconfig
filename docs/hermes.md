@@ -109,7 +109,7 @@ again over SSH, looking at the Mac.
 | What | Through | Set up by the bootstrap |
 | --- | --- | --- |
 | WhatsApp | [wacli](https://github.com/openclaw/wacli), a linked device of your number; `wacli sync --follow` keeps its store (`~/.local/state/wacli`) current; the `whatsapp` skill | the QR code to scan in WhatsApp → Linked devices |
-| Instagram | instagram.com in Hermes' browser (no API exists for a personal account): its pinned Chromium, headed, one persistent profile (`~/.hermes/browser-profile`); the `instagram` skill | your first login, on the Mac's screen |
+| Instagram | instagram.com in Hermes' always-open Google Chrome (no API exists for a personal account; `modules/hermes/agent/browser.nix`): one persistent profile (`~/.hermes/browser-profile`), DevTools on loopback for Hermes' browser tools and the events daemon; the `instagram` skill | your first login, on the Mac's screen |
 | 1Password | a service account reading one vault (`server.hermes.onepassword.vault`, "Hermes"): `browser_vault` fills its Login items into pages without the model seeing them; `server.hermes.onepassword.env` maps variables to `op://` references | its token, into the secrets file |
 
 For Instagram, put a Login item in that vault with the website
