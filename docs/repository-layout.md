@@ -29,6 +29,7 @@ modules/
       prompt/             SOUL.md (UniiChat's prompt), AGENTS.md (this server's rules)
       session/            its GUI session: launchd agents, display, fsearch, defaults
     plugins/unii/         the single-chat memory and sub-chats (Python)
+    events/               hermes_events: screens incoming messages, posts proposals (Python)
   uzu/                    local models: options, the mirai server
   home/                   the administrator's home-manager configuration
 ```
@@ -38,6 +39,7 @@ modules/
 ```sh
 nix flake check                                   # everything below
 nix build .#checks.aarch64-darwin.unii            # the plugin's tests
+nix build .#checks.aarch64-darwin.events          # the events daemon's tests
 nix build .#checks.aarch64-darwin.freeze          # what hermes-freeze picks
 nix build .#darwinConfigurations.Personal-Server.system   # the whole system, without switching
 nix run .#hermes-turns                            # two real Hermes turns through the memory, on a scripted model

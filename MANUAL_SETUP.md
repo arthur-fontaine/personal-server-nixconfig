@@ -28,6 +28,7 @@ missing, for example the BotFather settings you skipped.
 | Apple apps | runs a check of Reminders, Notes, Contacts, Calendar and Messages the way the gateway runs (launchd starting the launcher in Hermes' session), so each dialog is the gateway's own; opens Messages until Hermes can read your conversations; for Find My, shows the launcher to add to Screen Recording and Accessibility | click Allow in each dialog; in Messages, Settings → iMessage → "Enable Messages in iCloud" |
 | iMCP | starts it (Nix installs it in /Applications), trusts Hermes in it, waits until its services are on, then connects to it as Hermes | in its menu bar icon, click Calendar, Contacts, Location, Mail (choose `~/Library/Mail`), Music, Shortcuts, Voice Memos, Weather, allowing each dialog; allow Local Network |
 | HomeClaw | installs it from the App Store with `mas` (or opens its page), starts it, turns on its HTTP MCP endpoint and checks it answers | allow it your home data |
+| Check (second run) | asks uzu a question and the events' screening question on a test invitation (waiting for its first model download), then offers to send a fake WhatsApp message through the events chain ([docs/events.md](docs/events.md)) | see the proposal arrive in Telegram |
 | Instagram (second run) | opens Hermes' browser on instagram.com's login page, on the Mac's screen, until its profile holds a session | log in, save the login info, quit the browser |
 
 macOS reserves those clicks for a person: no script can grant them.
