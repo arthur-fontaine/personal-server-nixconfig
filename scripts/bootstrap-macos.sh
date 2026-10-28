@@ -719,6 +719,19 @@ instagram_login() {
   ok "Hermes is logged in to Instagram"
 }
 
+# Discord keeps its session in the site's storage, not a cookie this script
+# can read, so your "logged in" is what is recorded.
+discord_marker="$agent_home/.local/state/hermes-events/discord-logged-in"
+discord_login() {
+  step "Discord"
+  note "On the Mac's screen, in Chrome, the Discord tab (Hermes' events keep it open): log in."
+  note "Scanning the QR code with Discord's phone app is easiest. Allow notifications if it asks."
+  if gum confirm --affirmative "Logged in" --negative "Skip" "Logged in to Discord?"; then
+    as_agent sh -c 'mkdir -p "$(dirname "$1")" && touch "$1"' _ "$discord_marker"
+    ok "Hermes is logged in to Discord"
+  fi
+}
+
 if gui_session && [ "$(stat -f %Su /dev/console)" = "$agent" ]; then
   if gum confirm "Set up Hermes' Apple apps (iMessage, Notes, Reminders, Contacts, Calendar, Find My)?"; then
     hermes_lit 1
@@ -732,9 +745,16 @@ if gui_session && [ "$(stat -f %Su /dev/console)" = "$agent" ]; then
     instagram_login
     hermes_lit "$(setting server.energy.displayBrightness)"
   fi
+  if sudo test -e "$discord_marker"; then
+    ok "Hermes was logged in to Discord (it logs in again from 1Password when needed)"
+  elif gum confirm "Log Hermes in to your Discord?"; then
+    hermes_lit 1
+    discord_login
+    hermes_lit "$(setting server.energy.displayBrightness)"
+  fi
 else
-  warn "Hermes' Apple apps and Instagram need its desktop on the Mac's screen, which it is after a reboot:"
-  note "then run this script again over SSH, looking at the Mac, for its Apple Account, apps and Instagram."
+  warn "Hermes' Apple apps, Instagram and Discord need its desktop on the Mac's screen, which it is after a reboot:"
+  note "then run this script again over SSH, looking at the Mac, for its Apple Account, apps, Instagram and Discord."
 fi
 
 # ── Start ───────────────────────────────────────────────────────────────────

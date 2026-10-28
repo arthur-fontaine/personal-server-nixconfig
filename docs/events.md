@@ -14,7 +14,7 @@ where bobbolitas is.
 ```
 wacli (WhatsApp) ──webhook──┐
 imsg watch (iMessage) ──────┤
-Chrome (Instagram) ───CDP───┤
+Chrome (Instagram, Discord) ┤
 HomeClaw (HomeKit) ─webhook─┤
 pollers (calendar, mail, …) ┤
                             ▼
@@ -58,6 +58,7 @@ can only write to you; acting takes your answer in the main chat.
 | WhatsApp | messages to you | `wacli sync --webhook` | done |
 | iMessage, SMS | messages to you | `imsg watch --json` | done |
 | Instagram | its notifications (DMs, comments, mentions…) | Web Push to Hermes' always-open Google Chrome; the daemon hooks `showNotification` in Instagram's service worker over CDP | done |
+| Discord | its notifications (DMs, mentions) | a Discord tab the daemon keeps open in that Chrome, hooked on each document (Discord notifies from the open tab, not through push) | done |
 | HomeKit | accessory changes you choose (door, motion, leak…) | HomeClaw's webhook | done |
 | Calendar | new events, events starting within 30 min | iMCP `events_fetch`, every 5 min | done |
 | Mail | new unread mail | iMCP `mail_messages_search`, every 5 min | done |
@@ -79,7 +80,7 @@ Both were tried with a real Web Push before choosing.
 ## Settings
 
 `server.hermes.events`: `enable`, one switch per source (`whatsapp`,
-`imessage`, `instagram`, `homekit`, `calendar`, `mail`, `reminders`, `calls`,
+`imessage`, `instagram`, `discord`, `homekit`, `calendar`, `mail`, `reminders`, `calls`,
 `github`, `runpod`, `system`), `files` (the folders), `batchSeconds` (45),
 `maxBatchSeconds` (300), `maxAgeSeconds` (600), and the two loopback ports. The route's prompt is in
 `modules/hermes/agent/events.nix`.

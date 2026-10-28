@@ -30,6 +30,7 @@ missing, for example the BotFather settings you skipped.
 | HomeClaw | installs it from the App Store with `mas` (or opens its page), starts it, turns on its HTTP MCP endpoint and checks it answers, then points its webhook at Hermes' events daemon | allow it your home data; in its Settings → Webhook, choose the accessories it reports |
 | Check (second run) | asks uzu a question and the events' screening question on a test invitation (waiting for its first model download), then offers to send a fake WhatsApp message through the events chain ([docs/events.md](docs/events.md)) | see the proposal arrive in Telegram |
 | Instagram (second run) | starts Hermes' always-open Chrome on instagram.com, on the Mac's screen, until its profile holds a session | log in, save the login info, turn on Instagram's notifications if it offers them |
+| Discord (second run) | points you to the Discord tab Hermes' events keep open in its Chrome, and records your login | log in (the phone app's QR code is easiest), allow notifications |
 
 macOS reserves those clicks for a person: no script can grant them.
 

@@ -110,14 +110,15 @@ again over SSH, looking at the Mac.
 | --- | --- | --- |
 | WhatsApp | [wacli](https://github.com/openclaw/wacli), a linked device of your number; `wacli sync --follow` keeps its store (`~/.local/state/wacli`) current; the `whatsapp` skill | the QR code to scan in WhatsApp → Linked devices |
 | Instagram | instagram.com in Hermes' always-open Google Chrome (no API exists for a personal account; `modules/hermes/agent/browser.nix`): one persistent profile (`~/.hermes/browser-profile`), DevTools on loopback for Hermes' browser tools and the events daemon; the `instagram` skill | your first login, on the Mac's screen |
+| Discord | discord.com in the same Chrome (no API for a user account); the `discord` skill reads and sends, and the events daemon keeps a Discord tab open for its notifications | your first login, on the Mac's screen |
 | 1Password | a service account reading one vault (`server.hermes.onepassword.vault`, "Hermes"): `browser_vault` fills its Login items into pages without the model seeing them; `server.hermes.onepassword.env` maps variables to `op://` references | its token, into the secrets file |
 
-For Instagram, put a Login item in that vault with the website
-`https://www.instagram.com` (the page's origin must match exactly), your
+For Instagram and Discord, put a Login item each in that vault with the
+website `https://www.instagram.com` or `https://discord.com` (the page's origin must match exactly), your
 username and password, and its one-time password if you use two-factor
 authentication: Hermes logs in again by itself when the session ends.
 
-WhatsApp and Instagram both act as you, through clients their terms do not
+WhatsApp, Instagram and Discord all act as you, through clients their terms do not
 allow (an unofficial linked device, an automated browser): they may restrict
 an account that behaves like a bot. The skills tell Hermes to go at a person's
 pace and to confirm before it sends or posts anything.
