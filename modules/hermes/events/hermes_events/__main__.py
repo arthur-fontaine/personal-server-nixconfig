@@ -14,7 +14,7 @@ from aiohttp import web
 from . import pollers
 from .core import Pipeline, Seen
 from .hermes import HermesSink
-from .instagram import instagram_watch
+from .browser import instagram_watch
 from .sources import imessage_watch, whatsapp_app
 from .triage import UzuTriage
 
@@ -53,8 +53,10 @@ async def main(config: dict) -> None:
     await web.TCPSite(runner, config["listen"]["host"], config["listen"]["port"]).start()
     if on("imessage"):
         tasks.append(asyncio.create_task(imessage_watch(pipeline, sources["imessage"]["command"])))
-    if on("instagram"):
-        tasks.append(asyncio.create_task(instagram_watch(pipeline, sources["instagram"]["devtools"])))
+    if on("instagram") or on("discord"):
+        tasks.append(asyncio.create_task(instagram_watch(
+            pipeline, sources["instagram"]["devtools"],
+            discord=sources["discord"]["url"] if on("discord") else None)))
 
     state = pollers.State(os.path.join(config["state_dir"], "pollers.json"))
     imcp = pollers.MCP(config.get("imcp_command", []))
