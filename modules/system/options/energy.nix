@@ -17,6 +17,15 @@ in
         with its backlight at this level.
       '';
     };
+    dimAfter = mkOption {
+      type = types.ints.positive;
+      default = 600;
+      description = ''
+        Seconds without keyboard, mouse or trackpad input before the backlight
+        goes down to displayBrightness. While someone uses the Mac, it is left
+        alone.
+      '';
+    };
     disableBluetooth = mkOption {
       type = types.bool;
       default = true;
