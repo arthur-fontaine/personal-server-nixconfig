@@ -531,6 +531,70 @@ apple_apps() {
     hermes_gui /usr/bin/open "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility" || true
     gum confirm --affirmative "Done" --negative "" "Accessibility added?" || true
   fi
+
+  imcp_apps
+  homeclaw_app
+}
+
+agent_home="$(setting server.hermes.home)"
+imcp_prefs="$agent_home/Library/Containers/co.dododo.iMCP/Data/Library/Preferences/co.dododo.iMCP"
+# What iMCP serves Hermes (modules/hermes/agent/apple.nix); Maps uses Location.
+imcp_services=(calendar contacts location mail music shortcuts voiceMemos weather)
+
+imcp_apps() {
+  local service missing init
+  step "iMCP: Calendar, Contacts, Mail, Maps, Music, Shortcuts, Voice Memos, Weather"
+  sudo launchctl kickstart "gui/$agent_uid/org.nix-community.home.imcp" 2>/dev/null || true
+  sleep 3
+  # Its settings live in its container, which its first launch created.
+  as_agent hermes-app-defaults
+  while :; do
+    missing=()
+    for service in "${imcp_services[@]}"; do
+      [ "$(as_agent /usr/bin/defaults read "$imcp_prefs" "${service}Enabled" 2>/dev/null)" = 1 ] || missing+=("$service")
+    done
+    if [ "${#missing[@]}" = 0 ]; then
+      ok "iMCP serves all of them"
+      break
+    fi
+    note "On the Mac's screen, click iMCP's icon in the menu bar, then each gray service: ${missing[*]}."
+    note "Allow each dialog. Mail asks for a folder: choose ~/Library/Mail; Voice Memos, its recordings."
+    note "Leave Reminders, Notes and Messages off: Hermes' skills do those."
+    gum confirm --affirmative "Check again" --negative "Skip" "Turned on?" || break
+  done
+  # imcp-server finds the app over Bonjour, which macOS asks about (Local Network).
+  init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"hermes-agent","version":"0"}}}'
+  apple_app "iMCP reachable from Hermes (Local Network)" \
+    "(printf '%s\n' '$init'; sleep 15) | timeout 20 /Applications/iMCP.app/Contents/MacOS/imcp-server | grep -m1 -q serverInfo"
+}
+
+# HomeClaw is on the App Store only: Apple allows HomeKit nowhere else.
+homeclaw_app() {
+  local mas
+  step "HomeClaw: HomeKit"
+  if [ ! -d /Applications/HomeClaw.app ]; then
+    mas="$(nix build --no-link --print-out-paths "$flake.pkgs.mas")/bin/mas"
+    # mas installs as root for the App Store account of SUDO_UID: Hermes'.
+    if ! sudo launchctl asuser "$agent_uid" env SUDO_UID="$agent_uid" SUDO_GID="$(id -g "$agent")" \
+      SUDO_USER="$agent" HOME="$agent_home" "$mas" get 6759682551; then
+      note "On the Mac's screen, install HomeClaw from the App Store that opens (Get)."
+      hermes_gui /usr/bin/open "macappstore://apps.apple.com/app/id6759682551" || true
+      gum confirm --affirmative "Done" --negative "Skip" "Installed?" || return 0
+    fi
+  fi
+  [ -d /Applications/HomeClaw.app ] || { warn "HomeClaw is not installed: skipped."; return 0; }
+  note "On the Mac's screen, allow HomeClaw to access your home data."
+  sudo launchctl kickstart "gui/$agent_uid/org.nix-community.home.homeclaw" 2>/dev/null || true
+  sleep 5
+  # Its HTTP MCP switch, read at launch: set, then restart it.
+  as_agent hermes-app-defaults
+  sudo launchctl kickstart -k "gui/$agent_uid/org.nix-community.home.homeclaw" 2>/dev/null || true
+  while [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9090/mcp)" = 000 ]; do
+    warn "HomeClaw's MCP endpoint does not answer yet."
+    note "In HomeClaw's menu bar icon → Settings → Integrations, turn on Streamable HTTP MCP."
+    gum confirm --affirmative "Check again" --negative "Skip" "On?" || return 0
+  done
+  ok "HomeClaw serves HomeKit to Hermes"
 }
 
 if gui_session && [ "$(stat -f %Su /dev/console)" = "$agent" ]; then

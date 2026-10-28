@@ -24,6 +24,8 @@ missing, for example the BotFather settings you skipped.
 | Reboot | reboots, so macOS logs Hermes in and starts it | |
 | Apple Account (second run, over SSH) | opens Hermes' System Settings → Apple Account on the Mac's screen, and waits until it is signed in | sign in with your Apple Account; in iCloud turn on Messages, Notes, Reminders, Contacts, Calendars, Find My Mac |
 | Apple apps | runs a check of Reminders, Notes, Contacts, Calendar and Messages the way the gateway runs (launchd starting the launcher in Hermes' session), so each dialog is the gateway's own; opens Messages until Hermes can read your conversations; for Find My, shows the launcher to add to Screen Recording and Accessibility | click Allow in each dialog; in Messages, Settings → iMessage → "Enable Messages in iCloud" |
+| iMCP | starts it (Nix installs it in /Applications), trusts Hermes in it, waits until its services are on, then connects to it as Hermes | in its menu bar icon, click Calendar, Contacts, Location, Mail (choose `~/Library/Mail`), Music, Shortcuts, Voice Memos, Weather, allowing each dialog; allow Local Network |
+| HomeClaw | installs it from the App Store with `mas` (or opens its page), starts it, turns on its HTTP MCP endpoint and checks it answers | allow it your home data |
 
 macOS reserves those clicks for a person: no script can grant them.
 
