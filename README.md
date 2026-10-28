@@ -12,7 +12,7 @@ The layout follows [arthur-fontaine/nixconfig](https://github.com/arthur-fontain
   account, on `deepseek-v4.1-flash-free` from OpenCode Zen.
 - **One chat that never ends**: your Telegram DM with the bot is the main chat, with
   UniiChat-style memory instead of sessions and compaction.
-- **Sub-chats**: every topic of that DM, or group with the bot, with its own rules for
+- **Sub-chats**: every group with the bot, with its own rules for
   memory access, shared memory volumes, tools, expiry, encryption and model.
 - **Access rules enforced by macOS**: it reads anything, writes only what it
   created in the last 24 hours, and changes the machine only by pushing to this
