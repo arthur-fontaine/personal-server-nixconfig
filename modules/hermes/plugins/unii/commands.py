@@ -61,8 +61,8 @@ class SubCommand:
         if chat is None:
             return "Run /sub in a chat."
         if chat.is_main:
-            return ("This is the main chat. A sub-chat is a topic of this chat (Telegram: tap + to create one) "
-                    "or a group with the bot: use /sub there.\n\n" + HELP)
+            return ("This is the main chat. A sub-chat is a group with the bot: "
+                    "create one, add the bot, and use /sub there.\n\n" + HELP)
 
         if not words:
             return f"Sub-chat ({policies.preset_name(chat)}): {describe(policies.policy(chat))}\n\n{HELP}"
