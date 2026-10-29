@@ -108,7 +108,8 @@ again over SSH, looking at the Mac.
 
 Each of your other services is an integration, off until you turn it on
 (`server.hermes.integrations.<name>.enable`, which the bootstrap asks for):
-`whatsapp`, `instagram`, `discord`, `homekit` (HomeClaw), `onepassword`,
+`whatsapp`, `instagram`, `discord`, `homeassistant` (Hermes' official plugin:
+the `ha_*` tools), `homekit` (HomeClaw), `onepassword`,
 `runpod`, `github` (notifications). Its skill, MCP server and events come with
 it, and Hermes' instructions mention only those that are on. Apple's apps are
 not integrations: they come with the Mac.

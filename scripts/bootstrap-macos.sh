@@ -338,6 +338,7 @@ integration_choices=(
   "whatsapp|WhatsApp: read and send your messages and see new ones"
   "instagram|Instagram: DMs and posts and stories and its notifications"
   "discord|Discord: DMs and servers and its notifications"
+  "homeassistant|Home Assistant: your devices and their changes"
   "homekit|HomeKit: your home's accessories (installs HomeClaw from the App Store)"
   "onepassword|1Password: logins Hermes fills in without seeing them"
   "runpod|RunPod: GPU pods and pods left running"
@@ -384,6 +385,61 @@ if integration_on runpod && ! sudo grep -q '^RUNPOD_API_KEY=.' "$secrets"; then
     ok "RunPod: key written"
   fi
   unset runpod others
+fi
+
+# Home Assistant, when that integration is on: its address and a long-lived
+# token, both checked from this Mac before they are kept (the URL in
+# hosts/local.nix, HASS_TOKEN in the secrets file), and checked again on
+# every run.
+ha_api() { # url token → the HTTP status of /api/ (000: nothing answers)
+  local auth=()
+  [ -n "${2:-}" ] && auth=(-H "Authorization: Bearer $2")
+  # (An empty array under set -u fails in macOS' bash 3.2, hence the + form.)
+  curl -s -o /dev/null -w '%{http_code}' --max-time 10 ${auth[@]+"${auth[@]}"} "${1%/}/api/"
+}
+if integration_on homeassistant; then
+  ha_url="$(setting server.hermes.homeassistant.url)"
+  ha_token="$(sudo sed -n 's/^HASS_TOKEN=//p' "$secrets")"
+  if [ -n "$ha_token" ] && [ "$(ha_api "$ha_url" "$ha_token")" = 200 ]; then
+    ok "Home Assistant answers at $ha_url, and takes Hermes' token"
+  else
+    step "Home Assistant"
+    [ -n "$ha_token" ] && warn "Home Assistant does not answer at $ha_url with the saved token (status $(ha_api "$ha_url" "$ha_token"))."
+    while :; do
+      ha_url="$(gum input --value "$ha_url" --header "Home Assistant's address, as this Mac reaches it (e.g. http://192.168.1.10:8123)")"
+      ha_url="${ha_url%/}"
+      status="$(ha_api "$ha_url")"
+      if [ "$status" = 000 ]; then
+        warn "Nothing answers at $ha_url from this Mac: a wrong address or port, or another network."
+        gum confirm --affirmative "Try another" --negative "Skip" "Retry?" && continue
+        break
+      fi
+      # Without a token, Home Assistant's API answers 401: it is there.
+      [ "$status" = 401 ] || warn "$ha_url answers, but not like Home Assistant (status $status): checking with a token anyway."
+      ok "Home Assistant answers at $ha_url"
+      note "Create a token: your profile → Security → Long-lived access tokens → Create token:"
+      note "$ha_url/profile/security"
+      launchctl print "gui/$(id -u)" >/dev/null 2>&1 && /usr/bin/open "$ha_url/profile/security" 2>/dev/null || true
+      ha_token="$(gum input --password --header "Long-lived access token (empty to skip)" | tr -d '[:space:]')"
+      [ -n "$ha_token" ] || break
+      status="$(ha_api "$ha_url" "$ha_token")"
+      if [ "$status" = 200 ]; then
+        others="$(sudo grep -v '^HASS_TOKEN=' "$secrets" || true)"
+        printf '%s\nHASS_TOKEN=%s\n' "$others" "$ha_token" | sed '/^$/d' | write_secret "$secrets"
+        if [ "$ha_url" != "$(setting server.hermes.homeassistant.url)" ]; then
+          text="$(REPO="$REPO_DIR" HOST="$HOST" \
+            PATCH="$("$JQ" -cn --arg u "$ha_url" '{server: {hermes: {homeassistant: {url: $u}}}}')" \
+            nix eval --impure --raw --file "$REPO_DIR/scripts/lib/set-host.nix")"
+          printf '%s' "$text" > "$local_nix"
+        fi
+        ok "Home Assistant takes the token: Hermes can use it"
+        break
+      fi
+      warn "Home Assistant refused that token (status $status)."
+      gum confirm --affirmative "Try again" --negative "Skip" "Retry?" || break
+    done
+  fi
+  unset ha_token others status
 fi
 
 # The API key of each provider in the chain, asked only for those it uses and
