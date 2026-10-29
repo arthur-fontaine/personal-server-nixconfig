@@ -29,7 +29,9 @@ in
     settings = {
       context.engine = "unii";
       plugins = {
-        enabled = [ "unii" ];
+        # One list for every plugin: definitions of it in other modules replace,
+        # not add. The Home Assistant one: homeassistant.nix.
+        enabled = [ "unii" ] ++ lib.optional cfg.integrations.homeassistant.enable "homeassistant";
         # The compactions may run on another model than the chat.
         entries.unii.llm = lib.optionalAttrs (compactionModel != null) {
           allow_provider_override = true;

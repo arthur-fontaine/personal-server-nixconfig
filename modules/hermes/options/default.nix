@@ -10,5 +10,6 @@
     ./onepassword.nix
     ./events.nix
     ./integrations.nix
+    ./homeassistant.nix
   ];
 }

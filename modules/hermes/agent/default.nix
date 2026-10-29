@@ -22,6 +22,7 @@ in
     ./instagram.nix
     ./onepassword.nix
     ./events.nix
+    ./homeassistant.nix
     ./prompt
     ./session
   ];
