@@ -21,6 +21,9 @@ in
     onepassword = integration ''
       1Password: a service account reading one vault, whose logins Hermes
       fills into web pages without seeing them'';
+    homeassistant = integration ''
+      Home Assistant: its devices read and controlled (Hermes' official plugin,
+      the ha_* tools) and their state changes as events'';
     homekit = integration ''
       HomeKit: your home's accessories, through HomeClaw (a Mac App Store app
       the bootstrap installs), and their changes as events'';
