@@ -14,9 +14,9 @@ missing, for example the BotFather settings you skipped.
 | Nix | installs it (multi-user) | |
 | Repository | clones it to `~/personal-server-nixconfig` | |
 | This host | writes the git-ignored `hosts/local.nix`: host name, your user, the SSH keys allowed to log in (from your GitHub account, pasted, or this Mac's `~/.ssh/*.pub`) | choose the keys |
-| Secrets | writes `/etc/hermes/secrets.env` (root, then Hermes only, mode 0400): the OpenCode Zen and RunPod API keys | paste the keys |
+| Secrets | writes `/etc/hermes/secrets.env` (root, then Hermes only, mode 0400): the RunPod API key | paste it |
 | Telegram bot | walks you through @BotFather's `/newbot`, checks the token, reads your user id from your first message to the bot, sets its description, then checks Threaded Mode (with it, the DM stays the main chat and its topics, which only the bot opens with `/sub new`, are sub-chats), privacy mode (groups as sub-chats) and its picture (the Hermes logo, from the pinned Hermes source) | create the bot; for topics, in BotFather's Mini App, Threads Settings: Threaded Mode on and "Disallow users to create new threads" on; send `/setprivacy` → your bot → `Disable`; send `/setuserpic` → your bot → the Hermes logo it saved to `~/Downloads` |
-| Models | asks for the main model, then each fallback in order (a ChatGPT subscription, OpenCode Zen, any provider), the local model last; writes them to `hosts/local.nix` | choose |
+| Models | asks for the main model, then each fallback in order (a ChatGPT subscription, OpenCode Zen, any provider), the local model last; writes them to `hosts/local.nix`, then asks for the API key of each provider the chain uses that is not in the secrets file yet (none for ChatGPT, which logs in, or uzu) | choose; paste the keys |
 | System | runs `darwin-rebuild switch` | |
 | Auto-login | gives the `hermes` account a random password and writes `/etc/kcpassword`, so macOS logs it in at boot (the login user itself is in Nix) | confirm turning FileVault off, which auto-login needs |
 | ChatGPT (when the chain uses it) | `hermes auth add openai-codex` as Hermes: shows a link and a code | open the link on any device, sign in to ChatGPT, enter the code |

@@ -224,16 +224,15 @@ if sudo test -e "$secrets"; then
   bot_token="$(sudo sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$secrets")"
 else
   step "Secrets (stored in $secrets, readable by Hermes only)"
-  opencode="$(gum input --password --header "OpenCode Zen API key (https://opencode.ai/auth; empty if you will not use it)")"
   runpod="$(gum input --password --header "RunPod API key (https://www.runpod.io/console/user/settings)")"
   step "Your Telegram bot"
   bot_token="$(new_bot_token)"
   bot="$(tg "$bot_token" getMe | "$JQ" -r .result.username)"
   owner="$(owner_id "$bot_token" "$bot")"
   sudo mkdir -p "$(dirname "$secrets")"
-  printf 'OPENCODE_ZEN_API_KEY=%s\nRUNPOD_API_KEY=%s\nTELEGRAM_BOT_TOKEN=%s\nTELEGRAM_ALLOWED_USERS=%s\n' \
-    "$opencode" "$runpod" "$bot_token" "${owner//[^0-9]/}" | write_secret "$secrets"
-  unset opencode runpod
+  printf 'RUNPOD_API_KEY=%s\nTELEGRAM_BOT_TOKEN=%s\nTELEGRAM_ALLOWED_USERS=%s\n' \
+    "$runpod" "$bot_token" "${owner//[^0-9]/}" | write_secret "$secrets"
+  unset runpod
   ok "Secrets written"
   # What people see before their first message; BotFather's /setdescription does the same.
   tg "$bot_token" setMyShortDescription "short_description=Hermes%2C%20a%20personal%20agent%20on%20a%20home%20server" >/dev/null || true
@@ -331,6 +330,48 @@ else
   printf '%s' "$text" > "$local_nix"
   ok "Models: $(model_chain) → the local model"
 fi
+
+# The API key of each provider in the chain, asked only for those it uses and
+# not yet in the secrets file. ChatGPT logs in instead (below), uzu needs none.
+provider_key() { # provider → "VARIABLE|where to get one"
+  case "$1" in
+    openai-codex | uzu) ;;
+    opencode-zen) echo "OPENCODE_ZEN_API_KEY|https://opencode.ai/auth" ;;
+    opencode-go) echo "OPENCODE_GO_API_KEY|https://opencode.ai/auth" ;;
+    openrouter) echo "OPENROUTER_API_KEY|https://openrouter.ai/settings/keys" ;;
+    anthropic) echo "ANTHROPIC_API_KEY|https://console.anthropic.com/settings/keys" ;;
+    deepseek) echo "DEEPSEEK_API_KEY|https://platform.deepseek.com/api_keys" ;;
+    gemini) echo "GOOGLE_API_KEY|https://aistudio.google.com/apikey" ;;
+    xai) echo "XAI_API_KEY|https://console.x.ai" ;;
+    *)
+      # Hermes' docs list each provider's variable (docs/user-guide/features/fallback-providers.md).
+      gum input --header "The environment variable holding $1's API key (empty if it needs none)" ;;
+  esac
+}
+for provider in $(nix eval --json "$flake.config.server.hermes" \
+  --apply 'h: [h.model.provider] ++ map (f: f.provider) h.fallbacks' | "$JQ" -r 'unique[]'); do
+  key="$(provider_key "$provider")"
+  var="${key%%|*}"
+  [ -n "$var" ] || continue
+  if sudo grep -q "^$var=." "$secrets"; then
+    ok "$provider: its key is in the secrets file"
+    continue
+  fi
+  url="${key#*|}"
+  [ "$url" = "$key" ] && url=""
+  value="$(gum input --password --header "$provider API key ($var${url:+, from $url}; empty to skip)" | tr -d '[:space:]')"
+  if [ -n "$value" ]; then
+    # Read first, then rewrite in place (same owner and mode): a key left
+    # empty by an earlier run gives way to this one.
+    others="$(sudo grep -v "^$var=" "$secrets" || true)"
+    printf '%s\n%s=%s\n' "$others" "$var" "$value" | sed '/^$/d' | write_secret "$secrets"
+    unset others
+    ok "$provider: key written"
+  else
+    warn "$provider has no key: Hermes skips it in the chain."
+  fi
+  unset value
+done
 
 # ── The system ──────────────────────────────────────────────────────────────
 
