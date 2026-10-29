@@ -1,6 +1,8 @@
-# The main model on OpenCode Zen, and the on-device uzu server as a second
-# provider for the sub-chats that pin it (`model = "uzu:local"`).
-{ server, ... }:
+# The main model, its fallbacks in order (Hermes' fallback_providers:
+# https://hermes-agent.nousresearch.com/docs/user-guide/features/fallback-providers),
+# and the on-device uzu server: the last fallback, and the provider of the
+# sub-chats that pin it (`model = "uzu:local"`).
+{ lib, server, ... }:
 let
   cfg = server.hermes;
 in
@@ -10,6 +12,9 @@ in
       provider = cfg.model.provider;
       default = cfg.model.name;
     };
+
+    fallback_providers = cfg.fallbacks
+      ++ lib.optional (cfg.localFallback && server.uzu.enable) { provider = "uzu"; model = server.uzu.model; };
 
     providers.uzu = {
       name = "uzu (on this Mac)";

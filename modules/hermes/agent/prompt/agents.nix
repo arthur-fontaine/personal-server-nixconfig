@@ -6,6 +6,8 @@ let
   agent = server.hermes.user;
   remote = server.nixconfig.remote;
   model = server.hermes.model;
+  fallbacks = server.hermes.fallbacks
+    ++ lib.optional (server.hermes.localFallback && server.uzu.enable) { provider = "uzu"; model = "the local model"; };
   subchats = server.hermes.subchats;
 
   # One line per preset, from the same options the plugin reads.
@@ -154,7 +156,7 @@ in
 
   ## Models
 
-  You run on ${model.name} (${model.provider}). The sub-chats that pin `uzu:local`
+  You run on ${model.name} (${model.provider})${lib.optionalString (fallbacks != [ ]) ". When it fails, a turn goes on with ${lib.concatMapStringsSep ", then " (f: "${f.model} (${f.provider})") fallbacks}"}. The sub-chats that pin `uzu:local`
   answer with a model running on this Mac's GPU (uzu, OpenAI-compatible at
   http://127.0.0.1:${toString server.uzu.port}/v1): private and free, but small and slow.
 ''
