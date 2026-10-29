@@ -15,7 +15,7 @@ let
   # Both apps are sandboxed, so their settings live in their container, which
   # macOS creates at their first launch: until then there is nothing to set.
   # The rebuild runs this, and so does the bootstrap after the first launch.
-  appDefaults = pkgs.writeShellScriptBin "hermes-app-defaults" ''
+  appDefaults = pkgs.writeShellScriptBin "hermes-app-defaults" (''
     set_default() {
       local prefs="$HOME/Library/Containers/$1/Data/Library/Preferences"
       [ -d "$prefs" ] || return 0
@@ -34,7 +34,7 @@ let
   '' + lib.optionalString homekit ''
     # HomeClaw's MCP over HTTP, off by default.
     set_default com.shahine.homeclaw nativeMCPHTTPEnabled -bool true
-  '';
+  '');
 
   # `open -W` waits for the app, so launchd restarts it if it crashes.
   menuBarApp = app: {
