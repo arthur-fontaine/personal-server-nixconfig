@@ -246,6 +246,50 @@ class HomeKitEndpointTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([e["summary"] for e in sink.events], ["HomeKit: Front Door"])
 
 
+class HomeAssistantTest(unittest.IsolatedAsyncioTestCase):
+    def test_changes(self):
+        from hermes_events.homeassistant import change, websocket_url
+        def event(entity, old, new, name="Front door"):
+            return {"data": {"entity_id": entity, "old_state": {"state": old},
+                             "new_state": {"state": new, "attributes": {"friendly_name": name}}}}
+        watch = ({"binary_sensor", "lock"}, {"sensor.washer"})
+        self.assertEqual(change(event("binary_sensor.door", "off", "on"), *watch)[1], "Home Assistant: Front door is now on")
+        self.assertIsNone(change(event("binary_sensor.door", "on", "on"), *watch))  # attributes only
+        self.assertIsNone(change(event("light.kitchen", "off", "on"), *watch))  # not watched
+        self.assertIsNotNone(change(event("sensor.washer", "running", "done", "Washer"), *watch))
+        self.assertIsNone(change(event("lock.front", "unavailable", "unknown"), *watch))
+        self.assertEqual(websocket_url("https://ha.example:8123/"), "wss://ha.example:8123/api/websocket")
+
+    async def test_watch_against_a_fake_home_assistant(self):
+        from hermes_events.homeassistant import homeassistant_watch
+
+        async def ws(request):
+            socket = web.WebSocketResponse()
+            await socket.prepare(request)
+            await socket.send_json({"type": "auth_required"})
+            auth = await socket.receive_json()
+            await socket.send_json({"type": "auth_ok" if auth["access_token"] == "t" else "auth_invalid"})
+            await socket.receive_json()  # subscribe_events
+            for old, new in (("off", "on"), ("on", "off")):  # the second within the cooldown
+                await socket.send_json({"type": "event", "event": {"data": {
+                    "entity_id": "binary_sensor.door", "old_state": {"state": old},
+                    "new_state": {"state": new, "attributes": {"friendly_name": "Front door"}}}}})
+            await asyncio.sleep(1)
+            return socket
+
+        app = web.Application()
+        app.router.add_get("/api/websocket", ws)
+        server = TestServer(app)
+        await server.start_server()
+        self.addAsyncCleanup(server.close)
+        sink = FakeSink()
+        p = pipeline(tempfile.mkdtemp(), sink=sink)
+        task = asyncio.create_task(homeassistant_watch(p, str(server.make_url("")), "t", ["binary_sensor"], []))
+        await asyncio.sleep(0.5)
+        task.cancel()
+        self.assertEqual([e["summary"] for e in sink.events], ["Home Assistant: Front door is now on"])
+
+
 class FakeMCP:
     def __init__(self, answers):
         self.answers = answers

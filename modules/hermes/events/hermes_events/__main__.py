@@ -15,6 +15,7 @@ from . import pollers
 from .core import Pipeline, Seen
 from .hermes import HermesSink
 from .browser import instagram_watch
+from .homeassistant import homeassistant_watch
 from .sources import imessage_watch, whatsapp_app
 from .triage import UzuTriage
 
@@ -53,6 +54,13 @@ async def main(config: dict) -> None:
     await web.TCPSite(runner, config["listen"]["host"], config["listen"]["port"]).start()
     if on("imessage"):
         tasks.append(asyncio.create_task(imessage_watch(pipeline, sources["imessage"]["command"])))
+    if on("homeassistant"):
+        if secrets.get("HASS_TOKEN"):
+            c = sources["homeassistant"]
+            tasks.append(asyncio.create_task(homeassistant_watch(
+                pipeline, c["url"], secrets["HASS_TOKEN"], c["domains"], c["entities"])))
+        else:
+            logging.getLogger("hermes_events").info("homeassistant: no HASS_TOKEN in the secrets file, skipped")
     if on("instagram") or on("discord"):
         tasks.append(asyncio.create_task(instagram_watch(
             pipeline, sources["instagram"]["devtools"],
