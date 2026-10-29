@@ -125,9 +125,19 @@ pace and to confirm before it sends or posts anything.
 
 ## Models
 
-- Main: `deepseek-v4.1-flash` on OpenCode Zen, paid as you go (`server.hermes.model`).
-  OpenCode's free models (`*-free`) answer only its own app: through the API
-  they return HTTP 429 "Free usage limit reached" from the first request.
+- A chain, chosen by the bootstrap (or set in `hosts/local.nix`): the main model
+  (`server.hermes.model`), then its fallbacks in order (`server.hermes.fallbacks`),
+  then the local model (`server.hermes.localFallback`). When one fails (a limit
+  reached, an outage, an expired login), Hermes goes on with the next for that
+  turn, and tries the main one again on the next turn ([Hermes' fallback
+  providers](https://hermes-agent.nousresearch.com/docs/user-guide/features/fallback-providers)).
+  For example: your ChatGPT subscription, then OpenCode's DeepSeek, then uzu.
+- ChatGPT subscription: provider `openai-codex` (`gpt-6-sol`, `gpt-5.5`…). The
+  bootstrap logs Hermes in with a device code (a link and a code, from any
+  device); the login lives in `~/.hermes/auth.json` on the Hermes account.
+- OpenCode Zen: `deepseek-v4.1-flash`, paid as you go. OpenCode's free models
+  (`*-free`) answer only its own app: through the API they return HTTP 429
+  "Free usage limit reached" from the first request.
 - Local: uzu serves Qwen 3.5 9B on the GPU at `127.0.0.1:8000`
   (`server.uzu`), for the sub-chats that pin `uzu:local`. Compactions can use it
   too: `server.hermes.memory.compactionModel = "uzu:local"`.
