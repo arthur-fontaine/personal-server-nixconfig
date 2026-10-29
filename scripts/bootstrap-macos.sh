@@ -224,15 +224,13 @@ if sudo test -e "$secrets"; then
   bot_token="$(sudo sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$secrets")"
 else
   step "Secrets (stored in $secrets, readable by Hermes only)"
-  runpod="$(gum input --password --header "RunPod API key (https://www.runpod.io/console/user/settings)")"
   step "Your Telegram bot"
   bot_token="$(new_bot_token)"
   bot="$(tg "$bot_token" getMe | "$JQ" -r .result.username)"
   owner="$(owner_id "$bot_token" "$bot")"
   sudo mkdir -p "$(dirname "$secrets")"
-  printf 'RUNPOD_API_KEY=%s\nTELEGRAM_BOT_TOKEN=%s\nTELEGRAM_ALLOWED_USERS=%s\n' \
-    "$runpod" "$bot_token" "${owner//[^0-9]/}" | write_secret "$secrets"
-  unset runpod
+  printf 'TELEGRAM_BOT_TOKEN=%s\nTELEGRAM_ALLOWED_USERS=%s\n' \
+    "$bot_token" "${owner//[^0-9]/}" | write_secret "$secrets"
   ok "Secrets written"
   # What people see before their first message; BotFather's /setdescription does the same.
   tg "$bot_token" setMyShortDescription "short_description=Hermes%2C%20a%20personal%20agent%20on%20a%20home%20server" >/dev/null || true
@@ -329,6 +327,63 @@ else
     nix eval --impure --raw --file "$REPO_DIR/scripts/lib/set-host.nix")"
   printf '%s' "$text" > "$local_nix"
   ok "Models: $(model_chain) → the local model"
+fi
+
+# ── Integrations: your other services, each optional ───────────────────────
+# Written to hosts/local.nix (server.hermes.integrations); the steps below set
+# up only those that are on. Apple's apps are always there.
+
+# name|label (no commas: gum's --selected is comma-separated)
+integration_choices=(
+  "whatsapp|WhatsApp: read and send your messages and see new ones"
+  "instagram|Instagram: DMs and posts and stories and its notifications"
+  "discord|Discord: DMs and servers and its notifications"
+  "homekit|HomeKit: your home's accessories (installs HomeClaw from the App Store)"
+  "onepassword|1Password: logins Hermes fills in without seeing them"
+  "runpod|RunPod: GPU pods and pods left running"
+  "github|GitHub notifications as events"
+)
+integration_on() { [ "$(setting "server.hermes.integrations.$1.enable")" = 1 ]; }
+integrations_now() {
+  local line names=()
+  for line in "${integration_choices[@]}"; do integration_on "${line%%|*}" && names+=("${line%%|*}"); done
+  echo "${names[*]:-none}"
+}
+
+if grep -q 'integrations' "$local_nix" 2>/dev/null \
+  && ! gum confirm --default=false "Integrations: $(integrations_now). Change them?"; then
+  ok "Integrations: $(integrations_now)"
+else
+  step "Integrations"
+  note "Your other services Hermes may use, each acting as you there (space to pick, enter to confirm)."
+  labels=() selected=()
+  for line in "${integration_choices[@]}"; do
+    labels+=("${line#*|}")
+    integration_on "${line%%|*}" && selected+=("${line#*|}")
+  done
+  picked="$(IFS=,; gum choose --no-limit --selected="${selected[*]:-}" "${labels[@]}")" || picked=""
+  patch="{}"
+  for line in "${integration_choices[@]}"; do
+    on=false
+    grep -qxF "${line#*|}" <<< "$picked" && on=true
+    patch="$("$JQ" -c --arg n "${line%%|*}" --argjson on "$on" '.[$n] = {enable: $on}' <<< "$patch")"
+  done
+  text="$(REPO="$REPO_DIR" HOST="$HOST" \
+    PATCH="$("$JQ" -cn --argjson i "$patch" '{server: {hermes: {integrations: $i}}}')" \
+    nix eval --impure --raw --file "$REPO_DIR/scripts/lib/set-host.nix")"
+  printf '%s' "$text" > "$local_nix"
+  ok "Integrations: $(integrations_now)"
+fi
+
+# RunPod's key, when that integration is on (its MCP server, its events).
+if integration_on runpod && ! sudo grep -q '^RUNPOD_API_KEY=.' "$secrets"; then
+  runpod="$(gum input --password --header "RunPod API key (https://www.runpod.io/console/user/settings; empty to skip)" | tr -d '[:space:]')"
+  if [ -n "$runpod" ]; then
+    others="$(sudo grep -v '^RUNPOD_API_KEY=' "$secrets" || true)"
+    printf '%s\nRUNPOD_API_KEY=%s\n' "$others" "$runpod" | sed '/^$/d' | write_secret "$secrets"
+    ok "RunPod: key written"
+  fi
+  unset runpod others
 fi
 
 # The API key of each provider in the chain, asked only for those it uses and
@@ -535,10 +590,12 @@ fi
 # web pages (Instagram) without the model seeing them.
 
 op_vault="$(setting server.hermes.onepassword.vault)"
-if sudo grep -q '^OP_SERVICE_ACCOUNT_TOKEN=' "$secrets"; then
+if ! integration_on onepassword; then
+  :
+elif sudo grep -q '^OP_SERVICE_ACCOUNT_TOKEN=' "$secrets"; then
   ok "Hermes reads 1Password's \"$op_vault\" vault"
 else
-  step "1Password for Hermes (optional)"
+  step "1Password for Hermes"
   note "In 1Password: create a vault named \"$op_vault\", then Developer → Service Accounts → New,"
   note "with read access to \"$op_vault\" only. Put there the logins Hermes may use."
   op_token="$(gum input --password --header "Service account token (ops_…, empty to skip)")"
@@ -558,7 +615,9 @@ fi
 # ── WhatsApp, as a linked device of your number ────────────────────────────
 
 wa() { as_agent env WACLI_STORE_DIR="$(setting "home-manager.users.$agent.services.hermes-agent.environment.WACLI_STORE_DIR")" wacli "$@"; }
-if wa --json auth status 2>/dev/null | grep -q '"authenticated":true'; then
+if ! integration_on whatsapp; then
+  :
+elif wa --json auth status 2>/dev/null | grep -q '"authenticated":true'; then
   ok "Hermes reads your WhatsApp"
 elif gum confirm "Link your WhatsApp, so Hermes can read and send your messages?"; then
   step "WhatsApp"
@@ -730,7 +789,7 @@ apple_apps() {
   fi
 
   imcp_apps
-  homeclaw_app
+  integration_on homekit && homeclaw_app
 }
 
 agent_home="$(setting server.hermes.home)"
@@ -852,14 +911,18 @@ if gui_session && [ "$(stat -f %Su /dev/console)" = "$agent" ]; then
     apple_apps
     hermes_lit "$(setting server.energy.displayBrightness)"
   fi
-  if instagram_logged_in; then
+  if ! integration_on instagram; then
+    :
+  elif instagram_logged_in; then
     ok "Hermes is logged in to Instagram"
   elif gum confirm "Log Hermes in to your Instagram?"; then
     hermes_lit 1
     instagram_login
     hermes_lit "$(setting server.energy.displayBrightness)"
   fi
-  if sudo test -e "$discord_marker"; then
+  if ! integration_on discord; then
+    :
+  elif sudo test -e "$discord_marker"; then
     ok "Hermes was logged in to Discord (it logs in again from 1Password when needed)"
   elif gum confirm "Log Hermes in to your Discord?"; then
     hermes_lit 1

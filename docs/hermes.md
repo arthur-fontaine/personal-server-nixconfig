@@ -104,7 +104,14 @@ The skills' permissions belong to `/Library/Hermes/hermes-launcher`, which
 starts the gateway, so they hold across Hermes updates. A revoked one: run the bootstrap
 again over SSH, looking at the Mac.
 
-## WhatsApp, Instagram and 1Password
+## Integrations: WhatsApp, Instagram, Discord, 1Password…
+
+Each of your other services is an integration, off until you turn it on
+(`server.hermes.integrations.<name>.enable`, which the bootstrap asks for):
+`whatsapp`, `instagram`, `discord`, `homekit` (HomeClaw), `onepassword`,
+`runpod`, `github` (notifications). Its skill, MCP server and events come with
+it, and Hermes' instructions mention only those that are on. Apple's apps are
+not integrations: they come with the Mac.
 
 | What | Through | Set up by the bootstrap |
 | --- | --- | --- |

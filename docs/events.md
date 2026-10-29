@@ -79,6 +79,11 @@ Both were tried with a real Web Push before choosing.
 
 ## Settings
 
+The sources of an integration (WhatsApp, Instagram, Discord, HomeKit, GitHub,
+RunPod) are on when it is (`server.hermes.integrations`); Apple's and this
+Mac's are always on.
+
+
 `server.hermes.events`: `enable`, one switch per source (`whatsapp`,
 `imessage`, `instagram`, `discord`, `homekit`, `calendar`, `mail`, `reminders`, `calls`,
 `github`, `runpod`, `system`), `files` (the folders), `batchSeconds` (45),
