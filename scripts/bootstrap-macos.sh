@@ -224,7 +224,7 @@ if sudo test -e "$secrets"; then
   bot_token="$(sudo sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$secrets")"
 else
   step "Secrets (stored in $secrets, readable by Hermes only)"
-  opencode="$(gum input --password --header "OpenCode Zen API key (https://opencode.ai/auth)")"
+  opencode="$(gum input --password --header "OpenCode Zen API key (https://opencode.ai/auth; empty if you will not use it)")"
   runpod="$(gum input --password --header "RunPod API key (https://www.runpod.io/console/user/settings)")"
   step "Your Telegram bot"
   bot_token="$(new_bot_token)"
@@ -278,6 +278,58 @@ topics() {
 if [ -n "${bot_token:-}" ]; then
   botfather_settings "$bot_token" "$(tg "$bot_token" getMe | "$JQ" -r .result.username)"
   topics "$bot_token" "${owner:-$(sudo sed -n 's/^TELEGRAM_ALLOWED_USERS=//p' "$secrets" | cut -d, -f1)}"
+fi
+
+# ── Models: the main one, then its fallbacks ────────────────────────────────
+# Hermes tries them in order when one fails (a limit reached, an outage), for
+# that turn; the local model (uzu) always comes last. Written to
+# hosts/local.nix (server.hermes.model, server.hermes.fallbacks).
+
+# label|provider|model
+model_choices=(
+  "ChatGPT subscription: gpt-6-sol|openai-codex|gpt-6-sol"
+  "ChatGPT subscription: gpt-5.5|openai-codex|gpt-5.5"
+  "OpenCode Zen: DeepSeek V4.1 Flash (pay as you go)|opencode-zen|deepseek-v4.1-flash"
+  "Another provider and model…|other|"
+)
+model_entry() { # a label → {"provider", "name"}
+  local line provider name
+  for line in "${model_choices[@]}"; do
+    [ "${line%%|*}" = "$1" ] || continue
+    provider="$(cut -d'|' -f2 <<< "$line")"
+    name="$(cut -d'|' -f3 <<< "$line")"
+    if [ "$provider" = other ]; then
+      provider="$(gum input --header "Provider (a Hermes provider id: openrouter, anthropic, deepseek…)")"
+      name="$(gum input --header "Model for $provider")"
+    fi
+    "$JQ" -cn --arg p "$provider" --arg n "$name" '{provider: $p, name: $n}'
+  done
+}
+model_chain() {
+  nix eval --json "$flake.config.server.hermes" --apply 'h: [h.model] ++ map (f: { provider = f.provider; name = f.model; }) h.fallbacks' \
+    | "$JQ" -r 'map("\(.name) (\(.provider))") | join(" → ")'
+}
+
+if grep -q 'fallbacks' "$local_nix" 2>/dev/null && ! gum confirm --default=false "Models: $(model_chain) → the local model. Change them?"; then
+  ok "Models: $(model_chain) → the local model"
+else
+  step "Models"
+  note "The main model, then the ones Hermes falls back to, in order, when one fails;"
+  note "the local model (uzu) always comes last. A ChatGPT subscription logs in after the install."
+  labels=()
+  for line in "${model_choices[@]}"; do labels+=("${line%%|*}"); done
+  main="$(model_entry "$(gum choose --header "Main model" "${labels[@]}")")"
+  fallbacks="[]"
+  while :; do
+    pick="$(gum choose --header "Then, when it fails" "${labels[@]}" "Nothing else: then the local model")"
+    [ "$pick" = "Nothing else: then the local model" ] && break
+    fallbacks="$("$JQ" -c --argjson f "$(model_entry "$pick")" '. + [{provider: $f.provider, model: $f.name}]' <<< "$fallbacks")"
+  done
+  text="$(REPO="$REPO_DIR" HOST="$HOST" \
+    PATCH="$("$JQ" -cn --argjson m "$main" --argjson f "$fallbacks" '{server: {hermes: {model: $m, fallbacks: $f}}}')" \
+    nix eval --impure --raw --file "$REPO_DIR/scripts/lib/set-host.nix")"
+  printf '%s' "$text" > "$local_nix"
+  ok "Models: $(model_chain) → the local model"
 fi
 
 # ── The system ──────────────────────────────────────────────────────────────
@@ -406,6 +458,27 @@ elif [ "$(setting server.hermes.events.github)" = 1 ]; then
       warn "GitHub refused that token for notifications: skipped. Run this script again to retry."
     fi
     unset token
+  fi
+fi
+
+# ── Your ChatGPT subscription, when the chain uses it ──────────────────────
+
+uses_codex="$(nix eval --json "$flake.config.server.hermes" --apply 'h: builtins.any (p: p == "openai-codex") ([h.model.provider] ++ map (f: f.provider) h.fallbacks)')"
+if [ "$uses_codex" = true ]; then
+  hermes_cli() {
+    as_agent env HERMES_HOME="$(setting server.hermes.home)/.hermes" \
+      "$(setting "home-manager.users.$agent.services.hermes-agent.package")/bin/hermes" "$@"
+  }
+  if ! hermes_cli auth status openai-codex 2>&1 | grep -q "logged out"; then
+    ok "Hermes is logged in to your ChatGPT subscription"
+  else
+    step "Your ChatGPT subscription"
+    note "Hermes logs in with a code: open the link it shows (on any device), sign in to ChatGPT, enter the code."
+    if hermes_cli auth add openai-codex --type oauth; then
+      ok "Hermes is logged in to your ChatGPT subscription"
+    else
+      warn "Not logged in: Hermes falls back to the next model. Run this script again to retry."
+    fi
   fi
 fi
 
