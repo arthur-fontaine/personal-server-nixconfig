@@ -13,6 +13,10 @@
 # docs/uninstall.md describes each step, to do them by hand.
 set -euo pipefail
 
+# Removing everything deletes /nix: a bash from there would vanish under this
+# very script (a bus error). macOS' own one stays.
+case "$BASH" in /nix/*) exec /bin/bash "$0" "$@" ;; esac
+
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 export PATH="/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:$PATH"
 nix() { command nix --extra-experimental-features 'nix-command flakes' "$@"; }
@@ -136,12 +140,13 @@ remove_everything() {
   fi
   sudo rm -rf /etc/nix /var/root/.nix-profile /var/root/.nix-defexpr /var/root/.nix-channels \
     "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels"
+  # gum lives in /nix too: plain output from here on.
   if sudo diskutil apfs deleteVolume /nix; then
-    ok "Nix is gone"
+    printf '✓ Nix is gone\n'
   else
-    warn "The /nix volume is in use: reboot, then run: sudo diskutil apfs deleteVolume /nix"
+    printf '! The /nix volume is in use: reboot, then run: sudo diskutil apfs deleteVolume /nix\n'
   fi
-  echo "This repository's clone is still at $REPO_DIR; delete it when you are done."
+  printf "This repository's clone is still at %s; delete it when you are done.\n" "$REPO_DIR"
 }
 
 choice="$(gum choose --header "What should happen to this server?" \
