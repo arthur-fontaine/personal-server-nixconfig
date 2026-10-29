@@ -7,10 +7,16 @@
     # homeDirectory = "/Users/alice";
     # nixconfigDir = "/Users/alice/personal-server-nixconfig"; # where this repo is checked out
 
-    # Any option under server.* (see modules/*/options), for example:
+    # Any option under server.* (see modules/*/options), for example. The
+    # bootstrap writes the models and integrations for you.
     server = {
       ssh.authorizedKeys = [ "ssh-ed25519 AAAA... alice@laptop" ];
-      # hermes.model.name = "deepseek-v4.1-flash-free";
+      # The main model, then its fallbacks in order; the local one comes last.
+      # hermes.model = { provider = "openai-codex"; name = "gpt-6-sol"; };
+      # hermes.fallbacks = [ { provider = "opencode-zen"; model = "deepseek-v4.1-flash"; } ];
+      # hermes.integrations.whatsapp.enable = true;
+      # hermes.integrations.homeassistant.enable = true;
+      # hermes.homeassistant.url = "http://192.168.1.10:8123";
       # uzu.model = "alibaba:qwen3.5:0.8b:mirai:mirai-m:4";
       # energy.lowPowerMode = false;
     };
