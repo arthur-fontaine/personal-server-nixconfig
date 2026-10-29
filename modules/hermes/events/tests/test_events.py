@@ -37,6 +37,13 @@ def wa(text="on prend un verre ce soir ?", id="A1", chat="33611111111@s.whatsapp
             "Text": text, "ChatName": "Martin", **extra}
 
 
+async def eventually(check, timeout=3.0):
+    """Wait until `check()` holds: fixed sleeps fail on a loaded machine."""
+    deadline = time.time() + timeout
+    while not check() and time.time() < deadline:
+        await asyncio.sleep(0.02)
+
+
 class FakeTriage:
     def __init__(self, verdict={"urgency": "today"}):
         self.verdict, self.events = verdict, []
@@ -101,7 +108,7 @@ class PipelineTest(unittest.IsolatedAsyncioTestCase):
         for parsed in (whatsapp_message(wa(id="A1")), whatsapp_message(wa("à 19h ?", id="A2")),
                        whatsapp_message(wa(id="A1"))):  # a replay
             p.message(parsed[0], parsed[1])
-        await asyncio.sleep(0.15)
+        await eventually(lambda: sink.events)
         self.assertEqual(len(sink.events), 1)
         event = sink.events[0]
         self.assertIn("2 new messages", event["summary"])
@@ -132,7 +139,7 @@ class PipelineTest(unittest.IsolatedAsyncioTestCase):
         p.notice("homekit", "door", "Front door opened", "[Front Door] contact open", id="d1")
         p.notice("homekit", "door", "Front door opened", "[Front Door] contact open", id="d1")
         p.system("disk", "Disk almost full")
-        await asyncio.sleep(0.05)
+        await eventually(lambda: len(sink.events) >= 2)
         self.assertEqual([e["key"] for e in sink.events], ["homekit:door", "system:disk"])
         self.assertEqual(sink.events[1]["route"], "system")
 
@@ -226,7 +233,7 @@ class WhatsAppEndpointTest(unittest.IsolatedAsyncioTestCase):
         signature = "sha256=" + hmac.new(SECRET.encode(), body, hashlib.sha256).hexdigest()
         good = await client.post("/whatsapp", data=body, headers={"X-Wacli-Signature": signature})
         self.assertEqual(good.status, 204)
-        await asyncio.sleep(0.15)
+        await eventually(lambda: sink.events)
         self.assertEqual(len(sink.events), 1)
 
 
@@ -242,7 +249,7 @@ class HomeKitEndpointTest(unittest.IsolatedAsyncioTestCase):
         auth = {"Authorization": f"Bearer {SECRET}"}
         await client.post("/hooks/homeclaw", json={"text": "[HomeClaw] Webhook test event", "mode": "now"}, headers=auth)
         self.assertEqual((await client.post("/hooks/homeclaw", json=event, headers=auth)).status, 200)
-        await asyncio.sleep(0.05)
+        await eventually(lambda: sink.events)
         self.assertEqual([e["summary"] for e in sink.events], ["HomeKit: Front Door"])
 
 
@@ -285,7 +292,8 @@ class HomeAssistantTest(unittest.IsolatedAsyncioTestCase):
         sink = FakeSink()
         p = pipeline(tempfile.mkdtemp(), sink=sink)
         task = asyncio.create_task(homeassistant_watch(p, str(server.make_url("")), "t", ["binary_sensor"], []))
-        await asyncio.sleep(0.5)
+        await eventually(lambda: sink.events)
+        await asyncio.sleep(0.2)  # the second change, which the cooldown must drop
         task.cancel()
         self.assertEqual([e["summary"] for e in sink.events], ["Home Assistant: Front door is now on"])
 
@@ -307,6 +315,7 @@ class PollersTest(unittest.IsolatedAsyncioTestCase):
 
     async def drain(self):
         await asyncio.sleep(0.05)
+        await eventually(lambda: self.sink.events, timeout=1)
         return self.sink.events
 
     def test_state_seeds_first(self):
