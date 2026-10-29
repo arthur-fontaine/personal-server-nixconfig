@@ -1,7 +1,14 @@
-{ lib, ... }:
+{ config, lib, ... }:
 let
   inherit (lib) mkOption types;
   source = description: default: mkOption { type = types.bool; inherit default description; };
+  # An external service's events follow its integration (integrations.nix).
+  integration = name: description: mkOption {
+    type = types.bool;
+    default = config.server.hermes.integrations.${name}.enable;
+    defaultText = lib.literalExpression "config.server.hermes.integrations.${name}.enable";
+    inherit description;
+  };
 in
 {
   options.server.hermes.events = {
@@ -15,21 +22,21 @@ in
       '';
     };
 
-    whatsapp = source "Incoming WhatsApp messages (wacli's webhook)." true;
+    whatsapp = integration "whatsapp" "Incoming WhatsApp messages (wacli's webhook).";
     imessage = source "Incoming iMessages and SMS (imsg watch)." true;
-    instagram = source "Instagram's notifications, in Hermes' always-open Chrome." true;
-    discord = source "Discord's notifications, from a Discord tab kept open in that Chrome." true;
-    homekit = source "HomeKit accessory changes HomeClaw is set to report (its triggers)." true;
+    instagram = integration "instagram" "Instagram's notifications, in Hermes' always-open Chrome.";
+    discord = integration "discord" "Discord's notifications, from a Discord tab kept open in that Chrome.";
+    homekit = integration "homekit" "HomeKit accessory changes HomeClaw is set to report (its triggers).";
     calendar = source "New events in the calendar, and events starting soon (iMCP)." true;
     mail = source "New unread mail (iMCP, once its Mail folder access is granted)." true;
     reminders = source "Reminders falling due (remindctl)." true;
     calls = source "Missed calls (the call history iCloud syncs to this Mac)." true;
-    github = source ''
+    github = integration "github" ''
       GitHub notifications, with their own classic token (the notifications
       scope; fine-grained tokens cannot read them), GITHUB_NOTIFICATIONS_TOKEN
       in the secrets file: the bootstrap asks for it. Without it, skipped.
-    '' true;
-    runpod = source "RunPod pods left running (2, 6, 12, 24, 48 hours)." true;
+    '';
+    runpod = integration "runpod" "RunPod pods left running (2, 6, 12, 24, 48 hours).";
     system = source "This Mac: low disk, power cuts, a service down, new logins. Sent as is." true;
 
     files = mkOption {

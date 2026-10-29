@@ -12,7 +12,7 @@ let
   op = lib.getExe pkgs._1password-cli;
 in
 {
-  services.hermes-agent.settings = {
+  services.hermes-agent.settings = lib.mkIf server.hermes.integrations.onepassword.enable {
     vault.onepassword = {
       enabled = true;
       binary_path = op;

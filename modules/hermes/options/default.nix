@@ -9,5 +9,6 @@
     ./telegram.nix
     ./onepassword.nix
     ./events.nix
+    ./integrations.nix
   ];
 }
