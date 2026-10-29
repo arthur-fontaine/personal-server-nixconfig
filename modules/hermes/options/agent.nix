@@ -74,6 +74,10 @@ in
       provider = mkOption {
         type = types.str;
         default = "opencode-zen";
+        description = ''
+          The main model's provider: "openai-codex" (a ChatGPT subscription,
+          logged in by the bootstrap), "opencode-zen", or any Hermes provider.
+        '';
       };
       name = mkOption {
         type = types.str;
@@ -81,6 +85,26 @@ in
         # only its own app, and refuse API clients with HTTP 429.
         default = "deepseek-v4.1-flash";
       };
+    };
+    fallbacks = mkOption {
+      type = types.listOf (types.submodule {
+        options = {
+          provider = mkOption { type = types.str; };
+          model = mkOption { type = types.str; };
+        };
+      });
+      default = [ ];
+      example = [{ provider = "opencode-zen"; model = "deepseek-v4.1-flash"; }];
+      description = ''
+        Tried in order when the main model fails (a limit reached, an outage,
+        an expired login), for that turn only: the next one tries the main
+        model again. scripts/bootstrap-macos.sh asks for the chain.
+      '';
+    };
+    localFallback = mkOption {
+      type = types.bool;
+      default = true;
+      description = "After the fallbacks, the local model (uzu): slow and small, but always there.";
     };
   };
 }
