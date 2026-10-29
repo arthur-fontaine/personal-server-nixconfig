@@ -6,6 +6,27 @@ let
   agent = server.hermes.user;
   remote = server.nixconfig.remote;
   model = server.hermes.model;
+  on = lib.mapAttrs (_: i: i.enable) server.hermes.integrations;
+  accounts =
+    lib.optional on.whatsapp ''
+      - WhatsApp: your `whatsapp` skill (`wacli`, a linked device of their
+        number, synced in the background). Check `wacli --json auth status`.
+    ''
+    ++ lib.optional on.instagram ''
+      - Instagram: your `instagram` skill, on instagram.com in your browser,
+        which stays logged in.
+    ''
+    ++ lib.optional on.discord ''
+      - Discord: your `discord` skill, on discord.com in your browser.
+    ''
+    ++ lib.optional on.runpod ''
+      - RunPod: the `runpod` MCP tools (GPU pods).
+    ''
+    ++ lib.optional on.onepassword ''
+      - Logins: `browser_vault` fills those of the user's 1Password vault
+        "${server.hermes.onepassword.vault}" into web pages; you never see the
+        passwords, and you never ask for one in chat.
+    '';
   fallbacks = server.hermes.fallbacks
     ++ lib.optional (server.hermes.localFallback && server.uzu.enable) { provider = "uzu"; model = "the local model"; };
   subchats = server.hermes.subchats;
@@ -97,22 +118,16 @@ in
   - Calendar, Contacts, Mail (reading; drafts open in Mail), Maps, Music,
     Shortcuts, Voice Memos, Weather: the `imcp` MCP tools (iMCP, a menu bar
     app here). Its own Reminders, Notes and Messages tools are off: use the
-    skills for those.
-  - HomeKit: the `homeclaw` MCP tools (HomeClaw, a menu bar app).
+    skills for those.${lib.optionalString on.homekit "\n- HomeKit: the `homeclaw` MCP tools (HomeClaw, a menu bar app)."}
   - Anything else: AppleScript (`osascript`), `shortcuts run`, computer use.
   Each works once the user allowed it on this Mac. Check before you promise
   (`imsg chats --limit 1`, `remindctl status`, an MCP tool listing); when one
   fails for a permission or an app that is not running, tell the user to run
   scripts/bootstrap-macos.sh again, over SSH while looking at the Mac.
 
-  The user's other accounts, where you act as them:
-  - WhatsApp: your `whatsapp` skill (`wacli`, a linked device of their
-    number, synced in the background). Check `wacli --json auth status`.
-  - Instagram and Discord: your `instagram` and `discord` skills, on their
-    websites in your browser, which stays logged in.
-  - Logins: `browser_vault` fills those of the user's 1Password vault
-    "${server.hermes.onepassword.vault}" into web pages; you never see the
-    passwords, and you never ask for one in chat.
+  ${lib.optionalString (accounts != [ ]) ("The user's other accounts, where you act as them:\n" + lib.concatStrings accounts + "\n")}Any other account or service of theirs is not set up here: say so, and that
+  turning it on is an integration in this repository (server.hermes.integrations)
+  plus a run of scripts/bootstrap-macos.sh.
 
   ## Private, secret or temporary conversations: sub-chats
 

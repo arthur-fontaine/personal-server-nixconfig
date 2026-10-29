@@ -21,7 +21,7 @@ let
     exec ${wacli} sync --follow "$@"
   '';
 in
-{
+lib.mkIf server.hermes.integrations.whatsapp.enable {
   home.packages = [ pkgs.wacli ];
   home.sessionVariables.WACLI_STORE_DIR = store;
   services.hermes-agent.environment.WACLI_STORE_DIR = store;
