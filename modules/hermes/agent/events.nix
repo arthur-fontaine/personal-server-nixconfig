@@ -44,6 +44,12 @@ let
         devtools = "http://127.0.0.1:${toString server.hermes.browserPort}";
       };
       discord = { enabled = cfg.discord; url = "https://discord.com/channels/@me"; };
+      homeassistant = {
+        enabled = cfg.homeassistant;
+        inherit (server.hermes.homeassistant) url;
+        domains = server.hermes.homeassistant.watchDomains;
+        entities = server.hermes.homeassistant.watchEntities;
+      };
       calendar = { enabled = cfg.calendar; every = minutes 5; lead_minutes = 30; };
       mail = { enabled = cfg.mail; every = minutes 5; };
       reminders = { enabled = cfg.reminders; every = 60; command = lib.getExe pkgs.remindctl; };

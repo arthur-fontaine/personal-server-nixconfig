@@ -26,6 +26,7 @@ in
     imessage = source "Incoming iMessages and SMS (imsg watch)." true;
     instagram = integration "instagram" "Instagram's notifications, in Hermes' always-open Chrome.";
     discord = integration "discord" "Discord's notifications, from a Discord tab kept open in that Chrome.";
+    homeassistant = integration "homeassistant" "Home Assistant's state changes, in server.hermes.homeassistant's watched domains and entities.";
     homekit = integration "homekit" "HomeKit accessory changes HomeClaw is set to report (its triggers).";
     calendar = source "New events in the calendar, and events starting soon (iMCP)." true;
     mail = source "New unread mail (iMCP, once its Mail folder access is granted)." true;
