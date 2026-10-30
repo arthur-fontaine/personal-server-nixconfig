@@ -38,11 +38,11 @@ let
     exec ${lib.getExe pkgs.bash} ${scripts}/scripts/hermes-setup.sh "$@"
   '';
 
-  # Terminal runs a .command file it opens. Unanswered, it ends in 24 hours,
-  # and the next login asks again.
+  # Terminal runs a .command file it opens. (Not under timeout(1): it moves
+  # the command out of the terminal's foreground, where gum could not read.)
   window = pkgs.writeScript "hermes-setup.command" ''
     #!/bin/sh
-    exec ${pkgs.coreutils}/bin/timeout 86400 ${run} window
+    exec ${run} window
   '';
 
   check = pkgs.writeShellScript "hermes-setup-check" ''

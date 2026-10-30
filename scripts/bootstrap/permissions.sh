@@ -15,11 +15,6 @@ else
   lit() { :; }
 fi
 
-# The launcher reads the system's TCC database only with Full Disk Access.
-full_disk_access() {
-  gui_session && as_gateway "head -c 1 '/Library/Application Support/com.apple.TCC/TCC.db'" >/dev/null 2>&1
-}
-
 step "Permissions: computer use and Full Disk Access"
 if in_gui true; then
   # "unknown" until the driver's daemon has run once.

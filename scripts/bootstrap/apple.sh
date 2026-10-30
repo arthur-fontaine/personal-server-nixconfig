@@ -32,6 +32,11 @@ apple_app() {
 apple_apps() {
   note "Hermes' Apple Account:"
   while ! apple_account; do
+    if ! full_disk_access; then
+      warn "Hermes cannot see its Apple Account without Full Disk Access: grant it first (Permissions)."
+      gum confirm --affirmative "Check again" --negative "Skip" "Granted?" || return 0
+      continue
+    fi
     note "On the Mac's screen, in the System Settings that opens, sign in with your Apple Account,"
     note "then in iCloud turn on Messages, Notes, Reminders, Contacts, Calendars and Find My Mac."
     hermes_gui /usr/bin/open "x-apple.systempreferences:com.apple.systempreferences.AppleIDSettings" || true

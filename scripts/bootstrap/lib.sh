@@ -52,7 +52,8 @@ xml() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' <<< "$1"; }
 # holds the macOS permissions); prints its output, returns its status. It
 # waits up to 5 minutes, for a dialog to be answered.
 as_gateway() {
-  local cmd="$1" label=org.personal-server.bootstrap-check dir code=""
+  # Its own label: the login's check and an SSH bootstrap may run at once.
+  local cmd="$1" label="org.personal-server.bootstrap-check.$$" dir code=""
   dir="$(as_agent mktemp -d /tmp/hermes-check.XXXXXX)"
   as_agent tee "$dir/job.plist" >/dev/null <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -81,6 +82,11 @@ EOF
   as_root cat "$dir/out" 2>/dev/null || true
   as_root rm -rf "$dir"
   return "${code:-1}"
+}
+
+# The launcher (the gateway, so Hermes) reads the system's TCC database only with Full Disk Access.
+full_disk_access() {
+  gui_session && as_gateway "head -c 1 '/Library/Application Support/com.apple.TCC/TCC.db'" >/dev/null 2>&1
 }
 
 # Merge a JSON patch into this host in hosts/local.nix (scripts/lib/set-host.nix);
