@@ -28,13 +28,14 @@ class SystemOne(BaseHTTPRequestHandler):
             self.send_response(answer["status"])
             self.end_headers()
             return
-        criteria = body["questions"]["next_action"]["criteria"]
-        choice = answer["pick"](criteria)
-        data = {
-            "model": "fake-elephant",
-            "answers": {"next_action": {"type": "choice", "choice": choice, "confidence": 0.9,
-                                        "probabilities": {choice: 0.9}}},
-        }
+        answers = {}
+        for name, question in body["questions"].items():
+            # A System One model answers every question; those the test leaves
+            # out get the first option.
+            choose = answer.get(name, lambda criteria: next(iter(criteria)))
+            choice = choose(question["criteria"])
+            answers[name] = {"type": "choice", "choice": choice, "confidence": 0.9, "probabilities": {choice: 0.9}}
+        data = {"model": "fake-elephant", "answers": answers}
         payload = json.dumps(data).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -48,6 +49,14 @@ class SystemOne(BaseHTTPRequestHandler):
 
 def pick(word: str):
     return lambda criteria: next(k for k, v in criteria.items() if word in v)
+
+
+def op(name: str):
+    return lambda criteria: name
+
+
+CLICK_THIERRY = {"operation": op("click"), "click_target": pick("Thierry"), "type_target": pick("Message"), "text": op("t0")}
+DONE = {"operation": op("done")}
 
 
 class FakeDriver:
@@ -97,22 +106,29 @@ def test_config() -> None:
 def test_candidates() -> None:
     snapshot = asyncio.run(FakeDriver().call("get_browser_state", {"snapshot_format": "semantic_v2"}))
     snapshot.update(target_id="t1", tab_id="b")
-    offered = cands.build(snapshot, goal="open the conversation with Thierry")
-    ids = [c.id for c in offered]
-    assert ids[0] == "click:p1:90", ids[:3]
-    assert len(offered) == cands.MAX_ACTIONS + 3 and ids[-3:] == ["done", "reobserve", "abstain"]
-    assert "click:p1:91" not in ids  # Send stays out unless allowed
+    questions = cands.build(snapshot, goal="open the conversation with Thierry")
+    criteria = questions.criteria()
+    clicks = criteria["click_target"][1]
+    assert next(iter(clicks.values())) == 'the link "Thierry Martin"', list(clicks.values())[:3]
+    assert len(clicks) == cands.MAX_TARGETS
+    assert not any("Send" in v for v in clicks.values())  # Send stays out unless allowed
+    assert set(criteria["operation"][1]) == {"click", "type", "done", "reobserve", "abstain"}
+    assert "text" not in criteria
     risky = cands.build(snapshot, goal="send it", texts=["Thierry", "Salut"], allow_risky=True)
-    assert "click:p1:91" in [c.id for c in risky]
-    typed = next(c for c in risky if c.id == "type:p1:92:1")
-    assert typed.tool == "browser_type" and typed.arguments["text"] == "Salut" and typed.arguments["tab_id"] == "b"
-    assert typed.description == 'Type "Salut" into the textbox "Message"'
-    assert "type:p1:92:0" in [c.id for c in risky]
+    criteria = risky.criteria()
+    assert any("Send" in v for v in criteria["click_target"][1].values())
+    assert criteria["text"][1] == {"t0": '"Thierry"', "t1": '"Salut"'}
+    field = next(k for k, v in criteria["type_target"][1].items() if "Message" in v)
+    tool, arguments = risky.type(field, "Salut")
+    assert tool == "browser_type" and arguments == {"target_id": "t1", "tab_id": "b", "ref": "p1:92", "text": "Salut", "replace": True}
+    # A page with nothing to type into does not offer typing.
+    plain = cands.build({"target_id": "t", "tab_id": "a", "refs": [{"ref": "x", "role": "link", "name": "Home"}]}, goal="g")
+    assert set(plain.criteria()) == {"operation", "click_target"} and "type" not in plain.criteria()["operation"][1]
 
 
 def test_loop(port: int) -> None:
     REQUESTS.clear()
-    ANSWERS[:] = [{"pick": pick("Thierry")}, {"pick": pick("goal is already reached")}]
+    ANSWERS[:] = [CLICK_THIERRY, DONE]
     driver = FakeDriver()
     report = asyncio.run(server.run(
         "open the conversation with Thierry", texts=[], url="https://www.instagram.com/direct/",
@@ -124,16 +140,34 @@ def test_loop(port: int) -> None:
     first = REQUESTS[0]
     assert first["path"] == "/v1/systemone" and first["auth"] == "Api-Key k"
     assert first["body"]["model"] == "decision-models/baseten-elephant-9b-latest"
-    assert first["body"]["questions"]["next_action"]["type"] == "choice"
+    assert set(first["body"]["questions"]) == {"operation", "click_target", "type_target"}
+    assert first["body"]["questions"]["operation"]["type"] == "choice"
     # The model sees IDs and descriptions only, never tools or arguments.
     assert "browser_click" not in json.dumps(first["body"])
-    assert REQUESTS[1]["body"]["state"]["history"][0]["action"] == "click:p1:90"
+    assert REQUESTS[1]["body"]["state"]["history"][0]["action"] == 'Click the link "Thierry Martin"'
+
+    # Typing the right one of Hermes' texts, then stopping when a field needs
+    # a text Hermes did not give.
+    REQUESTS.clear()
+    ANSWERS[:] = [{"operation": op("type"), "type_target": pick("Message"), "text": op("t1"), "click_target": pick("Thierry")}, DONE]
+    driver = FakeDriver()
+    report = asyncio.run(server.run(
+        "send Thierry the message", texts=["Thierry", "Salut !"], url=None, allow_risky=True,
+        max_steps=5, driver=driver, pid=1, config=config(port),
+    ))
+    assert ("browser_type", {"target_id": "t1", "tab_id": "b", "ref": "p1:92", "text": "Salut !", "replace": True}) in driver.calls, report
+    ANSWERS[:] = [{"operation": op("type"), "type_target": pick("Message"), "click_target": pick("Thierry")}]
+    report = asyncio.run(server.run(
+        "send Thierry the message", texts=[], url=None, allow_risky=False,
+        max_steps=5, driver=FakeDriver(), pid=1, config=config(port),
+    ))
+    assert "needs a text" in report, report
 
 
 def test_model_errors(port: int) -> None:
     for answer, expected in [
         ({"status": 401}, "HTTP 401"),
-        ({"pick": lambda criteria: "not-offered"}, "not offered"),
+        ({"operation": op("not-offered")}, "not offered"),
     ]:
         ANSWERS[:] = [answer]
         report = asyncio.run(server.run(
@@ -164,7 +198,7 @@ def test_over_mcp(port: int, tmp: Path) -> None:
     })
     server.chrome_pid = lambda profile: 1  # no Chrome here
     os.environ["FAST_ACT_CHROME_PROFILE"] = str(tmp / "profile")
-    ANSWERS[:] = [{"pick": pick("Thierry")}, {"pick": pick("goal is already reached")}]
+    ANSWERS[:] = [{"operation": op("click"), "click_target": pick("Thierry")}, DONE]
     report = asyncio.run(server.browser_fast_act("open the conversation with Thierry"))
     assert 'Click the link "Thierry Martin"' in report and "goal is already reached" in report, report
 

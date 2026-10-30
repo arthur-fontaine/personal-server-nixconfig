@@ -1,31 +1,34 @@
-"""The actions a decision model may choose from, for one page snapshot.
+"""The questions a decision model answers about one page snapshot.
 
-Built as Cua's jev-use builds them (libs/cua-driver/examples/jev-use at
-2d974f1843c7343a70affba9d21e7362979edec3, python/sources.py
-BrowserSemanticSource): from a ``get_browser_state`` ``semantic_v2``
-snapshot's refs, clicked through ``browser_click`` and typed into through
-``browser_type``. The model sees only each candidate's ID and description;
-the tool and its exact arguments stay here. jev-use's tasks pick their few
-controls by hand; a page of any site has hundreds, so the closest to the goal
-are offered, with the reserved outcomes, within jev-use's cap (24).
+Shaped as browser-use's jev-ultrafast asks them (https://github.com/browser-use/jev-ultrafast,
+"How it works in a nutshell", https://x.com/gregpr07/status/2100411547290046717):
+from the page's element table, one request asks the operation and, for each
+operation, its target; the target of the chosen operation is used. The page's
+elements are those of a ``get_browser_state`` ``semantic_v2`` snapshot, acted
+on through ``browser_click`` and ``browser_type`` as Cua's jev-use does
+(libs/cua-driver/examples/jev-use at 2d974f1843c7343a70affba9d21e7362979edec3,
+python/sources.py BrowserSemanticSource). The text typed is never the
+model's: jev-ultrafast has a small LLM write it, here it is Hermes', given in
+full; the model picks which, when there are several.
 """
 
 from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Mapping
 
-MAX_ACTIONS = 24
+# jev-use caps a decision at 24 actions.
+MAX_TARGETS = 24
 
-DONE = "done"
-REOBSERVE = "reobserve"
-ABSTAIN = "abstain"
-RESERVED = {
+CLICK, TYPE, DONE, REOBSERVE, ABSTAIN = "click", "type", "done", "reobserve", "abstain"
+OPERATIONS = {
+    CLICK: "Click one element of the page.",
+    TYPE: "Type text into one field of the page.",
     DONE: "The goal is already reached on this page: stop here.",
     REOBSERVE: "The page is still changing (loading, animating): look at it again before acting.",
-    ABSTAIN: "None of the other options moves toward the goal: stop and hand back.",
+    ABSTAIN: "Nothing on this page moves toward the goal: stop and hand back.",
 }
 
 # Labels whose click does what cannot be undone, offered only when the caller
@@ -39,11 +42,50 @@ TYPABLE = {"textbox", "searchbox", "combobox", "textarea", "input"}
 
 
 @dataclass(frozen=True)
-class Candidate:
+class Element:
     id: str
     description: str
-    tool: str | None = None
-    arguments: Mapping[str, Any] = field(default_factory=dict)
+    ref: str
+
+
+@dataclass(frozen=True)
+class Questions:
+    """One step's questions, and how to act on each answer."""
+
+    target: Mapping[str, str]
+    clickable: Mapping[str, Element]
+    typable: Mapping[str, Element]
+    texts: tuple[str, ...]
+
+    def criteria(self) -> dict[str, tuple[str, dict[str, str]]]:
+        operations = dict(OPERATIONS)
+        if not self.clickable:
+            operations.pop(CLICK)
+        if not self.typable:
+            operations.pop(TYPE)
+        questions = {"operation": ("Which operation moves toward the goal now?", operations)}
+        if self.clickable:
+            questions["click_target"] = (
+                "If the operation is a click: which element?",
+                {key: e.description for key, e in self.clickable.items()},
+            )
+        if self.typable:
+            questions["type_target"] = (
+                "If the operation is typing: into which field?",
+                {key: e.description for key, e in self.typable.items()},
+            )
+        if len(self.texts) > 1:
+            questions["text"] = (
+                "If the operation is typing: which of these texts goes there?",
+                {f"t{index}": f'"{preview(text)}"' for index, text in enumerate(self.texts)},
+            )
+        return questions
+
+    def click(self, element_id: str) -> tuple[str, dict[str, Any]]:
+        return "browser_click", {**self.target, "ref": self.clickable[element_id].ref}
+
+    def type(self, element_id: str, text: str) -> tuple[str, dict[str, Any]]:
+        return "browser_type", {**self.target, "ref": self.typable[element_id].ref, "text": text, "replace": True}
 
 
 def _words(text: str) -> set[str]:
@@ -52,11 +94,10 @@ def _words(text: str) -> set[str]:
 
 
 def _label(ref: Mapping[str, Any]) -> str:
-    name = " ".join(str(ref.get("name") or "").split())
-    return name[:80]
+    return " ".join(str(ref.get("name") or "").split())[:80]
 
 
-def _preview(text: str) -> str:
+def preview(text: str) -> str:
     flat = " ".join(text.split())
     return flat if len(flat) <= 60 else flat[:57] + "..."
 
@@ -65,35 +106,32 @@ def build(
     snapshot: Mapping[str, Any],
     *,
     goal: str,
-    texts: list[str] = (),
+    texts: tuple[str, ...] | list[str] = (),
     allow_risky: bool = False,
-) -> list[Candidate]:
-    """The page's actions closest to ``goal``, then the reserved outcomes.
-
-    Every text Hermes wrote may go into every typable field: which one goes
-    where is the model's choice, among those closed candidates, so it never
-    writes anything itself (jev-use's tasks name their typing candidates the
-    same way, sources.py type_text)."""
-    target = {"target_id": snapshot["target_id"], "tab_id": snapshot["tab_id"]}
+) -> Questions:
+    """The page's elements closest to ``goal``, within jev-use's cap per question."""
     wanted = _words(goal + " " + " ".join(texts))
-    scored: list[tuple[int, int, Candidate]] = []
+    clickable: list[tuple[int, int, Element]] = []
+    typable: list[tuple[int, int, Element]] = []
     for order, ref in enumerate(snapshot.get("refs") or []):
         handle, role, label = ref.get("ref"), str(ref.get("role") or "element"), _label(ref)
         if not handle or not label:
             continue
         actions = set(ref.get("actions") or ["click"])
         closeness = len(wanted & _words(label + " " + role))
-        if "click" in actions and (allow_risky or not RISKY.search(label)):
-            scored.append((closeness, order, Candidate(
-                f"click:{handle}", f'Click the {role} "{label}"',
-                "browser_click", {**target, "ref": handle},
-            )))
+        element = Element(f"e{order}", f'the {role} "{label}"', str(handle))
         if "type" in actions and role in TYPABLE:
-            for index, text in enumerate(texts):
-                scored.append((closeness + 1, order, Candidate(
-                    f"type:{handle}:{index}", f'Type "{_preview(text)}" into the {role} "{label}"',
-                    "browser_type", {**target, "ref": handle, "text": text, "replace": True},
-                )))
-    scored.sort(key=lambda item: (-item[0], item[1]))
-    chosen = [candidate for _, _, candidate in scored[:MAX_ACTIONS]]
-    return chosen + [Candidate(key, description) for key, description in RESERVED.items()]
+            typable.append((closeness, order, element))
+        if "click" in actions and (allow_risky or not RISKY.search(label)):
+            clickable.append((closeness, order, element))
+
+    def closest(items: list[tuple[int, int, Element]]) -> dict[str, Element]:
+        items.sort(key=lambda item: (-item[0], item[1]))
+        return {element.id: element for _, _, element in items[:MAX_TARGETS]}
+
+    return Questions(
+        target={"target_id": snapshot["target_id"], "tab_id": snapshot["tab_id"]},
+        clickable=closest(clickable),
+        typable=closest(typable),
+        texts=tuple(texts),
+    )

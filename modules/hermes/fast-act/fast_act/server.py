@@ -2,9 +2,9 @@
 
 The loop of Cua's jev-use browser runner (libs/cua-driver/examples/jev-use at
 2d974f1843c7343a70affba9d21e7362979edec3, python/run.py): Cua Driver snapshots
-the page, candidates.build offers its actions, the decision model picks one
-ID, Cua Driver performs it, and again, until the model says the goal is
-reached or abstains. The model writes nothing: the text to type is Hermes'.
+the page, candidates.build asks the operation and its targets, the decision
+model answers them in one request, Cua Driver performs the operation on its
+target, and again, until the model says the goal is reached or abstains. The model writes nothing: the text to type is Hermes'.
 Hermes stays the judge of the outcome: the tool reports what it did.
 
 Environment: CUA_DRIVER_BIN, FAST_ACT_CHROME_PROFILE (the --user-data-dir of
@@ -26,7 +26,6 @@ from mcp.server.mcpserver import MCPServer
 from fast_act import candidates as cands
 from fast_act import decision
 
-INSTRUCTIONS = "Which one action should run next to reach the goal?"
 SESSION = "hermes-fast-act"
 
 
@@ -110,36 +109,48 @@ async def run(
         )
         snapshot.setdefault("target_id", target_id)
         snapshot.setdefault("tab_id", tab_id)
-        offered = cands.build(snapshot, goal=goal, texts=texts, allow_risky=allow_risky)
+        questions = cands.build(snapshot, goal=goal, texts=texts, allow_risky=allow_risky)
         try:
-            choice = await asyncio.to_thread(
-                decision.choose,
-                config,
-                instructions=INSTRUCTIONS,
-                state=decision_state(goal, snapshot, history),
-                criteria={c.id: c.description for c in offered},
+            answers = await asyncio.to_thread(
+                decision.ask, config, state=decision_state(goal, snapshot, history), questions=questions.criteria()
             )
         except decision.DecisionError as error:
             report.append(f"{step}. stopped: {error}")
             break
-        candidate = next(c for c in offered if c.id == choice.selected_id)
-        line = f"{step}. {candidate.description} (p={choice.confidence:.2f}, {round((time.perf_counter() - started) * 1000)} ms)"
-        if candidate.id == cands.REOBSERVE:
-            report.append(line)
-            history.append({"step": str(step), "action": candidate.id})
+        operation = answers["operation"]
+        ms = round((time.perf_counter() - started) * 1000)
+        if operation.selected_id == cands.REOBSERVE:
+            report.append(f"{step}. looked again ({ms} ms)")
+            history.append({"step": str(step), "action": "reobserve"})
             await asyncio.sleep(0.5)
             continue
-        if candidate.id in {cands.DONE, cands.ABSTAIN}:
-            report.append(line)
+        if operation.selected_id in {cands.DONE, cands.ABSTAIN}:
+            report.append(f"{step}. {cands.OPERATIONS[operation.selected_id]} (p={operation.confidence:.2f}, {ms} ms)")
             break
+        if operation.selected_id == cands.CLICK:
+            target = answers["click_target"]
+            element = questions.clickable[target.selected_id]
+            tool, arguments = questions.click(target.selected_id)
+            description = f"Click {element.description}"
+        else:
+            target = answers["type_target"]
+            element = questions.typable[target.selected_id]
+            if not texts:
+                # jev-ultrafast's small LLM would write it: here that is Hermes.
+                report.append(f"{step}. stopped: typing into {element.description} needs a text; call again with it in texts")
+                break
+            text = texts[int(answers["text"].selected_id[1:])] if len(texts) > 1 else texts[0]
+            tool, arguments = questions.type(target.selected_id, text)
+            description = f'Type "{cands.preview(text)}" into {element.description}'
+        line = f"{step}. {description} (p={min(operation.confidence, target.confidence):.2f}, {ms} ms)"
         try:
-            await driver.call(candidate.tool, dict(candidate.arguments))
+            await driver.call(tool, arguments)
         except DriverError as error:
             report.append(f"{line}: failed, {error}")
-            history.append({"step": str(step), "action": candidate.id, "result": "failed"})
+            history.append({"step": str(step), "action": description, "result": "failed"})
             continue
         report.append(line)
-        history.append({"step": str(step), "action": candidate.id, "description": candidate.description})
+        history.append({"step": str(step), "action": description})
     else:
         report.append(f"stopped after {max_steps} steps")
     return "\n".join(report)
