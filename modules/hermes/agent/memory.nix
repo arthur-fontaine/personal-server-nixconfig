@@ -31,7 +31,9 @@ in
       plugins = {
         # One list for every plugin: definitions of it in other modules replace,
         # not add. The Home Assistant one: homeassistant.nix.
-        enabled = [ "unii" ] ++ lib.optional cfg.integrations.homeassistant.enable "homeassistant";
+        enabled = [ "unii" ]
+          ++ lib.optional cfg.integrations.homeassistant.enable "homeassistant"
+          ++ lib.optional cfg.decision.approval.enable "guard"; # guard.nix
         # The compactions may run on another model than the chat.
         entries.unii.llm = lib.optionalAttrs (compactionModel != null) {
           allow_provider_override = true;

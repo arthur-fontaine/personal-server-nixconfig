@@ -105,7 +105,7 @@ Web pages go faster through `browser_fast_act` (`modules/hermes/fast-act`), once
 the bootstrap's Models section has its key: Cua Driver snapshots the page in
 Hermes' Chrome, a decision model answering System One picks one of its controls
 (by default Baseten's [elephant-1](https://www.baseten.co/library/elephant-1/);
-any Jev-compatible one through `server.hermes.decisionModel`), Cua Driver acts,
+any Jev-compatible one through `server.hermes.decision.computerUse`), Cua Driver acts,
 until the model says the goal is reached. Hermes gives the goal and the text;
 the model only chooses. It is Cua's [jev-use](https://cua.ai/docs/how-to-guides/driver/jev-use)
 loop, not yet in a release, configured with the names of Cua's OpenJev adapter
@@ -113,6 +113,25 @@ loop, not yet in a release, configured with the names of Cua's OpenJev adapter
 `modules/hermes/agent/fast-act.nix` and `modules/hermes/options/decision.nix`
 go, and the settings keep their meaning. Until then `pkgs/cua-driver.nix`
 provides a Cua Driver new enough (0.38.0; Hermes pins 0.21.0).
+
+## Auto-review of Hermes' actions
+
+With `server.hermes.decision.approval` on (the bootstrap's Models section;
+Baseten's mammoth-1 by default), the `guard` plugin (`modules/hermes/plugins/guard`)
+reviews every action Hermes is about to take, but reads (files, searches, the
+read-only MCP servers). A decision model rates two things at once, as Codex's
+automatic approval review does: how clearly your own messages authorize the
+action, and how risky it is. Low risk you asked for, or bounded risk you clearly
+asked for, runs at once; anything else waits for your yes in Telegram, through
+Hermes' own approval gate (a no, or no answer, refuses it). So does any error
+of the model: nothing is refused outright, nothing unclear runs.
+
+As in Claude Code's auto mode, the reviewer sees your messages and Hermes'
+actions, never what the tools returned: a WhatsApp message, an email or a web
+page telling Hermes to act cannot argue with it. Only Telegram turns count as
+yours (Telegram answers its owner only); a turn the events daemon starts, about
+an incoming message, authorizes nothing. Hermes' own checks stay underneath:
+its pattern-matched dangerous commands, and its hardline blocklist.
 
 iMCP's own Reminders, Notes and Messages services stay off (Nix sets them, with
 Hermes trusted as a client and its self-updates off): the skills do more there.

@@ -1,0 +1,7 @@
+name: guard
+version: 1.0.0
+description: "Auto-review of every action Hermes takes, by a decision model, from the user's own messages only: low-risk and asked for runs, anything else asks the user first."
+author: "personal-server-nixconfig"
+provides_hooks:
+  - pre_llm_call
+  - pre_tool_call

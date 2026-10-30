@@ -4,12 +4,17 @@ let
   hermes = inputs.hermes-agent.packages.${pkgs.stdenv.hostPlatform.system}.default;
 in
 {
-  # The unii plugin's tests, in the interpreter Hermes runs it with.
-  unii = pkgs.runCommand "unii-tests" { } ''
+  # The plugins' tests (unii, guard against a fake System One server on
+  # loopback), in the interpreter Hermes runs them with.
+  unii = pkgs.runCommand "unii-tests" { __darwinAllowLocalNetworking = true; } ''
     cp -R ${../modules/hermes/plugins} plugins
     chmod -R u+w plugins
+    # guard's System One client, as agent/guard.nix puts it.
+    cp ${../modules/hermes/fast-act/fast_act/decision.py} plugins/guard/systemone.py
     cd plugins
     export HOME=$TMPDIR
+    # The sandbox points it at a file it does not have; httpx loads it anyway.
+    export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
     for test in tests/test_*.py; do
       echo "== $test"
       ${hermes.hermesVenv}/bin/python3 -I "$test"
