@@ -58,6 +58,10 @@ Hermes in to your Apple Account, logs it in to Instagram and Discord if you
 chose them, and checks the whole chain. [`MANUAL_SETUP.md`](./MANUAL_SETUP.md)
 lists each step and the few clicks only you can make.
 
+After that, reach the Mac over SSH only. Logging in to your own account at its
+screen switches Hermes' session out and locks it: computer use stops until
+the next reboot, which logs Hermes in again.
+
 ## Changing it
 
 Edit, commit, push to `main`, then on the server:
