@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
-from hermes_events.core import Chat, Message, Pipeline, Seen  # noqa: E402
+from hermes_events.core import Chat, Journal, Message, Pipeline, Seen  # noqa: E402
 from hermes_events.hermes import HermesSink  # noqa: E402
 from hermes_events.sources import imessage_message, whatsapp_app, whatsapp_message  # noqa: E402
 from hermes_events.triage import UzuTriage  # noqa: E402
@@ -94,6 +94,12 @@ class InstagramTest(unittest.TestCase):
         chat, _ = instagram_message({"title": "Instagram", "body": "zoe.martin: ce soir", "tag": "", "host": "www.instagram.com"}, NOW)
         self.assertEqual(chat.name, "zoe.martin")
         self.assertIsNone(instagram_message({"title": "", "body": ""}, NOW))
+        # The message alone: the sender is unknown, not its first words.
+        chat, message = instagram_message({"title": "Instagram", "body": "on peut regarder ?", "host": "www.instagram.com"}, NOW)
+        self.assertEqual((chat.name, message.text), ("Instagram", "on peut regarder ?"))
+        self.assertIn("does not name", message.sender)
+        chat, _ = instagram_message({"title": "Instagram", "body": "x", "data": '{"sender":"t","thread":"1"}', "host": "www.instagram.com"}, NOW)
+        self.assertEqual(chat.name, "Instagram")
         chat, message = notification_message({"title": "Zoé (#général, Les copains)", "body": "on se voit ?", "host": "discord.com"}, NOW)
         self.assertEqual((chat.source, chat.name, message.text), ("discord", "Zoé (#général, Les copains)", "on se voit ?"))
 
@@ -156,10 +162,17 @@ class PipelineTest(unittest.IsolatedAsyncioTestCase):
     async def test_triage_drops(self):
         sink = FakeSink()
         p = pipeline(self.tmp, triage=FakeTriage(None), sink=sink)
+        p.journal = Journal(os.path.join(self.tmp, "recent.jsonl"))
         chat, message, _ = whatsapp_message(wa("😂"))
         p.message(chat, message)
         await asyncio.sleep(0.15)
         self.assertEqual(sink.events, [])
+        # Dropped, but kept where Hermes can look.
+        with open(os.path.join(self.tmp, "recent.jsonl")) as f:
+            records = [json.loads(line) for line in f]
+        self.assertEqual(len(records), 1)
+        self.assertIn("😂", records[0]["messages"])
+        self.assertTrue(records[0]["outcome"].startswith("not proposed"))
 
 
 class TriageTest(unittest.IsolatedAsyncioTestCase):

@@ -23,6 +23,8 @@ pollers (calendar, mail, …) ┤
                   · gathers a chat's messages until it is quiet for 45 s (capped at 5 min);
                     drops them if you answer there yourself
                   · asks the local model (uzu) a typed question: may this need you? how urgent?
+                  · writes every event and its outcome to recent.jsonl (two days), which Hermes
+                    reads when you ask whether something arrived
                             │ only what passes, signed
                             ▼
                   Hermes' webhook route "events" (127.0.0.1:8644)

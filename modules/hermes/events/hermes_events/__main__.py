@@ -12,7 +12,7 @@ import sys
 from aiohttp import web
 
 from . import pollers
-from .core import Pipeline, Seen
+from .core import Journal, Pipeline, Seen
 from .hermes import HermesSink
 from .browser import instagram_watch
 from .homeassistant import homeassistant_watch
@@ -44,6 +44,7 @@ async def main(config: dict) -> None:
         batch_seconds=config["batch_seconds"],
         max_batch_seconds=config["max_batch_seconds"],
         max_age_seconds=config["max_age_seconds"],
+        journal=Journal(os.path.join(config["state_dir"], "recent.jsonl")),
     )
     sources = config["sources"]
     on = lambda name: sources.get(name, {}).get("enabled")
