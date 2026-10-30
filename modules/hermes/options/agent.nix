@@ -76,7 +76,8 @@ in
         default = "opencode-zen";
         description = ''
           The main model's provider: "openai-codex" (a ChatGPT subscription,
-          logged in by the bootstrap), "opencode-zen", or any Hermes provider.
+          logged in by the bootstrap), "opencode-zen", any Hermes provider,
+          or one of server.hermes.providers.
         '';
       };
       name = mkOption {
@@ -99,6 +100,33 @@ in
         Tried in order when the main model fails (a limit reached, an outage,
         an expired login), for that turn only: the next one tries the main
         model again. scripts/bootstrap-macos.sh asks for the chain.
+      '';
+    };
+    providers = mkOption {
+      type = types.attrsOf (types.submodule ({ name, ... }: {
+        options = {
+          label = mkOption {
+            type = types.str;
+            default = name;
+            description = "Its name in Hermes' model picker.";
+          };
+          url = mkOption {
+            type = types.str;
+            description = "Its OpenAI-compatible base URL, the one /models and /chat/completions hang from.";
+          };
+          keyEnv = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = "The variable of the secrets file holding its API key; null when it takes none.";
+          };
+        };
+      }));
+      default = { };
+      example = { mistral = { url = "https://api.mistral.ai/v1"; keyEnv = "MISTRAL_API_KEY"; }; };
+      description = ''
+        OpenAI-compatible APIs Hermes does not know, by name: that name is
+        then a provider for the model and the fallbacks. The bootstrap adds
+        them ("Another OpenAI-compatible API").
       '';
     };
     localFallback = mkOption {
