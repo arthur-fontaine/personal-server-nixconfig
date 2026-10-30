@@ -33,6 +33,7 @@ modules/
       prompt/             SOUL.md (UniiChat's prompt), AGENTS.md (this server's rules)
       session/            its GUI session: launchd agents, display, fsearch, defaults, the setup at login
     plugins/unii/         the single-chat memory and sub-chats (Python)
+    plugins/guard/        the auto-review of Hermes' actions by a decision model (Python)
     events/               hermes_events: screens incoming messages, posts proposals (Python)
     fast-act/             fast_act: browser_fast_act, a decision model driving Chrome through Cua (Python)
   uzu/                    local models: options, the mirai server
