@@ -285,10 +285,11 @@ decision_setup() {
     model="$(gum input --header "Its model's id")"
     [ -n "$model" ] || return 1
   fi
+  local reask=""
   while :; do
     key=""
     if [ -n "$key_env" ]; then
-      key="$(secret_value "$key_env")"
+      [ -n "$reask" ] || key="$(secret_value "$key_env")"
       if [ -n "$key" ]; then
         note "Its key is in the secrets file ($key_env)."
       else
@@ -301,7 +302,8 @@ decision_setup() {
       200) ok "$model answers"; break ;;
       401 | 403)
         warn "It refused that key (HTTP $status)."
-        [ -n "$key_env" ] && set_secret "$key_env" ""
+        # Asked again, not wiped: another use may share it.
+        reask=1
         ;;
       *)
         warn "It did not answer the check (${status:-no answer}, HTTP status)."

@@ -93,6 +93,24 @@ def main() -> None:
     ANSWER.update(authorization="yes-please", risk="low")
     assert g.pre_tool_call("write_file", {"path": "/tmp/a"}, session_id="s")["action"] == "approve"
 
+    # "Always" covers a tool's bounded risk, a high-risk action only as it is.
+    ANSWER.clear()
+    ANSWER.update(authorization="low", risk="medium")
+    assert g.pre_tool_call("write_file", {"path": "/tmp/a"}, session_id="s")["rule_key"] == "guard:write_file:medium"
+    ANSWER.update(authorization="high", risk="high")
+    one = g.pre_tool_call("terminal", {"command": "wacli send --to Thierry 'Salut'"}, session_id="s")["rule_key"]
+    other = g.pre_tool_call("terminal", {"command": "wacli send --to Martin 'Salut'"}, session_id="s")["rule_key"]
+    assert one.startswith("guard:terminal:") and one != other
+
+    # A subagent works for its parent's turn; a cron job's turn is the user's.
+    g.pre_llm_call(session_id="s", user_message="Range mes téléchargements", platform="telegram")
+    g.pre_llm_call(session_id="child", user_message="(delegated task)", platform="", parent_session_id="s")
+    assert g.sessions["child"].turn_from_user and "Range mes téléchargements" in g.sessions["child"].messages
+    assert "(delegated task)" not in g.sessions["child"].messages
+    cron = Guard(g.model, frozenset({"telegram", "cron"}))
+    cron.pre_llm_call(session_id="c", user_message="Résume mes mails", platform="cron")
+    assert cron.sessions["c"].turn_from_user
+
     # Bounded risk needs clear authorization.
     from guard.review import allowed
 

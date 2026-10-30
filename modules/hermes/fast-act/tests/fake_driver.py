@@ -11,6 +11,12 @@ state = {"page": "inbox"}
 
 
 @server.tool(structured_output=True)
+def start_session(session: str = "") -> dict[str, Any]:
+    state["session"] = session
+    return {"session": session}
+
+
+@server.tool(structured_output=True)
 def list_windows(pid: int, session: str = "") -> dict[str, Any]:
     return {"windows": [{"window_id": 7, "is_on_screen": True, "bounds": {"width": 800, "height": 600}}]}
 
@@ -30,6 +36,8 @@ def get_browser_state(
 
 @server.tool(structured_output=True)
 def browser_click(target_id: str, tab_id: str, ref: str, session: str = "") -> dict[str, Any]:
+    if state.get("session") != session:
+        raise ValueError("no started session")
     state["page"] = "thierry"
     return {"status": "ok"}
 

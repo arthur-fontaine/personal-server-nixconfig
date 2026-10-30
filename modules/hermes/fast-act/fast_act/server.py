@@ -190,6 +190,8 @@ async def browser_fast_act(
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
+            # Cua's browsers guide starts the session its calls name first.
+            await Driver(session).call("start_session", {})
             return await run(
                 goal,
                 texts=list(texts or []),
