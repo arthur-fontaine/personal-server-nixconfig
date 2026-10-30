@@ -84,6 +84,7 @@ class Session:
 class Verdict:
     run: bool
     reason: str
+    risk: str = "unknown"
 
 
 def allowed(authorization: str, risk: str) -> bool:
@@ -109,7 +110,7 @@ def review(config: systemone.Config, session: Session, tool: str, args: Mapping[
             "risk": (INSTRUCTIONS["risk"], RISK),
         })
     except systemone.DecisionError as error:
-        return Verdict(False, f"the auto-review could not decide ({error})")
+        return Verdict(False, f"the auto-review could not decide ({error})", "unknown")
     authorization, risk = answers["authorization"].selected_id, answers["risk"].selected_id
     reason = f"{risk} risk, {authorization} authorization"
-    return Verdict(allowed(authorization, risk), reason)
+    return Verdict(allowed(authorization, risk), reason, risk)

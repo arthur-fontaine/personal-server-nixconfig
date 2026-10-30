@@ -21,8 +21,9 @@ lib.mkIf cfg.enable {
       key_env = cfg.keyEnv;
       timeout_ms = 10000;
       # Telegram answers its owner only (telegram.nix), so a Telegram turn is
-      # the user's; the events' webhook turns are not.
-      trusted_platforms = [ "telegram" ];
+      # the user's, and a cron job's too (its creation was reviewed); the
+      # events' webhook turns are not.
+      trusted_platforms = [ "telegram" "cron" ];
     };
   };
 }
