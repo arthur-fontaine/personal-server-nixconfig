@@ -97,6 +97,9 @@ imcp_missing() {
 imcp_apps() {
   local missing init
   note "iMCP: Calendar, Contacts, Mail, Maps, Music, Shortcuts, Voice Memos, Weather:"
+  # iMCP asks for Voice Memos' Recordings folder, which the app creates at
+  # its first launch: launched hidden, it is there by the time iMCP asks.
+  hermes_gui /usr/bin/open -g -j -a /System/Applications/VoiceMemos.app 2>/dev/null || true
   as_root launchctl kickstart "gui/$agent_uid/org.nix-community.home.imcp" 2>/dev/null || true
   sleep 3
   # Its settings live in its container, which its first launch created.
@@ -108,7 +111,8 @@ imcp_apps() {
       break
     fi
     note "On the Mac's screen, click iMCP's icon in the menu bar, then each gray service: $missing"
-    note "Allow each dialog. Mail asks for a folder: choose ~/Library/Mail; Voice Memos, its recordings."
+    note "Allow each dialog. Mail asks for a folder: choose ~/Library/Mail; Voice Memos, its Recordings folder"
+    note "(in group.com.apple.VoiceMemos.shared; missing? open Voice Memos once, then click it again)."
     note "Leave Reminders, Notes and Messages off: Hermes' skills do those."
     gum confirm --affirmative "Check again" --negative "Skip" "Turned on?" || break
   done
