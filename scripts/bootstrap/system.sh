@@ -60,32 +60,49 @@ fi
 
 # ── Hermes' account logs in at boot ─────────────────────────────────────────
 
+# /etc/kcpassword holds the account's password XORed with Apple's fixed key,
+# padded to a multiple of 12 bytes; macOS replays it at boot.
+kc_codec() { # encode|decode, stdin → stdout
+  /usr/bin/perl -e '
+    my @key = (0x7D, 0x89, 0x52, 0x23, 0xD2, 0xBC, 0xDD, 0xEA, 0xA3, 0xB9, 0x1F);
+    local $/; binmode STDIN; my $d = <STDIN>;
+    $d .= "\0" x (12 - length($d) % 12) if $ARGV[0] eq "encode";
+    my $p = join "", map { chr(ord(substr($d, $_, 1)) ^ $key[$_ % 11]) } 0 .. length($d) - 1;
+    $p =~ s/\0.*//s if $ARGV[0] eq "decode";
+    print $p;
+  ' "$1"
+}
+# The password it replays is still the account's: a password changed since,
+# or an account made again, would leave macOS asking for it at boot.
+login_works() {
+  sudo test -s /etc/kcpassword \
+    && dscl . -authonly "$agent" "$(sudo cat /etc/kcpassword | kc_codec decode)" >/dev/null 2>&1
+}
+
 step "Hermes' login at boot"
-if sudo test -e /etc/kcpassword; then
+if fdesetup isactive >/dev/null 2>&1; then
+  warn "FileVault is on, and macOS logs nobody in automatically while it is."
+  if gum confirm "Turn FileVault off? (macOS asks for your password, the one that unlocks the disk)"; then
+    # FileVault releases the disk's key only for a user allowed to unlock it,
+    # whatever sudo says: the password cannot be skipped, the user name can.
+    sudo fdesetup disable -user "$(id -un)"
+  fi
+fi
+if fdesetup isactive >/dev/null 2>&1; then
+  warn "Skipped: computer use and uzu need $agent logged in. Run this script again once FileVault is off."
+elif login_works; then
   ok "macOS logs $agent in at boot"
 else
-  if fdesetup isactive >/dev/null 2>&1; then
-    warn "FileVault is on, and macOS logs nobody in automatically while it is."
-    if gum confirm "Turn FileVault off? (macOS asks for your password, the one that unlocks the disk)"; then
-      # FileVault releases the disk's key only for a user allowed to unlock it,
-      # whatever sudo says: the password cannot be skipped, the user name can.
-      sudo fdesetup disable -user "$(id -un)"
-    fi
-  fi
-  if fdesetup isactive >/dev/null 2>&1; then
-    warn "Skipped: computer use and uzu need $agent logged in. Run this script again once FileVault is off."
-  else
-    # A random password: nobody types it, macOS replays it at boot from
-    # /etc/kcpassword (the password XORed with Apple's fixed key, padded to 12 bytes).
-    password="$(openssl rand -base64 24)"
-    sudo dscl . -passwd "/Users/$agent" "$password"
-    /usr/bin/perl -e '
-      my @key = (0x7D, 0x89, 0x52, 0x23, 0xD2, 0xBC, 0xDD, 0xEA, 0xA3, 0xB9, 0x1F);
-      my $p = shift; $p .= "\0" x (12 - length($p) % 12);
-      print join "", map { chr(ord(substr($p, $_, 1)) ^ $key[$_ % 11]) } 0 .. length($p) - 1;
-    ' "$password" | write_secret /etc/kcpassword
-    unset password
+  sudo test -e /etc/kcpassword && warn "The password macOS replays at boot is no longer $agent's: setting a new one."
+  # A random password: nobody types it.
+  password="$(openssl rand -base64 24)"
+  sudo dscl . -passwd "/Users/$agent" "$password"
+  printf '%s' "$password" | kc_codec encode | write_secret /etc/kcpassword
+  unset password
+  if login_works; then
     ok "macOS will log $agent in at boot"
+  else
+    warn "macOS does not take $agent's new password: it will ask for it at boot."
   fi
 fi
 
