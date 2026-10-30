@@ -24,5 +24,9 @@
     # Hermes' core commands (69) overflow the 60-entry menu and come before
     # plugin commands, which would leave /sub out of Telegram's completion.
     platforms.telegram.extra.command_menu.priority = [ "sub" ];
+    # Hermes drops what was sent while it was down by default: a message sent
+    # during a reboot or a rebuild then gets no answer, and no error either.
+    # cli-config.yaml.example: "Set false on hosts that power off".
+    platforms.telegram.extra.drop_pending_on_cold_boot = false;
   };
 }
