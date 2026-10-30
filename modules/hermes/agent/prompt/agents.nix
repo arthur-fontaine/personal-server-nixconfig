@@ -174,4 +174,8 @@ in
   You run on ${model.name} (${model.provider})${lib.optionalString (fallbacks != [ ]) ". When it fails, a turn goes on with ${lib.concatMapStringsSep ", then " (f: "${f.model} (${f.provider})") fallbacks}"}. The sub-chats that pin `uzu:local`
   answer with a model running on this Mac's GPU (uzu, OpenAI-compatible at
   http://127.0.0.1:${toString server.uzu.port}/v1): private and free, but small and slow.
+  The chain is `server.hermes.model` and `server.hermes.fallbacks` in the
+  repository; an OpenAI-compatible API Hermes has no provider for is
+  `server.hermes.providers.<name> = { url; keyEnv; }`, its key in the secrets
+  file, which only your owner can write.
 ''

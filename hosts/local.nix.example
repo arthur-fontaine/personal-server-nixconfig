@@ -12,8 +12,13 @@
     server = {
       ssh.authorizedKeys = [ "ssh-ed25519 AAAA... alice@laptop" ];
       # The main model, then its fallbacks in order; the local one comes last.
-      # hermes.model = { provider = "openai-codex"; name = "gpt-6-sol"; };
-      # hermes.fallbacks = [ { provider = "opencode-zen"; model = "deepseek-v4.1-flash"; } ];
+      # hermes.model = { provider = "openai-codex"; name = "gpt-6-luna"; };
+      # hermes.fallbacks = [
+      #   { provider = "opencode-zen"; model = "deepseek-v4.1-flash"; }
+      #   { provider = "mistral"; model = "mistral-large-latest"; }
+      # ];
+      # Another OpenAI-compatible API, its key MISTRAL_API_KEY in the secrets file.
+      # hermes.providers.mistral = { url = "https://api.mistral.ai/v1"; keyEnv = "MISTRAL_API_KEY"; };
       # hermes.integrations.whatsapp.enable = true;
       # hermes.integrations.homeassistant.enable = true;
       # hermes.homeassistant.url = "http://192.168.1.10:8123";
