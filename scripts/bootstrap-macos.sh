@@ -400,7 +400,8 @@ ha_api() { # url token → the HTTP status of /api/ (000: nothing answers)
   local auth=()
   [ -n "${2:-}" ] && auth=(-H "Authorization: Bearer $2")
   # (An empty array under set -u fails in macOS' bash 3.2, hence the + form.)
-  curl -s -o /dev/null -w '%{http_code}' --max-time 10 ${auth[@]+"${auth[@]}"} "${1%/}/api/"
+  # curl fails when nothing answers, which would end the script (set -e); its 000 says so.
+  curl -s -o /dev/null -w '%{http_code}' --max-time 10 ${auth[@]+"${auth[@]}"} "${1%/}/api/" || true
 }
 if integration_on homeassistant; then
   ha_url="$(setting server.hermes.homeassistant.url)"
@@ -416,6 +417,9 @@ if integration_on homeassistant; then
       status="$(ha_api "$ha_url")"
       if [ "$status" = 000 ]; then
         warn "Nothing answers at $ha_url from this Mac: a wrong address or port, or another network."
+        # https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy
+        note "Or macOS blocks this terminal until you allow it on the local network: if it asked, allow it"
+        note "(System Settings → Privacy & Security → Local Network), then try again. Over SSH it is not asked."
         gum confirm --affirmative "Try another" --negative "Skip" "Retry?" && continue
         break
       fi
