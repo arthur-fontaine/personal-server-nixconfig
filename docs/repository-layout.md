@@ -10,6 +10,7 @@ hosts/                    machine definitions (shared.nix, git-ignored local.nix
 pkgs/                     what nixpkgs lacks, as an overlay
 checks/                   `nix flake check`: the plugin and freeze tests; hermes-turns/, end to end
 scripts/                  bootstrap-macos.sh (the setup), uninstall-macos.sh (disable, remove), with gum
+  bootstrap/              the setup's sections, sourced in the order bootstrap-macos.sh lists
 modules/
   system/                 the Mac itself (nix-darwin)
     options/              server.admin, server.nixconfig, server.energy, server.localNetwork
