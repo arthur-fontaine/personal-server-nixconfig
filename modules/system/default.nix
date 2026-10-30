@@ -7,6 +7,7 @@
     ./power.nix
     ./ssh.nix
     ./quiet.nix
+    ./local-network.nix
   ];
 
   nixpkgs.overlays = [ (import ../../pkgs { inherit inputs; }) ];

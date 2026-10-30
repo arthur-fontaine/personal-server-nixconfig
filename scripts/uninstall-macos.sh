@@ -115,6 +115,8 @@ remove_everything() {
   sudo mdutil -a -i on >/dev/null || true
   if command -v blueutil >/dev/null; then blueutil --power 1 || true; fi
   sudo nvram -d StartupMute 2>/dev/null || true
+  # nix-darwin's uninstaller leaves the defaults it wrote.
+  sudo defaults delete com.apple.network.local-network 2>/dev/null || true
 
   step "Uninstalling nix-darwin"
   sudo -H env PATH="$PATH" nix --extra-experimental-features 'nix-command flakes' run nix-darwin#darwin-uninstaller

@@ -12,10 +12,11 @@ checks/                   `nix flake check`: the plugin and freeze tests; hermes
 scripts/                  bootstrap-macos.sh (the setup), uninstall-macos.sh (disable, remove), with gum
 modules/
   system/                 the Mac itself (nix-darwin)
-    options/              server.admin, server.nixconfig, server.energy
+    options/              server.admin, server.nixconfig, server.energy, server.localNetwork
     power.nix             never sleep, restart by itself, idle power down
     ssh.nix               SSH with keys only, server.ssh.authorizedKeys
     quiet.nix             Spotlight, Bluetooth, Siri, background downloads off
+    local-network.nix     the local network open to Hermes' agents (no permission dialog)
     nix.nix
   hermes/                 Hermes Agent
     options/              server.hermes.*: account, model, memory, sub-chats, access

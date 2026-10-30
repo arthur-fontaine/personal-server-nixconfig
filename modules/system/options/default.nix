@@ -5,5 +5,6 @@
   imports = [
     ./admin.nix
     ./energy.nix
+    ./network.nix
   ];
 }
