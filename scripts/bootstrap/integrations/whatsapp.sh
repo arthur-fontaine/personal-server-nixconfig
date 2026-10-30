@@ -7,6 +7,7 @@ if wa --json auth status 2>/dev/null | grep -q '"authenticated":true'; then
   keep "Hermes reads your WhatsApp" && return 0
   wa auth logout || true
 fi
+needs "WhatsApp" || return 0
 gum confirm "Link your WhatsApp now, so Hermes can read and send your messages?" || return 0
 note "On your phone: WhatsApp → Settings → Linked devices → Link a device, then scan this code."
 if wa auth --idle-exit 30s; then

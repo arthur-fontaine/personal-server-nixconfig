@@ -10,7 +10,7 @@ if ! on_hermes_screen; then
 elif as_root test -e "$discord_marker" \
   && keep "Hermes was logged in to Discord (it logs in again from 1Password when needed)"; then
   :
-else
+elif needs "Discord's login"; then
   hermes_lit 1
   note "On the Mac's screen, in Chrome, the Discord tab (Hermes' events keep it open): log in."
   note "Scanning the QR code with Discord's phone app is easiest. Allow notifications if it asks."

@@ -78,23 +78,28 @@ imcp_prefs="$agent_home/Library/Containers/co.dododo.iMCP/Data/Library/Preferenc
 # What iMCP serves Hermes (modules/hermes/agent/apple.nix); Maps uses Location.
 imcp_services=(calendar contacts location mail music shortcuts voiceMemos weather)
 
+# The services iMCP does not serve yet, one per line.
+imcp_missing() {
+  local service
+  for service in "${imcp_services[@]}"; do
+    [ "$(as_agent /usr/bin/defaults read "$imcp_prefs" "${service}Enabled" 2>/dev/null)" = 1 ] || echo "$service"
+  done
+}
+
 imcp_apps() {
-  local service missing init
+  local missing init
   note "iMCP: Calendar, Contacts, Mail, Maps, Music, Shortcuts, Voice Memos, Weather:"
-  as_root launchctl kickstart "gui/$agent_uid/org.nix-community.home.imcp" 2>/dev/null || true
+  as_root launchctl "gui/$agent_uid/org.nix-community.home.imcp" 2>/dev/null || true
   sleep 3
   # Its settings live in its container, which its first launch created.
   as_agent hermes-app-defaults
   while :; do
-    missing=()
-    for service in "${imcp_services[@]}"; do
-      [ "$(as_agent /usr/bin/defaults read "$imcp_prefs" "${service}Enabled" 2>/dev/null)" = 1 ] || missing+=("$service")
-    done
-    if [ "${#missing[@]}" = 0 ]; then
+    missing="$(imcp_missing | tr '\n' ' ')"
+    if [ -z "$missing" ]; then
       ok "iMCP serves all of them"
       break
     fi
-    note "On the Mac's screen, click iMCP's icon in the menu bar, then each gray service: ${missing[*]}."
+    note "On the Mac's screen, click iMCP's icon in the menu bar, then each gray service: $missing"
     note "Allow each dialog. Mail asks for a folder: choose ~/Library/Mail; Voice Memos, its recordings."
     note "Leave Reminders, Notes and Messages off: Hermes' skills do those."
     gum confirm --affirmative "Check again" --negative "Skip" "Turned on?" || break
@@ -109,10 +114,11 @@ step "Hermes' Apple Account and apps"
 if ! on_hermes_screen; then
   warn "They need Hermes' desktop on the Mac's screen, which it is after a reboot:"
   note "then run this script again over SSH, looking at the Mac."
-elif apple_account && as_gateway 'imsg chats --limit 1 | grep -q .' >/dev/null 2>&1 \
-  && keep "$agent is signed in to an Apple Account, and Hermes reads your messages"; then
+elif apple_account && as_gateway 'imsg chats --limit 1 | grep -q .' >/dev/null 2>&1 && [ -z "$(imcp_missing)" ] \
+  && keep "$agent is signed in to an Apple Account, Hermes reads your messages, iMCP serves its apps"; then
   :
-elif gum confirm "Set up Hermes' Apple apps (iMessage, Notes, Reminders, Contacts, Calendar, Find My)?"; then
+elif needs "Hermes' Apple Account and apps" \
+  && gum confirm "Set up Hermes' Apple apps (iMessage, Notes, Reminders, Contacts, Calendar, Find My)?"; then
   hermes_lit 1
   apple_apps
   hermes_lit "$(setting server.energy.displayBrightness)"

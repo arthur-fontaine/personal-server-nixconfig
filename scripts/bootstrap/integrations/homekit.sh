@@ -50,7 +50,7 @@ if ! on_hermes_screen; then
   warn "HomeClaw needs Hermes' desktop on the Mac's screen: run this script again then, over SSH."
 elif homeclaw_serves && keep "HomeClaw serves HomeKit to Hermes"; then
   :
-else
+elif needs "HomeKit (HomeClaw)"; then
   hermes_lit 1
   homeclaw_app
   hermes_lit "$(setting server.energy.displayBrightness)"

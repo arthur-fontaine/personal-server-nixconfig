@@ -111,6 +111,17 @@ keep() {
   ! gum confirm --default=false "Change it?"
 }
 
+# A step not done yet, about to ask. In the check pass of the setup at
+# Hermes' login (scripts/hermes-setup.sh sets checking), it is only noted,
+# and false: the step then asks nothing and does nothing, not even light the
+# screen. Otherwise true.
+to_do=()
+needs() {
+  [ -z "${checking:-}" ] && return 0
+  to_do+=("$1")
+  return 1
+}
+
 integration_on() { [ "$(setting "server.hermes.integrations.$1.enable")" = 1 ]; }
 
 # Opened in a browser when this session has a screen, always printed.

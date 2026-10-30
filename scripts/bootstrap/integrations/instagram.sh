@@ -15,7 +15,7 @@ if ! on_hermes_screen; then
   warn "Instagram's login needs Hermes' desktop on the Mac's screen: run this script again then, over SSH."
 elif instagram_logged_in && keep "Hermes is logged in to Instagram"; then
   :
-else
+elif needs "Instagram's login"; then
   hermes_lit 1
   as_root launchctl kickstart "gui/$agent_uid/org.nix-community.home.chrome" 2>/dev/null || true
   note "On the Mac's screen, in the Chrome window on instagram.com: log in (or out, then in as"
