@@ -1,5 +1,5 @@
 # browser_fast_act (../fast-act, fast_act): Hermes' Chrome driven through Cua
-# Driver, a decision model (server.hermes.decisionModel) choosing each action
+# Driver, a decision model (server.hermes.decision.computerUse) choosing each action
 # from the page's own controls instead of reading screenshots. Cua's jev-use
 # (libs/cua-driver/examples/jev-use) is the same loop, not yet in a release:
 # once Cua Driver or Hermes ships it, this module, ../fast-act and
@@ -7,7 +7,7 @@
 # names.
 { config, lib, pkgs, server, ... }:
 let
-  cfg = server.hermes.decisionModel;
+  cfg = server.hermes.decision.computerUse;
   hermes = config.services.hermes-agent.package;
   package = pkgs.runCommand "fast-act" { } ''
     mkdir -p $out
