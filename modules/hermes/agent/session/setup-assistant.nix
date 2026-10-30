@@ -9,10 +9,12 @@ let
     "DidSeeActivationLock"
     "DidSeeAppearanceSetup"
     "DidSeeApplePaySetup"
+    "DidSeeAppStore"
     "DidSeeAvatarSetup"
     "DidSeeCloudSetup"
     "DidSeeiCloudLoginForStorageServices"
     "DidSeeIntelligence"
+    "DidSeeLockdownMode"
     "DidSeePrivacy"
     "DidSeeScreenTime"
     "DidSeeSiriSetup"
@@ -30,8 +32,12 @@ in
     build="$(/usr/bin/sw_vers -buildVersion)"
     domain=com.apple.SetupAssistant
     ${lib.concatMapStringsSep "\n" (key: "run /usr/bin/defaults write $domain ${key} -bool true") seen}
+    # Liquid Glass' tint is GlassTintUpsell; "Welcome to Mac" shows only
+    # before another pane, so it goes with them.
     for key in LastSeenCloudProductVersion LastSeenDiagnosticsProductVersion LastSeenSiriProductVersion \
-      LastPrivacyBundleVersion; do
+      LastSeenIntelligenceProductVersion LastSeenSyncProductVersion LastSeeniCloudStorageServicesProductVersion \
+      LastSeenGlassTintUpsellProductVersion LastSeenAgeRangeSelectionProductVersion \
+      DidSeeNewFeaturesProductVersion LastPrivacyBundleVersion; do
       run /usr/bin/defaults write $domain "$key" -string "$version"
     done
     run /usr/bin/defaults write $domain LastSeenBuddyBuildVersion -string "$build"
