@@ -47,7 +47,7 @@ homeclaw_app() {
 
 homeclaw_serves() { [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9090/mcp || true)" != 000 ]; }
 if ! on_hermes_screen; then
-  warn "HomeClaw needs Hermes' desktop on the Mac's screen: run this script again then, over SSH."
+  warn "HomeClaw needs Hermes' desktop on the Mac's screen: it asks for it once macOS has logged it in."
 elif homeclaw_serves && keep "HomeClaw serves HomeKit to Hermes"; then
   :
 elif needs "HomeKit (HomeClaw)"; then

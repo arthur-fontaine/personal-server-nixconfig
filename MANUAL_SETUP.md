@@ -2,10 +2,13 @@
 
 `scripts/bootstrap-macos.sh` does all of it, in one run: run it on the server,
 at its own screen and keyboard (the permission dialogs show there), and let it
-reboot. Then run it once more over SSH while you look at the Mac, which shows
-Hermes' desktop: that run signs Hermes in to your Apple Account and allows its
-Apple apps, and logs it in to Instagram, Discord and HomeKit, which only work
-in its own session.
+reboot. What only works in Hermes' own session (its permissions, signing it in
+to your Apple Account and allowing its Apple apps, WhatsApp, Instagram,
+Discord, HomeKit) then comes to the Mac's screen by itself: at each login,
+`scripts/hermes-setup.sh` checks those steps, as Hermes, without asking
+anything, and when one is not done opens Terminal with the steps left, for
+24 hours (its log: `~hermes/Library/Logs/hermes-setup.log`). Over SSH,
+`scripts/bootstrap-macos.sh permissions apple accounts` runs the same steps.
 
 Running it again from the clone
 (`~/personal-server-nixconfig/scripts/bootstrap-macos.sh`) goes through every
@@ -34,16 +37,16 @@ reach over SSH) does not get in the way.
 | The configuration | runs `darwin-rebuild switch`: always the first time and after a change above, otherwise only if you ask; then moves a ChatGPT login made before the account existed into it | |
 | Hermes' login at boot | gives the `hermes` account a random password and writes `/etc/kcpassword`, so macOS logs it in at boot (the login user itself is in Nix); on every run, checks that the password it replays is still the account's (`dscl -authonly`) and that FileVault is off, and sets a new one when it is not. A daemon (Nix) clears `autoLoginUserScreenLocked`, which would lock the session right after the automatic login | confirm turning FileVault off, which auto-login needs |
 | GitHub access | opens GitHub's token page pre-filled (Contents: read and write, a year), then `gh auth login` for Hermes | create it; pick this repository under Repository access (a link cannot) |
-| Permissions | runs `cua-driver permissions grant`; macOS keeps them system-wide, so they cover the Hermes account; for Full Disk Access, opens the list and shows `/Library/Hermes/hermes-launcher` in Finder | click Allow for Accessibility and Screen Recording; add the launcher to Full Disk Access, once: Hermes updates keep it |
-| Apple Account (second run, over SSH) | opens Hermes' System Settings → Apple Account on the Mac's screen, and waits until it is signed in | sign in with your Apple Account; in iCloud turn on Messages, Notes, Reminders, Contacts, Calendars, Find My Mac |
+| Permissions | runs `cua-driver permissions grant`; macOS keeps them system-wide, so they cover the Hermes account; for Full Disk Access, opens the list and shows `/Library/Hermes/hermes-launcher` in Finder; then has the launcher browse for iMCP, so macOS asks its Local Network question now | click Allow for Accessibility and Screen Recording; add the launcher to Full Disk Access, once: Hermes updates keep it; allow hermes-launcher to find devices on the local network |
+| Apple Account (at Hermes' login) | opens Hermes' System Settings → Apple Account on the Mac's screen, and waits until it is signed in | sign in with your Apple Account; in iCloud turn on Messages, Notes, Reminders, Contacts, Calendars, Find My Mac |
 | Apple apps | runs a check of Reminders, Notes, Contacts, Calendar and Messages the way the gateway runs (launchd starting the launcher in Hermes' session), so each dialog is the gateway's own; opens Messages until Hermes can read your conversations; for Find My, shows the launcher to add to Screen Recording and Accessibility | click Allow in each dialog; in Messages, Settings → iMessage → "Enable Messages in iCloud" |
 | iMCP | starts it (Nix installs it in /Applications), trusts Hermes in it, waits until its services are on, then connects to it as Hermes | in its menu bar icon, click Calendar, Contacts, Location, Mail (choose `~/Library/Mail`), Music, Shortcuts, Voice Memos, Weather, allowing each dialog; allow Local Network |
 | WhatsApp *(integration)* | `wacli auth` as Hermes: shows a QR code, then the first sync | scan it: WhatsApp → Settings → Linked devices → Link a device |
-| Instagram (second run) *(integration)* | starts Hermes' always-open Chrome on instagram.com, on the Mac's screen, until its profile holds a session | log in, save the login info, turn on Instagram's notifications if it offers them |
-| Discord (second run) *(integration)* | points you to the Discord tab Hermes' events keep open in its Chrome, and records your login | log in (the phone app's QR code is easiest), allow notifications |
-| HomeKit (second run) *(integration)* | installs HomeClaw from the App Store with `mas` (or opens its page), starts it, turns on its HTTP MCP endpoint and checks it answers, then points its webhook at Hermes' events daemon | allow it your home data; in its Settings → Webhook, choose the accessories it reports |
+| Instagram (at Hermes' login) *(integration)* | starts Hermes' always-open Chrome on instagram.com, on the Mac's screen, until its profile holds a session | log in, save the login info, turn on Instagram's notifications if it offers them |
+| Discord (at Hermes' login) *(integration)* | points you to the Discord tab Hermes' events keep open in its Chrome, and records your login | log in (the phone app's QR code is easiest), allow notifications |
+| HomeKit (at Hermes' login) *(integration)* | installs HomeClaw from the App Store with `mas` (or opens its page), starts it, turns on its HTTP MCP endpoint and checks it answers, then points its webhook at Hermes' events daemon | allow it your home data; in its Settings → Webhook, choose the accessories it reports |
 | Start | restarts Hermes, or the first time reboots, so macOS logs Hermes in and starts it | |
-| Check (second run) | asks uzu a question and the events' screening question on a test invitation (waiting for its first model download), then offers to send a fake WhatsApp message through the events chain ([docs/events.md](docs/events.md)) | see the proposal arrive in Telegram |
+| Check (a run once Hermes is logged in) | asks uzu a question and the events' screening question on a test invitation (waiting for its first model download), then offers to send a fake WhatsApp message through the events chain ([docs/events.md](docs/events.md)) | see the proposal arrive in Telegram |
 
 macOS reserves those clicks for a person: no script can grant them.
 

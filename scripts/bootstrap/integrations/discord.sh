@@ -6,7 +6,7 @@ step "Integration · Discord"
 
 discord_marker="$agent_home/.local/state/hermes-events/discord-logged-in"
 if ! on_hermes_screen; then
-  warn "Discord's login needs Hermes' desktop on the Mac's screen: run this script again then, over SSH."
+  warn "Discord's login needs Hermes' desktop on the Mac's screen: it asks for it once macOS has logged it in."
 elif as_root test -e "$discord_marker" \
   && keep "Hermes was logged in to Discord (it logs in again from 1Password when needed)"; then
   :

@@ -112,8 +112,7 @@ imcp_apps() {
 
 step "Hermes' Apple Account and apps"
 if ! on_hermes_screen; then
-  warn "They need Hermes' desktop on the Mac's screen, which it is after a reboot:"
-  note "then run this script again over SSH, looking at the Mac."
+  warn "They need Hermes' desktop on the Mac's screen: it asks for them once macOS has logged it in (reboot)."
 elif apple_account && as_gateway 'imsg chats --limit 1 | grep -q .' >/dev/null 2>&1 && [ -z "$(imcp_missing)" ] \
   && keep "$agent is signed in to an Apple Account, Hermes reads your messages, iMCP serves its apps"; then
   :
