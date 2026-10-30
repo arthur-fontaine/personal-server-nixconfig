@@ -18,7 +18,10 @@ let
     ${wacli} --json auth status | grep -q '"authenticated":true' || exit 0
     set --
     ${webhook}
-    exec ${wacli} sync --follow "$@"
+    # Quiet: never "available", so WhatsApp does not take this linked device
+    # for you at a computer and keeps ringing your phone (wacli's docs/sync.md,
+    # --presence-mode). It costs only others' typing indicators, unused here.
+    exec ${wacli} sync --follow --presence-mode quiet "$@"
   '';
 in
 lib.mkIf server.hermes.integrations.whatsapp.enable {

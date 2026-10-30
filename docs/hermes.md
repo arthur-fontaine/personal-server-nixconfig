@@ -119,7 +119,7 @@ not integrations: they come with the Mac.
 
 | What | Through | Set up by the bootstrap |
 | --- | --- | --- |
-| WhatsApp | [wacli](https://github.com/openclaw/wacli), a linked device of your number; `wacli sync --follow` keeps its store (`~/.local/state/wacli`) current; the `whatsapp` skill | the QR code to scan in WhatsApp → Linked devices |
+| WhatsApp | [wacli](https://github.com/openclaw/wacli), a linked device of your number; `wacli sync --follow --presence-mode quiet` keeps its store (`~/.local/state/wacli`) current without showing you online, so your phone keeps its notifications; the `whatsapp` skill | the QR code to scan in WhatsApp → Linked devices |
 | Instagram | instagram.com in Hermes' always-open Google Chrome (no API exists for a personal account; `modules/hermes/agent/browser.nix`): one persistent profile (`~/.hermes/browser-profile`), DevTools on loopback for Hermes' browser tools and the events daemon; the `instagram` skill | your first login, on the Mac's screen |
 | Discord | discord.com in the same Chrome (no API for a user account); the `discord` skill reads and sends, and the events daemon keeps a Discord tab open for its notifications | your first login, on the Mac's screen |
 | 1Password | a service account reading one vault (`server.hermes.onepassword.vault`, "Hermes"): `browser_vault` fills its Login items into pages without the model seeing them; `server.hermes.onepassword.env` maps variables to `op://` references | its token, into the secrets file |
