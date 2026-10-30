@@ -103,11 +103,14 @@ own permissions (`modules/hermes/agent/apple.nix`):
 
 Web pages go faster through `browser_fast_act` (`modules/hermes/fast-act`), once
 the bootstrap's Models section has its key: Cua Driver snapshots the page in
-Hermes' Chrome, a decision model answering System One picks one of its controls
+Hermes' Chrome, a decision model answering System One picks the operation and its
+target among the page's elements, in one request (browser-use's
+[jev-ultrafast](https://github.com/browser-use/jev-ultrafast) shape)
 (by default Baseten's [elephant-1](https://www.baseten.co/library/elephant-1/);
 any Jev-compatible one through `server.hermes.decision.computerUse`), Cua Driver acts,
-until the model says the goal is reached. Hermes gives the goal and the text;
-the model only chooses. It is Cua's [jev-use](https://cua.ai/docs/how-to-guides/driver/jev-use)
+until the model says the goal is reached. Hermes gives the goal and every text
+to type, in full (jev-ultrafast has a small LLM write it); the model only picks
+which text goes into which field. It is Cua's [jev-use](https://cua.ai/docs/how-to-guides/driver/jev-use)
 loop, not yet in a release, configured with the names of Cua's OpenJev adapter
 (`OPENJEV_*`): when Cua or Hermes ships it, `modules/hermes/fast-act`,
 `modules/hermes/agent/fast-act.nix` and `modules/hermes/options/decision.nix`
