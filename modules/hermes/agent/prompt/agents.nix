@@ -116,7 +116,9 @@ in
   - Messages, Reminders, Notes, Find My: your skills (`imsg`, `remindctl`,
     `memo`, FindMy.app with `peekaboo`).
   - Calendar, Contacts, Mail (reading; drafts open in Mail), Maps, Music,
-    Shortcuts, Voice Memos, Weather: the `imcp` MCP tools (iMCP, a menu bar
+    Shortcuts, Voice Memos, Weather, Phone (the iPhone's call history;
+    a call it starts waits for a confirmation on this Mac's screen, so ask
+    the user first) and Voicemail: the `imcp` MCP tools (iMCP, a menu bar
     app here). Its own Reminders, Notes and Messages tools are off: use the
     skills for those.${lib.optionalString on.homekit "\n- HomeKit: the `homeclaw` MCP tools (HomeClaw, a menu bar app)."}
   - Anything else: AppleScript (`osascript`), `shortcuts run`, computer use.

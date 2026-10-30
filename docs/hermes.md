@@ -94,7 +94,7 @@ own permissions (`modules/hermes/agent/apple.nix`):
 | Reminders | `remindctl` ([steipete/remindctl](https://github.com/steipete/remindctl)) | Reminders |
 | Notes | `memo` ([antoniorodr/memo](https://github.com/antoniorodr/memo)) | Automation |
 | Find My | FindMy.app's window, `peekaboo` ([steipete/Peekaboo](https://github.com/steipete/Peekaboo)) | Screen Recording, Accessibility |
-| Calendar, Contacts, Mail (reading), Maps, Music, Shortcuts, Voice Memos, Weather | [iMCP](https://github.com/mattt/iMCP), MCP over stdio | each to iMCP itself, as you turn its services on; Local Network to the launcher |
+| Calendar, Contacts, Mail (reading), Maps, Music, Shortcuts, Voice Memos, Weather, Phone (call history, calls you confirm), Voicemail | [iMCP](https://github.com/mattt/iMCP), MCP over stdio | each to iMCP itself, as you turn its services on; Local Network to the launcher |
 | HomeKit | [HomeClaw](https://github.com/omarshahine/HomeClaw) (Mac App Store), MCP over HTTP on 127.0.0.1:9090 | home data, to HomeClaw |
 | Anything else | AppleScript (`osascript`), `shortcuts run`, computer use | Automation |
 
