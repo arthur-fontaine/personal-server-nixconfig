@@ -165,6 +165,37 @@ class EngineTest(Temp):
         self.assertTrue(selected[1]["content"].endswith("what number?"))
         self.assertIn("remember 7", json.loads(main.handle_tool_call("zoom", {"id": 0, "n": 1}))["result"])
 
+    def test_tool_entries_are_one_line_and_old_results_are_slimmed(self):
+        rt = self.runtime()
+        main = self.engine(rt, MAIN_KEY)
+        big = "x" * 40_000
+        history = [{"role": "system", "content": "SYS"}, {"role": "user", "content": "go"},
+                   {"role": "assistant", "content": "", "tool_calls": [{"id": "c", "function": {"name": "terminal", "arguments": big}}]},
+                   {"role": "tool", "tool_call_id": "c", "content": big},
+                   {"role": "assistant", "content": "done"}]
+        main.on_turn_complete(history)
+        volume = rt.volume("main")
+        tool = [m for m in volume.messages if m["kind"] in ("tool", "echo")]
+        self.assertEqual(len(tool), 2)  # one line each: no model call to summarize them
+        self.assertTrue(all(len(f"{m['kind']}: {m['text']}".encode()) <= rt.line_bytes for m in tool))
+
+        # Within a turn, only the last tool results keep their images and text.
+        image = {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}}
+        steps = []
+        for n in range(9):
+            steps += [{"role": "assistant", "content": "", "tool_calls": [{"id": f"t{n}", "function": {"name": "computer_use", "arguments": "{}"}}]},
+                      {"role": "tool", "tool_call_id": f"t{n}", "content": [{"type": "text", "text": "y" * 5000}, image]}]
+        request = [{"role": "system", "content": "SYS"}, {"role": "user", "content": "go"}] + steps
+        selected = main.select_context(request)
+        results = [m for m in selected if m.get("role") == "tool"]
+        kept = [m for m in results if any(p.get("type") == "image_url" for p in m["content"])]
+        self.assertEqual(len(results), 9)
+        self.assertEqual(len(kept), 9 - 4)  # 9 - 3 = 6 old ones, slimmed by blocks of 4
+        self.assertIn("dropped", results[0]["content"][-1]["text"])
+        self.assertLess(len(results[0]["content"][0]["text"]), 2000)
+        # The transcript itself is untouched.
+        self.assertTrue(any(p.get("type") == "image_url" for p in request[3]["content"]))
+
     def test_sub_chat_reads_but_does_not_write_main(self):
         rt = self.runtime()
         main = self.engine(rt, MAIN_KEY, sid="m")

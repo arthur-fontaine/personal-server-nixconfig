@@ -23,7 +23,7 @@ from agent.context_engine import ContextEngine
 
 from .policy import MAIN, PASSIVE_PLATFORMS, Chat, Policy
 from .runtime import Runtime, scrub_session
-from .volume import VolumeLocked
+from .volume import VolumeLocked, cut_utf8, utf8_size
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +82,46 @@ def _prepend(content: Any, prefix: str) -> Any:
 
 def _final(message: dict) -> bool:
     return message.get("role") == "assistant" and not message.get("tool_calls")
+
+
+# Within a turn, the tool results the model still sees in full: older ones keep
+# a clipped text and lose their images (a screenshot is ~2,500 tokens, re-sent
+# at every later step). The boundary moves by blocks, so the provider's prompt
+# cache breaks once every few steps, not at each.
+KEEP_TOOL_RESULTS = 3
+SLIM_BLOCK = 4
+SLIM_TEXT = 1_500
+
+
+def _slim_content(content: Any) -> Any:
+    if isinstance(content, str):
+        return content if len(content) <= SLIM_TEXT else content[:SLIM_TEXT] + " […clipped: an earlier step]"
+    if isinstance(content, list):
+        parts, dropped = [], 0
+        for part in content:
+            kind = str(part.get("type", "")) if isinstance(part, dict) else ""
+            if "image" in kind:
+                dropped += 1
+            elif kind == "text":
+                parts.append({**part, "text": _slim_content(part.get("text", ""))})
+            else:
+                parts.append(part)
+        if dropped:
+            parts.append({"type": "text", "text": f"[{dropped} image(s) of an earlier step, dropped: take a new one if needed]"})
+        return parts
+    return content
+
+
+def slim_turn(messages: list[dict]) -> list[dict]:
+    """The turn's older tool results, slimmed (request-only: the transcript keeps them)."""
+    tools = [k for k, m in enumerate(messages) if m.get("role") == "tool"]
+    boundary = max(0, len(tools) - KEEP_TOOL_RESULTS) // SLIM_BLOCK * SLIM_BLOCK
+    if not boundary:
+        return messages
+    slimmed = list(messages)
+    for k in tools[:boundary]:
+        slimmed[k] = {**slimmed[k], "content": _slim_content(slimmed[k].get("content"))}
+    return slimmed
 
 
 def turn_start(messages: list[dict], finished: bool) -> int | None:
@@ -175,7 +215,7 @@ class UniiEngine(ContextEngine):
             return selected
         system = [m for m in request_messages[:1] if m.get("role") == "system"]
         first = {**request_messages[k], "content": _prepend(request_messages[k].get("content"), prefix)}
-        return system + [first] + list(request_messages[k + 1 :])
+        return system + [first] + slim_turn(list(request_messages[k + 1 :]))
 
     # ── logging the turn ─────────────────────────────────────────────────
 
@@ -197,10 +237,21 @@ class UniiEngine(ContextEngine):
                     out.append(("hermes", text))
                 for call in message.get("tool_calls") or []:
                     fn = call.get("function", {})
-                    out.append(("tool", f"{fn.get('name')} {fn.get('arguments') or ''}".strip()))
+                    out.append(("tool", self._one_line("tool", f"{fn.get('name')} {fn.get('arguments') or ''}".strip())))
             elif role == "tool":
-                out.append(("echo", _text(message.get("content"))))
+                out.append(("echo", self._one_line("echo", _text(message.get("content")))))
         return out
+
+    def _one_line(self, kind: str, text: str) -> str:
+        """A tool call or its result, logged as one line: a line is its own node,
+        with no model call, so only the user's and Hermes' words are summarized.
+        What a tool returned is the tool's to show again; the memory keeps that
+        it ran and how it began."""
+        limit = self.runtime.line_bytes - len(kind) - 2
+        flat = " ".join(text.split())
+        if utf8_size(flat) <= limit:
+            return flat
+        return cut_utf8(flat, limit - utf8_size(" […]")) + " […]"
 
     def on_turn_complete(self, messages, usage=None, **kwargs) -> None:
         if self.passive or self.chat is None:
