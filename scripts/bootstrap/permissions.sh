@@ -1,4 +1,3 @@
-# Sourced by scripts/bootstrap-macos.sh, in its order.
 # ── Permissions ─────────────────────────────────────────────────────────────
 # Accessibility, Screen Recording and Full Disk Access live in macOS' system
 # database, so granting them from this session covers the Hermes account too.
@@ -19,11 +18,12 @@ else
   lit() { :; }
 fi
 
+step "Permissions: computer use and Full Disk Access"
 if in_gui true; then
   # "unknown" until the driver's daemon has run once.
   permissions="$(in_gui "$cua" permissions status --json 2>/dev/null | sed -n 's/.*"status": *"\([a-z_]*\)".*/\1/p')"
-  if [ "$permissions" != granted ] && ask "Grant computer use its permissions now? (status: ${permissions:-unknown})"; then
-    step "Accessibility and Screen Recording for CuaDriver"
+  if [ "$permissions" != granted ] && gum confirm "Grant computer use its permissions now? (status: ${permissions:-unknown})"; then
+    note "Accessibility and Screen Recording for CuaDriver."
     note "Dialogs open on this Mac's screen: click Allow / Open System Settings,"
     note "turn CuaDriver on in each list, then come back here."
     lit 1
@@ -33,7 +33,7 @@ if in_gui true; then
   fi
 
   if ask "Give Hermes Full Disk Access? (to read Desktop, Documents, Downloads, Mail, iCloud...)"; then
-    step "Full Disk Access for $launcher"
+    note "Full Disk Access for $launcher."
     note "In the list that opens, click +, then drag in the file Finder shows (or ⇧⌘G and paste its path)."
     note "It is granted once: Hermes updates keep it."
     lit 1

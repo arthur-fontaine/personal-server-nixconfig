@@ -1,7 +1,5 @@
-# Sourced by scripts/bootstrap-macos.sh, in its order.
-# ── Telegram ────────────────────────────────────────────────────────────────
+# ── Telegram: the bot, its settings and topics ──────────────────────────────
 
-JQ="$(nix build --no-link --print-out-paths nixpkgs#jq.bin)/bin/jq"
 # A Bot API call: tg <token> <method> [query string].
 tg() { curl -fsS "https://api.telegram.org/bot$1/$2${3:+?$3}"; }
 # A Bot API call with form fields: tg_post <token> <method> <name=value>...
@@ -100,20 +98,22 @@ bot_picture() {
   done
 }
 
-secrets="$(setting server.hermes.secretsFile)"
-if sudo test -e "$secrets"; then
-  ok "Secrets in $secrets"
-  bot_token="$(sudo sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$secrets")"
+step "Your Telegram bot"
+bot_token="$(secret_value TELEGRAM_BOT_TOKEN)"
+owner="$(secret_value TELEGRAM_ALLOWED_USERS | cut -d, -f1)"
+if [ -n "$bot_token" ] \
+  && keep "@$(tg "$bot_token" getMe | "$JQ" -r .result.username), answering only user $owner"; then
+  :
 else
-  step "Your Telegram bot"
   note "Its token and your Telegram id go to $secrets, readable by Hermes only."
   bot_token="$(new_bot_token)"
   bot="$(tg "$bot_token" getMe | "$JQ" -r .result.username)"
   owner="$(owner_id "$bot_token" "$bot")"
+  owner="${owner//[^0-9]/}"
   sudo mkdir -p "$(dirname "$secrets")"
-  printf 'TELEGRAM_BOT_TOKEN=%s\nTELEGRAM_ALLOWED_USERS=%s\n' \
-    "$bot_token" "${owner//[^0-9]/}" | write_secret "$secrets"
-  ok "Secrets written"
+  set_secret TELEGRAM_BOT_TOKEN "$bot_token"
+  set_secret TELEGRAM_ALLOWED_USERS "$owner"
+  ok "Bot token and your id written"
   # What people see before their first message; BotFather's /setdescription does the same.
   tg "$bot_token" setMyShortDescription "short_description=Hermes%2C%20a%20personal%20agent%20on%20a%20home%20server" >/dev/null || true
   tg "$bot_token" setMyDescription "description=Hermes%20answers%20only%20its%20owner." >/dev/null || true
@@ -126,6 +126,11 @@ topics() {
   local token="$1" owner="$2" bot probe thread
   bot="$(tg "$token" getMe | "$JQ" -r .result.username)"
   step "Topics, for sub-chats in your chat with @$bot (optional)"
+  # Once topics have been used, getMe tells; before, only a test topic does.
+  if [ "$(tg "$token" getMe | "$JQ" -r '[.result.has_topics_enabled, .result.allows_users_to_create_topics] | @text')" = '[true,false]' ]; then
+    ok "Topics are on: send /sub new in your chat with @$bot to open a sub-chat"
+    return 0
+  fi
   note "In @BotFather, tap Open (its Mini App): My bots → @$bot → Bot Settings → Threads Settings:"
   note "\"Threaded Mode\" ON, \"Disallow users to create new threads\" ON."
   note "Without topics, groups with @$bot are the sub-chats."
@@ -154,7 +159,5 @@ topics() {
   done
 }
 
-if [ -n "${bot_token:-}" ]; then
-  botfather_settings "$bot_token" "$(tg "$bot_token" getMe | "$JQ" -r .result.username)"
-  topics "$bot_token" "${owner:-$(sudo sed -n 's/^TELEGRAM_ALLOWED_USERS=//p' "$secrets" | cut -d, -f1)}"
-fi
+botfather_settings "$bot_token" "$(tg "$bot_token" getMe | "$JQ" -r .result.username)"
+topics "$bot_token" "$owner"

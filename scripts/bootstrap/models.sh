@@ -1,26 +1,20 @@
-# Sourced by scripts/bootstrap-macos.sh, in its order.
 # ── Models: the main one, then its fallbacks ────────────────────────────────
 # Hermes tries them in order when one fails (a limit reached, an outage), for
 # that turn; the local model (uzu) always comes last. Written to
 # hosts/local.nix (server.hermes.model, .fallbacks, and .providers for other
 # OpenAI-compatible APIs); each key goes to the secrets file as soon as its
-# provider is chosen. The providers and models are Hermes' own lists.
+# provider is chosen. The providers and models are Hermes' own lists. A
+# ChatGPT subscription logs in here too, before Hermes' account exists if need
+# be (system.sh then hands the login over).
 
 step "Models"
 note "Getting Hermes' lists of providers and models (Hermes is built first: a while, the first time)..."
 HERMES_PY="$(nix build --no-link --print-out-paths \
-  "$flake.config.home-manager.users.$(setting server.hermes.user).services.hermes-agent.package.hermesVenv")/bin/python3"
+  "$flake.config.home-manager.users.$agent.services.hermes-agent.package.hermesVenv")/bin/python3"
 hermes_models() { "$HERMES_PY" -I "$REPO_DIR/scripts/lib/hermes-models.py" "$@"; }
 provider_rows="$(hermes_models providers)" # id<TAB>label<TAB>key variable
 provider_names="$(hermes_models names)"
 provider_field() { awk -F'\t' -v id="$1" -v f="$2" '$1 == id { print $f; exit }' <<< "$provider_rows"; }
-
-secret_value() { sudo sed -n "s/^$1=//p" "$secrets" | head -n 1; }
-set_secret() { # variable value; rewritten in place, so a key left empty before gives way
-  local others
-  others="$(sudo grep -v "^$1=" "$secrets" || true)"
-  printf '%s\n%s=%s\n' "$others" "$1" "$2" | sed '/^$/d' | write_secret "$secrets"
-}
 
 key_page() {
   case "$1" in
@@ -149,12 +143,11 @@ model_chain() {
     | "$JQ" -r 'map("\(.name) (\(.provider))") | join(" → ")'
 }
 
-if grep -q 'fallbacks' "$local_nix" 2>/dev/null \
-  && ! gum confirm --default=false "Models: $(model_chain) → the local model. Change them?"; then
-  ok "Models: $(model_chain) → the local model"
+if grep -q 'fallbacks' "$local_nix" 2>/dev/null && keep "Models: $(model_chain) → the local model"; then
+  :
 else
   note "The main model, then the ones Hermes falls back to, in order, when one fails;"
-  note "the local model (uzu) always comes last. A ChatGPT subscription logs in after the install."
+  note "the local model (uzu) always comes last. A ChatGPT subscription logs in once the chain is chosen."
   new_providers="$(nix eval --json "$flake.config.server.hermes.providers")"
   until choose_entry "Main model · its provider (type to search)" && [ -n "$pick_provider" ]; do :; done
   main="$("$JQ" -cn --arg p "$pick_provider" --arg n "$pick_model" '{provider: $p, name: $n}')"
@@ -170,11 +163,8 @@ else
     n=$((n + 1))
     ok "Then: $pick_model ($pick_label)"
   done
-  text="$(REPO="$REPO_DIR" HOST="$HOST" \
-    PATCH="$("$JQ" -cn --argjson m "$main" --argjson f "$fallbacks" --argjson p "$new_providers" \
-      '{server: {hermes: {model: $m, fallbacks: $f, providers: $p}}}')" \
-    nix eval --impure --raw --file "$REPO_DIR/scripts/lib/set-host.nix")"
-  printf '%s' "$text" > "$local_nix"
+  set_host "$("$JQ" -cn --argjson m "$main" --argjson f "$fallbacks" --argjson p "$new_providers" \
+    '{server: {hermes: {model: $m, fallbacks: $f, providers: $p}}}')"
   ok "Models: $(model_chain) → the local model"
 fi
 
@@ -190,3 +180,45 @@ for provider in $(nix eval --json "$flake.config.server.hermes" \
     ask_key "$provider" "$(provider_field "$provider" 2)" "$(provider_field "$provider" 3)"
   fi
 done
+
+# A ChatGPT subscription in the chain logs in with a device code. Hermes keeps
+# the login in its home's auth.json: before its account exists, the login is
+# made in a throwaway home and kept root-only until system.sh moves it in.
+codex_staged="$(dirname "$secrets")/openai-codex-auth.json"
+hermes_bin="$(nix build --no-link --print-out-paths \
+  "$flake.config.home-manager.users.$agent.services.hermes-agent.package")/bin/hermes"
+hermes_cli() { sudo -u "$agent" -H env HERMES_HOME="$agent_home/.hermes" "$hermes_bin" "$@"; }
+codex_logged_in() {
+  if id "$agent" >/dev/null 2>&1; then
+    ! hermes_cli auth status openai-codex 2>&1 | grep -q "logged out"
+  else
+    sudo test -s "$codex_staged"
+  fi
+}
+codex_login() {
+  local home
+  note "Hermes logs in with a code: open the link it shows (on any device), sign in to ChatGPT, enter the code."
+  if id "$agent" >/dev/null 2>&1; then
+    hermes_cli auth add openai-codex --type oauth
+    return
+  fi
+  home="$(mktemp -d)"
+  chmod 700 "$home"
+  # HOME too: Hermes would otherwise read this user's own ~/.hermes and ~/.codex.
+  if HOME="$home" HERMES_HOME="$home" "$hermes_bin" auth add openai-codex --type oauth && [ -s "$home/auth.json" ]; then
+    write_secret "$codex_staged" < "$home/auth.json"
+  fi
+  rm -rf "$home"
+  sudo test -s "$codex_staged"
+}
+
+if nix eval --json "$flake.config.server.hermes" \
+  --apply 'h: builtins.any (p: p == "openai-codex") ([h.model.provider] ++ map (f: f.provider) h.fallbacks)' | grep -q true; then
+  if codex_logged_in && keep "Hermes is logged in to your ChatGPT subscription"; then
+    :
+  elif codex_login; then
+    ok "Hermes is logged in to your ChatGPT subscription"
+  else
+    warn "Not logged in: Hermes falls back to the next model. Run this script again to retry."
+  fi
+fi

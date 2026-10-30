@@ -1,4 +1,3 @@
-# Sourced by scripts/bootstrap-macos.sh, in its order.
 # ── Apple apps ──────────────────────────────────────────────────────────────
 # Messages, Notes, Reminders, Contacts, Calendar and Find My act on the Apple
 # Account the Hermes account is signed in to, and each asks macOS (TCC) the
@@ -68,7 +67,7 @@ apple_app() {
 }
 
 apple_apps() {
-  step "Hermes' Apple Account"
+  note "Hermes' Apple Account:"
   while ! apple_account; do
     note "On the Mac's screen, in the System Settings that opens, sign in with your Apple Account,"
     note "then in iCloud turn on Messages, Notes, Reminders, Contacts, Calendars and Find My Mac."
@@ -77,7 +76,7 @@ apple_apps() {
   done
   ok "$agent is signed in to an Apple Account"
 
-  step "Each Apple app's permission (dialogs on the Mac's screen)"
+  note "Each Apple app's permission (dialogs on the Mac's screen):"
   apple_app "Reminders" 'remindctl authorize >/dev/null 2>&1; [ "$(remindctl status --plain)" = full-access ]'
   apple_app "Notes" "osascript -e 'tell application \"Notes\" to count notes'"
   apple_app "Contacts" "osascript -e 'tell application \"Contacts\" to count people'"
@@ -110,17 +109,15 @@ apple_apps() {
   fi
 
   imcp_apps
-  integration_on homekit && homeclaw_app
 }
 
-agent_home="$(setting server.hermes.home)"
 imcp_prefs="$agent_home/Library/Containers/co.dododo.iMCP/Data/Library/Preferences/co.dododo.iMCP"
 # What iMCP serves Hermes (modules/hermes/agent/apple.nix); Maps uses Location.
 imcp_services=(calendar contacts location mail music shortcuts voiceMemos weather)
 
 imcp_apps() {
   local service missing init
-  step "iMCP: Calendar, Contacts, Mail, Maps, Music, Shortcuts, Voice Memos, Weather"
+  note "iMCP: Calendar, Contacts, Mail, Maps, Music, Shortcuts, Voice Memos, Weather:"
   sudo launchctl kickstart "gui/$agent_uid/org.nix-community.home.imcp" 2>/dev/null || true
   sleep 3
   # Its settings live in its container, which its first launch created.
@@ -145,45 +142,18 @@ imcp_apps() {
     "(printf '%s\n' '$init'; sleep 15) | timeout 20 /Applications/iMCP.app/Contents/MacOS/imcp-server | grep -m1 -q serverInfo"
 }
 
-# HomeClaw is on the App Store only: Apple allows HomeKit nowhere else.
-homeclaw_app() {
-  local mas
-  step "HomeClaw: HomeKit"
-  if [ ! -d /Applications/HomeClaw.app ]; then
-    mas="$(nix build --no-link --print-out-paths "$flake.pkgs.mas")/bin/mas"
-    # mas installs as root for the App Store account of SUDO_UID: Hermes'.
-    if ! sudo launchctl asuser "$agent_uid" env SUDO_UID="$agent_uid" SUDO_GID="$(id -g "$agent")" \
-      SUDO_USER="$agent" HOME="$agent_home" "$mas" get 6759682551; then
-      note "On the Mac's screen, install HomeClaw from the App Store that opens (Get)."
-      hermes_gui /usr/bin/open "macappstore://apps.apple.com/app/id6759682551" || true
-      gum confirm --affirmative "Done" --negative "Skip" "Installed?" || return 0
-    fi
-  fi
-  [ -d /Applications/HomeClaw.app ] || { warn "HomeClaw is not installed: skipped."; return 0; }
-  note "On the Mac's screen, allow HomeClaw to access your home data."
-  sudo launchctl kickstart "gui/$agent_uid/org.nix-community.home.homeclaw" 2>/dev/null || true
-  sleep 5
-  # Its HTTP MCP switch, read at launch: set, then restart it.
-  as_agent hermes-app-defaults
-  sudo launchctl kickstart -k "gui/$agent_uid/org.nix-community.home.homeclaw" 2>/dev/null || true
-  while [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9090/mcp)" = 000 ]; do
-    warn "HomeClaw's MCP endpoint does not answer yet."
-    note "In HomeClaw's menu bar icon → Settings → Integrations, turn on Streamable HTTP MCP."
-    gum confirm --affirmative "Check again" --negative "Skip" "On?" || return 0
-  done
-  ok "HomeClaw serves HomeKit to Hermes"
+# Hermes' desktop on the Mac's screen: after a reboot, macOS logs it in there.
+on_hermes_screen() { gui_session && [ "$(stat -f %Su /dev/console)" = "$agent" ]; }
 
-  # Its events go to Hermes' events daemon (docs/events.md), with the secret
-  # the daemon checks as a Bearer token.
-  local cli=/Applications/HomeClaw.app/Contents/MacOS/homeclaw-cli token
-  token="$(sudo sed -n 's/^WEBHOOK_SECRET=//p' "$secrets")"
-  if hermes_gui "$cli" config --webhook-url "http://127.0.0.1:$(setting server.hermes.events.port)" \
-    --webhook-token "$token" --webhook-enabled true >/dev/null && hermes_gui "$cli" config --webhook-test >/dev/null; then
-    ok "HomeClaw reports to Hermes' events"
-    note "Choose what it reports: HomeClaw's menu bar icon → Settings → Webhook, turn on the doors, sensors…"
-    note "(Immediate for what matters now, Batched for the rest)."
-  else
-    warn "Could not point HomeClaw's webhook at Hermes: Settings → Webhook, URL http://127.0.0.1:$(setting server.hermes.events.port)"
-  fi
-  unset token
-}
+step "Hermes' Apple Account and apps"
+if ! on_hermes_screen; then
+  warn "They need Hermes' desktop on the Mac's screen, which it is after a reboot:"
+  note "then run this script again over SSH, looking at the Mac."
+elif apple_account && as_gateway 'imsg chats --limit 1 | grep -q .' >/dev/null 2>&1 \
+  && keep "$agent is signed in to an Apple Account, and Hermes reads your messages"; then
+  :
+elif gum confirm "Set up Hermes' Apple apps (iMessage, Notes, Reminders, Contacts, Calendar, Find My)?"; then
+  hermes_lit 1
+  apple_apps
+  hermes_lit "$(setting server.energy.displayBrightness)"
+fi

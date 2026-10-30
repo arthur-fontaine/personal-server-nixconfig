@@ -4,37 +4,44 @@
 at its own screen and keyboard (the permission dialogs show there), and let it
 reboot. Then run it once more over SSH while you look at the Mac, which shows
 Hermes' desktop: that run signs Hermes in to your Apple Account and allows its
-Apple apps, which only work in its own session. Every step checks whether it is done,
-so running it again from the clone
-(`~/personal-server-nixconfig/scripts/bootstrap-macos.sh`) only redoes what is
-missing, for example the BotFather settings you skipped.
+Apple apps, and logs it in to Instagram, Discord and HomeKit, which only work
+in its own session.
+
+Running it again from the clone
+(`~/personal-server-nixconfig/scripts/bootstrap-macos.sh`) goes through every
+section: what is set up says so and asks "Change it?" (No by default), what is
+missing is set up. After a change to the host (models, integrations, keys, an
+address), the configuration is applied again. Each section is its own file in
+`scripts/bootstrap/`, run in the order `bootstrap-macos.sh` lists, which the
+table follows; each integration is one file in `scripts/bootstrap/integrations/`.
+The sections come from the clone: when it is behind GitHub, the script says so
+and shows the `git pull` to run.
 
 | Step | What the script does | What only you can do |
 | --- | --- | --- |
 | Nix | installs it (multi-user) | |
 | Repository | clones it to `~/personal-server-nixconfig` | |
 | This host | writes the git-ignored `hosts/local.nix`: host name, your user, the SSH keys allowed to log in (from your GitHub account, pasted, or this Mac's `~/.ssh/*.pub`) | choose the keys |
-| Secrets | creates `/etc/hermes/secrets.env` (root, then Hermes only, mode 0400) with the Telegram bot's token and your id | |
-| Telegram bot | walks you through @BotFather's `/newbot`, checks the token, reads your user id from your first message to the bot, sets its description, then checks Threaded Mode (with it, the DM stays the main chat and its topics, which only the bot opens with `/sub new`, are sub-chats), privacy mode (groups as sub-chats) and its picture (the Hermes logo, from the pinned Hermes source) | create the bot; for topics, in BotFather's Mini App, Threads Settings: Threaded Mode on and "Disallow users to create new threads" on; send `/setprivacy` → your bot → `Disable`; send `/setuserpic` → your bot → the Hermes logo it saved to `~/Downloads` |
-| Models | lists Hermes' providers to pick (type to search) for the main model, then each fallback, showing the chain so far, the local model last; asks a provider's API key as soon as it is picked (none for ChatGPT, which logs in after the install), then lists its models (`gpt-6-luna` first for ChatGPT), or takes one typed in; "Another OpenAI-compatible API" asks a name, its address and key, and checks them on its `/models`; writes the chain to `hosts/local.nix` and the keys to the secrets file | choose; paste the keys |
-| Integrations | asks which of your other services Hermes may use: WhatsApp, Instagram, Discord, Home Assistant, HomeKit, 1Password, RunPod, GitHub notifications (none by default; Apple's apps are always there), writes them to `hosts/local.nix`, then asks for RunPod's key if it is on. The steps below marked *(integration)* run only for those | pick |
-| Home Assistant *(integration)* | asks for its address and checks from this Mac that it answers (nothing at all: a wrong address or another network; a 401: it is there), opens its token page, checks the token against `/api/`, then keeps the address in `hosts/local.nix` and the token as `HASS_TOKEN`; checks both again on every run | give the address; create a long-lived access token (profile → Security) |
-| System | runs `darwin-rebuild switch` | |
-| Auto-login | gives the `hermes` account a random password and writes `/etc/kcpassword`, so macOS logs it in at boot (the login user itself is in Nix) | confirm turning FileVault off, which auto-login needs |
-| ChatGPT (when the chain uses it) | `hermes auth add openai-codex` as Hermes: shows a link and a code | open the link on any device, sign in to ChatGPT, enter the code |
-| GitHub | opens GitHub's token page pre-filled (Contents: read and write, a year), then `gh auth login` for Hermes; then a second pre-filled page for a classic token with only the notifications scope, for Hermes' events | create both; on the first, pick this repository under Repository access (a link cannot) |
-| 1Password *(integration)* | checks that the service account token reads the "Hermes" vault, then adds it to the secrets file | create the vault, the service account (read access to that vault only) and its token; put in the vault the logins Hermes may use, Instagram's with the website `https://www.instagram.com` |
-| WhatsApp *(integration)* | `wacli auth` as Hermes: shows a QR code, then the first sync | scan it: WhatsApp → Settings → Linked devices → Link a device |
-| Permissions | runs `cua-driver permissions grant`; macOS keeps them system-wide, so they cover the Hermes account | click Allow for Accessibility and Screen Recording |
-| Full Disk Access | opens the list and shows `/Library/Hermes/hermes-launcher` in Finder | add it, once: Hermes updates keep it |
-| Reboot | reboots, so macOS logs Hermes in and starts it | |
+| Telegram bot | walks you through @BotFather's `/newbot`, checks the token, reads your user id from your first message to the bot, keeps both in `/etc/hermes/secrets.env` (root, then Hermes only, mode 0400), sets its description, then checks privacy mode (groups as sub-chats), its picture (the Hermes logo, from the pinned Hermes source) and Threaded Mode (with it, the DM stays the main chat and its topics, which only the bot opens with `/sub new`, are sub-chats) | create the bot; send `/setprivacy` → your bot → `Disable`; send `/setuserpic` → your bot → the Hermes logo it saved to `~/Downloads`; for topics, in BotFather's Mini App, Threads Settings: Threaded Mode on and "Disallow users to create new threads" on |
+| Models | lists Hermes' providers to pick (type to search) for the main model, then each fallback, showing the chain so far, the local model last; asks a provider's API key as soon as it is picked, then lists its models (`gpt-6-luna` first for ChatGPT), or takes one typed in; "Another OpenAI-compatible API" asks a name, its address and key, and checks them on its `/models`; writes the chain to `hosts/local.nix` and the keys to the secrets file. A ChatGPT subscription logs in here (`hermes auth add openai-codex`: a link and a code), kept root-only until Hermes' account exists | choose; paste the keys; for ChatGPT, open the link on any device, sign in, enter the code |
+| Integrations | asks which of your other services Hermes may use: WhatsApp, Instagram, Discord, Home Assistant, HomeKit, 1Password, RunPod, GitHub notifications (none by default; Apple's apps are always there), and writes them to `hosts/local.nix`. The steps marked *(integration)* run only for those | pick |
+| RunPod *(integration)* | asks for its API key | create it |
+| Home Assistant *(integration)* | asks for its address and checks from this Mac that it answers (nothing at all: a wrong address, another network, or the terminal not allowed on the local network; a 401: it is there), opens its token page, checks the token against `/api/`, then keeps the address in `hosts/local.nix` and the token as `HASS_TOKEN`; checks both again on every run | give the address; create a long-lived access token (profile → Security); allow the terminal on the local network if macOS asks |
+| 1Password *(integration)* | checks that the service account token reads the "Hermes" vault (again on every run), then keeps it in the secrets file | create the vault, the service account (read access to that vault only) and its token; put in the vault the logins Hermes may use, Instagram's with the website `https://www.instagram.com` |
+| GitHub notifications *(integration)* | opens a pre-filled page for a classic token with only the notifications scope, checks it, keeps it for Hermes' events | create it |
+| The configuration | runs `darwin-rebuild switch`: always the first time and after a change above, otherwise only if you ask; then moves a ChatGPT login made before the account existed into it | |
+| Hermes' login at boot | gives the `hermes` account a random password and writes `/etc/kcpassword`, so macOS logs it in at boot (the login user itself is in Nix) | confirm turning FileVault off, which auto-login needs |
+| GitHub access | opens GitHub's token page pre-filled (Contents: read and write, a year), then `gh auth login` for Hermes | create it; pick this repository under Repository access (a link cannot) |
+| Permissions | runs `cua-driver permissions grant`; macOS keeps them system-wide, so they cover the Hermes account; for Full Disk Access, opens the list and shows `/Library/Hermes/hermes-launcher` in Finder | click Allow for Accessibility and Screen Recording; add the launcher to Full Disk Access, once: Hermes updates keep it |
 | Apple Account (second run, over SSH) | opens Hermes' System Settings → Apple Account on the Mac's screen, and waits until it is signed in | sign in with your Apple Account; in iCloud turn on Messages, Notes, Reminders, Contacts, Calendars, Find My Mac |
 | Apple apps | runs a check of Reminders, Notes, Contacts, Calendar and Messages the way the gateway runs (launchd starting the launcher in Hermes' session), so each dialog is the gateway's own; opens Messages until Hermes can read your conversations; for Find My, shows the launcher to add to Screen Recording and Accessibility | click Allow in each dialog; in Messages, Settings → iMessage → "Enable Messages in iCloud" |
 | iMCP | starts it (Nix installs it in /Applications), trusts Hermes in it, waits until its services are on, then connects to it as Hermes | in its menu bar icon, click Calendar, Contacts, Location, Mail (choose `~/Library/Mail`), Music, Shortcuts, Voice Memos, Weather, allowing each dialog; allow Local Network |
-| HomeClaw *(integration)* | installs it from the App Store with `mas` (or opens its page), starts it, turns on its HTTP MCP endpoint and checks it answers, then points its webhook at Hermes' events daemon | allow it your home data; in its Settings → Webhook, choose the accessories it reports |
-| Check (second run) | asks uzu a question and the events' screening question on a test invitation (waiting for its first model download), then offers to send a fake WhatsApp message through the events chain ([docs/events.md](docs/events.md)) | see the proposal arrive in Telegram |
+| WhatsApp *(integration)* | `wacli auth` as Hermes: shows a QR code, then the first sync | scan it: WhatsApp → Settings → Linked devices → Link a device |
 | Instagram (second run) *(integration)* | starts Hermes' always-open Chrome on instagram.com, on the Mac's screen, until its profile holds a session | log in, save the login info, turn on Instagram's notifications if it offers them |
 | Discord (second run) *(integration)* | points you to the Discord tab Hermes' events keep open in its Chrome, and records your login | log in (the phone app's QR code is easiest), allow notifications |
+| HomeKit (second run) *(integration)* | installs HomeClaw from the App Store with `mas` (or opens its page), starts it, turns on its HTTP MCP endpoint and checks it answers, then points its webhook at Hermes' events daemon | allow it your home data; in its Settings → Webhook, choose the accessories it reports |
+| Start | restarts Hermes, or the first time reboots, so macOS logs Hermes in and starts it | |
+| Check (second run) | asks uzu a question and the events' screening question on a test invitation (waiting for its first model download), then offers to send a fake WhatsApp message through the events chain ([docs/events.md](docs/events.md)) | see the proposal arrive in Telegram |
 
 macOS reserves those clicks for a person: no script can grant them.
 

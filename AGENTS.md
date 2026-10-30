@@ -70,12 +70,23 @@ Things that bit before:
 ## The bootstrap
 
 `scripts/bootstrap-macos.sh` runs on a fresh Mac, so under macOS' bash 3.2
-(`set -euo pipefail`): no associative arrays, and no empty array expanded
-under `set -u` (use `${a[@]+"${a[@]}"}`). Every step checks whether it is
-done, so a second run only does what is missing. Test a step by extracting its
-functions with `sed` into a script that stubs `sudo`, `gum`, `nix` and
-`setting`, and run it with `/bin/bash`; test network checks against a small
-local server.
+(`set -euo pipefail`): no associative arrays, no empty array expanded under
+`set -u` (use `${a[@]+"${a[@]}"}`), and no `x="$(cmd)"` whose cmd may fail
+(add `|| true`). It installs Nix and clones the repository, then sources
+`scripts/bootstrap/lib.sh` and each section of `scripts/bootstrap/` in the
+order it lists; an integration's setup is its own file in
+`scripts/bootstrap/integrations/`, starting with `integration_on <name> ||
+return 0`. A new step goes in the section it belongs to, after its `step`
+title: every section prints its title, and a part already set up says so with
+`keep "<summary>"`, which asks "Change it?". Anything that writes
+`hosts/local.nix` (`set_host`) runs before `system.sh` applies the
+configuration; anything that needs Hermes' account, after.
+
+Test sections by sourcing `lib.sh` and them, in that order, from a script that
+stubs `sudo`, `gum`, `nix`, `curl`, `id` and `launchctl` (and puts fake `gh`,
+`wacli`… first on `PATH`), and run it with `/bin/bash`, both as a first run
+and as a re-run answering No to every "Change it?"; test network checks
+against a small local server.
 
 ## Changing things
 
