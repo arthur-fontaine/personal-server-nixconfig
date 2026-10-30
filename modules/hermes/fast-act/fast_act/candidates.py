@@ -56,16 +56,26 @@ def _label(ref: Mapping[str, Any]) -> str:
     return name[:80]
 
 
+def _preview(text: str) -> str:
+    flat = " ".join(text.split())
+    return flat if len(flat) <= 60 else flat[:57] + "..."
+
+
 def build(
     snapshot: Mapping[str, Any],
     *,
     goal: str,
-    text: str | None = None,
+    texts: list[str] = (),
     allow_risky: bool = False,
 ) -> list[Candidate]:
-    """The page's actions closest to ``goal``, then the reserved outcomes."""
+    """The page's actions closest to ``goal``, then the reserved outcomes.
+
+    Every text Hermes wrote may go into every typable field: which one goes
+    where is the model's choice, among those closed candidates, so it never
+    writes anything itself (jev-use's tasks name their typing candidates the
+    same way, sources.py type_text)."""
     target = {"target_id": snapshot["target_id"], "tab_id": snapshot["tab_id"]}
-    wanted = _words(goal + " " + (text or ""))
+    wanted = _words(goal + " " + " ".join(texts))
     scored: list[tuple[int, int, Candidate]] = []
     for order, ref in enumerate(snapshot.get("refs") or []):
         handle, role, label = ref.get("ref"), str(ref.get("role") or "element"), _label(ref)
@@ -78,11 +88,12 @@ def build(
                 f"click:{handle}", f'Click the {role} "{label}"',
                 "browser_click", {**target, "ref": handle},
             )))
-        if text is not None and "type" in actions and role in TYPABLE:
-            scored.append((closeness + 1, order, Candidate(
-                f"type:{handle}", f'Type the text into the {role} "{label}"',
-                "browser_type", {**target, "ref": handle, "text": text, "replace": True},
-            )))
+        if "type" in actions and role in TYPABLE:
+            for index, text in enumerate(texts):
+                scored.append((closeness + 1, order, Candidate(
+                    f"type:{handle}:{index}", f'Type "{_preview(text)}" into the {role} "{label}"',
+                    "browser_type", {**target, "ref": handle, "text": text, "replace": True},
+                )))
     scored.sort(key=lambda item: (-item[0], item[1]))
     chosen = [candidate for _, _, candidate in scored[:MAX_ACTIONS]]
     return chosen + [Candidate(key, description) for key, description in RESERVED.items()]
