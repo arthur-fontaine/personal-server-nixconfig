@@ -75,3 +75,7 @@ Remove Hermes as above, then:
    `.nix-defexpr` and `.nix-channels` of root and of your user; then
    `sudo diskutil apfs deleteVolume /nix` (reboot first if it is in use).
 4. Delete the clone, `~/personal-server-nixconfig`.
+5. Close the terminal and open a new one: the old one still exports
+   nix-darwin's variables, and `NIX_SSL_CERT_FILE` names a certificate file
+   that is gone, so Nix there cannot download anything (installing again
+   fails on `/etc/ssl/certs/ca-certificates.crt`).
