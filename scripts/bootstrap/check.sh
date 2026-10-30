@@ -1,4 +1,3 @@
-# Sourced by scripts/bootstrap-macos.sh, in its order.
 # ── Check: the local model, and an event end to end ────────────────────────
 
 uzu_port="$(setting server.uzu.port)"

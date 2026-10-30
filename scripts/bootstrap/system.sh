@@ -1,5 +1,4 @@
-# Sourced by scripts/bootstrap-macos.sh, in its order.
-# ── The system ──────────────────────────────────────────────────────────────
+# ── This Mac: the configuration applied, Hermes' account and its access ────
 
 switch_system() {
   if [ -x /run/current-system/sw/bin/darwin-rebuild ]; then
@@ -32,22 +31,39 @@ apply() {
   switch_system
 }
 
-agent="$(setting server.hermes.user)"
-if ! id "$agent" >/dev/null 2>&1 || ask --default=false "Apply the configuration again?"; then
-  step "Applying the configuration (nix-darwin)"
+step "The configuration"
+if ! id "$agent" >/dev/null 2>&1 || [ "$host_changed" = 1 ]; then
+  note "Applying it (nix-darwin): the first time, this builds and downloads a lot."
   apply
   ok "Configuration applied"
+elif gum confirm --default=false "Apply the configuration again? (nothing changed above)"; then
+  apply
+  ok "Configuration applied"
+else
+  ok "Configuration unchanged"
 fi
 agent_uid="$(id -u "$agent")"
 as_agent() { sudo -u "$agent" -H env PATH="/etc/profiles/per-user/$agent/bin:$PATH" "$@"; }
 gui_session() { sudo launchctl print "gui/$agent_uid" >/dev/null 2>&1; }
 
-# ── The Hermes account logs in at boot ──────────────────────────────────────
+# The ChatGPT login made before the account existed (models.sh), moved in.
+if sudo test -s "$codex_staged"; then
+  if ! sudo test -s "$agent_home/.hermes/auth.json"; then
+    sudo -u "$agent" mkdir -p "$agent_home/.hermes"
+    sudo install -o "$agent" -g "$(id -g "$agent")" -m 600 "$codex_staged" "$agent_home/.hermes/auth.json"
+  fi
+  sudo rm -f "$codex_staged"
+fi
 
+# The events daemon and Hermes' webhook route share one secret.
+[ -n "$(secret_value WEBHOOK_SECRET)" ] || set_secret WEBHOOK_SECRET "$(openssl rand -hex 32)"
+
+# ── Hermes' account logs in at boot ─────────────────────────────────────────
+
+step "Hermes' login at boot"
 if sudo test -e /etc/kcpassword; then
-  ok "$agent logs in automatically"
+  ok "macOS logs $agent in at boot"
 else
-  step "Automatic login for $agent"
   if fdesetup isactive >/dev/null 2>&1; then
     warn "FileVault is on, and macOS logs nobody in automatically while it is."
     if gum confirm "Turn FileVault off? (macOS asks for your password, the one that unlocks the disk)"; then
@@ -69,89 +85,33 @@ else
       print join "", map { chr(ord(substr($p, $_, 1)) ^ $key[$_ % 11]) } 0 .. length($p) - 1;
     ' "$password" | write_secret /etc/kcpassword
     unset password
-    ok "$agent will log in at boot"
+    ok "macOS will log $agent in at boot"
   fi
 fi
 
 # ── GitHub, so Hermes can push changes to this repository ──────────────────
-# Both tokens from pre-filled pages: a fine-grained template URL (documented in
-# https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
-# and the classic form's scopes parameter.
+# A fine-grained token from a pre-filled template URL, documented in
+# https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
 
+step "Hermes' access to this repository (GitHub)"
 # owner/repo of the remote, https or ssh.
 repo_slug="$(setting server.nixconfig.remote | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
-
-# Opened in a browser when this session has a screen, always printed.
-show_link() {
-  note "$1"
-  launchctl print "gui/$(id -u)" >/dev/null 2>&1 && /usr/bin/open "$1" 2>/dev/null || true
-}
-
-if as_agent gh auth status >/dev/null 2>&1; then
-  ok "Hermes can push to GitHub"
+if as_agent gh auth status >/dev/null 2>&1 && keep "Hermes can push to GitHub"; then
+  :
 else
-  step "GitHub access for Hermes"
   note "A fine-grained token with Contents: read and write, pre-filled on this page:"
   show_link "https://github.com/settings/personal-access-tokens/new?name=Hermes%20(personal%20server)&description=Hermes%20pushes%20changes%20to%20${repo_slug//\//%2F}%20and%20applies%20them&target_name=${repo_slug%%/*}&expires_in=366&contents=write"
   note "Under Repository access, choose Only select repositories → ${repo_slug#*/} (a link cannot pick it)."
   note "Whoever can push here can change the whole Mac through sudo server-rebuild. It lasts a year:"
   note "run this script again to replace it."
-  token="$(gum input --password --header "GitHub token (github_pat_…, empty to skip)")"
+  token="$(gum input --password --header "GitHub token (github_pat_…, empty to skip)" | tr -d '[:space:]')"
   if [ -n "$token" ]; then
     # In gh's own file (~/.config/gh/hosts.yml, readable by the agent only), not
     # the keychain: the agent's runs unattended, and from here it has none.
     printf '%s' "$token" | as_agent gh auth login --git-protocol https --insecure-storage --with-token
-    unset token
     ok "Hermes can push to GitHub"
   else
     warn "Skipped: Hermes cannot push configuration changes yet."
   fi
-fi
-
-# Notifications, for Hermes' events (docs/events.md): fine-grained tokens
-# cannot read them, so a classic token with that one scope, kept apart.
-if sudo grep -q '^GITHUB_NOTIFICATIONS_TOKEN=' "$secrets"; then
-  ok "Hermes reads your GitHub notifications"
-elif [ "$(setting server.hermes.events.github)" = 1 ]; then
-  step "GitHub notifications, as Hermes' events (optional)"
-  note "A classic token with only the notifications scope, pre-filled on this page:"
-  show_link "https://github.com/settings/tokens/new?description=Hermes%20notifications%20(personal%20server)&scopes=notifications"
-  token="$(gum input --password --header "Notifications token (ghp_…, empty to skip)")"
-  if [ -n "$token" ]; then
-    if [ "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" https://api.github.com/notifications)" = 200 ]; then
-      printf 'GITHUB_NOTIFICATIONS_TOKEN=%s\n' "$token" | sudo sh -c 'umask 077 && cat >> "$1"' _ "$secrets"
-      ok "Hermes reads your GitHub notifications"
-    else
-      warn "GitHub refused that token for notifications: skipped. Run this script again to retry."
-    fi
-    unset token
-  fi
-fi
-
-# ── Your ChatGPT subscription, when the chain uses it ──────────────────────
-
-uses_codex="$(nix eval --json "$flake.config.server.hermes" --apply 'h: builtins.any (p: p == "openai-codex") ([h.model.provider] ++ map (f: f.provider) h.fallbacks)')"
-if [ "$uses_codex" = true ]; then
-  hermes_cli() {
-    as_agent env HERMES_HOME="$(setting server.hermes.home)/.hermes" \
-      "$(setting "home-manager.users.$agent.services.hermes-agent.package")/bin/hermes" "$@"
-  }
-  if ! hermes_cli auth status openai-codex 2>&1 | grep -q "logged out"; then
-    ok "Hermes is logged in to your ChatGPT subscription"
-  else
-    step "Your ChatGPT subscription"
-    note "Hermes logs in with a code: open the link it shows (on any device), sign in to ChatGPT, enter the code."
-    if hermes_cli auth add openai-codex --type oauth; then
-      ok "Hermes is logged in to your ChatGPT subscription"
-    else
-      warn "Not logged in: Hermes falls back to the next model. Run this script again to retry."
-    fi
-  fi
-fi
-
-# ── Events: the daemon and Hermes' webhook route share one secret ──────────
-
-if ! sudo grep -q '^WEBHOOK_SECRET=' "$secrets"; then
-  printf 'WEBHOOK_SECRET=%s\n' "$(openssl rand -hex 32)" | sudo sh -c 'umask 077 && cat >> "$1"' _ "$secrets"
-  ok "Secret for Hermes' events written"
+  unset token
 fi

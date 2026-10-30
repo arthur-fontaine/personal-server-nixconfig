@@ -61,15 +61,25 @@ warn() { gum style --foreground 214 "! $1"; }
 gum style --border rounded --padding "0 2" --bold "personal-server-nixconfig setup" \
   "$(gum style --faint 'Nix, nix-darwin and a Hermes Agent on this Mac')"
 
-# ── The repository and this host ────────────────────────────────────────────
+# ── The repository ─────────────────────────────────────────────────────────
 
+GIT="$(nix build --no-link --print-out-paths nixpkgs#git)/bin/git"
 if [ ! -d "$REPO_DIR/.git" ]; then
   step "Cloning $REPO_URL"
-  nix run nixpkgs#git -- clone "$REPO_URL" "$REPO_DIR"
+  "$GIT" clone "$REPO_URL" "$REPO_DIR"
 fi
 ok "Repository at $REPO_DIR"
+# The sections come from the clone: an old one would run old steps.
+if "$GIT" -C "$REPO_DIR" fetch -q origin 2>/dev/null \
+  && [ "$("$GIT" -C "$REPO_DIR" rev-list --count 'HEAD..@{upstream}' 2>/dev/null || echo 0)" != 0 ]; then
+  warn "The clone is behind GitHub: the steps below are its older ones. To update it, stop here and run:"
+  note "git -C $REPO_DIR pull"
+fi
 
-# Each section, in order, from the clone (scripts/bootstrap/).
-for section in host telegram models integrations system accounts permissions apple browser start check; do
+# Each section, in order, from the clone (scripts/bootstrap/). Integrations
+# come in two groups: what is set up before the configuration is applied
+# (it may change it), and what needs Hermes' account, after.
+source "$REPO_DIR/scripts/bootstrap/lib.sh"
+for section in host telegram models integrations system permissions apple accounts start check; do
   source "$REPO_DIR/scripts/bootstrap/$section.sh"
 done
