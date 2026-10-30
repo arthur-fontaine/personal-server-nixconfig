@@ -41,7 +41,10 @@ nix() { command nix --extra-experimental-features 'nix-command flakes' "$@"; }
 
 GUM="$(nix build --no-link --print-out-paths nixpkgs#gum)/bin/gum"
 gum() { "$GUM" "$@"; }
-step() { gum style --bold --foreground 212 "▶ $1"; }
+# A blank line before each section and each question that opens one, so
+# unrelated questions do not run together.
+step() { echo; gum style --bold --foreground 212 "▶ $1"; }
+ask() { echo; gum confirm "$@"; }
 ok() { gum style --foreground 42 "✓ $1"; }
 note() { gum style --faint "  $1"; }
 warn() { gum style --foreground 214 "! $1"; }
@@ -228,8 +231,8 @@ if sudo test -e "$secrets"; then
   ok "Secrets in $secrets"
   bot_token="$(sudo sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$secrets")"
 else
-  step "Secrets (stored in $secrets, readable by Hermes only)"
   step "Your Telegram bot"
+  note "Its token and your Telegram id go to $secrets, readable by Hermes only."
   bot_token="$(new_bot_token)"
   bot="$(tg "$bot_token" getMe | "$JQ" -r .result.username)"
   owner="$(owner_id "$bot_token" "$bot")"
@@ -496,11 +499,11 @@ integrations_now() {
   echo "${names[*]:-none}"
 }
 
+step "Integrations"
 if grep -q 'integrations' "$local_nix" 2>/dev/null \
   && ! gum confirm --default=false "Integrations: $(integrations_now). Change them?"; then
   ok "Integrations: $(integrations_now)"
 else
-  step "Integrations"
   note "Your other services Hermes may use, each acting as you there (space to pick, enter to confirm)."
   labels=() selected=()
   for line in "${integration_choices[@]}"; do
@@ -625,7 +628,7 @@ apply() {
 }
 
 agent="$(setting server.hermes.user)"
-if ! id "$agent" >/dev/null 2>&1 || gum confirm --default=false "Apply the configuration again?"; then
+if ! id "$agent" >/dev/null 2>&1 || ask --default=false "Apply the configuration again?"; then
   step "Applying the configuration (nix-darwin)"
   apply
   ok "Configuration applied"
@@ -782,7 +785,7 @@ if ! integration_on whatsapp; then
   :
 elif wa --json auth status 2>/dev/null | grep -q '"authenticated":true'; then
   ok "Hermes reads your WhatsApp"
-elif gum confirm "Link your WhatsApp, so Hermes can read and send your messages?"; then
+elif ask "Link your WhatsApp, so Hermes can read and send your messages?"; then
   step "WhatsApp"
   note "On your phone: WhatsApp → Settings → Linked devices → Link a device, then scan this code."
   if wa auth --idle-exit 30s; then
@@ -816,7 +819,7 @@ fi
 if in_gui true; then
   # "unknown" until the driver's daemon has run once.
   permissions="$(in_gui "$cua" permissions status --json 2>/dev/null | sed -n 's/.*"status": *"\([a-z_]*\)".*/\1/p')"
-  if [ "$permissions" != granted ] && gum confirm "Grant computer use its permissions now? (status: ${permissions:-unknown})"; then
+  if [ "$permissions" != granted ] && ask "Grant computer use its permissions now? (status: ${permissions:-unknown})"; then
     step "Accessibility and Screen Recording for CuaDriver"
     note "Dialogs open on this Mac's screen: click Allow / Open System Settings,"
     note "turn CuaDriver on in each list, then come back here."
@@ -826,7 +829,7 @@ if in_gui true; then
     lit "$(setting server.energy.displayBrightness)"
   fi
 
-  if gum confirm "Give Hermes Full Disk Access? (to read Desktop, Documents, Downloads, Mail, iCloud...)"; then
+  if ask "Give Hermes Full Disk Access? (to read Desktop, Documents, Downloads, Mail, iCloud...)"; then
     step "Full Disk Access for $launcher"
     note "In the list that opens, click +, then drag in the file Finder shows (or ⇧⌘G and paste its path)."
     note "It is granted once: Hermes updates keep it."
@@ -942,7 +945,7 @@ apple_apps() {
   # Screen Recording and Accessibility for the launcher, added by hand.
   if as_gateway 'peekaboo permissions --json --no-remote | jq -e "[.data.permissions[] | select(.isRequired) | .isGranted] | all"' >/dev/null 2>&1; then
     ok "Find My (screen reading)"
-  elif gum confirm "Let Hermes read app windows (Find My, through peekaboo)?"; then
+  elif ask "Let Hermes read app windows (Find My, through peekaboo)?"; then
     note "In each list that opens, click +, then drag in the file Finder shows (or ⇧⌘G and paste its path)."
     hermes_gui /usr/bin/open "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture" || true
     hermes_gui /usr/bin/open -R "$launcher" || true
@@ -1069,7 +1072,7 @@ discord_login() {
 }
 
 if gui_session && [ "$(stat -f %Su /dev/console)" = "$agent" ]; then
-  if gum confirm "Set up Hermes' Apple apps (iMessage, Notes, Reminders, Contacts, Calendar, Find My)?"; then
+  if ask "Set up Hermes' Apple apps (iMessage, Notes, Reminders, Contacts, Calendar, Find My)?"; then
     hermes_lit 1
     apple_apps
     hermes_lit "$(setting server.energy.displayBrightness)"
@@ -1078,7 +1081,7 @@ if gui_session && [ "$(stat -f %Su /dev/console)" = "$agent" ]; then
     :
   elif instagram_logged_in; then
     ok "Hermes is logged in to Instagram"
-  elif gum confirm "Log Hermes in to your Instagram?"; then
+  elif ask "Log Hermes in to your Instagram?"; then
     hermes_lit 1
     instagram_login
     hermes_lit "$(setting server.energy.displayBrightness)"
@@ -1087,7 +1090,7 @@ if gui_session && [ "$(stat -f %Su /dev/console)" = "$agent" ]; then
     :
   elif sudo test -e "$discord_marker"; then
     ok "Hermes was logged in to Discord (it logs in again from 1Password when needed)"
-  elif gum confirm "Log Hermes in to your Discord?"; then
+  elif ask "Log Hermes in to your Discord?"; then
     hermes_lit 1
     discord_login
     hermes_lit "$(setting server.energy.displayBrightness)"
@@ -1102,7 +1105,7 @@ fi
 if gui_session; then
   sudo launchctl kickstart -k "gui/$agent_uid/org.nix-community.home.hermes-agent" || true
   ok "Hermes is running"
-elif sudo test -e /etc/kcpassword && gum confirm "Reboot now? macOS then logs Hermes in and starts it."; then
+elif sudo test -e /etc/kcpassword && ask "Reboot now? macOS then logs Hermes in and starts it."; then
   sudo shutdown -r now
 else
   warn "Hermes starts once macOS logs $agent in: reboot when you are ready."
@@ -1150,7 +1153,7 @@ if gui_session && [ "$(setting server.uzu.enable)" = 1 ]; then
     "for _ in \$(seq 30); do curl -fsS '$webhook_health' >/dev/null 2>&1 && exit 0; sleep 2; done; exit 1" || true
   if [ "$(setting server.hermes.events.enable)" = 1 ] \
     && curl -fsS --max-time 5 "$webhook_health" >/dev/null 2>&1 \
-    && gum confirm "Send a fake WhatsApp message through Hermes' events? A proposal should then reach your Telegram main chat."; then
+    && ask "Send a fake WhatsApp message through Hermes' events? A proposal should then reach your Telegram main chat."; then
     # A message as wacli would post it, signed the same way (X-Wacli-Signature),
     # from an id no real account has, so a "yes, answer him" reaches nobody.
     body="$("$JQ" -cn --arg id "setup-test-$(date +%s)" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
