@@ -7,7 +7,10 @@ let
   server-rebuild = pkgs.writeShellScriptBin "server-rebuild" ''
     set -euo pipefail
     dir=${lib.escapeShellArg config.server.nixconfig.dir}
-    /usr/bin/sudo -u ${config.server.admin.user} -H /run/current-system/sw/bin/git -C "$dir" pull --ff-only
+    # Over HTTPS, as cloned: a ~/.gitconfig rewriting GitHub URLs to SSH would
+    # need the administrator's key, which may be in 1Password, out of reach here.
+    /usr/bin/sudo -u ${config.server.admin.user} -H GIT_CONFIG_GLOBAL=/dev/null \
+      /run/current-system/sw/bin/git -C "$dir" pull --ff-only
     exec /run/current-system/sw/bin/darwin-rebuild switch --flake "path:$dir#${hostName}"
   '';
 in
