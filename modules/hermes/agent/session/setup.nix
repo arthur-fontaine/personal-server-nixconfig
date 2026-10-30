@@ -11,6 +11,7 @@ let
     "server.hermes.access.launcher" = server.hermes.access.launcher;
     "server.energy.displayBrightness" = toString server.energy.displayBrightness;
     "server.hermes.events.port" = toString server.hermes.events.port;
+    "server.hermes.browserPort" = toString server.hermes.browserPort;
     "home-manager.users.${server.hermes.user}.launchd.agents.hermes-agent.config.EnvironmentVariables.PATH" =
       config.launchd.agents.hermes-agent.config.EnvironmentVariables.PATH;
     "home-manager.users.${server.hermes.user}.services.hermes-agent.environment.HERMES_CUA_DRIVER_CMD" =
