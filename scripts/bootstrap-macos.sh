@@ -5,7 +5,8 @@
 # permission dialogs show there), and let it reboot: nothing is left to run
 # afterwards. Each step checks whether it is done first, so running it again
 # from the clone (~/personal-server-nixconfig/scripts/bootstrap-macos.sh)
-# only redoes what is missing, e.g. BotFather settings left for later.
+# only redoes what is missing, e.g. BotFather settings left for later. Name
+# sections to run only those, after this host's: `bootstrap-macos.sh apple`.
 #
 # Modelled on https://github.com/arthur-fontaine/nixconfig/blob/main/scripts/bootstrap-macos.sh,
 # with gum (https://github.com/charmbracelet/gum) for the prompts and no Homebrew.
@@ -87,7 +88,15 @@ fi
 # Each section, in order, from the clone (scripts/bootstrap/). Integrations
 # come in two groups: what is set up before the configuration is applied
 # (it may change it), and what needs Hermes' account, after.
+sections=(host telegram models integrations system permissions apple accounts start check)
+if [ "$#" -gt 0 ]; then
+  for section in "$@"; do
+    case "$section" in host | lib) false ;; esac && [ -e "$REPO_DIR/scripts/bootstrap/$section.sh" ] \
+      || { echo "No section $section: pick among ${sections[*]:1}." >&2; exit 1; }
+  done
+  sections=(host "$@")
+fi
 source "$REPO_DIR/scripts/bootstrap/lib.sh"
-for section in host telegram models integrations system permissions apple accounts start check; do
+for section in "${sections[@]}"; do
   source "$REPO_DIR/scripts/bootstrap/$section.sh"
 done
