@@ -50,7 +50,11 @@ in
 {
   home.packages = [ appDefaults ];
   home.activation.appleAppDefaults = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    run ${appDefaults}/bin/hermes-app-defaults
+    # Writing into a container takes Full Disk Access, which the rebuild may
+    # lack: the bootstrap and the setup at login write them again, through
+    # the launcher.
+    run ${appDefaults}/bin/hermes-app-defaults \
+      || warnEcho "Could not write iMCP's and HomeClaw's settings; Hermes' setup at login does."
   '';
 
   launchd.agents = { imcp = menuBarApp imcp; } // lib.optionalAttrs homekit { homeclaw = menuBarApp homeclaw; };

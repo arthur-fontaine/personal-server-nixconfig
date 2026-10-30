@@ -46,6 +46,14 @@ mas_tool() { echo "${MAS_TOOL:-$(nix build --no-link --print-out-paths "$flake.p
 # Hermes' session keeps the backlight off: light it while you click.
 hermes_lit() { hermes_gui "$(brightness_tool)" "$1" || true; }
 
+# iMCP's and HomeClaw's settings (modules/hermes/agent/apple.nix), in their
+# sandbox containers, which macOS lets only a process with Full Disk Access
+# write into: the launcher, not Terminal.
+app_defaults() {
+  as_gateway hermes-app-defaults >/dev/null 2>&1 \
+    || warn "Could not write iMCP's and HomeClaw's settings: does Hermes have Full Disk Access?"
+}
+
 xml() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' <<< "$1"; }
 
 # Runs a shell command the way the gateway runs (under the launcher, which

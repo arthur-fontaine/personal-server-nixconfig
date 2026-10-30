@@ -21,7 +21,7 @@ homeclaw_app() {
   as_root launchctl kickstart "gui/$agent_uid/org.nix-community.home.homeclaw" 2>/dev/null || true
   sleep 5
   # Its HTTP MCP switch, read at launch: set, then restart it.
-  as_agent hermes-app-defaults
+  app_defaults
   as_root launchctl kickstart -k "gui/$agent_uid/org.nix-community.home.homeclaw" 2>/dev/null || true
   while [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9090/mcp)" = 000 ]; do
     warn "HomeClaw's MCP endpoint does not answer yet."
