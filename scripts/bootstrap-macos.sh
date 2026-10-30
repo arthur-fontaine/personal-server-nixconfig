@@ -40,7 +40,16 @@ done
 nix() { command nix --extra-experimental-features 'nix-command flakes' "$@"; }
 
 GUM="$(nix build --no-link --print-out-paths nixpkgs#gum)/bin/gum"
-gum() { "$GUM" "$@"; }
+# gum input keeps 400 characters unless told otherwise: tokens are longer
+# (a 1Password service account's is over 1000).
+gum() {
+  if [ "$1" = input ]; then
+    shift
+    "$GUM" input --char-limit 0 "$@"
+  else
+    "$GUM" "$@"
+  fi
+}
 # A blank line before each section and each question that opens one, so
 # unrelated questions do not run together.
 step() { echo; gum style --bold --foreground 212 "▶ $1"; }
@@ -764,7 +773,7 @@ else
   step "1Password for Hermes"
   note "In 1Password: create a vault named \"$op_vault\", then Developer → Service Accounts → New,"
   note "with read access to \"$op_vault\" only. Put there the logins Hermes may use."
-  op_token="$(gum input --password --header "Service account token (ops_…, empty to skip)")"
+  op_token="$(gum input --password --header "Service account token (ops_…, empty to skip)" | tr -d '[:space:]')"
   if [ -n "$op_token" ]; then
     op="$(nix build --no-link --print-out-paths "$flake.pkgs._1password-cli")/bin/op"
     if OP_SERVICE_ACCOUNT_TOKEN="$op_token" "$op" vault list --format json 2>/dev/null \
