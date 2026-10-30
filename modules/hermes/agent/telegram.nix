@@ -28,5 +28,14 @@
     # during a reboot or a rebuild then gets no answer, and no error either.
     # cli-config.yaml.example: "Set false on hosts that power off".
     platforms.telegram.extra.drop_pending_on_cold_boot = false;
+
+    # Answers appear as they are written: Telegram's native drafts in the main
+    # chat (a DM), edited messages in the sub-chats' topics, where Telegram
+    # allows no drafts (website/docs/user-guide/messaging/telegram.md,
+    # "Streaming transport"). Only the final message notifies.
+    streaming = {
+      enabled = true;
+      transport = "auto";
+    };
   };
 }

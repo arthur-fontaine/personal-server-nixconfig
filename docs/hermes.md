@@ -2,7 +2,10 @@
 
 ## One chat that never ends
 
-Your Telegram DM with the bot is the main chat, for daily use, forever. There
+Your Telegram DM with the bot is the main chat, for daily use, forever.
+Answers appear as they are written (Telegram's drafts; edited messages in the
+sub-chats' topics), and messages sent while Hermes was down are answered when
+it is back. There
 is no session to reset and nothing to compact by hand: the unii plugin
 (`modules/hermes/plugins/unii`) logs every message and keeps a view of the whole
 chat, recent messages word for word and older ones as merged summaries, so each
