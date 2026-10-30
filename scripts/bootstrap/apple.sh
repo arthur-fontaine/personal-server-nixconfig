@@ -84,20 +84,23 @@ imcp_prefs="$agent_home/Library/Containers/co.dododo.iMCP/Data/Library/Preferenc
 imcp_services=(calendar contacts location mail music shortcuts voiceMemos weather)
 
 # The services iMCP does not serve yet, one per line.
+# Read by the launcher: its container is closed to processes without Full
+# Disk Access (app_defaults, lib.sh).
 imcp_missing() {
-  local service
+  local service prefs
+  prefs="$(as_gateway "/usr/bin/defaults read '$imcp_prefs'" 2>/dev/null || true)"
   for service in "${imcp_services[@]}"; do
-    [ "$(as_agent /usr/bin/defaults read "$imcp_prefs" "${service}Enabled" 2>/dev/null)" = 1 ] || echo "$service"
+    grep -q "^ *${service}Enabled = 1;" <<< "$prefs" || echo "$service"
   done
 }
 
 imcp_apps() {
   local missing init
   note "iMCP: Calendar, Contacts, Mail, Maps, Music, Shortcuts, Voice Memos, Weather:"
-  as_root launchctl "gui/$agent_uid/org.nix-community.home.imcp" 2>/dev/null || true
+  as_root launchctl kickstart "gui/$agent_uid/org.nix-community.home.imcp" 2>/dev/null || true
   sleep 3
   # Its settings live in its container, which its first launch created.
-  as_agent hermes-app-defaults
+  app_defaults
   while :; do
     missing="$(imcp_missing | tr '\n' ' ')"
     if [ -z "$missing" ]; then
