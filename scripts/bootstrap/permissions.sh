@@ -21,6 +21,11 @@ if in_gui true; then
   permissions="$(in_gui "$cua" permissions status --json 2>/dev/null | sed -n 's/.*"status": *"\([a-z_]*\)".*/\1/p')"
   if [ "$permissions" = granted ]; then
     ok "Computer use has Accessibility and Screen Recording"
+  elif [ -n "${checking:-}" ] && [ "${permissions:-unknown}" = unknown ]; then
+    # Right after login, before Hermes first starts the driver's daemon,
+    # nothing tells: a missing grant shows when Hermes uses it, and Hermes
+    # says so.
+    :
   elif needs "computer use's permissions" \
     && gum confirm "Grant computer use its permissions now? (status: ${permissions:-unknown})"; then
     note "Accessibility and Screen Recording for CuaDriver."
