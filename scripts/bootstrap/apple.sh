@@ -81,7 +81,9 @@ apple_apps() {
 
 imcp_prefs="$agent_home/Library/Containers/co.dododo.iMCP/Data/Library/Preferences/co.dododo.iMCP"
 # What iMCP serves Hermes (modules/hermes/agent/apple.nix); Maps uses Location.
-imcp_services=(calendar contacts location mail music shortcuts voiceMemos weather)
+# (voicemailEnabled is in its binary; phone's, too short for `strings` to see
+# in a Swift binary, follows the same "<service>Enabled".)
+imcp_services=(calendar contacts location mail music shortcuts voiceMemos weather phone voicemail)
 
 # The services iMCP does not serve yet, one per line.
 # Read by the launcher: its container is closed to processes without Full
@@ -96,7 +98,7 @@ imcp_missing() {
 
 imcp_apps() {
   local missing init
-  note "iMCP: Calendar, Contacts, Mail, Maps, Music, Shortcuts, Voice Memos, Weather:"
+  note "iMCP: Calendar, Contacts, Mail, Maps, Music, Shortcuts, Voice Memos, Weather, Phone, Voicemail:"
   # iMCP asks for Voice Memos' Recordings folder, which the app creates at
   # its first launch: launched hidden, it is there by the time iMCP asks.
   hermes_gui /usr/bin/open -g -j -a /System/Applications/VoiceMemos.app 2>/dev/null || true
@@ -112,7 +114,8 @@ imcp_apps() {
     fi
     note "On the Mac's screen, click iMCP's icon in the menu bar, then each gray service: $missing"
     note "Allow each dialog. Mail asks for a folder: choose ~/Library/Mail; Voice Memos, its Recordings folder"
-    note "(in group.com.apple.VoiceMemos.shared; missing? open Voice Memos once, then click it again)."
+    note "(in group.com.apple.VoiceMemos.shared; missing? open Voice Memos once, then click it again);"
+    note "Phone and Voicemail, the folder their dialog names (your iPhone's calls and voicemails, through iCloud)."
     note "Leave Reminders, Notes and Messages off: Hermes' skills do those."
     gum confirm --affirmative "Check again" --negative "Skip" "Turned on?" || break
   done

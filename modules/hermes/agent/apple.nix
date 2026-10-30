@@ -1,6 +1,8 @@
 # Apple's apps beyond the bundled skills (Messages, Reminders, Notes, Find My:
 # tools.nix): iMCP (https://github.com/mattt/iMCP) for Calendar, Contacts,
-# Mail, Maps, Music, Shortcuts, Voice Memos and Weather, and, when the HomeKit
+# Mail, Maps, Music, Shortcuts, Voice Memos, Weather, Phone and Voicemail
+# (its Home needs a helper built with your own developer account, and its
+# Capture is what computer use does already), and, when the HomeKit
 # integration is on, HomeClaw (https://github.com/omarshahine/HomeClaw). Both
 # are menu bar apps in Hermes' session that hold their own permissions and
 # serve MCP.
