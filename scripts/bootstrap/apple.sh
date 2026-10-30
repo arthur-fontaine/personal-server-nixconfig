@@ -48,8 +48,14 @@ EOF
   return "${code:-1}"
 }
 
+# MobileMeAccounts stays empty on recent macOS: the iCloud account is the
+# AppleAccount one in the accounts database, which takes Full Disk Access
+# (the launcher's) to read.
 apple_account() {
-  as_agent /usr/bin/defaults read MobileMeAccounts Accounts 2>/dev/null | grep -q AccountID
+  as_agent /usr/bin/defaults read MobileMeAccounts Accounts 2>/dev/null | grep -q AccountID && return 0
+  as_gateway "/usr/bin/sqlite3 'file:$agent_home/Library/Accounts/Accounts4.sqlite?mode=ro' \
+    \"select count(*) from ZACCOUNT a join ZACCOUNTTYPE t on a.ZACCOUNTTYPE = t.Z_PK
+      where t.ZIDENTIFIER = 'com.apple.account.AppleAccount' and a.ZACTIVE = 1\" | grep -qx '[1-9][0-9]*'" >/dev/null 2>&1
 }
 
 # One app: run its check, which also brings up its dialog, until it passes.
