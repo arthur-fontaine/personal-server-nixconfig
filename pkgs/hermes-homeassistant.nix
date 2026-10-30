@@ -13,4 +13,8 @@ runCommand "homeassistant" { } ''
   cp -R ${source}/homeassistant $out
   chmod -R u+w $out
   rm -rf $out/tests
+  # It requires Hermes >= 0.21.5, which the pinned one is (v2026.9.24), but
+  # Hermes' Nix build stamps itself 0.0.0 (nix/hermes-agent.nix, `version ?
+  # "0.0.0"`), so the gate (hermes_cli/plugins_manifest.py) skipped it.
+  sed -i '/^requires_hermes:/d' $out/plugin.yaml
 ''
