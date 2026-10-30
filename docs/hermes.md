@@ -101,6 +101,19 @@ own permissions (`modules/hermes/agent/apple.nix`):
 | HomeKit | [HomeClaw](https://github.com/omarshahine/HomeClaw) (Mac App Store), MCP over HTTP on 127.0.0.1:9090 | home data, to HomeClaw |
 | Anything else | AppleScript (`osascript`), `shortcuts run`, computer use | Automation |
 
+Web pages go faster through `browser_fast_act` (`modules/hermes/fast-act`), once
+the bootstrap's Models section has its key: Cua Driver snapshots the page in
+Hermes' Chrome, a decision model answering System One picks one of its controls
+(by default Baseten's [elephant-1](https://www.baseten.co/library/elephant-1/);
+any Jev-compatible one through `server.hermes.decisionModel`), Cua Driver acts,
+until the model says the goal is reached. Hermes gives the goal and the text;
+the model only chooses. It is Cua's [jev-use](https://cua.ai/docs/how-to-guides/driver/jev-use)
+loop, not yet in a release, configured with the names of Cua's OpenJev adapter
+(`OPENJEV_*`): when Cua or Hermes ships it, `modules/hermes/fast-act`,
+`modules/hermes/agent/fast-act.nix` and `modules/hermes/options/decision.nix`
+go, and the settings keep their meaning. Until then `pkgs/cua-driver.nix`
+provides a Cua Driver new enough (0.38.0; Hermes pins 0.21.0).
+
 iMCP's own Reminders, Notes and Messages services stay off (Nix sets them, with
 Hermes trusted as a client and its self-updates off): the skills do more there.
 The skills' permissions belong to `/Library/Hermes/hermes-launcher`, which
