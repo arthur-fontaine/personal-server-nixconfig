@@ -24,7 +24,9 @@ Complete = Callable[[list[dict]], str]
 
 WORKERS = 8
 TRIES = 5
-CONTEXT_BYTES = 24_000
+# The chat before a node, for its summary to make sense: re-sent with every
+# summary and merge, so the bulk of their cost.
+CONTEXT_BYTES = 8_000
 
 
 class Compactor:
