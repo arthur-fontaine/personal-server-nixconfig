@@ -35,7 +35,8 @@ The layout follows [arthur-fontaine/nixconfig](https://github.com/arthur-fontain
 - **uzu**: Qwen 3.5 9B on the GPU: the last fallback, the events' screening,
   and private or temporary sub-chats.
 - **A server Mac**: SSH with keys only, never sleeps, restarts itself, the
-  display awake but unlit, Spotlight, Bluetooth and Siri off, Low Power Mode.
+  display awake but unlit, Spotlight, Bluetooth and Siri off, Low Power Mode,
+  the local network reachable without macOS' permission dialogs.
 
 ## Install
 

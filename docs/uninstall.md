@@ -60,7 +60,9 @@ Remove Hermes as above, then:
 
 1. Put macOS' own settings back: `sudo pmset -a restoredefaults`,
    `sudo mdutil -a -i on` (Spotlight), `blueutil --power 1`,
-   `sudo nvram -d StartupMute`.
+   `sudo nvram -d StartupMute`,
+   `sudo defaults delete com.apple.network.local-network` (the local network
+   open to every program, which takes a restart).
 2. Uninstall nix-darwin, which also restores the `/etc` files it managed:
    `sudo nix --extra-experimental-features "nix-command flakes" run nix-darwin#darwin-uninstaller`
    ([nix-darwin's README](https://github.com/nix-darwin/nix-darwin#uninstalling)).
