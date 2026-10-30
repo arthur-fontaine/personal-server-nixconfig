@@ -56,8 +56,9 @@ in
       default = { };
       description = ''
         The model reviewing each action Hermes is about to take, from the
-        user's own messages only: what it finds both low-risk and asked for
-        runs, everything else waits for the user's yes in Telegram.
+        user's own messages only: what it finds low-risk, or bounded and
+        clearly asked for, runs; everything else waits for the user's yes in
+        Telegram.
       '';
     };
   };

@@ -130,13 +130,16 @@ provides a Cua Driver new enough (0.38.0; Hermes pins 0.21.0).
 
 With `server.hermes.decision.approval` on (the bootstrap's Models section;
 Baseten's mammoth-1 by default), the `guard` plugin (`modules/hermes/plugins/guard`)
-reviews every action Hermes is about to take, but reads (files, searches, the
-read-only MCP servers). A decision model rates two things at once, as Codex's
-automatic approval review does: how clearly your own messages authorize the
-action, and how risky it is. Low risk you asked for, or bounded risk you clearly
-asked for, runs at once; anything else waits for your yes in Telegram, through
-Hermes' own approval gate (a no, or no answer, refuses it). So does any error
-of the model: nothing is refused outright, nothing unclear runs.
+reviews every action Hermes is about to take, but reads (files, searches, tool
+searches, the read-only MCP servers, screenshots). A decision model rates two
+things at once, as Codex's automatic approval review does: how clearly your own
+messages authorize the action, and how risky it is. Low risk (a click that
+navigates, a draft) runs at once, and so does bounded risk you clearly asked
+for; anything else waits for your yes in Telegram, through Hermes' own approval
+gate (a no, or no answer, refuses it). So does any error of the model: nothing
+is refused outright, nothing unclear runs. A short answer ("oui") is read with
+Hermes' question it answers. The review replaces computer_use's own question
+for each click or key, so one action asks at most once.
 
 As in Claude Code's auto mode, the reviewer sees your messages and Hermes'
 actions, never what the tools returned: a WhatsApp message, an email or a web

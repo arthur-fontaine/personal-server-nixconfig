@@ -341,7 +341,7 @@ if decision_ready approval \
   :
 else
   note "A decision model can review each action Hermes is about to take, from your own messages"
-  note "only: what is low-risk and asked for runs at once; anything else (sending, posting, paying,"
+  note "only: what is low-risk, or asked for and bounded, runs at once; anything else (sending, posting, paying,"
   note "deleting, or what an incoming message or a web page asked for) waits for your yes in Telegram."
   if ask "Review Hermes' actions with a decision model?"; then
     decision_setup approval decision-models/baseten-mammoth-27b-latest \

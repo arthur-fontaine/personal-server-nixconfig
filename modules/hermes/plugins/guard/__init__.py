@@ -9,6 +9,11 @@ memory: after a restart, the first actions of a chat ask once. pre_tool_call ask
 action but the read-only ones, and escalates what it does not clear to
 Hermes' approval gate: the user's yes in Telegram, a no or a timeout refusing
 it (website/docs/user-guide/features/hooks.md, pre_tool_call).
+
+computer_use asks the same gate itself for every click or key
+(tools/computer_use/tool.py, _request_approval); this review replaces that
+question, so it grants its key for the session (tools/approval.py,
+approve_session) before the tool asks: one action, one question at most.
 """
 
 from __future__ import annotations
@@ -20,6 +25,44 @@ import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def _text(content) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(str(part.get("text", "")) for part in content if isinstance(part, dict))
+    return ""
+
+
+def _last_reply(history) -> str:
+    for message in reversed(history or []):
+        if isinstance(message, dict) and message.get("role") == "assistant" and (text := _text(message.get("content")).strip()):
+            return text[-1000:]
+    return ""
+
+
+def _computer_use_keys(args: dict) -> list[str]:
+    """The keys computer_use's own gate checks for this call (tool.py, run and
+    _request_approval)."""
+    action = str(args.get("action") or "")
+    scopes = [action]
+    if args.get("bring_to_front") or (action == "focus_app" and args.get("raise_window")):
+        scopes.append("bring_to_front")
+    mode = "foreground" if args.get("delivery_mode") == "foreground" else "background"
+    return [f"cua:{scope}:{mode}" for scope in scopes]
+
+
+def _skip_computer_use_question(args: dict) -> None:
+    try:
+        from tools.approval import approve_session
+        from tools.approval_context import get_current_session_key
+
+        session_key = get_current_session_key()
+        for key in _computer_use_keys(args):
+            approve_session(session_key, key)
+    except Exception:
+        logger.warning("guard: could not spare computer_use its own question", exc_info=True)
 
 
 def _load(home: str):
@@ -50,7 +93,8 @@ class Guard:
         return self.sessions.setdefault(session_id or "", self._new())
 
     def pre_llm_call(
-        self, session_id: str = "", user_message: str = "", platform: str = "", parent_session_id: str = "", **_
+        self, session_id: str = "", user_message: str = "", platform: str = "", parent_session_id: str = "",
+        conversation_history=None, **_
     ):
         session = self._session(session_id)
         parent = self.sessions.get(parent_session_id) if parent_session_id else None
@@ -59,18 +103,24 @@ class Guard:
             # user wrote there, and whether that turn was theirs, carry over.
             session.messages.extend(parent.messages)
             session.turn_from_user = parent.turn_from_user
+            session.hermes_last_message = parent.hermes_last_message
             return
         session.turn_from_user = platform in self.trusted_platforms
         if session.turn_from_user and user_message:
-            session.messages.append(user_message[:2000])
+            session.messages.append(_text(user_message)[:2000])
+            # What a short answer ("oui") answers.
+            session.hermes_last_message = _last_reply(conversation_history)
 
     def pre_tool_call(self, tool_name: str, args: dict, task_id: str = "", session_id: str = "", **_):
         from .review import read_only, review
 
-        if read_only(tool_name):
+        args = args or {}
+        if read_only(tool_name, args):
             return None
         session = self._session(session_id or task_id)
-        verdict = review(self.model, session, tool_name, args or {})
+        verdict = review(self.model, session, tool_name, args)
+        if tool_name == "computer_use":
+            _skip_computer_use_question(args)
         session.actions.append(f"{tool_name}: {'ran' if verdict.run else 'asked the user'} ({verdict.reason})")
         logger.info("guard: %s %s (%s)", tool_name, "runs" if verdict.run else "asks", verdict.reason)
         if verdict.run:
@@ -79,7 +129,7 @@ class Guard:
         # tool for its bounded risks; a high-risk action only as it is, so
         # always sending to Zoé is not always sending.
         grain = verdict.risk if verdict.risk in {"low", "medium"} else hashlib.sha256(
-            json.dumps(args or {}, sort_keys=True, default=str).encode()).hexdigest()[:16]
+            json.dumps(args, sort_keys=True, default=str).encode()).hexdigest()[:16]
         return {
             "action": "approve",
             "message": f"Auto-review: {verdict.reason}. Run it?",
