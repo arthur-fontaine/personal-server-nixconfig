@@ -65,3 +65,6 @@ flake="path:$REPO_DIR#darwinConfigurations.$HOST"
 secrets="$(setting server.hermes.secretsFile)"
 agent="$(setting server.hermes.user)"
 agent_home="$(setting server.hermes.home)"
+agent_uid="$(id -u "$agent" 2>/dev/null || true)" # once the account exists (system.sh)
+launcher="$(setting server.hermes.access.launcher)"
+gateway_path="$(setting "home-manager.users.$agent.launchd.agents.hermes-agent.config.EnvironmentVariables.PATH")"

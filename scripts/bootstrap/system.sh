@@ -43,8 +43,6 @@ else
   ok "Configuration unchanged"
 fi
 agent_uid="$(id -u "$agent")"
-as_agent() { sudo -u "$agent" -H env PATH="/etc/profiles/per-user/$agent/bin:$PATH" "$@"; }
-gui_session() { sudo launchctl print "gui/$agent_uid" >/dev/null 2>&1; }
 
 # The ChatGPT login made before the account existed (models.sh), moved in.
 if sudo test -s "$codex_staged"; then

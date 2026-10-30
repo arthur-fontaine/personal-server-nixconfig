@@ -7,9 +7,9 @@ step "Integration · HomeKit"
 homeclaw_app() {
   local mas
   if [ ! -d /Applications/HomeClaw.app ]; then
-    mas="$(nix build --no-link --print-out-paths "$flake.pkgs.mas")/bin/mas"
+    mas="$(mas_tool)"
     # mas installs as root for the App Store account of SUDO_UID: Hermes'.
-    if ! sudo launchctl asuser "$agent_uid" env SUDO_UID="$agent_uid" SUDO_GID="$(id -g "$agent")" \
+    if ! as_root launchctl asuser "$agent_uid" env SUDO_UID="$agent_uid" SUDO_GID="$(id -g "$agent")" \
       SUDO_USER="$agent" HOME="$agent_home" "$mas" get 6759682551; then
       note "On the Mac's screen, install HomeClaw from the App Store that opens (Get)."
       hermes_gui /usr/bin/open "macappstore://apps.apple.com/app/id6759682551" || true
@@ -18,11 +18,11 @@ homeclaw_app() {
   fi
   [ -d /Applications/HomeClaw.app ] || { warn "HomeClaw is not installed: skipped."; return 0; }
   note "On the Mac's screen, allow HomeClaw to access your home data."
-  sudo launchctl kickstart "gui/$agent_uid/org.nix-community.home.homeclaw" 2>/dev/null || true
+  as_root launchctl kickstart "gui/$agent_uid/org.nix-community.home.homeclaw" 2>/dev/null || true
   sleep 5
   # Its HTTP MCP switch, read at launch: set, then restart it.
   as_agent hermes-app-defaults
-  sudo launchctl kickstart -k "gui/$agent_uid/org.nix-community.home.homeclaw" 2>/dev/null || true
+  as_root launchctl kickstart -k "gui/$agent_uid/org.nix-community.home.homeclaw" 2>/dev/null || true
   while [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9090/mcp)" = 000 ]; do
     warn "HomeClaw's MCP endpoint does not answer yet."
     note "In HomeClaw's menu bar icon → Settings → Integrations, turn on Streamable HTTP MCP."
@@ -33,7 +33,7 @@ homeclaw_app() {
   # Its events go to Hermes' events daemon (docs/events.md), with the secret
   # the daemon checks as a Bearer token.
   local cli=/Applications/HomeClaw.app/Contents/MacOS/homeclaw-cli token
-  token="$(sudo sed -n 's/^WEBHOOK_SECRET=//p' "$secrets")"
+  token="$(as_root sed -n 's/^WEBHOOK_SECRET=//p' "$secrets")"
   if hermes_gui "$cli" config --webhook-url "http://127.0.0.1:$(setting server.hermes.events.port)" \
     --webhook-token "$token" --webhook-enabled true >/dev/null && hermes_gui "$cli" config --webhook-test >/dev/null; then
     ok "HomeClaw reports to Hermes' events"

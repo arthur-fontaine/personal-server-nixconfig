@@ -11,7 +11,7 @@ gum confirm "Link your WhatsApp now, so Hermes can read and send your messages?"
 note "On your phone: WhatsApp → Settings → Linked devices → Link a device, then scan this code."
 if wa auth --idle-exit 30s; then
   ok "WhatsApp linked: its chats keep syncing in the background"
-  gui_session && sudo launchctl kickstart -k "gui/$agent_uid/org.nix-community.home.wacli" || true
+  gui_session && as_root launchctl kickstart -k "gui/$agent_uid/org.nix-community.home.wacli" || true
 else
   warn "Not linked. Run this script again to retry."
 fi
