@@ -23,7 +23,8 @@ DEFAULT_HOST="Personal-Server"
 echo "Administrator access is needed for Nix, the system and the Hermes account."
 sudo -v
 while sudo -n true 2>/dev/null; do sleep 60; done &
-trap 'kill $! >/dev/null 2>&1 || true' EXIT
+sudo_keepalive=$!
+trap 'kill $sudo_keepalive >/dev/null 2>&1 || true' EXIT
 
 # ── Nix, then gum from it ───────────────────────────────────────────────────
 
@@ -64,16 +65,23 @@ gum style --border rounded --padding "0 2" --bold "personal-server-nixconfig set
 # ── The repository ─────────────────────────────────────────────────────────
 
 GIT="$(nix build --no-link --print-out-paths nixpkgs#git)/bin/git"
+# The repository is public and read over HTTPS: a ~/.gitconfig that rewrites
+# GitHub URLs to SSH would need a key this session may not have (one in
+# 1Password, over SSH).
+git() { GIT_CONFIG_GLOBAL=/dev/null "$GIT" "$@"; }
 if [ ! -d "$REPO_DIR/.git" ]; then
   step "Cloning $REPO_URL"
-  "$GIT" clone "$REPO_URL" "$REPO_DIR"
+  git clone "$REPO_URL" "$REPO_DIR"
 fi
 ok "Repository at $REPO_DIR"
 # The sections come from the clone: an old one would run old steps.
-if "$GIT" -C "$REPO_DIR" fetch -q origin 2>/dev/null \
-  && [ "$("$GIT" -C "$REPO_DIR" rev-list --count 'HEAD..@{upstream}' 2>/dev/null || echo 0)" != 0 ]; then
-  warn "The clone is behind GitHub: the steps below are its older ones. To update it, stop here and run:"
-  note "git -C $REPO_DIR pull"
+if git -C "$REPO_DIR" fetch -q origin 2>/dev/null \
+  && [ "$(git -C "$REPO_DIR" rev-list --count 'HEAD..@{upstream}' 2>/dev/null || echo 0)" != 0 ]; then
+  warn "The clone is behind GitHub: its steps are older ones."
+  if gum confirm "Update it and start again?" && git -C "$REPO_DIR" pull -q --ff-only; then
+    kill "$sudo_keepalive" 2>/dev/null || true
+    exec "$REPO_DIR/scripts/bootstrap-macos.sh" "$@"
+  fi
 fi
 
 # Each section, in order, from the clone (scripts/bootstrap/). Integrations
