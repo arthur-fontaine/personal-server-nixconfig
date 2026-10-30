@@ -6,8 +6,8 @@ reboot. What only works in Hermes' own session (its permissions, signing it in
 to your Apple Account and allowing its Apple apps, WhatsApp, Instagram,
 Discord, HomeKit) then comes to the Mac's screen by itself: at each login,
 `scripts/hermes-setup.sh` checks those steps, as Hermes, without asking
-anything, and when one is not done opens Terminal with the steps left, for
-24 hours (its log: `~hermes/Library/Logs/hermes-setup.log`). Over SSH,
+anything, and when one is not done opens Terminal with the steps left, which
+ends after 24 hours unanswered (its log: `~hermes/Library/Logs/hermes-setup.log`). Over SSH,
 `scripts/bootstrap-macos.sh permissions apple accounts` runs the same steps.
 
 Running it again from the clone

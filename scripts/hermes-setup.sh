@@ -5,7 +5,7 @@
 # run of the whole bootstrap. launchd starts it at each login
 # (modules/hermes/agent/session/setup.nix); it checks every step without
 # asking or doing anything, and only when one is not done opens Terminal with
-# the steps to do, for 24 hours.
+# the steps to do, which ends after 24 hours unanswered.
 #
 #   hermes-setup.sh check    the check, then Terminal when a step is not done
 #   hermes-setup.sh window   the steps, in that Terminal
@@ -74,14 +74,19 @@ if [ -n "${checking:-}" ]; then
 else
   window_open && { echo "The setup window is open already."; exit 0; }
   echo "$$" > "$lock"
-  # timeout(1) ends it with TERM: without a trap, bash would skip EXIT's.
-  trap 'rm -f "$lock"' EXIT
-  trap 'exit 1' TERM HUP INT
+  # Unanswered, it ends in 24 hours, and the next login asks again. With KILL,
+  # since bash runs a TERM trap only once the question is answered, and its
+  # descendants too: that question may be a gum in a $(…).
+  descendants() { local pid; for pid in $(pgrep -P "$1"); do echo "$pid"; descendants "$pid"; done; }
+  ( sleep 86400; self=$BASHPID; kids="$(descendants $$ | grep -vx "$self" || true)"; kill -KILL $$ $kids ) &
+  watchdog=$!
+  trap 'rm -f "$lock"; kill "$watchdog" 2>/dev/null || true' EXIT
+  trap 'exit 1' HUP INT TERM
   hermes_lit 1
   # Left lit between steps: display.nix dims the screen once nobody touches it.
   hermes_lit() { :; }
   "$GUM" style --border rounded --padding "0 2" --bold "Hermes' setup" \
-    "$("$GUM" style --faint 'What needs this screen. It closes itself in 24 hours.')"
+    "$("$GUM" style --faint 'What needs this screen. Unanswered, it ends after 24 hours.')"
 fi
 
 for section in permissions apple accounts; do

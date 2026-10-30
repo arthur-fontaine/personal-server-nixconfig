@@ -54,8 +54,8 @@ switches to the configuration, then sets up the Hermes account's login, GitHub
 access, your Telegram bot and the macOS permissions, then reboots. After the
 reboot, Terminal opens on Hermes' desktop with what needs its screen: signing
 it in to your Apple Account, its Apple apps, Instagram and Discord if you
-chose them. It does so at each login while a step is left, and closes after
-24 hours. [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) lists each step and the few
+chose them. It does so at each login while a step is left, and ends after 24
+hours unanswered. [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) lists each step and the few
 clicks only you can make.
 
 After that, reach the Mac over SSH only. Logging in to your own account at its
