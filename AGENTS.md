@@ -104,6 +104,11 @@ against a small local server.
   Conventional Commits (`feat(hermes): …`, `fix(scripts): …`). Commits are
   signed through 1Password; when signing fails, commit with `--no-gpg-sign`
   and tell the user. Never push unless asked.
+- Stand-ins for what upstream has not released yet are built to be dropped:
+  `pkgs/cua-driver.nix` is used only while Hermes pins an older driver, and
+  `browser_fast_act` (`modules/hermes/fast-act`) reads the settings by the names
+  of Cua's own adapter (`OPENJEV_*`), so an official jev-use replaces it with
+  the same configuration (`server.hermes.decisionModel`).
 - Package what nixpkgs lacks in `pkgs/` from a pinned release or commit, and
   name the source in a comment. Signed macOS binaries and apps are copied
   as they are (`dontFixup`), never rewritten.

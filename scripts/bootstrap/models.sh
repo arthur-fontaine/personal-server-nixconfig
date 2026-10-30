@@ -222,3 +222,58 @@ if nix eval --json "$flake.config.server.hermes" \
     warn "Not logged in: Hermes falls back to the next model. Run this script again to retry."
   fi
 fi
+
+# The decision model of fast computer use (modules/hermes/agent/fast-act.nix):
+# a System One model picking each action browser_fast_act takes in Hermes'
+# Chrome. Baseten's elephant-1 unless hosts/local.nix names another
+# (server.hermes.decisionModel); its key goes to the secrets file.
+decision_model="$(setting server.hermes.decisionModel.model)"
+decision_key_env="$(setting server.hermes.decisionModel.keyEnv)"
+decision_status() { # key: the HTTP status of a one-question request
+  local url headers=(-H "Content-Type: application/json")
+  url="$(setting server.hermes.decisionModel.url)"
+  url="${url%/}"
+  case "$url" in */v1/systemone) ;; *) url="$url/v1/systemone" ;; esac
+  [ -n "$1" ] && headers+=(-H "Authorization: $(setting server.hermes.decisionModel.authScheme) $1")
+  curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$url" "${headers[@]}" \
+    -d "$("$JQ" -cn --arg m "$decision_model" '{model: $m, state: {message: "A setup check."},
+      questions: {check: {type: "choice", instructions: "Is this a setup check?", criteria: {yes: "Yes", no: "No"}}}}')" || true
+}
+decision_on() { set_host "$("$JQ" -cn --argjson on "$1" '{server: {hermes: {decisionModel: {enable: $on}}}}')"; }
+
+echo
+if [ "$(setting server.hermes.decisionModel.enable)" = 1 ] \
+  && { [ -z "$decision_key_env" ] || [ -n "$(secret_value "$decision_key_env")" ]; } \
+  && keep "Fast computer use: $decision_model picks each action"; then
+  :
+elif gum confirm "Fast computer use? A decision model ($decision_model) picks each click and field in Hermes' Chrome, instead of reading screenshots."; then
+  while :; do
+    key=""
+    if [ -n "$decision_key_env" ]; then
+      key="$(gum input --password --header "Its key ($decision_key_env; Baseten: https://app.baseten.co/settings/api_keys; empty to skip)" | tr -d '[:space:]')"
+      [ -n "$key" ] || { warn "No key: fast computer use stays off."; decision_on false; break; }
+    fi
+    status="$(decision_status "$key")"
+    case "$status" in
+      200)
+        [ -n "$key" ] && set_secret "$decision_key_env" "$key"
+        decision_on true
+        ok "Fast computer use: $decision_model answers"
+        break
+        ;;
+      401 | 403)
+        warn "The model refused that key (HTTP $status)."
+        ;;
+      *)
+        warn "The model did not answer the check (${status:-no answer}, HTTP status)."
+        gum confirm --default=false "Keep it anyway?" || { decision_on false; break; }
+        [ -n "$key" ] && set_secret "$decision_key_env" "$key"
+        decision_on true
+        break
+        ;;
+    esac
+  done
+  unset key
+elif [ "$(setting server.hermes.decisionModel.enable)" = 1 ]; then
+  decision_on false
+fi
