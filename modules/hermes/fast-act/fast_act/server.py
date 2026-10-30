@@ -90,7 +90,7 @@ def decision_state(goal: str, snapshot: dict[str, Any], history: list[dict[str, 
 async def run(
     goal: str,
     *,
-    text: str | None,
+    texts: list[str],
     url: str | None,
     allow_risky: bool,
     max_steps: int,
@@ -110,7 +110,7 @@ async def run(
         )
         snapshot.setdefault("target_id", target_id)
         snapshot.setdefault("tab_id", tab_id)
-        offered = cands.build(snapshot, goal=goal, text=text, allow_risky=allow_risky)
+        offered = cands.build(snapshot, goal=goal, texts=texts, allow_risky=allow_risky)
         try:
             choice = await asyncio.to_thread(
                 decision.choose,
@@ -150,7 +150,7 @@ server = MCPServer(
     instructions=(
         "browser_fast_act clicks and types through a web page in Hermes' Chrome, choosing each "
         "action with a fast decision model instead of screenshots. Give it one concrete goal and "
-        "the exact text to type, then check the page yourself."
+        "every text to type, written in full, then check the page yourself."
     ),
 )
 
@@ -158,15 +158,16 @@ server = MCPServer(
 @server.tool()
 async def browser_fast_act(
     goal: str,
-    text: str | None = None,
+    texts: list[str] | None = None,
     url: str | None = None,
     allow_risky: bool = False,
     max_steps: int = 8,
 ) -> str:
     """Reach a goal on a web page in Hermes' Chrome, fast.
 
-    goal: one concrete outcome on the page ("open the conversation with Thierry").
-    text: the exact text to type, written by you; the model never writes.
+    goal: one concrete outcome on the page ("send Thierry the message").
+    texts: every text to type on the way, written by you, in full ("Thierry",
+        then the message): the model only picks which goes into which field.
     url: a page to open first; otherwise the current tab.
     allow_risky: offer send, delete, publish, pay... (only when the user asked for it).
     max_steps: at most this many actions.
@@ -180,7 +181,7 @@ async def browser_fast_act(
             await session.initialize()
             return await run(
                 goal,
-                text=text,
+                texts=list(texts or []),
                 url=url,
                 allow_risky=allow_risky,
                 max_steps=max(1, min(max_steps, 20)),

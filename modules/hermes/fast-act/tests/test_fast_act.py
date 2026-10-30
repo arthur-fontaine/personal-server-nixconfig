@@ -102,10 +102,12 @@ def test_candidates() -> None:
     assert ids[0] == "click:p1:90", ids[:3]
     assert len(offered) == cands.MAX_ACTIONS + 3 and ids[-3:] == ["done", "reobserve", "abstain"]
     assert "click:p1:91" not in ids  # Send stays out unless allowed
-    risky = cands.build(snapshot, goal="send it", text="Salut", allow_risky=True)
+    risky = cands.build(snapshot, goal="send it", texts=["Thierry", "Salut"], allow_risky=True)
     assert "click:p1:91" in [c.id for c in risky]
-    typed = next(c for c in risky if c.id == "type:p1:92")
+    typed = next(c for c in risky if c.id == "type:p1:92:1")
     assert typed.tool == "browser_type" and typed.arguments["text"] == "Salut" and typed.arguments["tab_id"] == "b"
+    assert typed.description == 'Type "Salut" into the textbox "Message"'
+    assert "type:p1:92:0" in [c.id for c in risky]
 
 
 def test_loop(port: int) -> None:
@@ -113,7 +115,7 @@ def test_loop(port: int) -> None:
     ANSWERS[:] = [{"pick": pick("Thierry")}, {"pick": pick("goal is already reached")}]
     driver = FakeDriver()
     report = asyncio.run(server.run(
-        "open the conversation with Thierry", text=None, url="https://www.instagram.com/direct/",
+        "open the conversation with Thierry", texts=[], url="https://www.instagram.com/direct/",
         allow_risky=False, max_steps=5, driver=driver, pid=1, config=config(port),
     ))
     assert driver.page == "thierry", report
@@ -135,7 +137,7 @@ def test_model_errors(port: int) -> None:
     ]:
         ANSWERS[:] = [answer]
         report = asyncio.run(server.run(
-            "anything", text=None, url=None, allow_risky=False, max_steps=3,
+            "anything", texts=[], url=None, allow_risky=False, max_steps=3,
             driver=FakeDriver(), pid=1, config=config(port),
         ))
         assert "stopped" in report and expected in report, report
