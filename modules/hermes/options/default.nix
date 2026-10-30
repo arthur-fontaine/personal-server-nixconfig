@@ -11,5 +11,6 @@
     ./events.nix
     ./integrations.nix
     ./homeassistant.nix
+    ./decision.nix
   ];
 }
