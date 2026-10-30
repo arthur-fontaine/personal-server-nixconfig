@@ -12,7 +12,7 @@ instagram_logged_in() {
 }
 
 if ! on_hermes_screen; then
-  warn "Instagram's login needs Hermes' desktop on the Mac's screen: run this script again then, over SSH."
+  warn "Instagram's login needs Hermes' desktop on the Mac's screen: it asks for it once macOS has logged it in."
 elif instagram_logged_in && keep "Hermes is logged in to Instagram"; then
   :
 elif needs "Instagram's login"; then

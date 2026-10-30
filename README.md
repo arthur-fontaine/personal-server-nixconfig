@@ -51,12 +51,12 @@ chmod +x "$tmp" && "$tmp"
 It installs Nix, clones this repository to `~/personal-server-nixconfig`, asks
 for your SSH keys, your models and the integrations you want with their keys,
 switches to the configuration, then sets up the Hermes account's login, GitHub
-access, your Telegram bot and the macOS permissions, then reboots. Run it once
-more over SSH while you look at the Mac
-(`~/personal-server-nixconfig/scripts/bootstrap-macos.sh`): that run signs
-Hermes in to your Apple Account, logs it in to Instagram and Discord if you
-chose them, and checks the whole chain. [`MANUAL_SETUP.md`](./MANUAL_SETUP.md)
-lists each step and the few clicks only you can make.
+access, your Telegram bot and the macOS permissions, then reboots. After the
+reboot, Terminal opens on Hermes' desktop with what needs its screen: signing
+it in to your Apple Account, its Apple apps, Instagram and Discord if you
+chose them. It does so at each login while a step is left, and closes after
+24 hours. [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) lists each step and the few
+clicks only you can make.
 
 After that, reach the Mac over SSH only. Logging in to your own account at its
 screen switches Hermes' session out and locks it: computer use stops until

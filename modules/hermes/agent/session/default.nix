@@ -8,6 +8,7 @@
     ./full-disk.nix
     ./restart.nix
     ./setup-assistant.nix
+    ./setup.nix
     ./display.nix
     ./search.nix
     ./defaults.nix

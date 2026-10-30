@@ -9,7 +9,7 @@ flake.nix                 darwinConfigurations, packages, checks
 hosts/                    machine definitions (shared.nix, git-ignored local.nix)
 pkgs/                     what nixpkgs lacks, as an overlay
 checks/                   `nix flake check`: the plugin and freeze tests; hermes-turns/, end to end
-scripts/                  bootstrap-macos.sh (the setup), uninstall-macos.sh (disable, remove), with gum
+scripts/                  bootstrap-macos.sh (the setup), hermes-setup.sh (its screen steps, at Hermes' login), uninstall-macos.sh (disable, remove), with gum
   bootstrap/              the setup's sections (lib.sh: their helpers), sourced in the order bootstrap-macos.sh lists
     integrations/         one file per integration's setup
   lib/                    set-host.nix (edits hosts/local.nix), hermes-models.py (Hermes' providers and models)
@@ -31,7 +31,7 @@ modules/
       default.nix         the upstream module, from scratch, managed mode
       model.nix memory.nix telegram.nix mcp.nix tools.nix computer-use.nix
       prompt/             SOUL.md (UniiChat's prompt), AGENTS.md (this server's rules)
-      session/            its GUI session: launchd agents, display, fsearch, defaults
+      session/            its GUI session: launchd agents, display, fsearch, defaults, the setup at login
     plugins/unii/         the single-chat memory and sub-chats (Python)
     events/               hermes_events: screens incoming messages, posts proposals (Python)
   uzu/                    local models: options, the mirai server

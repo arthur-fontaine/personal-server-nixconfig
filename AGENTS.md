@@ -82,6 +82,16 @@ title: every section prints its title, and a part already set up says so with
 `hosts/local.nix` (`set_host`) runs before `system.sh` applies the
 configuration; anything that needs Hermes' account, after.
 
+The steps that need Hermes' screen (`permissions.sh`, `apple.sh`,
+`accounts.sh`) also run at each Hermes login, as Hermes in its session
+(`scripts/hermes-setup.sh`, `modules/hermes/agent/session/setup.nix`): first
+a check pass, then Terminal only if a step is not done. So they use lib.sh's
+helpers (`as_root`, `as_agent`, `hermes_gui`, `as_gateway`), never `sudo`
+itself, read only the settings `setup.nix` bakes in (add a `setting` key
+there too), and put `needs "<what>"` before a step's first question or
+action: in the check pass it notes the step and returns false, and the step
+must then do nothing, not even light the screen.
+
 Test sections by sourcing `lib.sh` and them, in that order, from a script that
 stubs `sudo`, `gum`, `nix`, `curl`, `id` and `launchctl` (and puts fake `gh`,
 `wacli`… first on `PATH`), and run it with `/bin/bash`, both as a first run

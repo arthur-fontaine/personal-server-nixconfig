@@ -58,5 +58,5 @@ if in_gui true; then
     as_gateway '/usr/bin/dns-sd -B _imcp._tcp local. >/dev/null & sleep 5; kill $!' >/dev/null 2>&1 || true
   fi
 else
-  warn "No screen here (SSH?): run this script at the Mac itself to grant the permissions."
+  warn "No screen here: Hermes' screen asks for them once macOS has logged it in (reboot)."
 fi
