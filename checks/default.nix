@@ -28,6 +28,19 @@ in
     touch $out
   '';
 
+  # browser_fast_act against a fake System One server and a fake Cua Driver
+  # (an MCP server over stdio), in the interpreter Hermes runs it with.
+  fast-act = pkgs.runCommand "fast-act-tests" { __darwinAllowLocalNetworking = true; } ''
+    cp -R ${../modules/hermes/fast-act} fast-act
+    chmod -R u+w fast-act
+    cd fast-act
+    export HOME=$TMPDIR
+    # The sandbox points it at a file it does not have; httpx loads it anyway.
+    export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
+    ${hermes.hermesVenv}/bin/python3 -I tests/test_fast_act.py
+    touch $out
+  '';
+
   # What hermes-freeze picks; the chown and ACLs themselves need root.
   freeze = pkgs.runCommand "hermes-freeze-tests" { } ''
     cp ${../modules/hermes/system/access/freeze.py} freeze.py

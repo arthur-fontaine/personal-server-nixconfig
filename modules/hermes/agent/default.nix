@@ -16,6 +16,7 @@ in
     ./skills.nix
     ./tools.nix
     ./computer-use.nix
+    ./fast-act.nix
     ./apple.nix
     ./whatsapp.nix
     ./browser.nix
