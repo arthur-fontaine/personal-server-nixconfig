@@ -15,6 +15,24 @@
       domain="gui/$UID"
       run mkdir -p "$dst"
 
+      # bootout returns before the service is gone, and a bootstrap right
+      # after fails (5: Input/output error), leaving the agent unloaded until
+      # the next login: wait for it to go, and try again.
+      restart() {
+        local name="$1" target="$2" try
+        run /bin/launchctl bootout "$domain/$name" 2>/dev/null || true
+        for try in $(seq 20); do
+          /bin/launchctl print "$domain/$name" >/dev/null 2>&1 || break
+          sleep 0.5
+        done
+        run install -m 0644 "$3" "$target"
+        for try in 1 2 3 4 5; do
+          run /bin/launchctl bootstrap "$domain" "$target" 2>/dev/null && return 0
+          sleep 1
+        done
+        warnEcho "Could not start $name: it starts at the next login."
+      }
+
       live=0
       if /bin/launchctl print "$domain" >/dev/null 2>&1; then
         live=1
@@ -28,13 +46,22 @@
         target="$dst/$name.plist"
         cmp -s "$plist" "$target" && continue
         if [ "$live" = 1 ]; then
-          run /bin/launchctl bootout "$domain/$name" 2>/dev/null || true
-        fi
-        run install -m 0644 "$plist" "$target"
-        if [ "$live" = 1 ]; then
-          run /bin/launchctl bootstrap "$domain" "$target" || warnEcho "Could not start $name"
+          restart "$name" "$target" "$plist"
+        else
+          run install -m 0644 "$plist" "$target"
         fi
       done
+
+      # One left unloaded by an earlier failed start, its plist unchanged since.
+      if [ "$live" = 1 ]; then
+        for target in "$dst"/org.nix-community.home.*.plist; do
+          [ -e "$target" ] || continue
+          name="$(basename "$target" .plist)"
+          /bin/launchctl print "$domain/$name" >/dev/null 2>&1 \
+            || run /bin/launchctl bootstrap "$domain" "$target" 2>/dev/null \
+            || warnEcho "Could not start $name: it starts at the next login."
+        done
+      fi
 
       # Agents this configuration no longer declares.
       for target in "$dst"/org.nix-community.home.*.plist; do
