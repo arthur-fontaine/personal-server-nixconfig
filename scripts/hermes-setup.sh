@@ -98,6 +98,10 @@ if [ -n "${checking:-}" ]; then
     echo "$(date '+%F %T') Everything is set up."
   else
     echo "$(date '+%F %T') To do: $(IFS=,; echo "${to_do[*]}"); opening the setup window."
+    # Terminal types the .command into Hermes' login shell. Without any startup
+    # file, zsh first runs zsh-newuser-install, which takes the command's first
+    # character as its answer.
+    [ -e "$HOME/.zshrc" ] || echo "# Read by the Terminal of scripts/hermes-setup.sh." > "$HOME/.zshrc"
     /usr/bin/open -a Terminal "$HERMES_SETUP_WINDOW"
   fi
 else
