@@ -14,8 +14,10 @@ missing is set up. After a change to the host (models, integrations, keys, an
 address), the configuration is applied again. Each section is its own file in
 `scripts/bootstrap/`, run in the order `bootstrap-macos.sh` lists, which the
 table follows; each integration is one file in `scripts/bootstrap/integrations/`.
-The sections come from the clone: when it is behind GitHub, the script says so
-and shows the `git pull` to run.
+The sections come from the clone: when it is behind GitHub, the script offers
+to update it and start again. It reads GitHub over HTTPS whatever your
+`~/.gitconfig` says, so a rewrite to SSH (whose key may be in 1Password, out of
+reach over SSH) does not get in the way.
 
 | Step | What the script does | What only you can do |
 | --- | --- | --- |
