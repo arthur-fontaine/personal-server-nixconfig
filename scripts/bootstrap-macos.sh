@@ -32,6 +32,11 @@ if [ ! -x /nix/var/nix/profiles/default/bin/nix ]; then
   sh <(curl --proto '=https' --tlsv1.2 -fsSL "$NIX_INSTALLER_URL") --daemon --yes
 fi
 export PATH="/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:$PATH"
+# A shell opened under a previous nix-darwin still names its certificates
+# (/etc/ssl/certs/ca-certificates.crt), gone with it; unset, Nix finds its own.
+for var in NIX_SSL_CERT_FILE SSL_CERT_FILE; do
+  if [ -n "${!var:-}" ] && [ ! -r "${!var}" ]; then unset "$var"; fi
+done
 nix() { command nix --extra-experimental-features 'nix-command flakes' "$@"; }
 
 GUM="$(nix build --no-link --print-out-paths nixpkgs#gum)/bin/gum"
