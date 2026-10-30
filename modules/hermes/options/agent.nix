@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ config, lib, ... }:
 let
   inherit (lib) mkOption types;
 in
@@ -100,6 +100,22 @@ in
         Tried in order when the main model fails (a limit reached, an outage,
         an expired login), for that turn only: the next one tries the main
         model again. scripts/bootstrap-macos.sh asks for the chain.
+      '';
+    };
+    backgroundModel = mkOption {
+      type = types.nullOr (types.submodule {
+        options = {
+          provider = mkOption { type = types.str; };
+          model = mkOption { type = types.str; };
+        };
+      });
+      default = if config.server.hermes.fallbacks == [ ] then null else lib.head config.server.hermes.fallbacks;
+      defaultText = lib.literalExpression "the first of fallbacks, or null";
+      description = ''
+        The model of the work nobody reads: unii's summaries (unless
+        memory.compactionModel names another) and Hermes' review after a turn,
+        which writes skills. By default the first fallback, so a subscription
+        chat model's quota goes to the chat; null: the main model.
       '';
     };
     providers = mkOption {

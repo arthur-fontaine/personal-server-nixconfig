@@ -17,6 +17,15 @@ Hermes' built-in memory, session search and compaction are off: the view
 replaces all three. The CLI (`hermes` as the Hermes account over SSH) is the
 main chat too. Subagents and cron jobs read the main memory but never write it.
 
+What it costs stays small: a tool call and its result are logged as one line
+(what a tool returned is the tool's to show again), so only your words and
+Hermes' are summarized, each with the 8 KB of chat before it; within a turn,
+only the last three tool results keep their screenshots and full text in what
+the model is sent (the transcript keeps everything). The summaries and Hermes'
+own review after a turn, which writes skills, run on
+`server.hermes.backgroundModel`: by default the first fallback, so a
+subscription's quota (ChatGPT's) goes to the chat itself.
+
 ## Sub-chats
 
 Your DM with the bot, outside any topic, is the main chat. With BotFather's

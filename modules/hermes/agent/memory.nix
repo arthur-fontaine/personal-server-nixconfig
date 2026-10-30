@@ -8,7 +8,11 @@ let
     cp -R ${../plugins/unii} $out
   '';
 
-  compactionModel = cfg.memory.compactionModel;
+  background = cfg.backgroundModel;
+  compactionModel =
+    if cfg.memory.compactionModel != null then cfg.memory.compactionModel
+    else if background != null then "${background.provider}:${background.model}"
+    else null;
 in
 {
   services.hermes-agent = {
@@ -39,6 +43,10 @@ in
           allow_provider_override = true;
           allow_model_override = true;
         };
+      };
+      # Hermes' post-turn review, which writes skills, on the background model.
+      auxiliary.background_review = lib.optionalAttrs (background != null) {
+        inherit (background) provider model;
       };
       memory = {
         memory_enabled = false;
