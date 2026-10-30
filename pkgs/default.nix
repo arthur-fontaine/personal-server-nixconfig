@@ -15,8 +15,15 @@ in
   imcp = final.callPackage ./apple/imcp.nix { };
   wacli = final.callPackage ./wacli.nix { };
   hermes-homeassistant = final.callPackage ./hermes-homeassistant.nix { };
-  # Hermes' pinned computer-use driver (its pm/lock.json).
-  cua-driver = inputs.hermes-agent.packages.${system}.pm-cua-driver;
+  # Hermes' pinned computer-use driver (its pm/lock.json), or ./cua-driver.nix
+  # while that one is older: once Hermes pins a newer driver, its own is used
+  # again and ./cua-driver.nix can go.
+  cua-driver =
+    let
+      pinned = inputs.hermes-agent.packages.${system}.pm-cua-driver;
+      ours = final.callPackage ./cua-driver.nix { };
+    in
+    if final.lib.versionAtLeast pinned.version ours.version then pinned else ours;
   # uzu's CLI, with its OpenAI-compatible `server`.
   mirai = inputs.uzu.packages.${system}.mirai;
 }

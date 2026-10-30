@@ -1,6 +1,7 @@
 # GUI actions through cua-driver
 # (https://github.com/NousResearch/hermes-agent/blob/74885f997bece88c1393bd174b25b32338336cb6/website/docs/user-guide/features/computer-use.md).
-# The driver is Hermes' pinned build; its signed CuaDriver.app keeps the
+# The driver is Hermes' pinned build, or a newer release while that one is
+# older (pkgs/cua-driver.nix); its signed CuaDriver.app keeps the
 # Accessibility and Screen Recording grants across updates (MANUAL_SETUP.md).
 { ... }:
 {
