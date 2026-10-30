@@ -5,49 +5,6 @@
 # as for the gateway, the launcher that launchd starts in Hermes' session, so
 # the dialogs show on Hermes' desktop and what you allow is the gateway's.
 
-gateway_path="$(setting "home-manager.users.$agent.launchd.agents.hermes-agent.config.EnvironmentVariables.PATH")"
-# Hermes' desktop, even when yours is open too.
-hermes_gui() { sudo launchctl asuser "$agent_uid" sudo -u "$agent" -H "$@"; }
-hermes_lit() {
-  hermes_gui "$(nix build --no-link --print-out-paths "path:$REPO_DIR#display-brightness")/bin/display-brightness" "$1" || true
-}
-
-xml() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' <<< "$1"; }
-
-# Runs a shell command the way the gateway runs; prints its output, returns its
-# status. It waits up to 5 minutes, for a dialog to be answered.
-as_gateway() {
-  local cmd="$1" label=org.personal-server.bootstrap-check dir code=""
-  dir="$(sudo -u "$agent" mktemp -d /tmp/hermes-check.XXXXXX)"
-  sudo -u "$agent" tee "$dir/job.plist" >/dev/null <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>$label</string>
-  <key>ProgramArguments</key><array>
-    <string>$(xml "$launcher")</string><string>/bin/sh</string><string>-c</string><string>$(xml "$cmd")</string>
-  </array>
-  <key>EnvironmentVariables</key><dict><key>PATH</key><string>$(xml "$gateway_path")</string></dict>
-  <key>StandardOutPath</key><string>$dir/out</string>
-  <key>StandardErrorPath</key><string>$dir/out</string>
-  <key>RunAtLoad</key><true/>
-</dict></plist>
-EOF
-  sudo launchctl bootout "gui/$agent_uid/$label" 2>/dev/null || true
-  if sudo launchctl bootstrap "gui/$agent_uid" "$dir/job.plist"; then
-    for _ in $(seq 300); do
-      sleep 1
-      code="$(sudo launchctl print "gui/$agent_uid/$label" 2>/dev/null \
-        | sed -n 's/^[[:space:]]*last exit code = \([0-9][0-9]*\).*/\1/p')"
-      [ -n "$code" ] && break
-    done
-    sudo launchctl bootout "gui/$agent_uid/$label" 2>/dev/null || true
-  fi
-  sudo cat "$dir/out" 2>/dev/null || true
-  sudo rm -rf "$dir"
-  return "${code:-1}"
-}
-
 # MobileMeAccounts stays empty on recent macOS: the iCloud account is the
 # AppleAccount one in the accounts database, which takes Full Disk Access
 # (the launcher's) to read.
@@ -124,7 +81,7 @@ imcp_services=(calendar contacts location mail music shortcuts voiceMemos weathe
 imcp_apps() {
   local service missing init
   note "iMCP: Calendar, Contacts, Mail, Maps, Music, Shortcuts, Voice Memos, Weather:"
-  sudo launchctl kickstart "gui/$agent_uid/org.nix-community.home.imcp" 2>/dev/null || true
+  as_root launchctl kickstart "gui/$agent_uid/org.nix-community.home.imcp" 2>/dev/null || true
   sleep 3
   # Its settings live in its container, which its first launch created.
   as_agent hermes-app-defaults
@@ -147,9 +104,6 @@ imcp_apps() {
   apple_app "iMCP reachable from Hermes (Local Network)" \
     "(printf '%s\n' '$init'; sleep 15) | timeout 20 /Applications/iMCP.app/Contents/MacOS/imcp-server | grep -m1 -q serverInfo"
 }
-
-# Hermes' desktop on the Mac's screen: after a reboot, macOS logs it in there.
-on_hermes_screen() { gui_session && [ "$(stat -f %Su /dev/console)" = "$agent" ]; }
 
 step "Hermes' Apple Account and apps"
 if ! on_hermes_screen; then

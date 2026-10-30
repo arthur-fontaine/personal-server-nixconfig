@@ -4,15 +4,12 @@
 # The dialogs need a screen: this session's if it has one, else Hermes'.
 
 cua="$(setting home-manager.users.$agent.services.hermes-agent.environment.HERMES_CUA_DRIVER_CMD)"
-launcher="$(setting server.hermes.access.launcher)"
 if launchctl print "gui/$(id -u)" >/dev/null 2>&1; then
   in_gui() { env CUA_DRIVER_RS_TELEMETRY_ENABLED=0 "$@"; }
   lit() { :; }
 elif gui_session; then
-  in_gui() { sudo launchctl asuser "$agent_uid" sudo -u "$agent" -H env CUA_DRIVER_RS_TELEMETRY_ENABLED=0 "$@"; }
-  # Hermes' session keeps the backlight off: light it while you click.
-  brightness="$(nix build --no-link --print-out-paths "path:$REPO_DIR#display-brightness")/bin/display-brightness"
-  lit() { in_gui "$brightness" "$1" || true; }
+  in_gui() { hermes_gui env CUA_DRIVER_RS_TELEMETRY_ENABLED=0 "$@"; }
+  lit() { hermes_lit "$1"; }
 else
   in_gui() { return 1; }
   lit() { :; }
