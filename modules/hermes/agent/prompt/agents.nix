@@ -111,7 +111,7 @@ in
   cron jobs that report here, and the skills you write yourself. Skills for
   services with no account here are turned off; any other service is not set
   up until you have checked.
-${lib.optionalString server.hermes.decisionModel.enable (lib.concatMapStrings (line: "\n  ${line}") [
+${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStrings (line: "\n  ${line}") [
     "On a web page, prefer `browser_fast_act`: it clicks and types through the"
     "page in your browser, a decision model choosing each action from the page's"
     "own controls, in a fraction of computer use's time. Give it one concrete"

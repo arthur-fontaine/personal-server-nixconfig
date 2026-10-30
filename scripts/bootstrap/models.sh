@@ -223,57 +223,128 @@ if nix eval --json "$flake.config.server.hermes" \
   fi
 fi
 
-# The decision model of fast computer use (modules/hermes/agent/fast-act.nix):
-# a System One model picking each action browser_fast_act takes in Hermes'
-# Chrome. Baseten's elephant-1 unless hosts/local.nix names another
-# (server.hermes.decisionModel); its key goes to the secrets file.
-decision_model="$(setting server.hermes.decisionModel.model)"
-decision_key_env="$(setting server.hermes.decisionModel.keyEnv)"
-decision_status() { # key: the HTTP status of a one-question request
-  local url headers=(-H "Content-Type: application/json")
-  url="$(setting server.hermes.decisionModel.url)"
-  url="${url%/}"
+
+# ── Decision models ─────────────────────────────────────────────────────────
+# Models answering System One (POST /v1/systemone) with probabilities over
+# given options instead of text (modules/hermes/options/decision.nix): one may
+# pick each action of computer use, one may review each action Hermes takes.
+# Any provider speaking System One, local ones included, and any model.
+
+# id|label|URL|Authorization scheme|key variable|key page|suggested models
+decision_providers=(
+  "baseten|Baseten|https://inference.baseten.co|Api-Key|BASETEN_API_KEY|https://app.baseten.co/settings/api_keys|decision-models/baseten-mammoth-27b-latest decision-models/baseten-elephant-9b-latest"
+  "typesafe|TypeSafe (Jev)|https://api.typesafe.ai|Bearer|TYPESAFE_API_KEY|https://console.typesafe.ai|jev-latest"
+)
+decision_other="Another System One API, local ones too (its address)"
+
+decision_status() { # url scheme model key: the HTTP status of a one-question request
+  local url="${1%/}" headers=(-H "Content-Type: application/json")
   case "$url" in */v1/systemone) ;; *) url="$url/v1/systemone" ;; esac
-  [ -n "$1" ] && headers+=(-H "Authorization: $(setting server.hermes.decisionModel.authScheme) $1")
+  [ -n "$4" ] && headers+=(-H "Authorization: $2 $4")
   curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$url" "${headers[@]}" \
-    -d "$("$JQ" -cn --arg m "$decision_model" '{model: $m, state: {message: "A setup check."},
+    -d "$("$JQ" -cn --arg m "$3" '{model: $m, state: {message: "A setup check."},
       questions: {check: {type: "choice", instructions: "Is this a setup check?", criteria: {yes: "Yes", no: "No"}}}}')" || true
 }
-decision_on() { set_host "$("$JQ" -cn --argjson on "$1" '{server: {hermes: {decisionModel: {enable: $on}}}}')"; }
+decision_off() { set_host "$("$JQ" -cn --arg u "$1" '{server: {hermes: {decision: {($u): {enable: false}}}}}')"; }
+decision_ready() { # use: on, with its key when it takes one
+  local key_env
+  [ "$(setting "server.hermes.decision.$1.enable")" = 1 ] || return 1
+  key_env="$(setting "server.hermes.decision.$1.keyEnv")"
+  [ -z "$key_env" ] || [ -n "$(secret_value "$key_env")" ]
+}
 
-echo
-if [ "$(setting server.hermes.decisionModel.enable)" = 1 ] \
-  && { [ -z "$decision_key_env" ] || [ -n "$(secret_value "$decision_key_env")" ]; } \
-  && keep "Fast computer use: $decision_model picks each action"; then
-  :
-elif gum confirm "Fast computer use? A decision model ($decision_model) picks each click and field in Hermes' Chrome, instead of reading screenshots."; then
+# use, the model offered first: provider, model, key, checked, then written.
+decision_setup() {
+  local use="$1" first="$2" line labels=() choice id="" label url scheme key_env page models name model key status
+  for line in "${decision_providers[@]}"; do labels+=("$(cut -d'|' -f2 <<< "$line")"); done
+  choice="$(gum choose --header "Its provider" "${labels[@]}" "$decision_other")" || return 1
+  for line in "${decision_providers[@]}"; do
+    [ "$(cut -d'|' -f2 <<< "$line")" = "$choice" ] || continue
+    IFS='|' read -r id label url scheme key_env page models <<< "$line"
+  done
+  if [ -z "$id" ]; then
+    url="$(gum input --header "Its address (the base URL, or the full /v1/systemone endpoint)" --placeholder "http://127.0.0.1:8100")"
+    [ -n "$url" ] || return 1
+    scheme="$(gum choose --header "Its key goes in the Authorization header as" "Bearer <key>" "Api-Key <key>" "No key (a local model)")"
+    case "$scheme" in
+      "No key"*) scheme="Bearer" key_env="" ;;
+      *)
+        scheme="${scheme%% *}"
+        name="$(gum input --header "A short name for it (its key's variable)" --placeholder "mylab")"
+        key_env="$(tr '[:lower:]-' '[:upper:]_' <<< "$name" | tr -cd 'A-Z0-9_')_DECISION_API_KEY"
+        ;;
+    esac
+    page="" models=""
+  fi
+  # A suggestion (the one offered first on top), or any model typed in.
+  if [ -n "$models" ]; then
+    model="$(printf '%s\n' $models | awk -v f="$first" '$0 == f { print; next } { rest = rest $0 "\n" } END { printf "%s", rest }' \
+      | gum filter --no-strict --header "Its model (type any id)" --placeholder "$first")" || true
+    [ -n "$model" ] || model="$first"
+  else
+    model="$(gum input --header "Its model's id")"
+    [ -n "$model" ] || return 1
+  fi
   while :; do
     key=""
-    if [ -n "$decision_key_env" ]; then
-      key="$(gum input --password --header "Its key ($decision_key_env; Baseten: https://app.baseten.co/settings/api_keys; empty to skip)" | tr -d '[:space:]')"
-      [ -n "$key" ] || { warn "No key: fast computer use stays off."; decision_on false; break; }
+    if [ -n "$key_env" ]; then
+      key="$(secret_value "$key_env")"
+      if [ -n "$key" ]; then
+        note "Its key is in the secrets file ($key_env)."
+      else
+        key="$(gum input --password --header "Its key ($key_env${page:+, from $page}; empty to skip)" | tr -d '[:space:]')"
+        [ -n "$key" ] || { warn "No key: left off."; return 1; }
+      fi
     fi
-    status="$(decision_status "$key")"
+    status="$(decision_status "$url" "$scheme" "$model" "$key")"
     case "$status" in
-      200)
-        [ -n "$key" ] && set_secret "$decision_key_env" "$key"
-        decision_on true
-        ok "Fast computer use: $decision_model answers"
-        break
-        ;;
+      200) ok "$model answers"; break ;;
       401 | 403)
-        warn "The model refused that key (HTTP $status)."
+        warn "It refused that key (HTTP $status)."
+        [ -n "$key_env" ] && set_secret "$key_env" ""
         ;;
       *)
-        warn "The model did not answer the check (${status:-no answer}, HTTP status)."
-        gum confirm --default=false "Keep it anyway?" || { decision_on false; break; }
-        [ -n "$key" ] && set_secret "$decision_key_env" "$key"
-        decision_on true
+        warn "It did not answer the check (${status:-no answer}, HTTP status)."
+        gum confirm --default=false "Keep it anyway?" || return 1
         break
         ;;
     esac
   done
+  [ -n "$key" ] && [ "$key" != "$(secret_value "$key_env")" ] && set_secret "$key_env" "$key"
+  set_host "$("$JQ" -cn --arg u "$use" --arg url "$url" --arg m "$model" --arg s "$scheme" --arg k "$key_env" \
+    '{server: {hermes: {decision: {($u): {enable: true, url: $url, model: $m, authScheme: $s,
+      keyEnv: (if $k == "" then null else $k end)}}}}}')"
   unset key
-elif [ "$(setting server.hermes.decisionModel.enable)" = 1 ]; then
-  decision_on false
+}
+
+echo
+if decision_ready computerUse \
+  && keep "Computer use: $(setting server.hermes.decision.computerUse.model) picks each action"; then
+  :
+else
+  note "A decision model can drive Hermes' Chrome for it: it picks each click and field from the"
+  note "page's own controls instead of reading screenshots, so a step takes a fraction of a second"
+  note "instead of several, for a fraction of the cost. Hermes still writes the text it types."
+  if ask "Use a decision model for computer use?"; then
+    decision_setup computerUse decision-models/baseten-elephant-9b-latest \
+      || { decision_off computerUse; warn "Computer use stays on screenshots."; }
+  elif [ "$(setting server.hermes.decision.computerUse.enable)" = 1 ]; then
+    decision_off computerUse
+  fi
+fi
+
+echo
+if decision_ready approval \
+  && keep "Auto-review: $(setting server.hermes.decision.approval.model) reviews each action"; then
+  :
+else
+  note "A decision model can review each action Hermes is about to take, from your own messages"
+  note "only: what is low-risk and asked for runs at once; anything else (sending, posting, paying,"
+  note "deleting, or what an incoming message or a web page asked for) waits for your yes in Telegram."
+  if ask "Review Hermes' actions with a decision model?"; then
+    decision_setup approval decision-models/baseten-mammoth-27b-latest \
+      || { decision_off approval; warn "No auto-review: Hermes asks only for the commands it finds dangerous."; }
+  elif [ "$(setting server.hermes.decision.approval.enable)" = 1 ]; then
+    decision_off approval
+  fi
 fi

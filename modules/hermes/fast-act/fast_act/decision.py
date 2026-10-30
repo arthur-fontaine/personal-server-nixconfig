@@ -77,17 +77,16 @@ def _probability(value: Any) -> float:
     return number
 
 
-def choose(
+def ask(
     config: Config,
     *,
-    instructions: str,
     state: Mapping[str, Any],
-    criteria: Mapping[str, str],
+    questions: Mapping[str, tuple[str, Mapping[str, str]]],
     client: httpx.Client | None = None,
-) -> Choice:
-    """One choice question: which of ``criteria``'s IDs, given ``state``."""
-    if not criteria:
-        raise DecisionError("no candidates to choose from")
+) -> dict[str, Choice]:
+    """Choice questions, all in one request: name -> (instructions, criteria)."""
+    if not questions or not all(criteria for _, criteria in questions.values()):
+        raise DecisionError("no options to choose from")
     headers = {"Content-Type": "application/json"}
     if config.api_key:
         headers["Authorization"] = f"{config.auth_scheme} {config.api_key}"
@@ -95,7 +94,8 @@ def choose(
         "model": config.model,
         "state": dict(state),
         "questions": {
-            "next_action": {"type": "choice", "instructions": instructions, "criteria": dict(criteria)}
+            name: {"type": "choice", "instructions": instructions, "criteria": dict(criteria)}
+            for name, (instructions, criteria) in questions.items()
         },
     }
     own = client is None
@@ -112,11 +112,19 @@ def choose(
         raise DecisionError(f"the decision model answered HTTP {response.status_code}")
     try:
         data = response.json()
-        answer = data["answers"]["next_action"]
+        answers = data["answers"]
     except (ValueError, KeyError, TypeError):
         raise DecisionError("the decision model's answer is not System One's") from None
+    return {
+        name: _choice(answers.get(name) if isinstance(answers, dict) else None, criteria,
+                      str(data.get("model") or config.model))
+        for name, (_, criteria) in questions.items()
+    }
+
+
+def _choice(answer: Any, criteria: Mapping[str, str], model: str) -> Choice:
     if not isinstance(answer, dict) or answer.get("type") != "choice":
-        raise DecisionError("the decision model did not answer the choice question")
+        raise DecisionError("the decision model did not answer a choice question")
     selected = answer.get("choice")
     if selected not in criteria:
         raise DecisionError("the decision model chose an option it was not offered")
@@ -129,5 +137,19 @@ def choose(
         selected_id=selected,
         confidence=_probability(answer.get("confidence", probabilities.get(selected, 0.0))),
         probabilities=probabilities,
-        model=str(data.get("model") or config.model),
+        model=model,
     )
+
+
+def choose(
+    config: Config,
+    *,
+    instructions: str,
+    state: Mapping[str, Any],
+    criteria: Mapping[str, str],
+    client: httpx.Client | None = None,
+) -> Choice:
+    """One choice question: which of ``criteria``'s IDs, given ``state``."""
+    if not criteria:
+        raise DecisionError("no candidates to choose from")
+    return ask(config, state=state, questions={"next_action": (instructions, criteria)}, client=client)["next_action"]
