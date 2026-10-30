@@ -119,7 +119,15 @@ imcp_apps() {
     note "Leave Reminders, Notes and Messages off: Hermes' skills do those."
     gum confirm --affirmative "Check again" --negative "Skip" "Turned on?" || break
   done
-  # imcp-server finds the app over Bonjour, which macOS asks about (Local Network).
+  # imcp-server finds the app over Bonjour, which macOS asks about (Local
+  # Network) for iMCP, for imcp-server and for the launcher, each on its own
+  # (iMCP's README, "Allowing local network access"). An app started before
+  # its access was allowed does not advertise: restart iMCP (its launchd job
+  # only waits on `open -W`, so it is the app that has to go).
+  as_root pkill -xu "$agent_uid" iMCP 2>/dev/null || true
+  sleep 2
+  as_root launchctl kickstart -k "gui/$agent_uid/org.nix-community.home.imcp" >/dev/null 2>&1 || true
+  sleep 5
   init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"hermes-agent","version":"0"}}}'
   apple_app "iMCP reachable from Hermes (Local Network)" \
     "(printf '%s\n' '$init'; sleep 15) | timeout 20 /Applications/iMCP.app/Contents/MacOS/imcp-server | grep -m1 -q serverInfo"
