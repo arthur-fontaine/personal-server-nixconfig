@@ -140,9 +140,17 @@ pace and to confirm before it sends or posts anything.
   turn, and tries the main one again on the next turn ([Hermes' fallback
   providers](https://hermes-agent.nousresearch.com/docs/user-guide/features/fallback-providers)).
   For example: your ChatGPT subscription, then OpenCode's DeepSeek, then uzu.
-- ChatGPT subscription: provider `openai-codex` (`gpt-6-sol`, `gpt-5.5`…). The
-  bootstrap logs Hermes in with a device code (a link and a code, from any
-  device); the login lives in `~/.hermes/auth.json` on the Hermes account.
+- Any provider Hermes knows, any of its models: the bootstrap lists them from
+  Hermes itself (`scripts/lib/hermes-models.py`, the provider's live list when
+  it has one), asks for the provider's key as soon as it is chosen, and takes a
+  model id typed in too.
+- Any other OpenAI-compatible API (a gateway, a self-hosted server): a name, its
+  address and its key, checked on its `/models`; written as
+  `server.hermes.providers.<name> = { url; keyEnv; }`, a provider like the others.
+- ChatGPT subscription: provider `openai-codex`, `gpt-6-luna` first (every plan's
+  default). The bootstrap logs Hermes in with a device code (a link and a code,
+  from any device) once its account exists; the login lives in
+  `~/.hermes/auth.json` on the Hermes account.
 - OpenCode Zen: `deepseek-v4.1-flash`, paid as you go. OpenCode's free models
   (`*-free`) answer only its own app: through the API they return HTTP 429
   "Free usage limit reached" from the first request.

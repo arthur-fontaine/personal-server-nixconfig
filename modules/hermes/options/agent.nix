@@ -36,8 +36,8 @@ in
       default = "/etc/hermes/secrets.env";
       description = ''
         A dotenv file, outside the Nix store and readable by the Hermes user
-        only: OPENCODE_ZEN_API_KEY, RUNPOD_API_KEY, TELEGRAM_BOT_TOKEN,
-        TELEGRAM_ALLOWED_USERS.
+        only: the model providers' keys (OPENCODE_ZEN_API_KEY…),
+        TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS, the integrations' keys.
         See MANUAL_SETUP.md.
       '';
     };
@@ -95,7 +95,7 @@ in
         };
       });
       default = [ ];
-      example = [{ provider = "opencode-zen"; model = "deepseek-v4.1-flash"; }];
+      example = [{ provider = "opencode-zen"; model = "deepseek-v4.1-flash"; } { provider = "openai-codex"; model = "gpt-6-luna"; }];
       description = ''
         Tried in order when the main model fails (a limit reached, an outage,
         an expired login), for that turn only: the next one tries the main
