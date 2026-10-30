@@ -82,10 +82,44 @@ class Batch:
     task: asyncio.Task | None = None
 
 
+class Journal:
+    """Every event the pipeline sent to triage or Hermes, proposed or not, for
+    two days (JSON Lines): what Hermes reads when the user asks whether
+    something arrived, since only proposals ever reach its chat."""
+
+    TTL = 2 * 86400
+
+    def __init__(self, path: str, clock=time.time):
+        self.path, self.clock = path, clock
+
+    def add(self, event: dict, outcome: str) -> None:
+        now = self.clock()
+        record = {
+            "time": datetime.fromtimestamp(now).isoformat(timespec="seconds"),
+            "t": now,
+            "source": event.get("source"),
+            "chat": event.get("chat"),
+            "summary": event.get("summary"),
+            "messages": event.get("messages"),
+            "outcome": outcome,
+        }
+        try:
+            with open(self.path) as f:
+                kept = [line for line in f if json.loads(line).get("t", 0) > now - self.TTL]
+        except (OSError, ValueError):
+            kept = []
+        kept.append(json.dumps(record, ensure_ascii=False) + "\n")
+        tmp = self.path + ".tmp"
+        with open(tmp, "w") as f:
+            f.writelines(kept)
+        os.replace(tmp, self.path)
+
+
 class Pipeline:
     def __init__(self, *, triage, sink, seen: Seen, batch_seconds: float, max_age_seconds: float,
-                 max_batch_seconds: float | None = None, max_chars: int = 4000, clock=time.time):
-        self.triage, self.sink, self.seen = triage, sink, seen
+                 max_batch_seconds: float | None = None, max_chars: int = 4000, clock=time.time,
+                 journal: Journal | None = None):
+        self.triage, self.sink, self.seen, self.journal = triage, sink, seen, journal
         self.batch_seconds, self.max_age, self.max_chars = batch_seconds, max_age_seconds, max_chars
         self.max_batch = max_batch_seconds if max_batch_seconds is not None else 5 * batch_seconds
         self.clock = clock
@@ -145,11 +179,21 @@ class Pipeline:
             verdict = await self.triage.decide(event, fail_open=fail_open)
             if verdict is None:
                 log.info("%s: triage says nothing to propose", event["key"])
+                self._journal(event, "not proposed (triage: nothing for the user)")
                 return
             event["urgency"] = verdict["urgency"]
         else:
             event["urgency"] = "now"
+        self._journal(event, f"proposed to the user ({event['urgency']})")
         await self.sink.post(event)
+
+    def _journal(self, event: dict, outcome: str) -> None:
+        if self.journal is None:
+            return
+        try:
+            self.journal.add(event, outcome)
+        except OSError as error:
+            log.warning("journal: %s", error)
 
     async def _flush_later(self, key: str, wait: float) -> None:
         await asyncio.sleep(wait)

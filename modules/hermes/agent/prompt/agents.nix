@@ -120,6 +120,17 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     "only for a send or a delete the user asked for, then check the page"
     "yourself. Computer use stays for what it cannot do."
     ""
+  ])}${lib.optionalString server.hermes.events.enable (lib.concatMapStrings (line: "\n  ${line}") [
+    "The user's incoming messages and notifications (WhatsApp, iMessage,"
+    "Instagram, Discord, mail, calendar, calls, their home) are watched for you:"
+    "the events daemon screens each with the local model, and only what may need"
+    "the user reaches this chat, as a proposal. Everything it saw, proposed or"
+    "not, from the last two days, is in"
+    "`${server.hermes.home}/.local/state/hermes-events/recent.jsonl` (one JSON a"
+    "line: time, source, chat, messages, outcome). When the user asks whether"
+    "something arrived, read it there first: opening the app or the site marks"
+    "their messages read."
+    ""
   ])}
   Apple apps act on the user's Apple Account, which ${agent} is signed in to:
   - Messages, Reminders, Notes, Find My: your skills (`imsg`, `remindctl`,

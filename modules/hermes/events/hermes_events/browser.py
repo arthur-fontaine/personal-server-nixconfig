@@ -37,7 +37,9 @@ HOOK = """(() => {
     if (!self.location.hostname.endsWith('%(host)s')) return;
     try {
       const o = options || {};
-      %(binding)s(JSON.stringify({title: String(title || ''), body: String(o.body || ''), tag: String(o.tag || ''), host: self.location.hostname}));
+      let data = '';
+      try { data = o.data === undefined ? '' : JSON.stringify(o.data).slice(0, 2000); } catch (e) {}
+      %(binding)s(JSON.stringify({title: String(title || ''), body: String(o.body || ''), tag: String(o.tag || ''), data, host: self.location.hostname}));
     } catch (e) {}
   };
   if (typeof ServiceWorkerRegistration !== 'undefined') {
@@ -75,6 +77,17 @@ def site_of(payload: dict) -> str:
     return "instagram" if "instagram.com" in payload.get("host", "") else "discord"
 
 
+_logged_fields: set[tuple[str, ...]] = set()
+
+
+def _data_fields(data: str) -> tuple[str, ...]:
+    try:
+        value = json.loads(data) if data else None
+    except ValueError:
+        return ()
+    return tuple(sorted(value)) if isinstance(value, dict) else ()
+
+
 def notification_message(payload: dict, now: float) -> tuple[Chat, Message] | None:
     title, body = payload.get("title", "").strip(), payload.get("body", "").strip()
     if not (title or body):
@@ -82,11 +95,24 @@ def notification_message(payload: dict, now: float) -> tuple[Chat, Message] | No
     source = site_of(payload)
     # A DM's notification is titled with the sender (Discord: "Martin", or
     # "Martin (#general, Server)"; Instagram: the sender, or "Instagram" with
-    # the sender leading the body): one chat per title, so a burst batches.
-    who = title if title and title.lower() not in ("instagram", "discord") else body.split(":")[0][:60]
+    # the sender leading the body, "martin.d: ce soir"): one chat per title, so
+    # a burst batches. Instagram also titles some "Instagram" with the message
+    # alone: then the sender is unknown, not the message's first words.
+    if title and title.lower() not in ("instagram", "discord"):
+        who = title
+    elif ":" in body:
+        who = body.split(":")[0][:60]
+    else:
+        who = ""
+    fields = _data_fields(payload.get("data", ""))
+    if fields and fields not in _logged_fields:
+        # Where the sender may be, for a later fix: the names, never the values.
+        _logged_fields.add(fields)
+        log.info("%s notification data fields: %s", source, ", ".join(fields))
     digest = hashlib.sha256(f"{payload.get('tag', '')}\0{title}\0{body}".encode()).hexdigest()[:16]
     chat = Chat(source, who or source, who or source.capitalize(), reply_hint=REPLY[source])
-    return chat, Message(digest, now, who or source.capitalize(), body or title)
+    sender = who or "someone (the notification does not name them)"
+    return chat, Message(digest, now, sender, body or title)
 
 
 instagram_message = notification_message
