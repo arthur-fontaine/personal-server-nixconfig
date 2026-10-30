@@ -134,8 +134,9 @@ reviews every action Hermes is about to take, but reads (files, searches, tool
 searches, the read-only MCP servers, screenshots). A decision model rates two
 things at once, as Codex's automatic approval review does: how clearly your own
 messages authorize the action, and how risky it is. Low risk (a click that
-navigates, a draft) runs at once, and so does bounded risk you clearly asked
-for; anything else waits for your yes in Telegram, through Hermes' own approval
+navigates, a draft) runs at once, bounded risk when you asked for it, and high
+risk (a send, a post) only when you asked for that exact action; anything else,
+and anything critical, waits for your yes in Telegram, through Hermes' own approval
 gate (a no, or no answer, refuses it). So does any error of the model: nothing
 is refused outright, nothing unclear runs. A short answer ("oui") is read with
 Hermes' question it answers. The review replaces computer_use's own question

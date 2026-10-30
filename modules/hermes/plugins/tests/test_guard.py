@@ -74,8 +74,11 @@ def main() -> None:
     assert set(REQUESTS[-1]["questions"]) == {"authorization", "risk"}
     assert REQUESTS[-1]["questions"]["risk"]["type"] == "choice"
 
-    # Asked for, but high risk (a send): the user's yes first.
+    # High risk (a send) the user asked for exactly runs; asked in substance
+    # only, it waits for their yes.
     ANSWER.update(authorization="high", risk="high")
+    assert g.pre_tool_call("terminal", {"command": "wacli send --to Zoé 'Salut'"}, session_id="s") is None
+    ANSWER.update(authorization="medium", risk="high")
     directive = g.pre_tool_call("terminal", {"command": "wacli send --to Zoé 'Salut'"}, session_id="s")
     assert directive["action"] == "approve" and "high risk" in directive["message"], directive
 
@@ -93,7 +96,7 @@ def main() -> None:
     from tools.approval import is_approved
     from tools.approval_context import get_current_session_key
 
-    ANSWER.update(authorization="high", risk="high")
+    ANSWER.update(authorization="medium", risk="high")
     directive = g.pre_tool_call("computer_use", {"action": "click", "coordinate": [430, 1320]}, session_id="s")
     assert directive["action"] == "approve" and "high risk" in directive["message"], directive
     assert is_approved(get_current_session_key(), "cua:click:background")
@@ -123,7 +126,7 @@ def main() -> None:
     ANSWER.clear()
     ANSWER.update(authorization="low", risk="medium")
     assert g.pre_tool_call("write_file", {"path": "/tmp/a"}, session_id="s")["rule_key"] == "guard:write_file:medium"
-    ANSWER.update(authorization="high", risk="high")
+    ANSWER.update(authorization="medium", risk="high")
     one = g.pre_tool_call("terminal", {"command": "wacli send --to Zoé 'Salut'"}, session_id="s")["rule_key"]
     other = g.pre_tool_call("terminal", {"command": "wacli send --to Zoé 'Salut'"}, session_id="s")["rule_key"]
     assert one.startswith("guard:terminal:") and one != other
@@ -142,6 +145,7 @@ def main() -> None:
 
     assert allowed("medium", "medium") and not allowed("low", "medium") and not allowed("high", "critical")
     assert allowed("unknown", "low") and not allowed("unknown", "medium")
+    assert allowed("high", "high") and not allowed("medium", "high")
 
     httpd.shutdown()
     print("guard: ok")

@@ -96,13 +96,16 @@ class Verdict:
 
 
 def allowed(authorization: str, risk: str) -> bool:
-    """Codex runs what scores under its high-risk bar; here: anything low
-    risk, since what cannot hurt needs no consent (a tool search, a click that
-    navigates), or bounded risk clearly asked for."""
+    """As Codex's policy.md: high risk needs the user's explicit ask, critical
+    always asks. Anything low risk runs, since what cannot hurt needs no
+    consent (a tool search, a click that navigates); bounded risk, asked for
+    in substance; high risk (a send), only the exact action the user asked."""
     if risk == "low":
         return True
     if risk == "medium":
         return authorization in {"high", "medium"}
+    if risk == "high":
+        return authorization == "high"
     return False
 
 
