@@ -147,6 +147,9 @@ remove_everything() {
     printf '! The /nix volume is in use: reboot, then run: sudo diskutil apfs deleteVolume /nix\n'
   fi
   printf "This repository's clone is still at %s; delete it when you are done.\n" "$REPO_DIR"
+  # A script cannot change the shell that started it, which still exports
+  # nix-darwin's variables (NIX_SSL_CERT_FILE names a file now gone).
+  printf 'Close this terminal and open a new one before installing again.\n'
 }
 
 choice="$(gum choose --header "What should happen to this server?" \
