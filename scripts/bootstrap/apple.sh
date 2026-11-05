@@ -61,6 +61,10 @@ apple_apps() {
   apple_app "Contacts" "osascript -e 'tell application \"Contacts\" to count people'"
   apple_app "Calendar" "osascript -e 'tell application \"Calendar\" to count calendars'"
   apple_app "Messages (sending)" "osascript -e 'tell application \"Messages\" to count accounts'"
+  # Moving, flagging or marking a mail: iMCP only reads it.
+  apple_app "Mail (moving, flagging)" "osascript -e 'tell application \"Mail\" to count accounts'"
+  # Unasked, an osascript to System Events waits on its dialog until it times out.
+  apple_app "System Events" "osascript -e 'tell application \"System Events\" to count processes'"
 
   # Reading needs Full Disk Access (Permissions, above) and Messages in iCloud,
   # which Messages turns on itself, not iCloud's settings.
@@ -200,7 +204,7 @@ elif apple_account && as_gateway 'imsg chats --limit 1 | grep -q .' >/dev/null 2
   && imcp_mail_reads && keep "$agent is signed in to an Apple Account, Hermes reads your messages, iMCP serves its apps"; then
   :
 elif needs "Hermes' Apple Account and apps" \
-  && gum confirm "Set up Hermes' Apple apps (iMessage, Notes, Reminders, Contacts, Calendar, Find My)?"; then
+  && gum confirm "Set up Hermes' Apple apps (iMessage, Notes, Reminders, Contacts, Calendar, Mail, Find My)?"; then
   hermes_lit 1
   apple_apps
   hermes_lit "$(setting server.energy.displayBrightness)"

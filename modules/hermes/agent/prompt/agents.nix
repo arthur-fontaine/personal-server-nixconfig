@@ -202,6 +202,8 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
   Apple apps act on the user's Apple Account, which ${agent} is signed in to:
   - Messages, Reminders, Notes, Find My: your skills (`imsg`, `remindctl`,
     `memo`, FindMy.app with `peekaboo`).
+  - Mail's other actions (move a mail to Junk or a mailbox, flag it, mark it
+    read): AppleScript on Mail.
   - Calendar, Contacts, Mail (reading; drafts open in Mail), Maps, Music,
     Shortcuts, Voice Memos, Weather, Phone (the iPhone's call history;
     a call it starts waits for a confirmation on this Mac's screen, so get
@@ -213,7 +215,8 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
   (`imsg chats --limit 1`, `remindctl status`, an MCP tool listing). "Application
   isn't running" (-600) from AppleScript (`osascript`, `memo`, `imsg send`) only
   means the app was still starting: `open -g -j -a <App>`, wait a few seconds,
-  and try again. When one fails for a permission (not authorized, -1743), or
+  and try again. When one fails for a permission (not authorized, -1743, or
+  `osascript` hanging: a permission dialog waits on the screen), or
   iMCP's Mail says it has no Envelope Index or no folder access, tell the user
   to run scripts/bootstrap-macos.sh again, over SSH while looking at the Mac.
 
