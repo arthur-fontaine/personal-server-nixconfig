@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 let
   inherit (lib) mkOption types;
 in
@@ -23,6 +23,16 @@ in
       # Qwen 3.5 9B, 4-bit (about 5 GB): the largest that leaves the M1 Pro room to work.
       default = "alibaba:qwen3.5:9b:mirai:mirai-m:4";
       description = "The model `mirai server` serves. `mirai list-models` lists the others.";
+    };
+    modelFiles = mkOption {
+      type = types.nullOr types.package;
+      default = pkgs.uzu-models.${config.server.uzu.model} or null;
+      defaultText = lib.literalExpression "pkgs.uzu-models.\${config.server.uzu.model} or null";
+      description = ''
+        The model's files, pinned (pkgs/uzu-models.nix). Null: mirai downloads
+        the revision Trymirai's registry names at each start, which may not
+        load on this Mac.
+      '';
     };
     port = mkOption {
       type = types.port;

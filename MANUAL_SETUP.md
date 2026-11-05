@@ -46,7 +46,7 @@ reach over SSH) does not get in the way.
 | Discord (at Hermes' login) *(integration)* | points you to the Discord tab Hermes' events keep open in its Chrome, until that tab is on discord.com/channels (Chrome's DevTools list) | log in (the phone app's QR code is easiest), allow notifications |
 | HomeKit (at Hermes' login) *(integration)* | installs HomeClaw from the App Store with `mas` (or opens its page), starts it, turns on its HTTP MCP endpoint and checks it answers, then points its webhook at Hermes' events daemon | allow it your home data; in its Settings → Webhook, choose the accessories it reports |
 | Start | restarts Hermes, or the first time reboots, so macOS logs Hermes in and starts it | |
-| Check (a run once Hermes is logged in) | asks uzu a question and the events' screening question on a test invitation (waiting for its first model download), then offers to send a fake WhatsApp message through the events chain ([docs/events.md](docs/events.md)) | see the proposal arrive in Telegram |
+| Check (a run once Hermes is logged in) | asks uzu a question and the events' screening question on a test invitation (waiting for it to load), then offers to send a fake WhatsApp message through the events chain ([docs/events.md](docs/events.md)) | see the proposal arrive in Telegram |
 
 macOS reserves those clicks for a person: no script can grant them.
 
@@ -58,8 +58,10 @@ reaches Hermes and everything it runs, across updates.
 
 ## After the setup
 
-- uzu downloads its model (Qwen 3.5 9B, about 5 GB) when it first starts:
-  `tail -f /Users/hermes/Library/Logs/uzu.log`.
+- uzu's model (Qwen 3.5 9B, about 5 GB) is pinned in Nix (`pkgs/uzu-models.nix`), so
+  `server-rebuild` downloads it once, not uzu at each start. Its log:
+  `tail -f /Users/hermes/Library/Logs/uzu.log`. The copy uzu downloaded itself before,
+  `/Users/hermes/.cache/mirai`, is no longer used.
 - DigUp downloads its embedding model at the first `digup index`.
 - Keep the lid open: the backlight is off, but a closed lid turns the display
   off and computer use sees a black screen. The Mac never sleeps either way.

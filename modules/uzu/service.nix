@@ -1,6 +1,6 @@
 # `mirai server` (https://github.com/trymirai/uzu, crates/legacy/cli): one model
-# on the GPU behind an OpenAI-compatible endpoint on localhost. It downloads the
-# model on its first start.
+# on the GPU behind an OpenAI-compatible endpoint on localhost, from its pinned
+# files (pkgs/uzu-models.nix). It answers whatever model name a request gives.
 { config, lib, pkgs, ... }:
 let
   cfg = config.server.uzu;
@@ -16,7 +16,7 @@ in
           "${pkgs.mirai}/bin/mirai"
           "server"
           "--model"
-          cfg.model
+          (if cfg.modelFiles != null then "${cfg.modelFiles}" else cfg.model)
           "--host"
           "127.0.0.1"
           "--port"

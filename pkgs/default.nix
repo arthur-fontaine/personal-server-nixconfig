@@ -26,4 +26,6 @@ in
     if final.lib.versionAtLeast pinned.version ours.version then pinned else ours;
   # uzu's CLI, with its OpenAI-compatible `server`.
   mirai = inputs.uzu.packages.${system}.mirai;
+  # Its models, pinned by revision (./uzu-models.nix).
+  uzu-models = final.callPackage ./uzu-models.nix { };
 }

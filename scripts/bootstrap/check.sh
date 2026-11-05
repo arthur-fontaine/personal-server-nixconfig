@@ -14,7 +14,7 @@ uzu_ask() { # system prompt, user message, extra JSON fields
 if gui_session && [ "$(setting server.uzu.enable)" = 1 ]; then
   step "The local model (uzu)"
   if ! curl -fsS "$uzu_url/models" >/dev/null 2>&1; then
-    note "At its first start uzu downloads its model (about 5 GB): this can take a while."
+    note "uzu loads its model (about 5 GB) onto the GPU at its first start: this can take a minute."
     gum spin --title "Waiting for uzu" -- bash -c \
       "for _ in \$(seq 360); do curl -fsS '$uzu_url/models' >/dev/null 2>&1 && exit 0; sleep 5; done; exit 1" || true
   fi

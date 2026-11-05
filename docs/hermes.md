@@ -211,4 +211,8 @@ pace and to confirm before it sends or posts anything.
   "Free usage limit reached" from the first request.
 - Local: uzu serves Qwen 3.5 9B on the GPU at `127.0.0.1:8000`
   (`server.uzu`), for the sub-chats that pin `uzu:local`. Compactions can use it
-  too: `server.hermes.memory.compactionModel = "uzu:local"`.
+  too: `server.hermes.memory.compactionModel = "uzu:local"`. Its files are pinned
+  by revision in `pkgs/uzu-models.nix`, without the speculator: Trymirai's
+  registry otherwise serves a new revision at any start, and the one of Oct 30,
+  2026 made uzu panic on M1 to M4 GPUs (its speculator needs an M5's MXU). A new
+  model, or a new uzu, comes with a new entry there, tried on an M1 to M4 first.
