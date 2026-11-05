@@ -64,6 +64,6 @@ Open https://www.instagram.com/. If it shows the login form:
 
 - You act as the user, in front of real people. Send a DM, post, comment,
   like or follow only when the user asked for that, and confirm the exact text
-  and recipient first unless they gave both.
+  and recipient first unless they gave both. @confirm@
 - Go at a person's pace: no bulk actions, no scraping loops, a few seconds
   between actions. Instagram locks accounts that behave like bots.

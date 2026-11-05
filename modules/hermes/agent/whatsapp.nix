@@ -7,6 +7,7 @@ let
   store = "${server.hermes.home}/.local/state/wacli";
   wacli = lib.getExe pkgs.wacli;
   events = server.hermes.events;
+  confirm = import ./skills/confirm.nix { inherit server; };
   # Each stored message posted to the events daemon (events.nix), signed with
   # the secrets file's WEBHOOK_SECRET.
   webhook = lib.optionalString (events.enable && events.whatsapp) ''
@@ -28,7 +29,7 @@ lib.mkIf server.hermes.integrations.whatsapp.enable {
   home.packages = [ pkgs.wacli ];
   home.sessionVariables.WACLI_STORE_DIR = store;
   services.hermes-agent.environment.WACLI_STORE_DIR = store;
-  services.hermes-agent.hermesHomeFiles."skills/social-media/whatsapp/SKILL.md" = ./skills/whatsapp/SKILL.md;
+  services.hermes-agent.hermesHomeFiles."skills/social-media/whatsapp/SKILL.md" = confirm.skill ./skills/whatsapp/SKILL.md;
 
   # Unlinked, it exits, and the bootstrap starts it once linked. A dropped
   # connection exits non-zero and launchd restarts it.

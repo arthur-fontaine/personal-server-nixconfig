@@ -60,6 +60,7 @@ let
     + "${expiry p.ttl}, encrypted ${onOff p.encrypted}, "
     + "model ${if p.model == null then "the main one" else p.model}";
   presets = lib.concatStringsSep "\n" (lib.mapAttrsToList describe subchats.presets);
+  confirm = import ../skills/confirm.nix { inherit server; };
 in
 ''
   # The user's instructions
@@ -109,6 +110,14 @@ in
     your Nix profile) stays writable.
   - Work in ~/workspace.
 
+  ## Asking the user
+
+  When you need the user's choice or their yes, give them buttons: the
+  `clarify` tool with choices, which Telegram shows as buttons (they can still
+  type another answer). A question in your reply is for an open question only.
+  Before you act as them (a message, a post, a call), get their yes.
+  ${confirm.rule}
+
   ## What works here, and what does not yet
 
   A skill or a toolset tells you how to use something; it does not mean the app,
@@ -150,8 +159,8 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     `memo`, FindMy.app with `peekaboo`).
   - Calendar, Contacts, Mail (reading; drafts open in Mail), Maps, Music,
     Shortcuts, Voice Memos, Weather, Phone (the iPhone's call history;
-    a call it starts waits for a confirmation on this Mac's screen, so ask
-    the user first) and Voicemail: the `imcp` MCP tools (iMCP, a menu bar
+    a call it starts waits for a confirmation on this Mac's screen, so get
+    the user's yes first, see "Asking the user") and Voicemail: the `imcp` MCP tools (iMCP, a menu bar
     app here). Its own Reminders, Notes and Messages tools are off: use the
     skills for those.${lib.optionalString on.homekit "\n- HomeKit: the `homeclaw` MCP tools (HomeClaw, a menu bar app)."}
   - Anything else: AppleScript (`osascript`), `shortcuts run`, computer use.

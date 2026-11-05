@@ -42,7 +42,7 @@ Open https://discord.com/channels/@me. If it shows the login page:
 
 You write as the user, to real people: only send what the user asked for,
 to who they asked; confirm the recipient and the exact text first unless they
-gave both. Click the message box at the bottom, type, press Enter (Shift+Enter
+gave both. @confirm@ Click the message box at the bottom, type, press Enter (Shift+Enter
 for a new line). Check that it appears in the conversation.
 
 ## Care

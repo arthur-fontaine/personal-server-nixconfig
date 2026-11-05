@@ -6,14 +6,15 @@
 { lib, server, ... }:
 let
   on = name: server.hermes.integrations.${name}.enable;
+  confirm = import ./skills/confirm.nix { inherit server; };
 in
 {
   services.hermes-agent.hermesHomeFiles =
     lib.optionalAttrs (on "instagram") {
-      "skills/social-media/instagram/SKILL.md" = ./skills/instagram/SKILL.md;
+      "skills/social-media/instagram/SKILL.md" = confirm.skill ./skills/instagram/SKILL.md;
     }
     # Discord the same way: discord.com in that browser (docs/hermes.md).
     // lib.optionalAttrs (on "discord") {
-      "skills/social-media/discord/SKILL.md" = ./skills/discord/SKILL.md;
+      "skills/social-media/discord/SKILL.md" = confirm.skill ./skills/discord/SKILL.md;
     };
 }

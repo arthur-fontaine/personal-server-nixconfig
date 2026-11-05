@@ -46,7 +46,7 @@ Adapted from https://github.com/openclaw/openclaw/blob/1aea2df9351969f6cbac4bc17
 
 You write as the user, to real people: only send when the user asked for that
 message to that person. Confirm the recipient and the exact text first, unless
-they gave both explicitly in the same request.
+they gave both explicitly in the same request. @confirm@
 
 Read the chat's latest messages first (`messages list` above) and write what
 follows them: no second hello or introduction in a running conversation, and

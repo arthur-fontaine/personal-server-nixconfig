@@ -159,9 +159,10 @@ its pattern-matched dangerous commands, and its hardline blocklist.
 
 Every question Hermes asks you has buttons. Its own belong to a turn: its
 approval card and the `clarify` tool's choices are buttons in the chat the
-turn runs in, and the events' proposals are buttons in the main chat
-(docs/events.md). A plugin that must ask you outside any turn, as the sandbox
-does for a request its guest makes, uses the `owner_approval` plugin
+turn runs in (its instructions say to ask with `clarify`, not in a reply),
+and the events' proposals are buttons in the main chat (docs/events.md). A
+plugin that must ask you outside any turn, as the sandbox does for a request
+its guest makes, uses the `owner_approval` plugin
 (`modules/hermes/plugins/owner_approval`; its Python API is in its
 docstring): a message with buttons in the main chat that only you can
 answer, edited to show your answer, and refused when you do not answer in
@@ -198,7 +199,9 @@ authentication: Hermes logs in again by itself when the session ends.
 WhatsApp, Instagram and Discord all act as you, through clients their terms do not
 allow (an unofficial linked device, an automated browser): they may restrict
 an account that behaves like a bot. The skills tell Hermes to go at a person's
-pace and to confirm before it sends or posts anything.
+pace and to confirm before it sends or posts anything, always with buttons:
+with the auto-review on, its approval card is the question; without it,
+Hermes asks with `clarify` and choices (`modules/hermes/agent/skills/confirm.nix`).
 
 ## Models
 
