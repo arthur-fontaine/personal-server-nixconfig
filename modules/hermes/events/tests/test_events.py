@@ -177,6 +177,15 @@ class PipelineTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(records), 1)
         self.assertIn("😂", records[0]["messages"])
         self.assertTrue(records[0]["outcome"].startswith("not proposed"))
+        # A profile's reason lands in the journal.
+        p.triage = FakeTriage({"dropped": "newsletter"})
+        p.notice("mail", "m1", "New mail", "From: news@x", id="m1", triage="mail")
+        await eventually(lambda: len(open(p.journal.path).readlines()) == 2)
+        with open(p.journal.path) as f:
+            last = json.loads(f.readlines()[-1])
+        self.assertEqual(last["outcome"], "not proposed (triage: newsletter)")
+        self.assertEqual(p.triage.events[0][0]["triage"], "mail")
+        self.assertEqual(sink.events, [])
 
 
 class TriageTest(unittest.IsolatedAsyncioTestCase):
@@ -210,6 +219,31 @@ class TriageTest(unittest.IsolatedAsyncioTestCase):
         event = {"key": "k", "summary": "s", "messages": "m"}
         self.assertEqual(await triage.decide(event, fail_open=True), {"urgency": "unknown"})
         self.assertIsNone(await triage.decide(event, fail_open=False))
+        mail = {**event, "triage": "mail"}
+        self.assertEqual(await triage.decide(mail, fail_open=True), {"urgency": "unknown"})
+        self.assertIsNone(await triage.decide(mail, fail_open=False))
+
+    async def test_mail_profile(self):
+        requests, answer = [], {}
+
+        async def uzu(request):
+            requests.append(await request.json())
+            return web.json_response({"choices": [{"message": {"content": json.dumps(answer)}}]})
+
+        triage = UzuTriage(await self.serve(uzu), "qwen")
+        event = {"key": "mail:1", "summary": "New mail", "messages": "From: Free <facture@free.fr>", "triage": "mail"}
+        answer.update(category="payment_problem", urgency="today")
+        self.assertEqual(await triage.decide(event, fail_open=False), {"urgency": "today", "category": "payment_problem"})
+        request = requests[-1]
+        self.assertEqual(request["response_format"]["json_schema"]["name"], "mail_triage")
+        self.assertIn("spam_or_phishing", request["response_format"]["json_schema"]["schema"]["properties"]["category"]["enum"])
+        self.assertEqual(request["messages"][1]["content"], "From: Free <facture@free.fr>")
+        for noise in ("spam_or_phishing", "newsletter", "promotion", "social_notification", "other_automated"):
+            answer.update(category=noise)
+            self.assertEqual(await triage.decide(event, fail_open=True), {"dropped": noise})
+        # Chat events keep their own question.
+        await triage.decide({"key": "k", "summary": "s", "messages": "m"}, fail_open=False)
+        self.assertEqual(requests[-1]["response_format"]["json_schema"]["name"], "triage")
 
 
 class HermesTest(unittest.IsolatedAsyncioTestCase):

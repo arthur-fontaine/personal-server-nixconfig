@@ -160,14 +160,16 @@ class Pipeline:
             log.info("%s: the user answered, dropped %d message(s)", chat.key, len(batch.messages))
 
     def notice(self, source: str, key: str, summary: str, details: str = "", *, id: str | None = None,
-               screen: bool = True, fail_open: bool = True) -> None:
+               screen: bool = True, fail_open: bool = True, triage: str | None = None) -> None:
         """An event that is not a chat message (a HomeKit change, a calendar
         event, a missed call...). `id` dedupes it; `screen` False skips the
-        triage (it always matters)."""
+        triage (it always matters); `triage` names its profile (triage.py)."""
         if id is not None and not self.seen.add(f"{source}:{id}"):
             return
         event = {"source": source, "key": f"{source}:{key}", "summary": summary,
                  "messages": details[: self.max_chars], "context": "", "reply_hint": "", "is_group": False}
+        if triage:
+            event["triage"] = triage
         self.spawn(self._send(event, screen, fail_open))
 
     def system(self, key: str, text: str) -> None:
@@ -180,14 +182,18 @@ class Pipeline:
         self.seen.save()
         if screen:
             verdict = await self.triage.decide(event, fail_open=fail_open)
-            if verdict is None:
-                log.info("%s: triage says nothing to propose", event["key"])
-                self._journal(event, "not proposed (triage: nothing for the user)")
+            if verdict is None or verdict.get("dropped"):
+                why = (verdict or {}).get("dropped") or "nothing for the user"
+                log.info("%s: triage says nothing to propose (%s)", event["key"], why)
+                self._journal(event, f"not proposed (triage: {why})")
                 return
             event["urgency"] = verdict["urgency"]
+            if verdict.get("category"):
+                event["category"] = verdict["category"]
         else:
             event["urgency"] = "now"
-        self._journal(event, f"proposed to the user ({event['urgency']})")
+        label = ", ".join(filter(None, (event.get("category"), event["urgency"])))
+        self._journal(event, f"proposed to the user ({label})")
         await self.sink.post(event)
 
     def _journal(self, event: dict, outcome: str) -> None:
