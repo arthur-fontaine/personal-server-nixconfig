@@ -100,6 +100,8 @@ class InstagramTest(unittest.TestCase):
         chat, message = instagram_message({"title": "Instagram", "body": "on peut regarder ?", "host": "www.instagram.com"}, NOW)
         self.assertEqual((chat.name, message.text), ("Instagram", "on peut regarder ?"))
         self.assertIn("does not name", message.sender)
+        chat, message = instagram_message({"title": "Replied to your story", "body": "Replied to your story: ok", "host": "www.instagram.com"}, NOW)
+        self.assertIn("does not name", message.sender)
         chat, _ = instagram_message({"title": "Instagram", "body": "x", "data": '{"sender":"t","thread":"1"}', "host": "www.instagram.com"}, NOW)
         self.assertEqual(chat.name, "Instagram")
         chat, message = notification_message({"title": "Zoé (#général, Les copains)", "body": "on se voit ?", "host": "discord.com"}, NOW)
@@ -531,6 +533,15 @@ class InstagramThreadTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((thread.id, thread.name, thread.is_group), ("340282366841710300949128", "Zoé", False))
         self.assertEqual([m.sender for m in thread.items], ["Zoé", "me", "Zoé"])
         self.assertEqual(thread.sender_of("On se voit toujours à 20 h ?"), "Zoé")
+        story = Thread.parse({**ig_thread([]), "items": [{"item_id": "s", "user_id": 2, "timestamp": str(int(NOW * 1e6)),
+                                                          "item_type": "reel_share", "reel_share": {"text": "Tu as vu son message ?"}}]})
+        self.assertEqual(story.items[0].sender, "Zoé")
+        self.assertTrue(any(i.text.startswith("[replied to a story]") for i in story.items))
+        group = Thread.parse(ig_thread([("2", NOW, "Tu as vu son message ?"), ("3", NOW, "quoi")], is_group=True,
+                                       users=[{"pk": 2, "username": "a", "full_name": "Nino"}, {"pk": 3, "username": "b"}]))
+        self.assertEqual(group.sender_of("Replied to your story: Tu as vu son message ?"), "Nino")
+        self.assertEqual(group.sender_of("Ah bon mais pq elle t’as…"), "Nino")
+        self.assertIsNone(group.sender_of("ok"))
         new = [Message("n", NOW, "?", "On se voit toujours à 20 h ?")]
         context = thread.context(new, 10, NOW - 86400)
         self.assertEqual([m.text for m in context.earlier], ["tu viens ce soir ?", "oui"])

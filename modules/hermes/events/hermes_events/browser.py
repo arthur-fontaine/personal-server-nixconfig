@@ -100,9 +100,10 @@ def notification_message(payload: dict, now: float) -> tuple[Chat, Message] | No
     # the sender leading the body, "zoe.martin: ce soir"): one chat per title, so
     # a burst batches. Instagram also titles some "Instagram" with the message
     # alone: then the sender is unknown, not the message's first words.
-    if title and title.lower() not in ("instagram", "discord"):
+    unnamed = ("instagram", "discord", "replied to your story")
+    if title and title.lower() not in unnamed:
         who = title
-    elif ":" in body:
+    elif ":" in body and body.split(":")[0].strip().lower() not in unnamed:
         who = body.split(":")[0][:60]
     else:
         who = ""
@@ -159,9 +160,17 @@ def item_text(item: dict) -> str:
             "story_share": "[shared story]"}.get(kind, f"[{kind}]" if kind else "")
 
 
+_PREFIX = re.compile(r"^(?:replied to your story:\s*|\[replied to a story\]\s*)+")
+
+
 def _same(a: str, b: str) -> bool:
-    a, b = " ".join(a.split()).casefold(), " ".join(b.split()).casefold()
-    return bool(a and b) and (a == b or (len(b) >= 12 and a.startswith(b.rstrip("…."))))
+    """A thread's item and a notification's body, which Instagram may clip
+    ("…") or prefix ("Replied to your story: …")."""
+    a, b = (_PREFIX.sub("", " ".join(t.split()).casefold()).strip() for t in (a, b))
+    if not (a and b):
+        return False
+    short, long = sorted((a.rstrip("…."), b.rstrip("….")), key=len)
+    return a == b or (len(short) >= 8 and short in long)
 
 
 @dataclass
