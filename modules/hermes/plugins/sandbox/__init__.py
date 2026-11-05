@@ -67,6 +67,33 @@ STOP = {
 }
 
 
+GRANTS = {
+    "name": "sandbox_grants",
+    "description": (
+        "What a running sandbox session may reach: its grants (host, method or any, path prefix or any). Pi asks "
+        "Hermes for access to anything else, and Hermes' approval system decides; you only read them here."
+    ),
+    "parameters": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
+}
+REVOKE = {
+    "name": "sandbox_revoke",
+    "description": (
+        "Take a grant back from a running sandbox session, as sandbox_grants lists it (host, method, path_prefix; "
+        "omit the null ones). Its next request there asks Hermes again."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "host": {"type": "string"},
+            "method": {"type": "string"},
+            "path_prefix": {"type": "string"},
+        },
+        "required": ["id", "host"],
+    },
+}
+
+
 def _routing() -> dict:
     from .runner import ROUTING
 
@@ -114,6 +141,8 @@ def tools(sandbox) -> list[tuple[dict, object]]:
         (STATUS, lambda args, **_: _answer(lambda: sandbox.status(args.get("id") or None))),
         (RESULT, lambda args, **_: _answer(lambda: sandbox.result(args.get("id", ""), args.get("max_chars")))),
         (STOP, lambda args, **_: _answer(lambda: sandbox.stop(args.get("id", "")))),
+        (GRANTS, lambda args, **_: _answer(lambda: sandbox.grants(args.get("id", "")))),
+        (REVOKE, lambda args, **_: _answer(lambda: sandbox.revoke(args.get("id", ""), args))),
     ]
 
 

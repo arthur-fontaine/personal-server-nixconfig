@@ -153,11 +153,19 @@ def main() -> None:
     assert replies[1]["grant"] == {"host": "pypi.org", "method": "GET", "pathPrefix": "/simple"}
     assert replies[2]["allow"] is False
     assert len(asked) == 1 and "pypi.org/simple/requests/" in asked[0][1] and waiting in asked[0][1]
-    assert sandbox.live[waiting].grants[0]["host"] == "opencode.ai"
+    listed = json.loads(handlers["sandbox_grants"]({"id": waiting}))
+    assert listed["running"] and listed["grants"][0]["host"] == "opencode.ai", listed
+    assert "no such grant" in json.loads(handlers["sandbox_revoke"]({"id": waiting, "host": "example.com"}))["error"]
+    revoked = json.loads(handlers["sandbox_revoke"](
+        {"id": waiting, "host": "PyPI.org", "method": "get", "path_prefix": "/simple"}))
+    assert revoked["revoked"]["host"] == "pypi.org", revoked
+    assert [g["host"] for g in revoked["grants"]] == ["opencode.ai"]
     assert json.loads(handlers["sandbox_stop"]({"id": waiting}))["status"] == "stopping"
     until(lambda: events, "the stop's completion")
     assert "stopped" in events[0]["output"] and "no changes" in events[0]["output"]
     assert json.loads(handlers["sandbox_result"]({"id": waiting}))["diff"] == ""
+    assert json.loads(handlers["sandbox_grants"]({"id": waiting}))["running"] is False
+    assert "not running" in json.loads(handlers["sandbox_revoke"]({"id": waiting, "host": "opencode.ai"}))["error"]
 
     # Bad ids and a session lost to a restart.
     assert "no such session" in json.loads(handlers["sandbox_result"]({"id": "../../etc"}))["error"]

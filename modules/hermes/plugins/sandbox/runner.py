@@ -364,6 +364,39 @@ class Sandbox:
         out["fetch_command"] = f"git fetch {review} {branch}:{branch}"
         return out
 
+    # sandbox_grants
+    def grants(self, session_id: str) -> dict:
+        self._dir(session_id)
+        live = self.live.get(session_id)
+        if live is None or live.state not in LIVE:
+            return {"id": session_id, "running": False, "grants": [],
+                    "note": "the session is not running: its grants ended with it"}
+        with live.lock:
+            return {"id": session_id, "running": True, "grants": [dict(g) for g in live.grants]}
+
+    # sandbox_revoke
+    def revoke(self, session_id: str, grant: dict, wait: float = 5.0) -> dict:
+        self._dir(session_id)
+        live = self.live.get(session_id)
+        if live is None or live.state not in LIVE:
+            raise SandboxError(f"session {session_id} is not running")
+        wanted = {
+            "host": str(grant.get("host") or "").strip().lower().rstrip("."),
+            "method": str(grant["method"]).upper() if grant.get("method") else None,
+            "pathPrefix": str(grant.get("path_prefix") or grant.get("pathPrefix") or "") or None,
+        }
+        with live.lock:
+            if wanted not in live.grants:
+                raise SandboxError(f"no such grant in session {session_id}: sandbox_grants lists them as they are")
+        live.send({"type": "revoke", "grant": wanted})
+        deadline = time.monotonic() + wait
+        while time.monotonic() < deadline:
+            with live.lock:
+                if wanted not in live.grants:
+                    return {"id": session_id, "revoked": wanted, "grants": [dict(g) for g in live.grants]}
+            time.sleep(0.05)
+        raise SandboxError(f"session {session_id} did not confirm the revocation in {wait:g} s")
+
     # sandbox_stop
     def stop(self, session_id: str) -> dict:
         self._dir(session_id)

@@ -7,3 +7,5 @@ provides_tools:
   - sandbox_status
   - sandbox_result
   - sandbox_stop
+  - sandbox_grants
+  - sandbox_revoke

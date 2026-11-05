@@ -200,6 +200,7 @@ def main() -> None:
     state = REQUESTS[-1]["state"]
     assert state["trusted_user_messages"] == ["Corrige le paquet"] and state["recent_actions"] == ["sandbox_run: fix it"]
     assert "pypi.org" in state["planned_action"]["arguments"]
+    assert g.pre_tool_call("sandbox_grants", {"id": "x"}, session_id="s") is None, "read-only"
     plugin.GUARD = None
 
     httpd.shutdown()

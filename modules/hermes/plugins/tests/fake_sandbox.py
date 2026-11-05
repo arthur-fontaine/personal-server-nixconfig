@@ -33,7 +33,9 @@ def main() -> None:
     say(type="phase", phase="pi")
     status = "finished"
     if session["task"] == "wait":
-        say(type="grants", grants=[{"host": "opencode.ai", "method": None, "pathPrefix": None}])
+        grants = [{"host": "opencode.ai", "method": None, "pathPrefix": None},
+                  {"host": "pypi.org", "method": "GET", "pathPrefix": "/simple"}]
+        say(type="grants", grants=grants)
         say(type="request", id=1, kind="network", session=session["id"], host="pypi.org", method="GET",
             path="/simple/requests/", scheme="https", ambiguous=False)
         say(type="request", id=2, kind="approve", host="example.com")
@@ -42,6 +44,9 @@ def main() -> None:
             if message["type"] == "reply":
                 with open(workdir / "replies.jsonl", "a") as replies:
                     replies.write(line)
+            if message["type"] == "revoke":
+                grants = [g for g in grants if g != message["grant"]]
+                say(type="grants", grants=grants)
             if message["type"] == "stop":
                 status = "stopped"
                 break

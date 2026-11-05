@@ -34,6 +34,8 @@ READ_ONLY = frozenset({
     "zoom", "date",
     # owner_approval's: a message with buttons to the user, as clarify.
     "propose",
+    # The sandbox's: what a session may reach, listed.
+    "sandbox_grants",
 })
 # computer_use's actions that only look (tools/computer_use/tool.py, _ACTIONS:
 # the ones not marked destructive).

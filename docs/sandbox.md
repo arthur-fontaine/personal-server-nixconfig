@@ -14,6 +14,8 @@ and this Mac: nothing Pi writes runs here before you review it.
 | `sandbox_status(id?)` | its phase (image, boot, repo, pi, export), Pi's turns and tool calls so far; without an id, the last sessions |
 | `sandbox_result(id)` | Pi's branch: its log, diffstat and diff, Pi's last answer (marked untrusted), and the `git fetch` that takes the branch |
 | `sandbox_stop(id)` | stops it; what Pi committed so far stays readable |
+| `sandbox_grants(id)` | what a running session may reach: its grants (host, method, path prefix), read only (the auto-review skips it) |
+| `sandbox_revoke(id, host, method?, path_prefix?)` | takes one of those grants back; Pi's next request there asks again |
 
 When a session ends, the chat that started it gets a notice (an internal
 notification turn, like a background process' end) naming the session and
