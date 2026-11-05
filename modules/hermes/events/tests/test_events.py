@@ -24,7 +24,7 @@ from hermes_events.hermes import HermesSink  # noqa: E402
 from hermes_events.sources import imessage_message, whatsapp_app, whatsapp_message  # noqa: E402
 from hermes_events.triage import UzuTriage  # noqa: E402
 from hermes_events.browser import (  # noqa: E402
-    Instagram, Thread, instagram_message, notification_message, resolve_instagram, thread_id_of)
+    Instagram, keep_discord, Thread, instagram_message, notification_message, resolve_instagram, thread_id_of)
 from hermes_events.history import Context, History, imessage_earlier, whatsapp_earlier  # noqa: E402
 from hermes_events import pollers  # noqa: E402
 import sqlite3  # noqa: E402
@@ -600,6 +600,35 @@ class InstagramThreadTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("seen", ig.cdp.expression)
         self.assertEqual(calls[-1], "Target.closeTarget")
         self.assertIsNone(await ig.thread("1; alert(1)"))
+
+
+
+class DiscordTest(unittest.IsolatedAsyncioTestCase):
+    async def test_logged_out_is_said_once(self):
+        tmp = tempfile.mkdtemp()
+        sink = FakeSink()
+        p = pipeline(tmp, sink=sink)
+        url = {"now": "https://discord.com/channels/@me"}
+
+        class FakeCDP:
+            async def call(self, method, params=None, session=None):
+                if method == "Target.getTargets":
+                    return {"result": {"targetInfos": [{"targetId": "D", "url": url["now"]}]}}
+                if method == "Target.createTarget":
+                    return {"result": {"targetId": "D"}}
+                if method == "Target.attachToTarget":
+                    return {"result": {"sessionId": "S"}}
+                return {"result": {}}
+
+        task = asyncio.create_task(keep_discord(FakeCDP(), "https://discord.com/channels/@me", every=0.01, pipeline=p))
+        await asyncio.sleep(0.05)
+        self.assertEqual(sink.events, [])
+        url["now"] = "https://discord.com/login?redirect_to=%2Fchannels%2F%40me"
+        await eventually(lambda: sink.events)
+        await asyncio.sleep(0.05)
+        task.cancel()
+        self.assertEqual([e["key"] for e in sink.events], ["system:discord-logged-out"])
+        self.assertIn("logged out", sink.events[0]["text"])
 
 
 if __name__ == "__main__":

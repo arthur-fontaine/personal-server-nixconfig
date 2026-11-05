@@ -379,13 +379,26 @@ async def paused(cdp: CDP, session: str, host: str) -> None:
         await cdp.call("Debugger.resume", {}, session)
 
 
-async def keep_discord(cdp: CDP, url: str, every: float = 60, host: str = "discord.com") -> None:
-    """One Discord tab, open in the background and hooked; reopened when gone."""
-    target = None
+async def keep_discord(cdp: CDP, url: str, every: float = 60, host: str = "discord.com",
+                       pipeline: Pipeline | None = None) -> None:
+    """One Discord tab, open in the background and hooked; reopened when gone.
+    Logged out, Discord sends it to /login, where nothing ever notifies: the
+    user hears of it once."""
+    target, warned = None, False
     while True:
         try:
             pages = (await cdp.call("Target.getTargets"))["result"]["targetInfos"]
             mine = next((t for t in pages if t["targetId"] == target), None)
+            logged_out = bool(mine) and "/login" in mine.get("url", "")
+            if not logged_out:
+                warned = False
+            elif not warned:
+                warned = True
+                log.warning("Discord is logged out in Hermes' Chrome")
+                if pipeline is not None:
+                    pipeline.system("discord-logged-out", "Discord is logged out in Hermes' Chrome, so its "
+                                    "messages no longer reach Hermes: run scripts/bootstrap-macos.sh at the Mac to "
+                                    "log in again.")
             if not mine or host not in mine.get("url", ""):
                 target = (await cdp.call("Target.createTarget", {"url": "about:blank", "background": True}))["result"]["targetId"]
                 session = (await cdp.call("Target.attachToTarget", {"targetId": target, "flatten": True}))["result"]["sessionId"]
@@ -421,7 +434,7 @@ async def instagram_watch(pipeline: Pipeline, devtools: str, host: str = "instag
                     log.info("watching Instagram's notifications")
                     if discord:
                         await cdp.call("Browser.grantPermissions", {"origin": discord_origin, "permissions": ["notifications"]})
-                        cdp.spawn(keep_discord(cdp, discord, host=discord_host))
+                        cdp.spawn(keep_discord(cdp, discord, host=discord_host, pipeline=pipeline))
                     delay = 5
                     await reader
         except Exception as err:

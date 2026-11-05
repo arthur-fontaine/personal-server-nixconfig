@@ -86,7 +86,7 @@ When a source cannot be read, the event goes on without its history.
 | WhatsApp | messages to you | `wacli sync --webhook` | done |
 | iMessage, SMS | messages to you | `imsg watch --json` | done |
 | Instagram | its notifications (DMs, comments, mentions…) | Web Push to Hermes' always-open Google Chrome; the daemon hooks `showNotification` in Instagram's service worker over CDP | done |
-| Discord | its notifications (DMs, mentions) | a Discord tab the daemon keeps open in that Chrome, hooked on each document (Discord notifies from the open tab, not through push) | done |
+| Discord | its notifications (DMs, mentions) | a Discord tab the daemon keeps open in that Chrome, hooked on each document (Discord notifies from the open tab, not through push); logged out, it says so once in the main chat | done |
 | Home Assistant | state changes in the watched domains (locks, the alarm, binary sensors, people) and entities, one per entity per 30 s | its WebSocket API (`state_changed`), with `HASS_TOKEN`; `server.hermes.homeassistant.watchDomains` / `watchEntities` | done |
 | HomeKit | accessory changes you choose (door, motion, leak…) | HomeClaw's webhook | done |
 | Calendar | new events, events starting within 30 min | iMCP `events_fetch`, every 5 min | done |
