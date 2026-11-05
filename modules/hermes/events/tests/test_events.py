@@ -490,6 +490,12 @@ class HistoryTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Zoé: à quelle heure ?", event["messages"])
         self.assertNotIn("ciné", event["messages"])
         self.assertIn("ciné", UzuTriage("u", "m").request(triage.events[0][0])["messages"][1]["content"])
+        # The small model gets the last lines only.
+        long = {**event, "context": "Earlier:\n" + "\n".join(f"[1{i}:00] me: m{i}" for i in range(10)) + "\n\nThe new messages:"}
+        content = UzuTriage("u", "m").request(long)["messages"][1]["content"]
+        self.assertNotIn("m3", content)
+        self.assertIn("m9", content)
+        self.assertIn("The new messages:\n[", content)
         # A notice has no conversation, but the field the route's prompt names.
         p.notice("calendar", "x", "Soon: dentist", id="c1")
         await eventually(lambda: len(sink.events) == 2)

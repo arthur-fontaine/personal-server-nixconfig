@@ -26,7 +26,9 @@ let
     triage = {
       url = "http://127.0.0.1:${toString server.uzu.port}/v1/chat/completions";
       model = server.uzu.model;
-      timeout = 30;
+      # ~6 s for a message alone on the server; its conversation adds a few
+      # lines (triage.py, recent).
+      timeout = 60;
     };
     batch_seconds = cfg.batchSeconds;
     max_batch_seconds = cfg.maxBatchSeconds;
