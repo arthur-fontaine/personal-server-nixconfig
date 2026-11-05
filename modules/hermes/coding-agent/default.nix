@@ -2,7 +2,7 @@
 # reviews its branch (docs/sandbox.md). Everything of it is in this folder:
 #   hermes-plugin/  the Hermes plugin "sandbox" (sandbox_run…, the broker's actions)
 #   sidecar/        hermes-sandbox, the Node host owning one VM (pkgs/hermes-sandbox.nix)
-#   pi/             Pi as the image has it: its packages, settings.json, extensions/
+#   pi/             Pi as the image has it: its packages, settings.json, advisor.json, extensions/
 #   tests/          the plugin's tests, against a fake sidecar (checks: coding-agent)
 #
 # Two modules, for two module systems: `options` is nix-darwin's

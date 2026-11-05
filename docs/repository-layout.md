@@ -39,7 +39,7 @@ modules/
       default.nix         server.hermes.sandbox, and its wiring into Hermes (imported by options/ and agent/)
       hermes-plugin/      the plugin "sandbox": sandbox_run…, the broker's actions (Python)
       sidecar/            hermes-sandbox: the Node host owning one Gondolin VM (pkgs/hermes-sandbox.nix)
-      pi/                 Pi as the image has it: packages (for linux-arm64), settings.json, extensions/
+      pi/                 Pi as the image has it: packages (for linux-arm64), settings.json, advisor.json, extensions/
       tests/              the plugin's tests, against a fake sidecar
     events/               hermes_events: screens incoming messages, posts proposals (Python)
     fast-act/             fast_act: browser_fast_act, a decision model driving Chrome through Cua (Python)

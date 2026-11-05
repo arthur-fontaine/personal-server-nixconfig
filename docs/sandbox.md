@@ -54,7 +54,41 @@ never counts a notice as your message.
   `opencode-go/deepseek-v4.1-flash` with thinking `high` (this model has no
   medium), set in Pi's own settings, the repository's `.pi/` configuration
   ignored (`--no-approve`), with one extension of ours: `request_host_action`
-  (below).
+  (below), and an advisor (next section).
+
+## Pi's advisor
+
+Pi runs with [pi-advisor-flow](https://github.com/philipbrembeck/pi-advisor)
+0.14.4 (pinned in `pi/package.json` and its lockfile, loaded by path from
+the guest's `node_modules`, since Pi cannot install an `npm:` package
+offline). Pi is the executor; it gets an `ask_advisor` tool and is prompted
+to call it at its plan, after a failure and before it says it is done, and
+the flow calls it on its own when Pi repeats the same tool call three
+times. The advisor is a second request to a model with a bounded view of
+the session; its answer comes back to Pi as advice, nothing more. Nothing
+inside the VM is approved by it: it is Pi's reviewer, not Hermes'.
+
+Its configuration is `pi/advisor.json`, which a session writes to Pi's
+agent directory (`/root/.pi/agent/advisor.json`, the only one the flow
+reads: a repository's own is ignored), with `server.hermes.sandbox.model`
+and `thinking` as the executor's and `server.hermes.sandbox.advisor` over it:
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| `advisor.model` (`advisor`) | `opencode-go/deepseek-v4.1-flash`, Pi's own | through the same provider, so the same placeholder key and host, opencode.ai: no new grant. `advisorDisableSameModel` is `false`, or the flow would skip a same-model advisor |
+| `advisor.effort` (`advisorEffort`) | `max` | this model takes `low`, `high` or `max` (pi-ai's opencode-go catalog); the executor stays at `high` |
+| `advisor.maxCalls` (`advisorMaxCallsPerSession`) | 5 | Pi's calls and the automatic gate's together; later ones are refused and Pi goes on alone |
+| `advisor.contextMaxChars` (`contextMaxChars`) | 15,000 | how much of the conversation one call carries |
+| `advisorToolResultMaxBytes` | 20,000 | a tool's output, cut, in that view |
+| `advisorRedactSecrets` | `true` | the flow's own redaction of what it sends (the guest holds no secret anyway) |
+| `advisorSessionSummary` | `true` | its usage summary at the end (shown only with a UI) |
+| `alwaysOn` | `true` | active from the session's start: `pi -p` never runs `/advisor` |
+| `simpleMode` | `false` | Simple mode lifts the call budget |
+| `gateFailureMode` | `block-tool` | a gate that fails, blocks or finds the budget spent refuses that one tool call; the default would abort the whole run |
+| `advisorHerdrIntegration`, `advisorScoutEnabled`, `advisorJevFilterEnabled` | `false` | nothing but the model: no terminal integration, no scout, no classifier endpoint |
+
+`server.hermes.sandbox.advisor.enable = false` writes the same file with the
+flow off (`alwaysOn` and its tools off).
 
 ## When Pi needs another host
 
@@ -171,10 +205,11 @@ All in `modules/hermes/coding-agent`:
   answers it) and the broker (`src/broker.mjs`; `src/folders.mjs` copies a
   folder in). If Hermes
   restarts, its sessions end with it (`sandbox_status` says "lost").
-- `pi/`: Pi as the image has it: its packages, from their own lockfile,
-  installed by Nix for linux-arm64; `settings.json` (its model, thinking
-  level and extensions; a session writes it to Pi's agent directory with
-  `server.hermes.sandbox.model` and `thinking` over it); and
+- `pi/`: Pi as the image has it: its packages (Pi, pi-advisor-flow), from
+  their own lockfile, installed by Nix for linux-arm64; `settings.json` (its
+  model, thinking level, packages and extensions; a session writes it to
+  Pi's agent directory with `server.hermes.sandbox.model` and `thinking`
+  over it); `advisor.json`, the advisor's (above); and
   `extensions/request-host-action`, the `request_host_action` tool.
 - `tests/`: the plugin's tests, against a fake sidecar
   (`nix build .#checks.aarch64-darwin.coding-agent`); the sidecar's run in
@@ -193,7 +228,3 @@ the isolation with a made-up key: the guest sees only the placeholder, a host
 without a grant gets 403, opencode.ai answers, `hermes.sandbox` is answered
 by the sidecar: 401 without the token, an answer with it, 400 for an unknown
 field, 401 once the token is revoked. Last, Pi starts.
-
-## Not yet
-
-Pi's advisor is the next stage.
