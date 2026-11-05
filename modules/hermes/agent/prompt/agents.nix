@@ -22,6 +22,19 @@ let
     ++ lib.optional on.runpod ''
       - RunPod: the `runpod` MCP tools (GPU pods).
     ''
+    # Tool search matches every word against the tools' own text, so "turn
+    # off the TV" found nothing and Hermes guessed MCP names: the names here.
+    ++ lib.optional on.homeassistant ''
+      - Their home (Home Assistant: lights, TV, plugs, locks, sensors): the
+        `ha_*` tools, not MCP ones. `ha_list_entities` (filter by domain, as
+        `media_player` for a TV, or by name) finds the device, `ha_get_state`
+        reads it, `ha_list_services` lists what it can do, `ha_call_service`
+        acts (`media_player.turn_off`, `light.turn_on`…).
+    ''
+    ++ lib.optional on.github ''
+      - GitHub: its notifications reach you as events; for the rest, `gh` in
+        the terminal once `gh auth status` says it is logged in.
+    ''
     ++ lib.optional on.onepassword ''
       - Logins: `browser_vault` fills those of the user's 1Password vault
         "${server.hermes.onepassword.vault}" into web pages; you never see the
