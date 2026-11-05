@@ -19,14 +19,18 @@ apple_account() {
 # `tell application` launches an app that is not running, but may send it the
 # command before it is ready: AppleScript then fails with "Application isn't
 # running" (-600), which is not a refusal, so that is retried for a while.
+# AppleScript's own launch does not always bring the app up, and it then
+# answers -600 through every retry: each retry launches the app itself, hidden.
 apple_app() {
-  local what="$1" check="$2" out tries passed
+  local what="$1" check="$2" out tries passed app
+  app="$(sed -n 's/.*tell application \\\{0,1\}"\([^"\\]*\)\\\{0,1\}".*/\1/p' <<< "$check")"
   while :; do
     tries=0
     while :; do
       passed=0
       out="$(as_gateway "$check" 2>&1)" && passed=1
       [ "$passed" = 1 ] || [[ "$out" != *"(-600)"* ]] || [ "$tries" -ge 15 ] && break
+      [ -n "$app" ] && as_gateway "/usr/bin/open -g -j -a '$app'" >/dev/null 2>&1 || true
       tries=$((tries + 1))
       sleep 2
     done
@@ -122,7 +126,7 @@ imcp_mail_reads() {
   init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"hermes-agent","version":"0"}}}'
   call='{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mail_messages_search","arguments":{"limit":1}}}'
   as_gateway "(printf '%s\n' '$init' '{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}' '$call'; sleep 15) \
-    | timeout 20 /Applications/iMCP.app/Contents/MacOS/imcp-server | grep -m1 '\"id\":2' | grep -qv '\"isError\":true'" 2>/dev/null
+    | timeout 20 /Applications/iMCP.app/Contents/MacOS/imcp-server 2>/dev/null | grep -m1 '\"id\":2' | grep -qv '\"isError\":true'" 2>/dev/null
 }
 
 # iMCP reads Mail's own index, ~/Library/Mail/V<n>/MailData/Envelope Index
@@ -193,7 +197,7 @@ imcp_apps() {
   sleep 5
   init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"hermes-agent","version":"0"}}}'
   apple_app "iMCP reachable from Hermes (Local Network)" \
-    "(printf '%s\n' '$init'; sleep 15) | timeout 20 /Applications/iMCP.app/Contents/MacOS/imcp-server | grep -m1 -q serverInfo"
+    "(printf '%s\n' '$init'; sleep 15) | timeout 20 /Applications/iMCP.app/Contents/MacOS/imcp-server 2>/dev/null | grep -m1 -q serverInfo"
   imcp_mail
 }
 
