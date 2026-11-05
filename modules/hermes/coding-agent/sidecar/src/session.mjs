@@ -400,7 +400,11 @@ export class Session {
     const hostPath = path.join(this.config.workdir, name);
     try {
       await run(vm, [...GIT, "bundle", "create", "--quiet", `/tmp/${name}`, ref], { env });
-      fs.writeFileSync(hostPath, await vm.fs.readFile(`/tmp/${name}`), { mode: 0o600 });
+      // Through exec, not vm.fs.readFile: called from this HTTP hook, while
+      // the guest's request waits on it, Gondolin 0.14's readFile never
+      // returns (seen on a real VM; exec does).
+      const encoded = await run(vm, ["base64", "-w", "0", `/tmp/${name}`], { env });
+      fs.writeFileSync(hostPath, Buffer.from(encoded, "base64"), { mode: 0o600 });
       await vm.exec(["rm", "-f", `/tmp/${name}`], { env }).catch(() => {});
       const answer = await this.#ask("git_push", { branch }, { bundle: name, base: this.base });
       if (answer.status !== "allowed") return answer;

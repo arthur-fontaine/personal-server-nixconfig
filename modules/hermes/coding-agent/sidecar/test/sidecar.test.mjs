@@ -681,6 +681,9 @@ class WaitingVm extends FakeVm {
       this.files.set(argv.at(-2), Buffer.from(`BUNDLE ${argv.at(-1)}`));
       return Promise.resolve({ exitCode: 0, stdout: "", stderr: "" });
     }
+    if (argv[0] === "base64") {
+      return Promise.resolve({ exitCode: 0, stdout: this.files.get(argv.at(-1)).toString("base64"), stderr: "" });
+    }
     return super.exec(argv, options);
   }
 }
@@ -709,8 +712,8 @@ test("session: the broker's actions reach the plugin typed, and their answers ac
     const response = await vm.options.httpHooks.onRequest(post(body, { token }));
     return [response.status, await response.json()];
   };
-  const answerNext = async (fields) => {
-    const before = lines.filter((l) => l.type === "request").length;
+  const requests = () => lines.filter((l) => l.type === "request").length;
+  const answerNext = async (fields, before = requests()) => {
     await until(() => lines.filter((l) => l.type === "request").length > before, "a request");
     const request = lines.filter((l) => l.type === "request").at(-1);
     write({ type: "reply", id: request.id, ...fields });
@@ -733,9 +736,13 @@ test("session: the broker's actions reach the plugin typed, and their answers ac
 
   // git_push: the branch must exist; it leaves as a bundle the plugin pushes.
   assert.deepEqual(await call({ action: "git_push", branch: "sandbox/nope" }), [200, { ok: false, status: "error", result: { error: "no such branch in /workspace/repo" } }]);
+  const asked = requests();
   pending = call({ action: "git_push", branch: "sandbox/w" });
-  request = await answerNext({ status: "allowed", by: "owner", outcome: "pushed" });
+  await until(() => fs.existsSync(path.join(workdir, "push-1.bundle")), "the bundle on the host");
+  const pushed = fs.readFileSync(path.join(workdir, "push-1.bundle"), "utf8");
+  request = await answerNext({ status: "allowed", by: "owner", outcome: "pushed" }, asked);
   assert.equal(request.bundle, "push-1.bundle");
+  assert.equal(pushed, "BUNDLE refs/heads/sandbox/w", "the plugin finds the guest's bundle on the host");
   assert.deepEqual(await pending, [200, { ok: true, status: "allowed", result: { pushed: "sandbox/w" } }]);
   assert.ok(!fs.existsSync(path.join(workdir, "push-1.bundle")), "the bundle is gone once pushed");
 
