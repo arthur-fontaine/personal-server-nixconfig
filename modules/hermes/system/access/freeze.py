@@ -80,6 +80,11 @@ def scan(config, now):
         for path, st in walk(root["path"], excluded):
             if st.st_uid != agent.pw_uid or path == root["path"]:
                 continue
+            # Sockets and pipes are a running process's endpoints, not data:
+            # one handed over could no longer be connected to (it needs
+            # write), as the browser harness's socket in /tmp was.
+            if not (stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode) or stat.S_ISLNK(st.st_mode)):
+                continue
             key = f"{st.st_dev}:{st.st_ino}"
             first_seen = ledger.get(key, now)
             seen[key] = first_seen

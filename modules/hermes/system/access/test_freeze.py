@@ -80,5 +80,26 @@ class FreezeTest(unittest.TestCase):
         self.assertNotIn(os.path.join(self.home, ".hermes"), self.frozen)
 
 
+    def test_sockets_and_pipes_never_freeze(self):
+        import socket
+
+        fifo = os.path.join(self.home, "workspace", "pipe")
+        os.mkfifo(fifo)
+        # A short path: AF_UNIX allows ~104 bytes.
+        sock_dir = tempfile.mkdtemp(dir="/tmp")
+        sock_path = os.path.join(sock_dir, "s.sock")
+        server = socket.socket(socket.AF_UNIX)
+        server.bind(sock_path)
+        try:
+            config = {**self.config, "roots": [*self.config["roots"], {"path": sock_dir}]}
+            freeze.scan(config, time.time() + 2 * DAY)
+            self.assertNotIn(fifo, self.frozen)
+            self.assertNotIn(sock_path, self.frozen)
+            self.assertIn(os.path.join(self.home, "workspace"), self.frozen)
+        finally:
+            server.close()
+            shutil.rmtree(sock_dir, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()
