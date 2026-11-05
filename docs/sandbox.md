@@ -35,15 +35,16 @@ never counts a notice as your message.
   (`opencode.ai`) and `hermes.sandbox`, Hermes' broker as the guest names
   it; anything else Pi asks Hermes for (below), and a refusal is a 403.
   `hermes.sandbox` is answered by the sidecar itself, before any lookup, so
-  its requests never leave this Mac; until the broker comes (a later stage)
-  its answer is a 503. Each decision goes to the session's `audit.jsonl`,
+  its requests never leave this Mac: it is Hermes' broker (below). Each decision goes to the session's `audit.jsonl`,
   with the host, method and path, never headers or query. A grant can be
   narrowed to a method and a path prefix; paths are compared as the URL
   parser leaves them, never percent-decoded, and one still holding an
   encoded `/`, `\` or `.` (`%2F`, `%5C`, `%2E`) matches no path prefix, only
   a grant for the whole host: decoded, `/repos/a%2F..%2Fb` would pass for a
   path under `/repos/a`.
-- **Secrets**: none. Pi reads `OPENCODE_API_KEY`, which in the guest is a
+- **Secrets**: none of this Mac's. The one value the guest holds is the
+  broker's token (`HERMES_BROKER_TOKEN`), made for the session and dead once
+  Pi is done. Pi reads `OPENCODE_API_KEY`, which in the guest is a
   random placeholder; the host swaps it for the real key
   (`server.hermes.sandbox.keyEnv`, `OPENCODE_GO_API_KEY` in the secrets
   file) in the headers of requests to opencode.ai only, and blocks it to any
@@ -51,7 +52,8 @@ never counts a notice as your message.
   Hermes' environment.
 - **Pi**: 1.5.0, headless (`--mode json --print`), on
   `opencode-go/deepseek-v4.1-flash` with thinking `high` (this model has no
-  medium), the repository's own `.pi/` configuration ignored (`--no-approve`).
+  medium), the repository's own `.pi/` configuration ignored (`--no-approve`),
+  with one extension of ours: `request_host_action` (below).
 
 ## When Pi needs another host
 
@@ -89,6 +91,39 @@ no host of its own (Pi runs offline, its telemetry and update check off), so
 nothing else is allowed in advance. At most four questions per session wait
 at once; more are refused.
 
+## What else Pi can ask Hermes for
+
+Pi has one tool for Hermes, `request_host_action`, which sends one typed
+action to the broker, `POST https://hermes.sandbox/v1/actions`. The sidecar
+answers it, never the network. Each call needs the session's bearer token
+(made by the plugin at launch with `secrets.token_urlsafe`, given to the
+sidecar in its environment and to the guest as `HERMES_BROKER_TOKEN`,
+checked in constant time). It is revoked when Pi is done or the session
+stops, and every later call gets a 401. The body is JSON, 16 KB at most, and
+each action has a strict schema: a field it does not name is a 400. No action
+has a field for Pi's reasons. The action is judged on its own, as the
+planned action `sandbox_<action>` {session, …its fields}, by the same two
+steps as a host: the auto-review against your messages from `sandbox_run`,
+then your buttons.
+
+| Action | Fields | What Hermes does when it is allowed |
+| --- | --- | --- |
+| `request_host` | `host`, `method?`, `pathPrefix?` | adds the grant to the session, before Pi's requests need it. The auto-review grants it at low risk; otherwise you get **Grant it this session** / **Deny**. No question about an address or a bare name (refused) |
+| `request_folder` | `path` (absolute, or `~/…`: Hermes' home) | resolves it on this Mac (the card shows the absolute path, and what Pi typed if it differs) and copies it into the sidecar's memory, where the guest reads it under `/host/<name>` through Gondolin's `ReadonlyProvider`. It is a snapshot taken when you say yes, never a mount, never written back, and read-only even to the guest's root. Regular files and folders only (no symlinks), at most 10,000 files and 100 MB. Hermes reads only what its account may: a missing folder and a forbidden one get the same error, and nobody is asked |
+| `git_push` | `branch` | only the session's own branch, `sandbox/<id>` or `sandbox/<id>-<name>`, and only when the session came from a repository with an `origin`. The branch leaves the VM as a bundle, is fetched into the review clone (`review.git`), and is pushed from there to `origin`'s URL by this Mac's git. Hooks are off, `ext::` transports are refused, there is no checkout and no force, so a branch already pushed only fast-forwards. The card shows the repository, the remote (without credentials), the head and the commits since the session began |
+| `ask_user` | `question`, `choices` (2 to 4) | sends you the question, marked as Pi's words, with its choices and **Don't answer**. Pi gets the choice you tap. It is not auto-reviewed, since you are the one asked. At most 10 per session |
+| `shell` | `command`, `cwd?` | **always your buttons** (**Run it once** / **Deny**), even when the auto-review would clear it: its rating goes on the card. The command runs with `bash -c` as Hermes' account, in a new temporary folder under `~/.hermes/sandbox/shell` (or `cwd`, resolved like a folder). Its environment is rebuilt from nothing (`PATH`, `HOME`, `LANG`, `TMPDIR`), so no variable of the secrets file comes along. It is stopped after 2 minutes. Pi gets the exit code and at most 4 KB of output, passed through Hermes' redaction (`agent/redact.py`) |
+
+The answer Pi gets is minimal: `{ok, status, result?}`, `status` being
+`allowed`, `denied`, `timeout` or `error`. It never carries the auto-review's
+reasons, never a path of this Mac beyond what Pi sent, never a secret. The
+`result` is the grant, the folder's `/host` path and file count, `pushed`,
+the answer, or the command's exit code and output. A denial or a timeout is
+final for the session: the same action asked again gets the same answer
+without a question. At most four actions wait at once (a 429 beyond), and so
+do at most four questions to you per session. A decision taken after the
+session ended does nothing.
+
 Every decision is a line of the session's
 `~/.hermes/sandbox/sessions/<id>/audit.jsonl`: the time, the session, the
 request (method, scheme, host, path: never its headers or query), the
@@ -96,7 +131,12 @@ decision, who took it (`grant`, `guard`, `owner`, `timeout`, `unavailable`,
 `limit`, `policy`, `error`), the outcome for the guest (allowed by a grant,
 allowed once, allowed and granted for the session, refused: 403), the grant
 involved and the reason (the auto-review's rating, the button tapped). The
-grants added or revoked by hand are lines too.
+grants added or revoked by hand are lines too, and so is every broker call
+(`event: "action"`): the action, its typed fields (never the token), the
+decision (`allowed`, `denied`, `timeout`, `error`), who took it (`guard`,
+`owner`, `policy`, `limit`, `final` for a denial repeated, `broker` for a call
+refused before any decision: 401, 400, 413…) and the outcome (granted,
+copied N files to /host/…, pushed, ran with exit N…).
 
 ## How it comes back
 
@@ -116,17 +156,20 @@ git fetch ~hermes/.hermes/sandbox/sessions/<id>/review.git sandbox/<id>:sandbox/
 ## The pieces
 
 - `modules/hermes/plugins/sandbox`: the plugin (the tools; `runner.py`: the
-  sessions, the bundles, the review). Its settings, from
+  sessions, the bundles, the review; `approval.py`: the auto-review and the
+  buttons; `actions.py`: the broker's actions). Its settings, from
   `modules/hermes/agent/sandbox.nix`, are in `~/.hermes/sandbox/config.json`.
 - `modules/hermes/sandbox`: `hermes-sandbox` (`pkgs/hermes-sandbox.nix`), a
   Node sidecar, one process per session, speaking JSON lines on stdio with the
   plugin (`src/protocol.mjs`). It owns the VM and its network policy
   (`src/policy.mjs`: a grant set that can change while the VM runs, and the
   question to Hermes for what no grant covers; the plugin's `approval.py`
-  answers it). If Hermes
+  answers it) and the broker (`src/broker.mjs`; `src/folders.mjs` copies a
+  folder in). If Hermes
   restarts, its sessions end with it (`sandbox_status` says "lost").
 - `modules/hermes/sandbox/guest`: Pi's packages for the VM, from their own
-  lockfile, installed by Nix for linux-arm64.
+  lockfile, installed by Nix for linux-arm64, and its extension
+  (`extensions/request-host-action`, the `request_host_action` tool).
 
 The guest image (Alpine 3.23 with Node, git, bash, ripgrep, fd and Pi's
 tree) is built by Gondolin's own builder, without Docker, the first time a
@@ -139,9 +182,9 @@ at a time, stopped after `timeout` (two hours).
 `sudo -iu hermes hermes-sandbox smoke` builds the image if need be and checks
 the isolation with a made-up key: the guest sees only the placeholder, a host
 without a grant gets 403, opencode.ai answers, `hermes.sandbox` is answered
-by the sidecar (503), Pi starts.
+by the sidecar: 401 without the token, an answer with it, 400 for an unknown
+field, 401 once the token is revoked. Last, Pi starts.
 
 ## Not yet
 
-A broker for typed actions (a push, say) on Pi's behalf, and Pi's advisor
-are the next stages.
+Pi's advisor is the next stage.

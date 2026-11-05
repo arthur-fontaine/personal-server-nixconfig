@@ -162,7 +162,8 @@ watch pattern matching). Hermes' own checks stay underneath:
 its pattern-matched dangerous commands, and its hardline blocklist.
 
 The same review answers what a sandboxed Pi session asks Hermes for (a host
-its grants do not cover; [sandbox.md](sandbox.md)). Nothing inside the VM is
+its grants do not cover, a folder of this Mac, a push, a command here;
+[sandbox.md](sandbox.md)); a command here always comes to you. Nothing inside the VM is
 approved: Pi runs its own commands freely there. Pi asks Hermes for access,
 and Hermes' approval system decides as for one of its own tool calls: the
 decision model reviews the request against your messages from when Hermes
@@ -196,7 +197,10 @@ key is swapped in by the host, for opencode.ai only) and no network but its
 model, and `sandbox_result` reads its branch from a review clone where nothing
 it wrote can run. When Pi needs another host, it asks Hermes for access and
 Hermes' approval system decides: the auto-review, or your buttons (Once, this
-method and path, the whole host, Deny; no answer refuses). You take the branch with `git fetch`, after reading it. The
+method and path, the whole host, Deny; no answer refuses). Pi may also ask,
+with typed actions only, for a read-only copy of a folder, a push of its
+branch, your answer to a question, or a command here (always your buttons).
+You take the branch with `git fetch`, after reading it. The
 details: [sandbox.md](sandbox.md).
 
 ## Integrations: WhatsApp, Instagram, Discord, 1Password…
