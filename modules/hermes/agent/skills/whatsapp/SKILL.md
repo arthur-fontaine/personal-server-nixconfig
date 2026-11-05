@@ -31,6 +31,8 @@ Adapted from https://github.com/openclaw/openclaw/blob/1aea2df9351969f6cbac4bc17
 ## Read and search
 
 - Recent chats: `wacli --json chats list --limit 20`, or `--query "name or number"`.
+- A chat's latest messages, both sides (`FromMe` is the user):
+  `wacli --json --read-only messages list --chat <jid> --limit 20` (newest first).
 - Search: `wacli --json messages search "words" --limit 20 [--chat <jid>]`,
   with `--after 2026-01-01 --before 2026-02-01` or `--has-media`.
 - One message: `wacli --json messages show --chat <jid> --id <message_id> --full`
@@ -45,6 +47,10 @@ Adapted from https://github.com/openclaw/openclaw/blob/1aea2df9351969f6cbac4bc17
 You write as the user, to real people: only send when the user asked for that
 message to that person. Confirm the recipient and the exact text first, unless
 they gave both explicitly in the same request.
+
+Read the chat's latest messages first (`messages list` above) and write what
+follows them: no second hello or introduction in a running conversation, and
+nothing it already says.
 
 - Text: `wacli send text --to "+33612345678" --message "…"`; a group:
   `--to "<id>@g.us"`; a synced contact or chat name works too.

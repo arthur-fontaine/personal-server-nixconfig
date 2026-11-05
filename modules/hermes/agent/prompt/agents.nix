@@ -160,7 +160,10 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
   fails for a permission or an app that is not running, tell the user to run
   scripts/bootstrap-macos.sh again, over SSH while looking at the Mac.
 
-  ${lib.optionalString (accounts != [ ]) ("The user's other accounts, where you act as them:\n" + lib.concatStrings accounts + "\n")}Any other account or service of theirs is not set up here: say so, and that
+  ${lib.optionalString (accounts != [ ]) ("The user's other accounts, where you act as them:\n" + lib.concatStrings accounts + "\n"
+    + "Before you write in a conversation as them, read its latest messages, both\n"
+    + "sides, and write what follows: no second hello or introduction, nothing it\n"
+    + "already says.\n\n")}Any other account or service of theirs is not set up here: say so, and that
   turning it on is an integration in this repository (server.hermes.integrations)
   plus a run of scripts/bootstrap-macos.sh.
 
