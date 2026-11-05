@@ -95,6 +95,12 @@ export function guestEnv(secretEnv, broker = null) {
     GIT_AUTHOR_EMAIL: "pi@sandbox.invalid",
     GIT_COMMITTER_NAME: "Pi (sandbox)",
     GIT_COMMITTER_EMAIL: "pi@sandbox.invalid",
+    // /workspace is owned by another uid than the guest's root, and git
+    // refuses such a repository; safe.directory counts only from the
+    // command line or the global config, and this is the command line's.
+    GIT_CONFIG_COUNT: "1",
+    GIT_CONFIG_KEY_0: "safe.directory",
+    GIT_CONFIG_VALUE_0: "*",
   };
 }
 

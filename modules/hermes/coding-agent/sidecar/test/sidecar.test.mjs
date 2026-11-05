@@ -423,6 +423,7 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
   assert.equal(pi.options.env.OPENCODE_API_KEY, "PLACEHOLDER");
   assert.equal(pi.options.env.HERMES_BROKER_TOKEN, session.broker.token);
   assert.equal(pi.options.env.HERMES_BROKER_URL, "https://hermes.sandbox/v1/actions");
+  assert.deepEqual([pi.options.env.GIT_CONFIG_KEY_0, pi.options.env.GIT_CONFIG_VALUE_0], ["safe.directory", "*"], "Pi's git takes the repository");
   const settings = JSON.parse(vm.files.get("/root/.pi/agent/settings.json").toString());
   assert.deepEqual([settings.defaultProvider, settings.defaultModel, settings.defaultThinkingLevel], ["opencode-go", "deepseek-v4.1-flash", "high"]);
   assert.deepEqual(settings.extensions, ["/opt/pi/extensions/request-host-action"]);
