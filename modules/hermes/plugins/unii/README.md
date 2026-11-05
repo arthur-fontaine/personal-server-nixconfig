@@ -19,6 +19,7 @@ session search and its compaction are switched off: the view replaces them.
 | `compactor.py` | building nodes: queue, ruler, retries (§4) |
 | `prompts.py` | the compaction prompt and tasks, verbatim (§4–5) |
 | `engine.py` | the turn (§6) as a Hermes context engine |
+| `refresh.py` | new instructions reach the chat (below) |
 | `../../agent/prompt/SOUL.md` | the turn prompt, verbatim (§5) |
 
 Where it departs from the design:
@@ -28,6 +29,12 @@ Where it departs from the design:
 - Logs are one file per volume rather than one per day.
 - The view is one user message (view, then the turn's state, then the message)
   instead of separate blocks.
+
+Hermes freezes a session's system prompt and tool list at its first turn, and
+the single chat is one session that never ends: a new SOUL.md, AGENTS.md or
+config.yaml (a toolset, an MCP server) never reached it. When one of them
+changed, the plugin's first load in a process clears every open session's
+stored prompt and tool list, so Hermes builds both again on the next turn.
 
 ## Sub-chats
 

@@ -353,5 +353,52 @@ class GatewayHooksTest(Temp):
         self.assertIsNone(hooks.post_gateway_admission(session_key=MAIN_KEY, platform="whatsapp", text="hi"))
 
 
+class FakeSessions:
+    def __init__(self, rows):
+        self.rows = rows
+        self.prompts = {r["id"]: "old" for r in rows}
+        self.tools = {r["id"]: "[]" for r in rows}
+        self.closed = 0
+
+    def list_sessions_rich(self, **_):
+        return self.rows
+
+    def update_system_prompt(self, sid, prompt):
+        self.prompts[sid] = prompt
+
+    def update_session_tool_names(self, sid, pin):
+        self.tools[sid] = pin
+
+    def close(self):
+        self.closed += 1
+
+
+class RefreshTest(Temp):
+    def test_changed_instructions_reset_open_sessions_once(self):
+        from unii.refresh import refresh_prompts
+
+        home = os.path.join(self.root, "home")
+        workspace = os.path.join(self.root, "workspace")
+        os.makedirs(home)
+        os.makedirs(workspace)
+        agents = os.path.join(workspace, "AGENTS.md")
+        with open(agents, "w") as f:
+            f.write("v1")
+        db = FakeSessions([{"id": "open", "ended_at": None}, {"id": "ended", "ended_at": 1.0}])
+
+        self.assertEqual(refresh_prompts(home, workspace, lambda: db), 1)
+        self.assertEqual((db.prompts, db.tools), ({"open": None, "ended": "old"}, {"open": None, "ended": "[]"}))
+
+        db.prompts["open"] = "new"
+        self.assertEqual(refresh_prompts(home, workspace, lambda: db), 0)
+        self.assertEqual(db.prompts["open"], "new")
+
+        with open(agents, "w") as f:
+            f.write("v2")
+        self.assertEqual(refresh_prompts(home, workspace, lambda: db), 1)
+        self.assertIsNone(db.prompts["open"])
+        self.assertEqual(db.closed, 2)
+
+
 if __name__ == "__main__":
     unittest.main()

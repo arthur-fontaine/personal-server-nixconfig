@@ -1,6 +1,6 @@
 # The single chat's memory is the unii plugin (../plugins/unii). Hermes' own
 # memory, its distillation and its compaction are off: the view replaces them.
-{ lib, pkgs, server, ... }:
+{ config, lib, pkgs, server, ... }:
 let
   cfg = server.hermes;
 
@@ -28,6 +28,9 @@ in
       volumes = cfg.memory.volumes;
       presets = cfg.subchats.presets;
       default_preset = cfg.subchats.default;
+      # Where AGENTS.md is: a change to it rebuilds the chat's prompt
+      # (../plugins/unii/refresh.py).
+      workspace = config.services.hermes-agent.workingDirectory;
     };
 
     settings = {

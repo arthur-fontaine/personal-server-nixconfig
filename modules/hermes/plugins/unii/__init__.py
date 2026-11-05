@@ -93,6 +93,13 @@ def register(ctx) -> None:
         state["hooks"] = Hooks(runtime)
         register_sweeper(state["hooks"])
         logger.info("unii: memory in %s", runtime.root)
+        try:
+            from .refresh import refresh_prompts
+            from .runtime import _session_db
+
+            refresh_prompts(home, config.get("workspace", ""), _session_db)
+        except Exception:
+            logger.warning("unii: could not refresh the sessions' prompts", exc_info=True)
 
     ctx.register_context_engine(UniiEngine(runtime))
     if real:
