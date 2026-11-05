@@ -17,7 +17,7 @@ import { BROKER_PATH, Broker } from "./broker.mjs";
 import { copyFolder } from "./folders.mjs";
 import { NetworkPolicy, describeRequest, normalizeGrant, unaskable } from "./policy.mjs";
 import { PiProgress } from "./pi-events.mjs";
-import { PI_CLI, PI_DIR, ensureImage } from "./image.mjs";
+import { PI_CLI, ensureImage } from "./image.mjs";
 
 const REPO = "/workspace/repo";
 const GIT = ["git", "-c", "safe.directory=*", "-c", "core.hooksPath=/dev/null", "-C", REPO];
@@ -48,25 +48,36 @@ export const DEFAULTS = {
 // What the guest is given to reach the broker; the token comes from the
 // plugin (HERMES_SANDBOX_TOKEN), a new one per session.
 export const BROKER_ENV = { url: "HERMES_BROKER_URL", token: "HERMES_BROKER_TOKEN" };
-// Pi's side of the broker (guest/extensions), loaded explicitly: the
-// repository's own .pi/ stays ignored.
-export const BROKER_EXTENSION = `${PI_DIR}/extensions/request-host-action/index.js`;
+// Pi's agent directory in the guest: its settings.json starts from the one
+// baked into the image (../pi/settings.json: model, thinking, extensions),
+// with the session's model and thinking over them.
+export const PI_AGENT_DIR = "/root/.pi/agent";
 // Folders of this Mac Pi asked for and Hermes gave: read-only copies.
 export const HOST_FILES = "/host";
 
-export function piArgv({ task, model, thinking }) {
+export function piArgv({ task }) {
   // Pi reads a leading @ as a file to attach.
   const message = task.startsWith("@") ? ` ${task}` : task;
   return [
     "node", PI_CLI,
     "--mode", "json", "--print",
-    "--model", model, "--thinking", thinking,
     // The repository is the task's subject, not configuration: its .pi/
-    // settings and extensions are ignored.
+    // settings and extensions are ignored; ours (PI_AGENT_DIR) are not.
     "--no-approve",
-    "--extension", BROKER_EXTENSION,
     "--", message,
   ];
+}
+
+// The image's settings.json with the session's model ("provider/id") and
+// thinking level.
+export function piSettings(guestDir, { model, thinking }) {
+  const baked = JSON.parse(fs.readFileSync(path.join(guestDir, "settings.json"), "utf8"));
+  const slash = model.indexOf("/");
+  return {
+    ...baked,
+    ...(slash > 0 ? { defaultProvider: model.slice(0, slash), defaultModel: model.slice(slash + 1) } : { defaultModel: model }),
+    defaultThinkingLevel: thinking,
+  };
 }
 
 export function guestEnv(secretEnv, broker = null) {
@@ -269,6 +280,8 @@ export class Session {
     this.#checkStopped();
 
     this.setPhase("pi");
+    await run(vm, ["mkdir", "-p", PI_AGENT_DIR], { env });
+    await vm.fs.writeFile(`${PI_AGENT_DIR}/settings.json`, JSON.stringify(piSettings(config.guestDir, config), null, 2));
     this.audit({ event: "pi", model: config.model, thinking: config.thinking });
     const pi = await this.#runPi(vm, env);
     // Pi is done: nothing in the guest may ask Hermes for anything now.

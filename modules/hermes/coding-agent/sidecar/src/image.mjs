@@ -3,7 +3,8 @@
 // configuration, into Hermes' state. No Docker: postBuild.commands would need
 // one on macOS (build/index.js, shouldUseContainer), so nothing runs in the
 // rootfs at build time; Pi arrives as a finished node_modules tree
-// (postBuild.copy) that Nix installed for linux-arm64 from guest/'s lockfile.
+// (postBuild.copy) that Nix installed for linux-arm64 from ../pi's lockfile,
+// with Pi's settings.json and extensions.
 
 import crypto from "node:crypto";
 import fs from "node:fs";

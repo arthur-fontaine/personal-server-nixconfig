@@ -6,7 +6,7 @@ comes back to the chat as an internal notification turn (the gateway's
 completion queue, as a background process' does). sandbox_result reads Pi's
 branch from a review clone; nothing from the VM runs on the host, and its
 branch reaches the user's repository only by the user's own `git fetch`.
-config.json (agent/sandbox.nix) names the sidecar and the session's settings.
+config.json (../default.nix) names the sidecar and the session's settings.
 When Pi needs a host no grant covers, the sidecar asks; approval.py decides.
 """
 

@@ -18,7 +18,7 @@ in
     ./computer-use.nix
     ./fast-act.nix
     ./guard.nix
-    ./sandbox.nix
+    (import ../coding-agent).agent
     ./owner-approval.nix
     ./apple.nix
     ./whatsapp.nix

@@ -6,13 +6,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
+import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
 
 import { Peer } from "../src/protocol.mjs";
 import { Grants, NetworkPolicy, ambiguousPath, describeRequest, normalizeGrant } from "../src/policy.mjs";
 import { PiProgress } from "../src/pi-events.mjs";
 import { buildConfig, imageId, ensureImage } from "../src/image.mjs";
-import { Session, brokerResponse, piArgv } from "../src/session.mjs";
+import { Session, brokerResponse, piArgv, piSettings } from "../src/session.mjs";
 import { Broker, InvalidAction, MAX_BODY, validateAction } from "../src/broker.mjs";
 import { FolderTooLarge, copyFolder } from "../src/folders.mjs";
 
@@ -38,6 +39,7 @@ function peerPair() {
 function readOnlyGuest() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-guest-"));
   fs.mkdirSync(path.join(dir, "node_modules"));
+  fs.copyFileSync(new URL("../../pi/settings.json", import.meta.url), path.join(dir, "settings.json"));
   fs.writeFileSync(path.join(dir, "node_modules", "x.js"), "");
   fs.chmodSync(path.join(dir, "node_modules", "x.js"), 0o444);
   fs.chmodSync(path.join(dir, "node_modules"), 0o555);
@@ -281,11 +283,22 @@ test("pi events: counters, last answer, framing across chunks", () => {
   assert.ok(progress.settled);
 });
 
-test("pi argv: headless JSON mode, model and thinking, no project config, a task never read as a file", () => {
-  const argv = piArgv({ task: "@etc/passwd fix it", model: "opencode-go/deepseek-v4.1-flash", thinking: "high" });
-  assert.deepEqual(argv.slice(2, 10), ["--mode", "json", "--print", "--model", "opencode-go/deepseek-v4.1-flash", "--thinking", "high", "--no-approve"]);
+test("pi argv: headless JSON mode, no project config, a task never read as a file", () => {
+  const argv = piArgv({ task: "@etc/passwd fix it" });
+  assert.deepEqual(argv.slice(2, 6), ["--mode", "json", "--print", "--no-approve"]);
   assert.equal(argv.at(-2), "--");
   assert.equal(argv.at(-1), " @etc/passwd fix it");
+});
+
+test("pi settings: the image's, under the session's model and thinking; the extensions it names exist", () => {
+  const pi = fileURLToPath(new URL("../../pi", import.meta.url));
+  const baked = JSON.parse(fs.readFileSync(path.join(pi, "settings.json"), "utf8"));
+  for (const extension of baked.extensions) {
+    assert.ok(extension.startsWith("/opt/pi/"));
+    assert.ok(fs.existsSync(path.join(pi, extension.slice("/opt/pi/".length), "index.js")), extension);
+  }
+  assert.deepEqual(piSettings(pi, { model: "opencode-go/other-model", thinking: "max" }),
+    { ...baked, defaultProvider: "opencode-go", defaultModel: "other-model", defaultThinkingLevel: "max" });
 });
 
 test("image: identity follows the guest tree, builds once, never half", async () => {
@@ -410,9 +423,9 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
   assert.equal(pi.options.env.OPENCODE_API_KEY, "PLACEHOLDER");
   assert.equal(pi.options.env.HERMES_BROKER_TOKEN, session.broker.token);
   assert.equal(pi.options.env.HERMES_BROKER_URL, "https://hermes.sandbox/v1/actions");
-  assert.equal(pi.argv[pi.argv.indexOf("--extension") + 1], "/opt/pi/extensions/request-host-action/index.js");
-  assert.ok(pi.argv.includes("opencode-go/deepseek-v4.1-flash"));
-  assert.equal(pi.argv[pi.argv.indexOf("--thinking") + 1], "high");
+  const settings = JSON.parse(vm.files.get("/root/.pi/agent/settings.json").toString());
+  assert.deepEqual([settings.defaultProvider, settings.defaultModel, settings.defaultThinkingLevel], ["opencode-go", "deepseek-v4.1-flash", "high"]);
+  assert.deepEqual(settings.extensions, ["/opt/pi/extensions/request-host-action"]);
   assert.ok(lines.some((l) => l.type === "done" && l.result.status === "finished"));
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(workdir, "result.json"), "utf8")).commits, 1);
   const audit = fs.readFileSync(path.join(workdir, "audit.jsonl"), "utf8").trim().split("\n").map(JSON.parse);

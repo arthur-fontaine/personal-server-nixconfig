@@ -1,8 +1,9 @@
-# hermes-sandbox (../modules/hermes/sandbox): the Node sidecar running one Pi
-# session in a Gondolin microVM, and Pi's tree for that VM. Both from their
-# pnpm lockfiles: Gondolin 0.14.0 for the host, Pi 1.5.0 for the guest,
-# installed for linux-arm64 (guest/pnpm-workspace.yaml), copied into the
-# image by `hermes-sandbox build-image`.
+# hermes-sandbox (../modules/hermes/coding-agent/sidecar): the Node sidecar
+# running one Pi session in a Gondolin microVM, and Pi's tree for that VM
+# (../modules/hermes/coding-agent/pi). Both from their pnpm lockfiles:
+# Gondolin 0.14.0 for the host, Pi 1.5.0 for the guest, installed for
+# linux-arm64 (pi/pnpm-workspace.yaml), copied into the image with Pi's
+# settings.json and extensions by `hermes-sandbox build-image`.
 {
   lib,
   stdenvNoCC,
@@ -22,7 +23,8 @@
   which,
 }:
 let
-  root = ../modules/hermes/sandbox;
+  sidecar = ../modules/hermes/coding-agent/sidecar;
+  pi = ../modules/hermes/coding-agent/pi;
   fs = lib.fileset;
   version = "0.1.0";
 
@@ -32,8 +34,8 @@ let
     pname = "hermes-sandbox-guest";
     inherit version;
     src = fs.toSource {
-      root = root + "/guest";
-      fileset = fs.unions (map (f: root + "/guest/${f}") [ "package.json" "pnpm-lock.yaml" "pnpm-workspace.yaml" "extensions" ]);
+      root = pi;
+      fileset = fs.unions (map (f: pi + "/${f}") [ "package.json" "pnpm-lock.yaml" "pnpm-workspace.yaml" "settings.json" "extensions" ]);
     };
     nativeBuildInputs = [ nodejs_24 pnpmConfigHook pnpm ];
     pnpmDeps = fetchPnpmDeps {
@@ -44,8 +46,9 @@ let
     };
     installPhase = ''
       mkdir -p $out
-      # Pi's own extensions (request_host_action), loaded by path.
-      cp -R package.json node_modules extensions $out/
+      # Pi's settings (the session's agent directory starts from them) and
+      # its own extensions (request_host_action), which they load by path.
+      cp -R package.json settings.json node_modules extensions $out/
       # Its only symlinks; the guest runs Pi's cli.js by path.
       rm -rf $out/node_modules/.bin
       test -f $out/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js
@@ -57,13 +60,19 @@ in
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "hermes-sandbox";
   inherit version;
+  # The coding agent's folder, built in sidecar/: its tests also read
+  # ../pi/settings.json and the extensions it names.
   src = fs.toSource {
-    inherit root;
-    fileset = fs.unions [ (root + "/package.json") (root + "/pnpm-lock.yaml") (root + "/src") (root + "/test") ];
+    root = ../modules/hermes/coding-agent;
+    fileset = fs.unions [
+      (sidecar + "/package.json") (sidecar + "/pnpm-lock.yaml") (sidecar + "/src") (sidecar + "/test")
+      (pi + "/settings.json") (pi + "/extensions")
+    ];
   };
+  sourceRoot = "source/sidecar";
   nativeBuildInputs = [ nodejs_24 pnpmConfigHook pnpm makeWrapper ];
   pnpmDeps = fetchPnpmDeps {
-    inherit (finalAttrs) pname version src;
+    inherit (finalAttrs) pname version src sourceRoot;
     inherit pnpm;
     fetcherVersion = 5;
     hash = "sha256-kRh4qGL0BVf2ksa2Py31jWtotqCauS8kE5rU87H86/Y=";

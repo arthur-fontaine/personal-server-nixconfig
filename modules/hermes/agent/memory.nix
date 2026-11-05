@@ -37,7 +37,7 @@ in
         # not add. The Home Assistant one: homeassistant.nix.
         enabled = [ "unii" "owner_approval" "guard" ] # owner-approval.nix, guard.nix
           ++ lib.optional cfg.integrations.homeassistant.enable "homeassistant"
-          ++ lib.optional cfg.sandbox.enable "sandbox"; # sandbox.nix
+          ++ lib.optional cfg.sandbox.enable "sandbox"; # ../coding-agent
         # The compactions may run on another model than the chat.
         entries.unii.llm = lib.optionalAttrs (compactionModel != null) {
           allow_provider_override = true;

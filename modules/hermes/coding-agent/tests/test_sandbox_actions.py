@@ -2,7 +2,7 @@
 owner_approval: what each asks, what the review may clear, and what is done
 here once allowed (a grant, a folder, a push, an answer, a command).
 
-Run from the plugins directory.
+Run with Hermes' interpreter: `python3 -I tests/<this file>`.
 """
 
 from __future__ import annotations
@@ -15,7 +15,8 @@ import tempfile
 import types
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import plugin_path  # noqa: E402,F401
 
 from sandbox.actions import Actions, check, Invalid, shell_env, strip_credentials  # noqa: E402
 from sandbox.approval import Approver  # noqa: E402

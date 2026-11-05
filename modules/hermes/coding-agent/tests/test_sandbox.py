@@ -1,7 +1,8 @@
 """The sandbox plugin against a fake hermes-sandbox (fake_sandbox.py).
 
-Run from the plugins directory. Checks the session's life (one at a time, the
-repository in as a bundle, the completion routed back without Pi's words), the
+Run with Hermes' interpreter: `python3 -I tests/<this file>`.
+
+Checks the session's life (one at a time, the repository in as a bundle, the completion routed back without Pi's words), the
 sidecar's environment (the OpenCode key only), and the review: Pi's branch
 read from a bare clone where no hook, diff driver or textconv runs.
 """
@@ -16,7 +17,8 @@ import tempfile
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import plugin_path  # noqa: E402,F401
 
 from sandbox import tools  # noqa: E402
 from sandbox.approval import Approver  # noqa: E402

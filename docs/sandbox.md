@@ -52,8 +52,9 @@ never counts a notice as your message.
   Hermes' environment.
 - **Pi**: 1.5.0, headless (`--mode json --print`), on
   `opencode-go/deepseek-v4.1-flash` with thinking `high` (this model has no
-  medium), the repository's own `.pi/` configuration ignored (`--no-approve`),
-  with one extension of ours: `request_host_action` (below).
+  medium), set in Pi's own settings, the repository's `.pi/` configuration
+  ignored (`--no-approve`), with one extension of ours: `request_host_action`
+  (below).
 
 ## When Pi needs another host
 
@@ -155,11 +156,14 @@ git fetch ~hermes/.hermes/sandbox/sessions/<id>/review.git sandbox/<id>:sandbox/
 
 ## The pieces
 
-- `modules/hermes/plugins/sandbox`: the plugin (the tools; `runner.py`: the
-  sessions, the bundles, the review; `approval.py`: the auto-review and the
-  buttons; `actions.py`: the broker's actions). Its settings, from
-  `modules/hermes/agent/sandbox.nix`, are in `~/.hermes/sandbox/config.json`.
-- `modules/hermes/sandbox`: `hermes-sandbox` (`pkgs/hermes-sandbox.nix`), a
+All in `modules/hermes/coding-agent`:
+
+- `default.nix`: the options (`server.hermes.sandbox`) and Hermes' wiring:
+  the plugin, and its settings in `~/.hermes/sandbox/config.json`.
+- `hermes-plugin/`: the plugin, `sandbox` to Hermes (the tools; `runner.py`:
+  the sessions, the bundles, the review; `approval.py`: the auto-review and
+  the buttons; `actions.py`: the broker's actions).
+- `sidecar/`: `hermes-sandbox` (`pkgs/hermes-sandbox.nix`), a
   Node sidecar, one process per session, speaking JSON lines on stdio with the
   plugin (`src/protocol.mjs`). It owns the VM and its network policy
   (`src/policy.mjs`: a grant set that can change while the VM runs, and the
@@ -167,9 +171,14 @@ git fetch ~hermes/.hermes/sandbox/sessions/<id>/review.git sandbox/<id>:sandbox/
   answers it) and the broker (`src/broker.mjs`; `src/folders.mjs` copies a
   folder in). If Hermes
   restarts, its sessions end with it (`sandbox_status` says "lost").
-- `modules/hermes/sandbox/guest`: Pi's packages for the VM, from their own
-  lockfile, installed by Nix for linux-arm64, and its extension
-  (`extensions/request-host-action`, the `request_host_action` tool).
+- `pi/`: Pi as the image has it: its packages, from their own lockfile,
+  installed by Nix for linux-arm64; `settings.json` (its model, thinking
+  level and extensions; a session writes it to Pi's agent directory with
+  `server.hermes.sandbox.model` and `thinking` over it); and
+  `extensions/request-host-action`, the `request_host_action` tool.
+- `tests/`: the plugin's tests, against a fake sidecar
+  (`nix build .#checks.aarch64-darwin.coding-agent`); the sidecar's run in
+  its build (`checks.aarch64-darwin.sandbox`).
 
 The guest image (Alpine 3.23 with Node, git, bash, ripgrep, fd and Pi's
 tree) is built by Gondolin's own builder, without Docker, the first time a

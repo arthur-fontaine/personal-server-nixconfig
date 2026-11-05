@@ -8,7 +8,7 @@ new folder next to them.
 flake.nix                 darwinConfigurations, packages, checks
 hosts/                    machine definitions (shared.nix, git-ignored local.nix)
 pkgs/                     what nixpkgs lacks, as an overlay
-checks/                   `nix flake check`: the plugins', the sandbox sidecar's and freeze tests; hermes-turns/, end to end
+checks/                   `nix flake check`: the plugins', the coding agent's and freeze tests; hermes-turns/, end to end
 scripts/                  bootstrap-macos.sh (the setup), hermes-setup.sh (its screen steps, at Hermes' login), uninstall-macos.sh (disable, remove), with gum
   bootstrap/              the setup's sections (lib.sh: their helpers), sourced in the order bootstrap-macos.sh lists
     integrations/         one file per integration's setup
@@ -22,7 +22,7 @@ modules/
     local-network.nix     the local network open to Hermes' agents (no permission dialog)
     nix.nix
   hermes/                 Hermes Agent
-    options/              server.hermes.*: account, model, memory, sub-chats, access, sandbox
+    options/              server.hermes.*: account, model, memory, sub-chats, access (the sandbox's: coding-agent/)
     system/               what it is to macOS (nix-darwin)
       user.nix            its own account, with home-manager
       access/             read.nix, freeze.nix (+ freeze.py), rebuild.nix, secrets.nix
@@ -30,15 +30,17 @@ modules/
     agent/                its home-manager configuration
       default.nix         the upstream module, from scratch, managed mode
       model.nix memory.nix telegram.nix mcp.nix tools.nix computer-use.nix
-      sandbox.nix         the sandbox plugin and its sidecar, when server.hermes.sandbox is on
       prompt/             SOUL.md (UniiChat's prompt), AGENTS.md (this server's rules)
       session/            its GUI session: launchd agents, display, fsearch, defaults, the setup at login
     plugins/unii/         the single-chat memory and sub-chats (Python)
     plugins/guard/        the auto-review of Hermes' actions by a decision model (Python)
     plugins/owner_approval/  asks you with Telegram buttons from outside a turn, for other plugins (Python)
-    plugins/sandbox/      sandbox_run…: Pi sessions in a microVM, their branch reviewed (Python)
-    sandbox/              hermes-sandbox: the Node sidecar owning one Gondolin VM (pkgs/hermes-sandbox.nix)
-      guest/              Pi's packages for the VM, installed for linux-arm64
+    coding-agent/         Pi sessions in a microVM, their branch reviewed (docs/sandbox.md)
+      default.nix         server.hermes.sandbox, and its wiring into Hermes (imported by options/ and agent/)
+      hermes-plugin/      the plugin "sandbox": sandbox_run…, the broker's actions (Python)
+      sidecar/            hermes-sandbox: the Node host owning one Gondolin VM (pkgs/hermes-sandbox.nix)
+      pi/                 Pi as the image has it: packages (for linux-arm64), settings.json, extensions/
+      tests/              the plugin's tests, against a fake sidecar
     events/               hermes_events: screens incoming messages, posts proposals (Python)
     fast-act/             fast_act: browser_fast_act, a decision model driving Chrome through Cua (Python)
   uzu/                    local models: options, the mirai server
@@ -49,8 +51,9 @@ modules/
 
 ```sh
 nix flake check                                   # everything below
-nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval, sandbox)
-nix build .#checks.aarch64-darwin.sandbox         # the sandbox sidecar's tests, in its build
+nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval)
+nix build .#checks.aarch64-darwin.coding-agent    # the coding agent's plugin, against a fake sidecar
+nix build .#checks.aarch64-darwin.sandbox         # the coding agent's sidecar tests, in its build
 nix build .#checks.aarch64-darwin.events          # the events daemon's tests
 nix build .#checks.aarch64-darwin.freeze          # what hermes-freeze picks
 nix build .#darwinConfigurations.Personal-Server.system   # the whole system, without switching

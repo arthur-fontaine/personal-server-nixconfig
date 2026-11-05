@@ -2,7 +2,7 @@
 a fake owner_approval: the auto-review first, against the user's launching
 messages only, then the owner's buttons.
 
-Run from the plugins directory.
+Run with Hermes' interpreter: `python3 -I tests/<this file>`.
 """
 
 from __future__ import annotations
@@ -13,7 +13,8 @@ import time
 import types
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import plugin_path  # noqa: E402,F401
 
 from sandbox import approval  # noqa: E402
 from sandbox.approval import Approver, grant_prefix  # noqa: E402

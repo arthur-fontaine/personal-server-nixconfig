@@ -5,8 +5,7 @@ let
 in
 {
   # The plugins' tests (unii, guard against a fake System One server on
-  # loopback, sandbox against a fake sidecar), in the interpreter Hermes runs
-  # them with.
+  # loopback, owner_approval), in the interpreter Hermes runs them with.
   unii = pkgs.runCommand "unii-tests" { __darwinAllowLocalNetworking = true; nativeBuildInputs = [ pkgs.git ]; } ''
     cp -R ${../modules/hermes/plugins} plugins
     chmod -R u+w plugins
@@ -23,9 +22,23 @@ in
     touch $out
   '';
 
-  # The sandbox sidecar's tests (protocol, network policy, Pi's events, a
-  # session against a fake VM) run in its build; the plugin's are in unii's.
+  # The coding agent's sidecar tests (protocol, network policy, the broker,
+  # Pi's events, a session against a fake VM) run in its build.
   sandbox = pkgs.hermes-sandbox;
+
+  # The coding agent's plugin against a fake sidecar, its approvals and its
+  # broker actions with a fake guard and owner, in Hermes' interpreter.
+  coding-agent = pkgs.runCommand "coding-agent-tests" { nativeBuildInputs = [ pkgs.git ]; } ''
+    cp -R ${../modules/hermes/coding-agent} coding-agent
+    chmod -R u+w coding-agent
+    cd coding-agent
+    export HOME=$TMPDIR
+    for test in tests/test_*.py; do
+      echo "== $test"
+      ${hermes.hermesVenv}/bin/python3 -I "$test"
+    done
+    touch $out
+  '';
 
   # The events daemon's tests: fake uzu and Hermes servers on loopback, and
   # Hermes' own signature check.

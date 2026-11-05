@@ -12,6 +12,6 @@
     ./integrations.nix
     ./homeassistant.nix
     ./decision.nix
-    ./sandbox.nix
+    (import ../coding-agent).options
   ];
 }
