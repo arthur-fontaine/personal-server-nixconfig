@@ -137,7 +137,7 @@ test("policy: denies what no grant covers, audits without headers or query", asy
   assert.deepEqual(describeRequest({ url: "not a url", method: "get" }).host, "");
 });
 
-test("policy: an approver can allow once or add a grant for the session (stage 2's hook)", async () => {
+test("policy: an approver can allow once or add a grant for the session", async () => {
   const asked = [];
   const answers = [{ allow: true }, { allow: true, grant: { host: "pypi.org", method: "GET" } }, { allow: false }];
   const policy = new NetworkPolicy({
@@ -153,9 +153,84 @@ test("policy: an approver can allow once or add a grant for the session (stage 2
   assert.equal(await get("https://pypi.org/simple/y"), true, "the grant now covers it, no question");
   assert.equal(await get("https://files.example/a"), false);
   assert.equal(asked.length, 3);
-  assert.deepEqual(asked[0], { host: "files.example", method: "GET", path: "/a", scheme: "https" });
+  assert.deepEqual(asked[0], { host: "files.example", method: "GET", path: "/a", scheme: "https", ambiguous: false });
   const failing = new NetworkPolicy({ approve: async () => { throw new Error("gone"); } });
   assert.equal(await failing.isRequestAllowed(new Request("https://x.example/")), false);
+});
+
+function gate() {
+  let open;
+  const opened = new Promise((resolve) => { open = resolve; });
+  return { open, opened };
+}
+
+test("policy: concurrent requests to one host make one question", async () => {
+  const asked = [];
+  let release = gate();
+  let answer = { allow: true, grant: { host: "pypi.org" }, by: "owner" };
+  const audit = [];
+  const policy = new NetworkPolicy({
+    audit: (e) => audit.push(e),
+    approve: async (what) => { asked.push(what); await release.opened; return answer; },
+  });
+  const get = (url, method = "GET") => policy.isRequestAllowed(new Request(url, { method }));
+  const all = Promise.all([get("https://pypi.org/a"), get("https://pypi.org/b"), get("https://pypi.org/a", "POST")]);
+  await tick();
+  assert.equal(asked.length, 1, "the others wait on the first question");
+  release.open();
+  assert.deepEqual(await all, [true, true, true], "a host grant covers them all");
+  assert.deepEqual(audit.map((e) => e.by), ["owner", "grant", "grant"]);
+
+  // Allowed once: the identical request rides along, another path asks anew.
+  asked.length = 0;
+  release = gate();
+  answer = { allow: true, by: "owner" };
+  const once = Promise.all([get("https://files.example/x"), get("https://files.example/x"), get("https://files.example/y")]);
+  await tick();
+  assert.equal(asked.length, 1);
+  release.open();
+  assert.deepEqual(await once, [true, true, true]);
+  assert.deepEqual(asked.map((w) => w.path), ["/x", "/y"]);
+
+  // Refused: every request waiting on that host is refused with it.
+  asked.length = 0;
+  release = gate();
+  answer = { allow: false, by: "timeout" };
+  const refused = Promise.all([get("https://evil.example/a"), get("https://evil.example/b")]);
+  await tick();
+  release.open();
+  assert.deepEqual(await refused, [false, false]);
+  assert.equal(asked.length, 1);
+  assert.deepEqual(audit.slice(-2).map((e) => [e.decision, e.by]), [["deny", "timeout"], ["deny", "timeout"]]);
+});
+
+test("policy: addresses and bare names are refused without a question; a bad grant refuses", async () => {
+  const asked = [];
+  const policy = new NetworkPolicy({ approve: async (w) => { asked.push(w); return { allow: true, grant: { host: "a b" } }; } });
+  for (const url of ["https://1.2.3.4/", "http://localhost/", "https://intranet/", "https://[::1]/", "https://printer.local/"]) {
+    assert.equal(await policy.isRequestAllowed(new Request(url)), false, url);
+  }
+  assert.equal(asked.length, 0);
+  assert.equal(await policy.isRequestAllowed(new Request("https://ok.example/")), false, "an invalid grant is a refusal");
+  assert.equal(policy.grants.list().length, 0);
+  assert.equal((await policy.isRequestAllowed(new Request("https://ok.example/a%2Fb"))), false);
+  assert.equal(asked.at(-1).ambiguous, true, "Hermes is told the path is ambiguous");
+});
+
+test("session: Pi's requests become network questions to the plugin, and grants are reported", async () => {
+  const { peer, lines, write } = peerPair();
+  const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-session-"));
+  const session = new Session({ id: "q", task: "t", workdir, stateDir: workdir, guestDir: GUEST, branch: "sandbox/q" },
+    { gondolin: {}, peer, env: {} });
+  const allowed = session.policy.isRequestAllowed(new Request("https://pypi.org/simple/x"));
+  await until(() => lines.some((l) => l.type === "request"), "the question");
+  const request = lines.find((l) => l.type === "request");
+  assert.deepEqual([request.kind, request.session, request.host, request.method, request.path], ["network", "q", "pypi.org", "GET", "/simple/x"]);
+  write({ type: "reply", id: request.id, allow: true, by: "guard", grant: { host: "pypi.org", method: "GET", pathPrefix: "/simple" } });
+  assert.equal(await allowed, true);
+  const grants = lines.filter((l) => l.type === "grants").at(-1).grants;
+  assert.ok(grants.some((g) => g.host === "pypi.org" && g.pathPrefix === "/simple"));
+  fs.rmSync(workdir, { recursive: true, force: true });
 });
 
 test("pi events: counters, last answer, framing across chunks", () => {

@@ -45,6 +45,14 @@ in
         its subdomains; everything else gets 403. Nothing but HTTP leaves it.
       '';
     };
+    approvalTimeout = mkOption {
+      type = types.ints.positive;
+      default = 300;
+      description = ''
+        Seconds the owner has to answer a sandbox's question (a host Pi asks
+        Hermes for, when the auto-review does not clear it); no answer refuses.
+      '';
+    };
     memory = mkOption {
       type = types.str;
       default = "3G";

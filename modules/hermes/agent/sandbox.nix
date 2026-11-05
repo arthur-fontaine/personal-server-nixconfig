@@ -25,6 +25,10 @@ lib.mkIf cfg.enable {
       key_env = cfg.keyEnv;
       grants = cfg.allowedHosts;
       max_diff_chars = 30000;
+      # Pi asks Hermes for access to other hosts: guard's review first when
+      # it is on (agent/guard.nix, its model and config), then the owner.
+      auto_review = server.hermes.decision.approval.enable;
+      approval_timeout = cfg.approvalTimeout;
     };
   };
 }

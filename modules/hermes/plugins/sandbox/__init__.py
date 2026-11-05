@@ -7,12 +7,14 @@ completion queue, as a background process' does). sandbox_result reads Pi's
 branch from a review clone; nothing from the VM runs on the host, and its
 branch reaches the user's repository only by the user's own `git fetch`.
 config.json (agent/sandbox.nix) names the sidecar and the session's settings.
+When Pi needs a host no grant covers, the sidecar asks; approval.py decides.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import sys
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -21,8 +23,10 @@ RUN = {
     "name": "sandbox_run",
     "description": (
         "Start a coding session of Pi (another coding agent) in an isolated VM, for a self-contained task on a "
-        "git repository: it works on a copy of the repository (a git bundle of one ref), without this Mac's files, "
-        "secrets or network beyond its model. Returns the session id at once; a notification comes when it ends. "
+        "git repository: it works on a copy of the repository (a git bundle of one ref), without this Mac's files "
+        "or secrets. Its network reaches its model only; when Pi needs another host it asks Hermes for access, and "
+        "Hermes' approval system decides (the auto-review, or the user's buttons): you have nothing to do. "
+        "Returns the session id at once; a notification comes when it ends. "
         "Then read its work with sandbox_result and show it to the user: nothing from it is applied here."
     ),
     "parameters": {
@@ -73,6 +77,20 @@ def _routing() -> dict:
     return {key: get_session_env(var, "") for key, var in ROUTING.items()}
 
 
+def _launch(session_id: str) -> dict | None:
+    # The user's words as guard holds them for the session calling
+    # sandbox_run (guard publishes itself as ``guard``); None when the
+    # auto-review is off.
+    guard = sys.modules.get("guard")
+    if guard is None or not hasattr(guard, "launch_context"):
+        return None
+    try:
+        return guard.launch_context(session_id)
+    except Exception:  # noqa: BLE001
+        logger.exception("sandbox: could not read the user's messages from guard")
+        return None
+
+
 def _push_completion(event: dict) -> None:
     from tools.process_registry import process_registry
 
@@ -90,8 +108,9 @@ def _answer(call) -> str:
 
 def tools(sandbox) -> list[tuple[dict, object]]:
     return [
-        (RUN, lambda args, **_: _answer(lambda: sandbox.run(
-            args.get("task", ""), args.get("repo") or None, args.get("ref") or None, routing=_routing()))),
+        (RUN, lambda args, session_id="", task_id="", **_: _answer(lambda: sandbox.run(
+            args.get("task", ""), args.get("repo") or None, args.get("ref") or None, routing=_routing(),
+            launch=_launch(session_id or task_id)))),
         (STATUS, lambda args, **_: _answer(lambda: sandbox.status(args.get("id") or None))),
         (RESULT, lambda args, **_: _answer(lambda: sandbox.result(args.get("id", ""), args.get("max_chars")))),
         (STOP, lambda args, **_: _answer(lambda: sandbox.stop(args.get("id", "")))),

@@ -6,9 +6,10 @@
 //
 // A grant is { host, method?, pathPrefix? }: host is exact ("opencode.ai") or
 // a wildcard of subdomains ("*.example.com", not example.com itself); no
-// method means any method, no pathPrefix any path. Stage 1 only has the
-// static grants; stage 2 sets `approve`, an async callback asking Hermes
-// about what no grant covers, whose answer may add a grant for the session.
+// method means any method, no pathPrefix any path. What no grant covers goes
+// to `approve`, an async callback: Pi asks Hermes for access, and Hermes'
+// approval system decides (allow once, allow with a grant for the session,
+// or refuse). Requests to a host already asked about wait for that answer.
 //
 // Paths are compared as the URL parser leaves them: dot segments resolved,
 // a backslash turned into "/", everything else still percent-encoded. Never decoded:
@@ -114,47 +115,102 @@ export function describeRequest(request) {
   };
 }
 
+// Hosts never worth a question: an address or a single label is no name the
+// owner can judge, and Pi's work needs names (the image itself needs no host
+// but the granted ones: Pi runs offline, its telemetry and update check off).
+export function unaskable(host) {
+  return !host.includes(".") || /^[0-9.]+$/.test(host) || host.startsWith("[") || host.endsWith(".localhost") ||
+    host.endsWith(".local") || host.endsWith(".internal");
+}
+
+const DENIED = { allow: false };
+
 export class NetworkPolicy {
-  constructor({ grants = [], audit = () => {}, approve = null } = {}) {
+  constructor({ grants = [], audit = () => {}, approve = null, onGrants = () => {} } = {}) {
     this.grants = grants instanceof Grants ? grants : new Grants(grants);
     this.audit = audit;
-    // async ({host, method, path, scheme}) => { allow: bool, grant?: Grant }
+    // async ({host, method, path, scheme, ambiguous}) =>
+    //   { allow: bool, grant?: Grant, by?: string, reason?: string }
     this.approve = approve;
+    this.onGrants = onGrants;
+    // host -> the pending question's answer: one question per host at a time.
+    this.asking = new Map();
     this.isRequestAllowed = this.isRequestAllowed.bind(this);
+  }
+
+  addGrant(grant) {
+    const added = this.grants.add(grant);
+    this.onGrants(this.grants.list());
+    return added;
+  }
+
+  revokeGrant(grant) {
+    const removed = this.grants.revoke(grant);
+    if (removed) this.onGrants(this.grants.list());
+    return removed;
+  }
+
+  #log(what, decision, by, reason) {
+    this.audit({ event: "network", decision, by, reason, ...what });
+    return decision === "allow";
   }
 
   async isRequestAllowed(request) {
     const what = describeRequest(request);
     if (!what.host || (what.scheme !== "https" && what.scheme !== "http")) {
-      this.audit({ event: "network", decision: "deny", reason: "malformed", ...what });
-      return false;
+      return this.#log(what, "deny", "policy", "malformed");
     }
-    const grant = this.grants.covers(what);
-    if (grant) {
-      this.audit({ event: "network", decision: "allow", reason: "grant", ...what });
-      return true;
+    what.ambiguous = ambiguousPath(what.path);
+    // Requests to a host already being asked about wait for that answer
+    // (Pi often fires several at once): one question, not one per request.
+    for (;;) {
+      if (this.grants.covers(what)) return this.#log(what, "allow", "grant", "covered");
+      const pending = this.asking.get(what.host);
+      if (!pending) break;
+      const answer = await pending;
+      if (!answer.allow) return this.#log(what, "deny", answer.by ?? "approval", "the question it waited on was refused");
+      if (!answer.grant && answer.method === what.method && answer.path === what.path) {
+        return this.#log(what, "allow", answer.by ?? "approval", "the same request, allowed once");
+      }
+      // Allowed with a grant (checked again above) or once for another
+      // request: this one gets its own question.
     }
-    if (!this.approve) {
-      this.audit({ event: "network", decision: "deny", reason: "no grant", ...what });
-      return false;
-    }
+    if (!this.approve) return this.#log(what, "deny", "policy", "no grant");
+    if (unaskable(what.host)) return this.#log(what, "deny", "policy", "not a host name to ask about");
+    const question = this.#ask(what);
+    this.asking.set(what.host, question);
     let answer;
     try {
-      answer = await this.approve(what);
-    } catch (error) {
-      this.audit({ event: "network", decision: "deny", reason: `approval failed: ${error.message}`, ...what });
-      return false;
+      answer = await question;
+    } finally {
+      this.asking.delete(what.host);
     }
-    const allow = answer?.allow === true;
-    if (allow && answer.grant) {
+    return this.#log(what, answer.allow ? "allow" : "deny", answer.by ?? "approval", answer.reason ?? "");
+  }
+
+  // Never rejects: a failure is a refusal.
+  async #ask(what) {
+    let answer;
+    try {
+      answer = await this.approve({ ...what });
+    } catch (error) {
+      return { ...DENIED, by: "error", reason: `approval failed: ${error.message}` };
+    }
+    const out = {
+      allow: answer?.allow === true,
+      by: typeof answer?.by === "string" ? answer.by : "approval",
+      reason: typeof answer?.reason === "string" ? answer.reason.slice(0, 500) : "",
+      method: what.method,
+      path: what.path,
+      grant: null,
+    };
+    if (out.allow && answer.grant) {
       try {
-        this.grants.add(answer.grant);
+        out.grant = this.addGrant(answer.grant);
       } catch (error) {
-        this.audit({ event: "network", decision: "deny", reason: error.message, ...what });
-        return false;
+        return { ...DENIED, by: out.by, reason: error.message };
       }
     }
-    this.audit({ event: "network", decision: allow ? "allow" : "deny", reason: "approval", ...what });
-    return allow;
+    return out;
   }
 }

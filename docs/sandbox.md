@@ -47,6 +47,40 @@ never counts a notice as your message.
   `opencode-go/deepseek-v4.1-flash` with thinking `high` (this model has no
   medium), the repository's own `.pi/` configuration ignored (`--no-approve`).
 
+## When Pi needs another host
+
+Nothing inside the VM is ever approved: Pi's commands, edits and tests run
+freely there, as they would on a machine of its own. A question comes only
+at Hermes' boundary, when Pi asks Hermes for something, here a host no grant
+of the session covers. Pi asks Hermes for access; Hermes' approval system
+decides, exactly as for one of Hermes' own tool calls:
+
+1. The request waits (the guest sees a slow connection). Requests to a host
+   already being asked about wait for that one question, then are let
+   through if its answer covers them (a grant, or the same request allowed
+   once) and refused if it was refused.
+2. With the auto-review on (`server.hermes.decision.approval`,
+   [hermes.md](hermes.md)), its decision model, guard's own (same
+   `~/.hermes/guard/config.json`, same review), rates the action
+   `sandbox_network` {session, method, host, path} against your messages as
+   guard held them when Hermes called `sandbox_run`, and nothing Pi wrote.
+   Cleared, the request goes through; at low risk, its method and path
+   prefix become a grant for the session.
+3. Otherwise, or with the auto-review off, you get buttons in the main chat
+   (the `owner_approval` plugin): the session, its task, the method, host
+   and path (one line, cut), and **Once**, **GET /prefix this session** (the
+   path's directory), **All of host this session**, **Deny**. No answer in
+   `server.hermes.sandbox.approvalTimeout` (5 minutes), or no Telegram,
+   refuses: the guest gets a 403.
+
+A path holding an encoded `/`, `\` or `.` is never auto-reviewed and gets no
+path button: only once, the whole host, or no. Addresses and names without
+a dot (`1.2.3.4`, `localhost`, `*.local`, `*.internal`) are refused without a
+question: no task needs them, and you could not judge them. The image needs
+no host of its own (Pi runs offline, its telemetry and update check off), so
+nothing else is allowed in advance. At most four questions per session wait
+at once; more are refused.
+
 ## How it comes back
 
 When Pi is done, what it left uncommitted becomes a last commit, and the
@@ -70,8 +104,9 @@ git fetch ~hermes/.hermes/sandbox/sessions/<id>/review.git sandbox/<id>:sandbox/
 - `modules/hermes/sandbox`: `hermes-sandbox` (`pkgs/hermes-sandbox.nix`), a
   Node sidecar, one process per session, speaking JSON lines on stdio with the
   plugin (`src/protocol.mjs`). It owns the VM and its network policy
-  (`src/policy.mjs`: a grant set that can change while the VM runs, and an
-  approval callback for what no grant covers, unused for now). If Hermes
+  (`src/policy.mjs`: a grant set that can change while the VM runs, and the
+  question to Hermes for what no grant covers; the plugin's `approval.py`
+  answers it). If Hermes
   restarts, its sessions end with it (`sandbox_status` says "lost").
 - `modules/hermes/sandbox/guest`: Pi's packages for the VM, from their own
   lockfile, installed by Nix for linux-arm64.
@@ -90,6 +125,5 @@ without a grant gets 403, opencode.ai answers, Pi starts.
 
 ## Not yet
 
-Pi's sessions reach opencode.ai only. Asking you about other hosts as Pi
-needs them, a broker for typed actions (a push, say) on Pi's behalf, and Pi's
-advisor are the next stages.
+A broker for typed actions (a push, say) on Pi's behalf, and Pi's advisor
+are the next stages.

@@ -184,9 +184,46 @@ class Guard:
         }
 
 
+# The loaded Guard, for other plugins (the sandbox's network questions):
+# ``import guard`` once this plugin is loaded (register publishes the module).
+GUARD: Guard | None = None
+
+
+def launch_context(session_id: str) -> dict | None:
+    """What the user wrote in a session so far, as the review would read it:
+    the trusted messages and whether the current turn is theirs. None when
+    guard is not loaded."""
+    if GUARD is None:
+        return None
+    session = GUARD.sessions.get(session_id or "")
+    if session is None:
+        return {"messages": [], "turn_from_user": False}
+    return {"messages": list(session.messages), "turn_from_user": bool(session.turn_from_user)}
+
+
+def review_action(context: dict, tool: str, args: dict, actions=()):
+    """Review an action taken outside Hermes' own tool calls, against a
+    context from launch_context (never anything else as the user's words).
+    Returns review.Verdict; a refusal to run when guard is not loaded."""
+    from .review import Session, Verdict, review
+
+    if GUARD is None:
+        return Verdict(False, "the auto-review is off")
+    session = Session()
+    session.messages.extend((context or {}).get("messages") or [])
+    session.turn_from_user = bool((context or {}).get("turn_from_user"))
+    session.actions.extend(actions)
+    return review(GUARD.model, session, tool, args)
+
+
 def register(ctx) -> None:
+    import sys
+
     from hermes_constants import get_hermes_home
 
+    global GUARD
     guard = Guard(*_load(str(get_hermes_home())))
+    GUARD = guard
+    sys.modules.setdefault("guard", sys.modules[__name__])
     ctx.register_hook("pre_llm_call", guard.pre_llm_call)
     ctx.register_hook("pre_tool_call", guard.pre_tool_call)

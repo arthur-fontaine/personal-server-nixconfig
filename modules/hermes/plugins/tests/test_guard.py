@@ -182,6 +182,26 @@ def main() -> None:
     assert allowed("unknown", "low") and not allowed("unknown", "medium")
     assert allowed("high", "high") and not allowed("medium", "high")
 
+    # For other plugins (the sandbox): the user's words of a session, and a
+    # review against them only.
+    plugin.GUARD = None
+    assert plugin.launch_context("s") is None
+    assert not plugin.review_action({}, "sandbox_network", {}).run
+    plugin.GUARD = g
+    context = plugin.launch_context("s")
+    assert context["turn_from_user"] and "Range mes téléchargements" in context["messages"]
+    assert plugin.launch_context("unknown") == {"messages": [], "turn_from_user": False}
+    ANSWER.clear()
+    ANSWER.update(authorization="high", risk="low")
+    verdict = plugin.review_action(
+        {"messages": ["Corrige le paquet"], "turn_from_user": True}, "sandbox_network",
+        {"session": "x", "method": "GET", "host": "pypi.org", "path": "/simple/"}, ["sandbox_run: fix it"])
+    assert verdict.run and verdict.risk == "low"
+    state = REQUESTS[-1]["state"]
+    assert state["trusted_user_messages"] == ["Corrige le paquet"] and state["recent_actions"] == ["sandbox_run: fix it"]
+    assert "pypi.org" in state["planned_action"]["arguments"]
+    plugin.GUARD = None
+
     httpd.shutdown()
     print("guard: ok")
 

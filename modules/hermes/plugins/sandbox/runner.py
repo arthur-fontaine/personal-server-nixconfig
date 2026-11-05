@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from .approval import Approver
+
 logger = logging.getLogger(__name__)
 
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
@@ -72,6 +74,11 @@ class Live:
     phase: str = "starting"
     progress: dict = field(default_factory=dict)
     result: dict | None = None
+    task: str = ""
+    # What the user had written when sandbox_run was called (guard's
+    # launch_context): the only words the auto-review counts as theirs.
+    launch: dict | None = None
+    grants: list = field(default_factory=list)
     started: float = field(default_factory=time.time)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -119,6 +126,7 @@ class Sandbox:
         notify: Callable[[dict], None] | None = None,
         env: dict | None = None,
         popen: Callable[..., subprocess.Popen] = subprocess.Popen,
+        approver: Approver | None = None,
     ) -> None:
         self.config = config
         self.state_dir = Path(config["state_dir"]).expanduser()
@@ -128,9 +136,14 @@ class Sandbox:
         self.popen = popen
         self.live: dict[str, Live] = {}
         self.lock = threading.Lock()
+        self.approver = approver or Approver(
+            auto_review=bool(config.get("auto_review")), timeout=float(config.get("approval_timeout", 300)))
 
     # sandbox_run
-    def run(self, task: str, repo: str | None = None, ref: str | None = None, routing: dict | None = None) -> dict:
+    def run(
+        self, task: str, repo: str | None = None, ref: str | None = None, routing: dict | None = None,
+        launch: dict | None = None,
+    ) -> dict:
         task = (task or "").strip()
         if not task:
             raise SandboxError("task is empty")
@@ -159,6 +172,7 @@ class Sandbox:
                 "timeoutSeconds": self.config["timeout_seconds"],
                 "keyEnv": self.config["key_env"],
                 "grants": self.config["grants"],
+                "approvalTimeoutSeconds": self.config.get("approval_timeout", 300),
             }
             (workdir / "session.json").write_text(json.dumps(session, indent=2))
             meta = {
@@ -172,7 +186,7 @@ class Sandbox:
                 stderr=open(workdir / "sidecar.log", "ab"),
                 text=True, env=self._sidecar_env(), start_new_session=True,
             )
-            live = Live(session_id, process)
+            live = Live(session_id, process, task=task, launch=launch)
             self.live[session_id] = live
         threading.Thread(target=self._read, args=(live, meta), name=f"sandbox-{session_id}", daemon=True).start()
         return {"id": session_id, "branch": branch, "status": "starting"}
@@ -205,9 +219,14 @@ class Sandbox:
                     live.progress = {k: v for k, v in message.items() if k != "type"}
                 elif kind == "done":
                     live.result = message.get("result") or {}
+                elif kind == "grants":
+                    live.grants = list(message.get("grants") or [])
                 elif kind == "request":
-                    # Stage 1 grants nothing beyond the configured hosts.
-                    live.send({"type": "reply", "id": message.get("id"), "allow": False})
+                    # Answered off this thread: a question may wait minutes
+                    # for the owner, and the sidecar's other messages go on.
+                    threading.Thread(
+                        target=self._answer, args=(live, message), name=f"sandbox-{live.id}-ask", daemon=True,
+                    ).start()
                 elif kind == "log":
                     logger.info("sandbox %s: %s", live.id, message.get("message"))
         live.process.wait()
@@ -218,6 +237,17 @@ class Sandbox:
             live.state = str(live.result.get("status", "failed"))
             result = dict(live.result)
         self._notify(meta, result)
+
+    def _answer(self, live: Live, message: dict) -> None:
+        if message.get("kind") == "network":
+            try:
+                answer = self.approver.decide({"id": live.id, "task": live.task, "launch": live.launch}, message)
+            except Exception as error:  # noqa: BLE001
+                logger.exception("sandbox %s: the network question failed", live.id)
+                answer = {"allow": False, "by": "error", "reason": str(error)[:300]}
+        else:
+            answer = {"allow": False, "by": "policy", "reason": f"unknown request {message.get('kind')!r}"}
+        live.send({**answer, "type": "reply", "id": message.get("id")})
 
     def _notify(self, meta: dict, result: dict) -> None:
         # The chat hears that it ended and where to look, never Pi's words:

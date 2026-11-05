@@ -41,15 +41,15 @@ async function main(argv) {
     peer.onClose = () => session.stop("stopped");
     peer.on("stop", () => session.stop("stopped"));
     peer.on("status", () => peer.send("status", { phase: session.phase, ...session.progress.snapshot() }));
+    // Both answer with the grants as they are now (policy.onGrants).
     peer.on("grant", ({ grant }) => {
-      const added = session.policy.grants.add(grant);
+      const added = session.policy.addGrant(grant);
       session.audit({ event: "grant", grant: added });
-      peer.send("grants", { grants: session.policy.grants.list() });
     });
     peer.on("revoke", ({ grant }) => {
-      session.policy.grants.revoke(grant);
-      session.audit({ event: "revoke", grant });
-      peer.send("grants", { grants: session.policy.grants.list() });
+      const removed = session.policy.revokeGrant(grant);
+      session.audit({ event: "revoke", grant, removed });
+      if (!removed) peer.send("grants", { grants: session.policy.grants.list() });
     });
     const result = await session.run();
     process.exitCode = result.status === "finished" ? 0 : 1;

@@ -29,6 +29,9 @@ export const DEFAULTS = {
   keyEnv: "OPENCODE_GO_API_KEY",
   grants: ["opencode.ai"],
   secretHosts: ["opencode.ai"],
+  // How long a question about a host may wait for Hermes' answer (its
+  // approval system has its own, shorter timeout; this is the backstop).
+  approvalTimeoutSeconds: 300,
 };
 
 export function piArgv({ task, model, thinking }) {
@@ -108,6 +111,12 @@ export class Session {
     this.policy = new NetworkPolicy({
       grants: this.config.grants,
       audit: (entry) => this.audit(entry),
+      // Pi asks Hermes for access: its approval system decides (the
+      // plugin's approval.py), and the answer may add a grant.
+      approve: (what) => this.peer.request("network", { ...what, session: this.config.id }, {
+        timeoutMs: (this.config.approvalTimeoutSeconds + 60) * 1000,
+      }),
+      onGrants: (grants) => this.peer.send("grants", { grants }),
     });
   }
 
@@ -162,6 +171,7 @@ export class Session {
     const key = this.env[config.keyEnv];
     if (!key) throw new Error(`${config.keyEnv} is not set: the OpenCode Go key, in the secrets file`);
     this.audit({ event: "start", grants: this.policy.grants.list() });
+    this.peer.send("grants", { grants: this.policy.grants.list() });
 
     this.setPhase("image");
     const image = await ensureImage({

@@ -33,11 +33,15 @@ def main() -> None:
     say(type="phase", phase="pi")
     status = "finished"
     if session["task"] == "wait":
-        say(type="request", id=1, kind="approve", host="example.com")
+        say(type="grants", grants=[{"host": "opencode.ai", "method": None, "pathPrefix": None}])
+        say(type="request", id=1, kind="network", session=session["id"], host="pypi.org", method="GET",
+            path="/simple/requests/", scheme="https", ambiguous=False)
+        say(type="request", id=2, kind="approve", host="example.com")
         for line in sys.stdin:
             message = json.loads(line)
             if message["type"] == "reply":
-                (workdir / "reply.json").write_text(line)
+                with open(workdir / "replies.jsonl", "a") as replies:
+                    replies.write(line)
             if message["type"] == "stop":
                 status = "stopped"
                 break

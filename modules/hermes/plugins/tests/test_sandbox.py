@@ -19,6 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sandbox import tools  # noqa: E402
+from sandbox.approval import Approver  # noqa: E402
 from sandbox.runner import Sandbox, SandboxError, bundle_repository  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
@@ -68,7 +69,13 @@ def main() -> None:
         "grants": ["opencode.ai"], "max_diff_chars": 30000,
     }
     env = {"PATH": os.environ["PATH"], "HOME": str(home), "OPENCODE_GO_API_KEY": "go-key", "TELEGRAM_BOT_TOKEN": "tg"}
-    sandbox = Sandbox(config, notify=events.append, env=env)
+    asked: list[tuple] = []
+
+    def ask(title, details, choices, timeout):
+        asked.append((title, details, choices, timeout))
+        return "path"
+
+    sandbox = Sandbox(config, notify=events.append, env=env, approver=Approver(auto_review=False, ask=ask))
     handlers = {schema["name"]: handler for schema, handler in tools(sandbox)}
     routing = {"platform": "telegram", "chat_id": "42", "chat_type": "dm", "session_key": "agent:main:telegram:dm:42",
                "parent_session_id": "s1", "user_id": "7", "user_name": "A", "thread_id": ""}
@@ -132,13 +139,21 @@ def main() -> None:
     again = json.loads(handlers["sandbox_result"]({"id": session_id, "max_chars": 10}))
     assert again["diff_truncated"] and len(again["diff"]) == 10
 
-    # One at a time; a stop ends the running one; questions are denied.
+    # One at a time; a stop ends the running one. Pi asks Hermes for access:
+    # with the auto-review off, the owner's buttons answer; an unknown
+    # question is refused.
     events.clear()
     waiting = sandbox.run("wait")["id"]
     refused = json.loads(handlers["sandbox_run"]({"task": "another"}))
     assert "one sandbox at a time" in refused["error"], refused
-    until(lambda: (root / "state" / "sessions" / waiting / "reply.json").exists(), "the reply")
-    assert json.loads((root / "state" / "sessions" / waiting / "reply.json").read_text())["allow"] is False
+    replies_path = root / "state" / "sessions" / waiting / "replies.jsonl"
+    until(lambda: replies_path.exists() and len(replies_path.read_text().splitlines()) == 2, "the replies")
+    replies = {r["id"]: r for r in map(json.loads, replies_path.read_text().splitlines())}
+    assert replies[1]["allow"] is True and replies[1]["by"] == "owner", replies
+    assert replies[1]["grant"] == {"host": "pypi.org", "method": "GET", "pathPrefix": "/simple"}
+    assert replies[2]["allow"] is False
+    assert len(asked) == 1 and "pypi.org/simple/requests/" in asked[0][1] and waiting in asked[0][1]
+    assert sandbox.live[waiting].grants[0]["host"] == "opencode.ai"
     assert json.loads(handlers["sandbox_stop"]({"id": waiting}))["status"] == "stopping"
     until(lambda: events, "the stop's completion")
     assert "stopped" in events[0]["output"] and "no changes" in events[0]["output"]

@@ -9,8 +9,11 @@
 //   {"type": "<command>", ...}           a command (stop, grant, revoke)
 //   {"type": "reply", "id": n, ...}      the answer to request n
 //
-// Requests are how the network policy will wait on Hermes' authorization
-// (stage 2): isRequestAllowed awaits peer.request("approve", {...}).
+// Requests are how the network policy waits on Hermes' authorization:
+// isRequestAllowed awaits peer.request("network", {session, host, method,
+// path, scheme, ambiguous}), answered {allow, grant?, by, reason}. The
+// sidecar also tells the plugin its grants whenever they change:
+// {"type": "grants", "grants": [...]}.
 
 export class Peer {
   constructor(input, output) {
