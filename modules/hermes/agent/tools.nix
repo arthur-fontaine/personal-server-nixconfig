@@ -32,6 +32,13 @@ in
 {
   services.hermes-agent.extraPackages = tools;
 
+  # Web search stays OpenAI's own, server-side on the Codex model (Hermes picks
+  # it from the openai-codex login), but that backend cannot read a page, so
+  # web_extract failed ("search-only backend"). Firecrawl without a key reads
+  # through Hermes' keyless free tiers
+  # (website/docs/user-guide/features/web-search.md, plugins/web/firecrawl).
+  services.hermes-agent.settings.web.extract_backend = "firecrawl";
+
   # The gateway's PATH, which every terminal command inherits: the tools above,
   # then what the agent installed into its profile, then the system's.
   launchd.agents.hermes-agent.config.EnvironmentVariables.PATH = lib.mkForce (lib.concatStringsSep ":" [

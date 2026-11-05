@@ -110,6 +110,10 @@ own permissions (`modules/hermes/agent/apple.nix`):
 | HomeKit | [HomeClaw](https://github.com/omarshahine/HomeClaw) (Mac App Store), MCP over HTTP on 127.0.0.1:9090 | home data, to HomeClaw |
 | Anything else | AppleScript (`osascript`), `shortcuts run`, computer use | Automation |
 
+Web search is OpenAI's own, run server-side by the Codex model; reading a page
+(`web_extract`) goes through Firecrawl's keyless tier (`modules/hermes/agent/tools.nix`),
+since that search cannot extract.
+
 Web pages go faster through `browser_fast_act` (`modules/hermes/fast-act`), once
 the bootstrap's Models section has its key: Cua Driver snapshots the page in
 Hermes' Chrome, a decision model answering System One picks the operation and its
