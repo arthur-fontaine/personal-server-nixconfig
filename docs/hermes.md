@@ -132,11 +132,14 @@ provides a Cua Driver new enough (0.38.0; Hermes pins 0.21.0).
 
 ## Auto-review of Hermes' actions
 
-With `server.hermes.decision.approval` on (the bootstrap's Models section;
-Baseten's mammoth-1 by default), the `guard` plugin (`modules/hermes/plugins/guard`)
+The `guard` plugin (`modules/hermes/plugins/guard`), always installed,
 reviews every action Hermes is about to take, but reads (files, searches, tool
 searches, the read-only MCP servers, screenshots; opening a web page is reviewed,
-its address can carry data out). A decision model rates two
+its address can carry data out). It fails closed: without a decision model
+(`server.hermes.decision.approval` off), every such action waits for your yes
+in Telegram, on an approval card whose reason reads `no decision model
+configured: ` and the action. With it on (the bootstrap's Models section;
+Baseten's mammoth-1 by default), a decision model rates two
 things at once, as Codex's automatic approval review does: how clearly your own
 messages authorize the action, and how risky it is. Low risk (a click that
 navigates, a draft) runs at once, bounded risk when you asked for it, and high
@@ -164,7 +167,7 @@ approved: Pi runs its own commands freely there. Pi asks Hermes for access,
 and Hermes' approval system decides as for one of its own tool calls: the
 decision model reviews the request against your messages from when Hermes
 started the session, never Pi's, and what it does not clear comes to you as
-buttons. With the auto-review off, every such request comes to you.
+buttons. Without a decision model, every such request comes to you.
 
 Every question Hermes asks you has buttons. Its own belong to a turn: its
 approval card and the `clarify` tool's choices are buttons in the chat the
@@ -222,8 +225,8 @@ WhatsApp, Instagram and Discord all act as you, through clients their terms do n
 allow (an unofficial linked device, an automated browser): they may restrict
 an account that behaves like a bot. The skills tell Hermes to go at a person's
 pace and to confirm before it sends or posts anything, always with buttons:
-with the auto-review on, its approval card is the question; without it,
-Hermes asks with `clarify` and choices (`modules/hermes/agent/skills/confirm.nix`).
+guard's approval card is the question, with or without a decision model
+(`modules/hermes/agent/skills/confirm.nix`).
 
 ## Models
 

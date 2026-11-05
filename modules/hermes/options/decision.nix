@@ -3,7 +3,8 @@
 # Jev, Baseten's elephant-1 and mammoth-1, or a local one swap by the same four
 # values, one model per use:
 # - computerUse: picks each action of browser_fast_act (agent/fast-act.nix);
-# - approval: reviews each action Hermes is about to take (plugins/guard).
+# - approval: reviews each action Hermes is about to take (plugins/guard,
+#   which asks the user for all of them without it).
 { lib, ... }:
 let
   inherit (lib) mkOption types;
@@ -58,7 +59,9 @@ in
         The model reviewing each action Hermes is about to take, from the
         user's own messages only: what it finds low-risk runs, and riskier
         actions the user asked for (a send, only that exact one); everything
-        else waits for the user's yes in Telegram.
+        else waits for the user's yes in Telegram. Off, the review (plugins/guard)
+        stays and fails closed: every action but the read-only ones waits for
+        that yes.
       '';
     };
   };

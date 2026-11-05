@@ -10,7 +10,9 @@ re-enter a Telegram chat as a turn of its platform. A subagent inherits its pare
 memory: after a restart, the first actions of a chat ask once. pre_tool_call asks the decision model about every
 action but the read-only ones, and escalates what it does not clear to
 Hermes' approval gate: the user's yes in Telegram, a no or a timeout refusing
-it (website/docs/user-guide/features/hooks.md, pre_tool_call).
+it (website/docs/user-guide/features/hooks.md, pre_tool_call). Without a
+decision model (config.json has none), it fails closed: every action but the
+read-only ones goes to that gate.
 
 computer_use asks the same gate itself for every click or key
 (tools/computer_use/tool.py, _request_approval); this review replaces that
@@ -116,6 +118,9 @@ def _load(home: str):
     from . import systemone
 
     config = json.loads((Path(home) / "guard" / "config.json").read_text())
+    trusted = frozenset(config.get("trusted_platforms", ["telegram", "cron"]))
+    if not config.get("model"):
+        return None, trusted
     key = os.environ.get(config["key_env"], "") if config.get("key_env") else ""
     model = systemone.Config.from_env({
         "OPENJEV_BASE_URL": config["url"],
@@ -124,7 +129,7 @@ def _load(home: str):
         "OPENJEV_API_KEY": key,
         "OPENJEV_TIMEOUT_MS": str(config.get("timeout_ms", 10000)),
     })
-    return model, frozenset(config.get("trusted_platforms", ["telegram", "cron"]))
+    return model, trusted
 
 
 class Guard:
@@ -177,9 +182,13 @@ class Guard:
         # always sending to Zoé is not always sending.
         grain = verdict.risk if verdict.risk in {"low", "medium"} else hashlib.sha256(
             json.dumps(args, sort_keys=True, default=str).encode()).hexdigest()[:16]
+        if self.model is None:
+            message = f"{verdict.reason}: {summary(tool_name, args)}"
+        else:
+            message = f"{summary(tool_name, args)} (auto-review: {verdict.reason})"
         return {
             "action": "approve",
-            "message": f"{summary(tool_name, args)} (auto-review: {verdict.reason})",
+            "message": message,
             "rule_key": f"guard:{tool_name}:{grain}",
         }
 
@@ -187,6 +196,12 @@ class Guard:
 # The loaded Guard, for other plugins (the sandbox's network questions):
 # ``import guard`` once this plugin is loaded (register publishes the module).
 GUARD: Guard | None = None
+
+
+def reviewing() -> bool:
+    """Whether a decision model reviews actions: guard is loaded and has one.
+    Without it, review_action never clears anything."""
+    return GUARD is not None and GUARD.model is not None
 
 
 def launch_context(session_id: str) -> dict | None:

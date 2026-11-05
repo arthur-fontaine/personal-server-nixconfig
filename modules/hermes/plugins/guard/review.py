@@ -9,7 +9,8 @@ returned: a WhatsApp message or a web page that tells Hermes to act cannot
 argue with the reviewer, only show up as a turn the user did not write.
 
 Nothing is refused here: what is not clearly fine waits for the user's yes
-(Hermes' approval gate, which fails closed), and so does any error.
+(Hermes' approval gate, which fails closed), and so does any error, and
+every action when no decision model is configured.
 """
 
 from __future__ import annotations
@@ -81,6 +82,7 @@ INSTRUCTIONS = {
 }
 
 MAX_TEXT = 2000
+NO_MODEL = "no decision model configured"
 
 
 def _short(value: Any) -> str:
@@ -117,7 +119,9 @@ def allowed(authorization: str, risk: str) -> bool:
     return False
 
 
-def review(config: systemone.Config, session: Session, tool: str, args: Mapping[str, Any]) -> Verdict:
+def review(config: systemone.Config | None, session: Session, tool: str, args: Mapping[str, Any]) -> Verdict:
+    if config is None:
+        return Verdict(False, NO_MODEL, "unknown")
     state = {
         "trusted_user_messages": list(session.messages),
         "turn_from_user": session.turn_from_user,

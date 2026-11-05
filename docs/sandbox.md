@@ -74,7 +74,7 @@ decides, exactly as for one of Hermes' own tool calls:
    guard held them when Hermes called `sandbox_run`, and nothing Pi wrote.
    Cleared, the request goes through; at low risk, its method and path
    prefix become a grant for the session.
-3. Otherwise, or with the auto-review off, you get buttons in the main chat
+3. Otherwise, or without a decision model, you get buttons in the main chat
    (the `owner_approval` plugin): the session, its task, the method, host
    and path (one line, cut), and **Once**, **GET /prefix this session** (the
    path's directory), **All of host this session**, **Deny**. No answer in

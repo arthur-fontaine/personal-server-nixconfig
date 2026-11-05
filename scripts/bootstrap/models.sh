@@ -343,9 +343,10 @@ else
   note "A decision model can review each action Hermes is about to take, from your own messages"
   note "only: what is low-risk runs at once, and what is riskier when you asked for it (a send, only that"
   note "exact one); anything else (what an incoming message or a web page asked for) waits for your yes in Telegram."
+  note "Without one, every action but reads waits for your yes."
   if ask "Review Hermes' actions with a decision model?"; then
     decision_setup approval decision-models/baseten-mammoth-27b-latest \
-      || { decision_off approval; warn "No auto-review: Hermes asks only for the commands it finds dangerous."; }
+      || { decision_off approval; warn "No auto-review: every action but reads waits for your yes in Telegram."; }
   elif [ "$(setting server.hermes.decision.approval.enable)" = 1 ]; then
     decision_off approval
   fi

@@ -201,7 +201,34 @@ def main() -> None:
     assert state["trusted_user_messages"] == ["Corrige le paquet"] and state["recent_actions"] == ["sandbox_run: fix it"]
     assert "pypi.org" in state["planned_action"]["arguments"]
     assert g.pre_tool_call("sandbox_grants", {"id": "x"}, session_id="s") is None, "read-only"
+    assert plugin.reviewing()
     plugin.GUARD = None
+    assert not plugin.reviewing()
+
+    # No decision model: fail closed. Every action but the read-only ones
+    # goes to the approval card, without a request anywhere.
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as home:
+        (Path(home) / "guard").mkdir()
+        (Path(home) / "guard" / "config.json").write_text(json.dumps({"timeout_ms": 10000, "trusted_platforms": ["telegram", "cron"]}))
+        model, trusted = plugin._load(home)
+    assert model is None and trusted == {"telegram", "cron"}
+    off = Guard(model, trusted)
+    sent = len(REQUESTS)
+    off.pre_llm_call(session_id="o", user_message="Envoie Salut à Zoé", platform="telegram")
+    assert off.pre_tool_call("read_file", {"path": "/tmp/x"}, session_id="o") is None
+    directive = off.pre_tool_call("terminal", {"command": "wacli send --to Zoé 'Salut'"}, session_id="o")
+    assert directive["action"] == "approve", directive
+    assert directive["message"] == "no decision model configured: terminal: wacli send --to Zoé 'Salut'", directive
+    assert directive["rule_key"].startswith("guard:terminal:") and not directive["rule_key"].endswith(":unknown")
+    long = off.pre_tool_call("write_file", {"path": "/tmp/a", "content": "x" * 5000}, session_id="o")
+    assert long["action"] == "approve" and len(long["message"]) < 450
+    plugin.GUARD = off
+    assert not plugin.reviewing()
+    assert plugin.review_action({"messages": ["x"], "turn_from_user": True}, "sandbox_network", {}).reason == "no decision model configured"
+    plugin.GUARD = None
+    assert len(REQUESTS) == sent, "no request without a model"
 
     httpd.shutdown()
     print("guard: ok")
