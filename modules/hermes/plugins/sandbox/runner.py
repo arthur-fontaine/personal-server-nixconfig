@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from .actions import Actions
 from .approval import Approver
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,7 @@ class Live:
     progress: dict = field(default_factory=dict)
     result: dict | None = None
     task: str = ""
+    repo: str | None = None
     # What the user had written when sandbox_run was called (guard's
     # launch_context): the only words the auto-review counts as theirs.
     launch: dict | None = None
@@ -138,6 +140,11 @@ class Sandbox:
         self.lock = threading.Lock()
         self.approver = approver or Approver(
             auto_review=bool(config.get("auto_review")), timeout=float(config.get("approval_timeout", 300)))
+        self.actions = Actions(
+            self.approver, state_dir=self.state_dir, sessions_dir=self.sessions_dir, env=self.env,
+            safe_git=lambda args, cwd=None: _git(SAFE_GIT + args, cwd=cwd, env=SAFE_GIT_ENV),
+            shell_timeout=float(config.get("shell_timeout", 120)),
+        )
 
     # sandbox_run
     def run(
@@ -180,13 +187,17 @@ class Sandbox:
                 "branch": branch, "created": time.time(), "routing": routing or {},
             }
             (workdir / "meta.json").write_text(json.dumps(meta, indent=2))
+            # The broker's token, new per session, in the sidecar's
+            # environment only (never on disk); it gives it to the guest
+            # and revokes it when Pi is done.
+            env = {**self._sidecar_env(), "HERMES_SANDBOX_TOKEN": secrets.token_urlsafe(32)}
             process = self.popen(
                 [self.config["command"], "run", str(workdir / "session.json")],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=open(workdir / "sidecar.log", "ab"),
-                text=True, env=self._sidecar_env(), start_new_session=True,
+                text=True, env=env, start_new_session=True,
             )
-            live = Live(session_id, process, task=task, launch=launch)
+            live = Live(session_id, process, task=task, launch=launch, repo=repo)
             self.live[session_id] = live
         threading.Thread(target=self._read, args=(live, meta), name=f"sandbox-{session_id}", daemon=True).start()
         return {"id": session_id, "branch": branch, "status": "starting"}
@@ -239,12 +250,20 @@ class Sandbox:
         self._notify(meta, result)
 
     def _answer(self, live: Live, message: dict) -> None:
+        session = {"id": live.id, "task": live.task, "launch": live.launch}
         if message.get("kind") == "network":
             try:
-                answer = self.approver.decide({"id": live.id, "task": live.task, "launch": live.launch}, message)
+                answer = self.approver.decide(session, message)
             except Exception as error:  # noqa: BLE001
                 logger.exception("sandbox %s: the network question failed", live.id)
                 answer = {"allow": False, "by": "error", "reason": str(error)[:300]}
+        elif message.get("kind") == "action":
+            session.update(repo=live.repo, alive=lambda: live.state in LIVE)
+            try:
+                answer = self.actions.handle(session, message)
+            except Exception as error:  # noqa: BLE001
+                logger.exception("sandbox %s: the action failed", live.id)
+                answer = {"status": "error", "by": "error", "reason": str(error)[:300]}
         else:
             answer = {"allow": False, "by": "policy", "reason": f"unknown request {message.get('kind')!r}"}
         live.send({**answer, "type": "reply", "id": message.get("id")})
@@ -341,11 +360,12 @@ class Sandbox:
             return out
         review = path / "review.git"
         branch = out["branch"]
-        if not review.exists():
-            _git(SAFE_GIT + ["init", "--quiet", "--bare", str(review)], env=SAFE_GIT_ENV)
-            _git(SAFE_GIT + ["bundle", "verify", "--quiet", str(bundle)], cwd=review, env=SAFE_GIT_ENV)
-            _git(SAFE_GIT + ["fetch", "--quiet", "--no-tags", str(bundle), f"+refs/heads/{branch}:refs/heads/{branch}"],
-                 cwd=review, env=SAFE_GIT_ENV)
+        # A git_push during the session may have made the clone already:
+        # the final bundle is fetched over it, once.
+        fetched = review / "hermes-final-fetched"
+        if not fetched.exists():
+            self.actions.fetch_review(review, bundle, branch)
+            fetched.touch()
         head = _git(SAFE_GIT + ["rev-parse", f"refs/heads/{branch}"], cwd=review, env=SAFE_GIT_ENV).strip()
         base = out["base"] or EMPTY_TREE
         span = f"{out['base']}..{head}" if out["base"] else head

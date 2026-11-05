@@ -73,7 +73,7 @@ def main() -> None:
 
     def ask(title, details, choices, timeout):
         asked.append((title, details, choices, timeout))
-        return "path"
+        return "c1" if title == "Pi asks you" else "path"
 
     sandbox = Sandbox(config, notify=events.append, env=env, approver=Approver(auto_review=False, ask=ask))
     handlers = {schema["name"]: handler for schema, handler in tools(sandbox)}
@@ -117,6 +117,9 @@ def main() -> None:
     assert sidecar_env["OPENCODE_GO_API_KEY"] == "go-key"
     assert "TELEGRAM_BOT_TOKEN" not in sidecar_env
     assert sidecar_env["XDG_CACHE_HOME"].startswith(str(root / "state"))
+    # The broker's token: new per session, in the sidecar's environment only.
+    token = sidecar_env["HERMES_SANDBOX_TOKEN"]
+    assert len(token) >= 40 and token not in (workdir / "session.json").read_text()
 
     status = json.loads(handlers["sandbox_status"]({"id": session_id}))
     assert status["state"] == "finished" and status["commits"] == 1, status
@@ -147,11 +150,16 @@ def main() -> None:
     refused = json.loads(handlers["sandbox_run"]({"task": "another"}))
     assert "one sandbox at a time" in refused["error"], refused
     replies_path = root / "state" / "sessions" / waiting / "replies.jsonl"
-    until(lambda: replies_path.exists() and len(replies_path.read_text().splitlines()) == 2, "the replies")
+    until(lambda: replies_path.exists() and len(replies_path.read_text().splitlines()) == 3, "the replies")
     replies = {r["id"]: r for r in map(json.loads, replies_path.read_text().splitlines())}
     assert replies[1]["allow"] is True and replies[1]["by"] == "owner", replies
     assert replies[1]["grant"] == {"host": "pypi.org", "method": "GET", "pathPrefix": "/simple"}
     assert replies[2]["allow"] is False
+    # A broker action reaches actions.py: here the owner's answer to Pi.
+    assert replies[3]["status"] == "allowed" and replies[3]["result"] == {"answer": "bar"}, replies[3]
+    assert [a[0] for a in asked] == ["Sandbox network access", "Pi asks you"] or \
+        [a[0] for a in asked] == ["Pi asks you", "Sandbox network access"], asked
+    asked[:] = [a for a in asked if a[0] != "Pi asks you"]
     assert len(asked) == 1 and "pypi.org/simple/requests/" in asked[0][1] and waiting in asked[0][1]
     listed = json.loads(handlers["sandbox_grants"]({"id": waiting}))
     assert listed["running"] and listed["grants"][0]["host"] == "opencode.ai", listed

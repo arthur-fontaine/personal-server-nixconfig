@@ -16,6 +16,9 @@ on the same host's question). Then, as for one of Hermes' own tool calls:
 2. Otherwise the owner gets buttons (owner_approval): once, this method and
    path prefix for the session, the whole host for the session, deny. No
    answer in time, or no Telegram, refuses.
+
+The broker's typed actions (actions.py) go through the same two steps,
+``review`` then ``ask_owner``.
 """
 
 from __future__ import annotations
@@ -105,49 +108,63 @@ class Approver:
         # An ambiguous path (an encoded "/", "\" or ".") is the owner's to
         # judge: what the server reads is not what a reviewer would see.
         if self.auto_review and not ambiguous:
-            actions = [f"sandbox_run (session {session['id']}): {clean(session.get('task'), 500)}"]
-            try:
-                verdict = self.review(session.get("launch"), TOOL, request, actions)
-            except Exception as error:  # noqa: BLE001
-                logger.warning("sandbox: the auto-review failed: %s", error)
-                verdict = None
+            verdict, review_note = self.verdict(session, TOOL, request)
             if verdict is not None and verdict.run:
                 answer = {"allow": True, "by": "guard", "reason": verdict.reason}
                 if verdict.risk == "low":
                     answer["grant"] = {"host": host, "method": method, "pathPrefix": grant_prefix(path)}
                 return answer
-            review_note = f"Auto-review: {verdict.reason}." if verdict is not None else "Auto-review unavailable."
-        return self._ask_owner(session, request, scheme, ambiguous, review_note, path)
+        return self._ask_network(session, request, scheme, ambiguous, review_note, path)
 
-    def _ask_owner(self, session, request, scheme, ambiguous, review_note, path) -> dict:
+    def verdict(self, session: dict, tool: str, args: dict):
+        """guard's review of an action of the session, against the user's
+        launching messages only; (verdict or None, a note for the card)."""
+        actions = [f"sandbox_run (session {session['id']}): {clean(session.get('task'), 500)}"]
+        try:
+            verdict = self.review(session.get("launch"), tool, args, actions)
+        except Exception as error:  # noqa: BLE001
+            logger.warning("sandbox: the auto-review failed: %s", error)
+            verdict = None
+        note = f"Auto-review: {verdict.reason}." if verdict is not None else "Auto-review unavailable."
+        return verdict, note
+
+    def ask_owner(self, session: dict, title: str, details: str, choices) -> str:
+        """The owner's buttons; "limit" when the session already has
+        MAX_OPEN questions waiting."""
         sid = session["id"]
         with self.lock:
             if self.open.get(sid, 0) >= MAX_OPEN:
-                return deny("limit", f"{MAX_OPEN} questions already open for this session")
+                return "limit"
             self.open[sid] = self.open.get(sid, 0) + 1
         try:
-            method, host = request["method"], request["host"]
-            prefix = grant_prefix(path)
-            choices = [("once", "Once")]
-            if not ambiguous:
-                choices.append(("path", clean(f"{method} {prefix} this session", 48)))
-            choices += [("host", clean(f"All of {host} this session", 48)), ("deny", "Deny")]
-            lines = [
-                f"Pi, in sandbox session {sid}, asks Hermes for access to a host it has no grant for.",
-                "",
-                f"Task: {clean(session.get('task'), MAX_TASK)}",
-                f"Request: {method} {scheme}://{host}{request['path']}",
-            ]
-            if ambiguous:
-                lines.append('The path holds an encoded "/", "\\" or ".": only once or the whole host.')
-            if review_note:
-                lines.append(review_note)
-            choice = self.ask("Sandbox network access", "\n".join(lines), choices, self.timeout)
+            return self.ask(title, details, choices, self.timeout)
         finally:
             with self.lock:
                 self.open[sid] -= 1
                 if not self.open[sid]:
                     del self.open[sid]
+
+    def _ask_network(self, session, request, scheme, ambiguous, review_note, path) -> dict:
+        sid = session["id"]
+        method, host = request["method"], request["host"]
+        prefix = grant_prefix(path)
+        choices = [("once", "Once")]
+        if not ambiguous:
+            choices.append(("path", clean(f"{method} {prefix} this session", 48)))
+        choices += [("host", clean(f"All of {host} this session", 48)), ("deny", "Deny")]
+        lines = [
+            f"Pi, in sandbox session {sid}, asks Hermes for access to a host it has no grant for.",
+            "",
+            f"Task: {clean(session.get('task'), MAX_TASK)}",
+            f"Request: {method} {scheme}://{host}{request['path']}",
+        ]
+        if ambiguous:
+            lines.append('The path holds an encoded "/", "\\" or ".": only once or the whole host.')
+        if review_note:
+            lines.append(review_note)
+        choice = self.ask_owner(session, "Sandbox network access", "\n".join(lines), choices)
+        if choice == "limit":
+            return deny("limit", f"{MAX_OPEN} questions already open for this session")
         if choice == "once":
             return {"allow": True, "by": "owner", "reason": "once"}
         if choice == "path" and not ambiguous:

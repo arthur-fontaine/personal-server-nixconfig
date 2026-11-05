@@ -39,6 +39,8 @@ def main() -> None:
         say(type="request", id=1, kind="network", session=session["id"], host="pypi.org", method="GET",
             path="/simple/requests/", scheme="https", ambiguous=False)
         say(type="request", id=2, kind="approve", host="example.com")
+        say(type="request", id=3, kind="action", session=session["id"], action="ask_user",
+            args={"question": "Which name?", "choices": ["foo", "bar"]})
         for line in sys.stdin:
             message = json.loads(line)
             if message["type"] == "reply":
