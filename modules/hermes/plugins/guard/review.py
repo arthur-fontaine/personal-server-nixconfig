@@ -28,6 +28,8 @@ READ_ONLY = frozenset({
     "web_search", "web_extract", "x_search", "vision_analyze", "video_analyze",
     "clarify", "todo_list", "read_terminal", "read_window_below", "show_tip",
     "memory", "react_to_message", "tool_search", "tool_describe",
+    # unii's own tools (plugins/unii/engine.py): they open its memory's view.
+    "zoom", "date",
 })
 # computer_use's actions that only look (tools/computer_use/tool.py, _ACTIONS:
 # the ones not marked destructive).
