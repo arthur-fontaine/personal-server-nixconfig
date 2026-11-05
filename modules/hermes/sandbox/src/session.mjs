@@ -97,6 +97,8 @@ export async function bootVm({ gondolin, imageDir, config, key, policy }) {
 // The broker's answer. Its actions come in a later stage: until then every
 // request to it gets a 503, or a 403 when its grant was revoked.
 export async function brokerResponse(request, config, policy) {
+  // The audit line is the policy's (by "grant" or "policy"); what the guest
+  // got instead of an upstream answer is the status below.
   if (describeRequest(request).host !== config.brokerHost) return undefined;
   const allowed = await policy.isRequestAllowed(request);
   return new Response(allowed ? "the Hermes broker is not available yet\n" : "forbidden\n", {

@@ -131,7 +131,12 @@ test("policy: denies what no grant covers, audits without headers or query", asy
   const request = (url, method = "GET") => new Request(url, { method, headers: { authorization: "Bearer PLACEHOLDER" } });
   assert.equal(await policy.isRequestAllowed(request("https://opencode.ai/inference/go/openai/v1/chat", "POST")), true);
   assert.equal(await policy.isRequestAllowed(request("https://example.com/x?token=abc")), false);
-  assert.deepEqual(audit.map((e) => [e.host, e.decision]), [["opencode.ai", "allow"], ["example.com", "deny"]]);
+  assert.deepEqual(audit.map((e) => [e.request.host, e.decision, e.by, e.outcome]), [
+    ["opencode.ai", "allow", "grant", "allowed by a grant"],
+    ["example.com", "deny", "policy", "refused: 403"],
+  ]);
+  assert.deepEqual(audit[0].request, { method: "POST", scheme: "https", host: "opencode.ai", path: "/inference/go/openai/v1/chat" });
+  assert.equal(audit[0].grant.host, "opencode.ai");
   assert.ok(!JSON.stringify(audit).includes("PLACEHOLDER"));
   assert.ok(!JSON.stringify(audit).includes("token=abc"));
   assert.deepEqual(describeRequest({ url: "not a url", method: "get" }).host, "");
@@ -180,6 +185,8 @@ test("policy: concurrent requests to one host make one question", async () => {
   release.open();
   assert.deepEqual(await all, [true, true, true], "a host grant covers them all");
   assert.deepEqual(audit.map((e) => e.by), ["owner", "grant", "grant"]);
+  assert.equal(audit[0].outcome, "allowed, and granted for the session");
+  assert.deepEqual(audit[0].grant, { host: "pypi.org", method: null, pathPrefix: null });
 
   // Allowed once: the identical request rides along, another path asks anew.
   asked.length = 0;
@@ -247,7 +254,9 @@ test("broker: hermes.sandbox is answered on the host, never asked about, and not
   session.policy.revokeGrant("hermes.sandbox");
   assert.equal((await brokerResponse(new Request("https://hermes.sandbox/"), session.config, session.policy)).status, 403);
   assert.ok(!lines.some((l) => l.type === "request"), "never a question about the broker");
-  assert.deepEqual(audit().map((e) => [e.host, e.decision]), [["hermes.sandbox", "allow"], ["hermes.sandbox", "deny"]]);
+  const network = audit().filter((e) => e.event === "network");
+  assert.deepEqual(network.map((e) => [e.request.host, e.decision, e.by]), [["hermes.sandbox", "allow", "grant"], ["hermes.sandbox", "deny", "policy"]]);
+  assert.ok(network.every((e) => e.session === "b" && e.time));
   fs.rmSync(workdir, { recursive: true, force: true });
 });
 

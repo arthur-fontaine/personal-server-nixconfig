@@ -85,6 +85,15 @@ no host of its own (Pi runs offline, its telemetry and update check off), so
 nothing else is allowed in advance. At most four questions per session wait
 at once; more are refused.
 
+Every decision is a line of the session's
+`~/.hermes/sandbox/sessions/<id>/audit.jsonl`: the time, the session, the
+request (method, scheme, host, path: never its headers or query), the
+decision, who took it (`grant`, `guard`, `owner`, `timeout`, `unavailable`,
+`limit`, `policy`, `error`), the outcome for the guest (allowed by a grant,
+allowed once, allowed and granted for the session, refused: 403), the grant
+involved and the reason (the auto-review's rating, the button tapped). The
+grants added or revoked by hand are lines too.
+
 ## How it comes back
 
 When Pi is done, what it left uncommitted becomes a last commit, and the

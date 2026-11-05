@@ -153,8 +153,20 @@ export class NetworkPolicy {
     return removed;
   }
 
-  #log(what, decision, by, reason) {
-    this.audit({ event: "network", decision, by, reason, ...what });
+  // One audit line per decision: the request (never its headers or query),
+  // allow or deny, who decided (grant, guard, owner, timeout, unavailable,
+  // limit, policy, error) and what came of it for the guest.
+  #log(what, decision, by, reason, { grant = null, outcome = null } = {}) {
+    const { method, scheme, host, path } = what;
+    this.audit({
+      event: "network",
+      request: { method, scheme, host, path },
+      decision,
+      by,
+      outcome: outcome ?? (decision === "allow" ? "allowed once" : "refused: 403"),
+      ...(grant ? { grant } : {}),
+      ...(reason ? { reason } : {}),
+    });
     return decision === "allow";
   }
 
@@ -167,7 +179,8 @@ export class NetworkPolicy {
     // Requests to a host already being asked about wait for that answer
     // (Pi often fires several at once): one question, not one per request.
     for (;;) {
-      if (this.grants.covers(what)) return this.#log(what, "allow", "grant", "covered");
+      const covering = this.grants.covers(what);
+      if (covering) return this.#log(what, "allow", "grant", "", { grant: covering, outcome: "allowed by a grant" });
       const pending = this.asking.get(what.host);
       if (!pending) break;
       const answer = await pending;
@@ -189,7 +202,8 @@ export class NetworkPolicy {
     } finally {
       this.asking.delete(what.host);
     }
-    return this.#log(what, answer.allow ? "allow" : "deny", answer.by ?? "approval", answer.reason ?? "");
+    return this.#log(what, answer.allow ? "allow" : "deny", answer.by ?? "approval", answer.reason ?? "",
+      answer.grant ? { grant: answer.grant, outcome: "allowed, and granted for the session" } : {});
   }
 
   // Never rejects: a failure is a refusal.

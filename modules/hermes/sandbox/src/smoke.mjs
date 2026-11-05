@@ -46,8 +46,8 @@ export async function smoke({ gondolin, stateDir, guestDir, log = (line) => proc
     const version = await vm.exec(["node", PI_CLI, "--version"], { env });
     check("Pi starts", version.exitCode === 0, version.stdout.trim() || version.stderr.trim().slice(-200));
     check("the policy logged both decisions",
-      audit.some((e) => e.host === "example.com" && e.decision === "deny") &&
-      audit.some((e) => e.host === "opencode.ai" && e.decision === "allow"));
+      audit.some((e) => e.request.host === "example.com" && e.decision === "deny") &&
+      audit.some((e) => e.request.host === "opencode.ai" && e.decision === "allow"));
   } finally {
     await vm.close();
   }
