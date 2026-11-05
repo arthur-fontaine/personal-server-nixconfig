@@ -61,7 +61,9 @@ at Hermes' boundary, when Pi asks Hermes for something, here a host no grant
 of the session covers. Pi asks Hermes for access; Hermes' approval system
 decides, exactly as for one of Hermes' own tool calls:
 
-1. The request waits (the guest sees a slow connection). Requests to a host
+1. The request waits (the guest sees a slow connection; a client whose own
+   timeout is shorter than your answer gives up first, and asks again on its
+   next try, where a grant you gave meanwhile lets it through). Requests to a host
    already being asked about wait for that one question, then are let
    through if its answer covers them (a grant, or the same request allowed
    once) and refused if it was refused.
@@ -136,7 +138,8 @@ at a time, stopped after `timeout` (two hours).
 
 `sudo -iu hermes hermes-sandbox smoke` builds the image if need be and checks
 the isolation with a made-up key: the guest sees only the placeholder, a host
-without a grant gets 403, opencode.ai answers, Pi starts.
+without a grant gets 403, opencode.ai answers, `hermes.sandbox` is answered
+by the sidecar (503), Pi starts.
 
 ## Not yet
 

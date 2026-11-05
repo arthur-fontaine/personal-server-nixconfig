@@ -158,6 +158,14 @@ posts in your chat itself (a background process or a subagent finishing, a
 watch pattern matching). Hermes' own checks stay underneath:
 its pattern-matched dangerous commands, and its hardline blocklist.
 
+The same review answers what a sandboxed Pi session asks Hermes for (a host
+its grants do not cover; [sandbox.md](sandbox.md)). Nothing inside the VM is
+approved: Pi runs its own commands freely there. Pi asks Hermes for access,
+and Hermes' approval system decides as for one of its own tool calls: the
+decision model reviews the request against your messages from when Hermes
+started the session, never Pi's, and what it does not clear comes to you as
+buttons. With the auto-review off, every such request comes to you.
+
 Every question Hermes asks you has buttons. Its own belong to a turn: its
 approval card and the `clarify` tool's choices are buttons in the chat the
 turn runs in (its instructions say to ask with `clarify`, not in a reply),
@@ -183,7 +191,9 @@ another coding agent, in a microVM: `sandbox_run` copies one ref in as a git
 bundle, Pi works there with no access to this Mac, no secret (its OpenCode Go
 key is swapped in by the host, for opencode.ai only) and no network but its
 model, and `sandbox_result` reads its branch from a review clone where nothing
-it wrote can run. You take the branch with `git fetch`, after reading it. The
+it wrote can run. When Pi needs another host, it asks Hermes for access and
+Hermes' approval system decides: the auto-review, or your buttons (Once, this
+method and path, the whole host, Deny; no answer refuses). You take the branch with `git fetch`, after reading it. The
 details: [sandbox.md](sandbox.md).
 
 ## Integrations: WhatsApp, Instagram, Discord, 1Password…
