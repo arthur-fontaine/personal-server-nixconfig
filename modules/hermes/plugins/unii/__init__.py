@@ -59,6 +59,10 @@ def _complete(state: dict, config: dict):
             max_tokens=600,
             temperature=0.2,
             purpose="unii.compaction",
+            # Hermes' 30 s default timed out on the background model (a
+            # flash model through OpenCode Zen) on large summaries, and each
+            # time fell back to the chat's own subscription.
+            timeout=config.get("compaction_timeout", 90),
             **pinned,
         )
         return result.text or ""
