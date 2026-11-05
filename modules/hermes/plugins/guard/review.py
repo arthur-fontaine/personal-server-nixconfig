@@ -30,6 +30,8 @@ READ_ONLY = frozenset({
     "memory", "react_to_message", "tool_search", "tool_describe",
     # unii's own tools (plugins/unii/engine.py): they open its memory's view.
     "zoom", "date",
+    # owner_approval's: a message with buttons to the user, as clarify.
+    "propose",
 })
 # computer_use's actions that only look (tools/computer_use/tool.py, _ACTIONS:
 # the ones not marked destructive).

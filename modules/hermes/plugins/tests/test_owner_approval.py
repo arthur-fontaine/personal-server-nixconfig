@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 import threading
@@ -72,9 +73,15 @@ def main() -> None:
     assert oa.ask("Network", "GET https://pypi.org/", choices, timeout=1) == oa.UNAVAILABLE
 
     # The plugin registers one scoped handler and publishes its module.
-    registered = []
-    oa.register(types.SimpleNamespace(register_telegram_handler=registered.append))
+    registered, tools, injected = [], {}, []
+    ctx = types.SimpleNamespace(
+        register_telegram_handler=registered.append,
+        register_tool=lambda **kw: tools.__setitem__(kw["name"], kw),
+        inject_message=lambda content, **kw: injected.append((content, kw)) or True)
+    oa.register(ctx)
     assert sys.modules["owner_approval"] is oa and registered == [oa.telegram_handlers]
+    assert tools["propose"]["toolset"] == "owner_proposal"
+    assert "error" in json.loads(tools["propose"]["handler"]({"message": "x", "options": ["a"]}))
     bot = Bot()
     app = App(bot)
 
@@ -84,7 +91,7 @@ def main() -> None:
     run(wire())
     (handler,) = app.handlers
     assert handler.pattern.match("oa:abcd1234:0") and not handler.pattern.match("ea:once:1")
-    assert not handler.pattern.match("cl:1:0")
+    assert not handler.pattern.match("cl:1:0") and handler.pattern.match("op:abcd1234:1")
 
     def tap(index: int, user: int, n: int = -1) -> Query:
         data = bot.sent[n]["reply_markup"].inline_keyboard
@@ -149,6 +156,25 @@ def main() -> None:
     os.environ["TELEGRAM_ALLOWED_USERS"] = ""
     assert oa.ask("x", "y", choices, timeout=5) == oa.UNAVAILABLE
     os.environ["TELEGRAM_ALLOWED_USERS"] = str(OWNER)
+
+    # An event's proposal: buttons in the main chat; the owner's tap continues it.
+    out = json.loads(tools["propose"]["handler"]({
+        "message": "Léa invites you for drinks at 8pm; you are free.",
+        "options": ["Reply to Léa that I'm in for 8pm", "Ask Léa where", "Ignore"]}))
+    assert out["sent"] and "[SILENT]" in out["note"], out
+    message = bot.sent[-1]
+    assert message["chat_id"] == OWNER and "1. Reply to Léa" in message["text"]
+    assert tap(1, 77).answers == ["Only the owner can answer this."] and not injected
+    tap(0, OWNER)
+    ((turn, kw),) = injected
+    assert turn == "I picked option 1 of your proposal: Reply to Léa that I'm in for 8pm"
+    assert kw["origin"] == {"platform": "telegram", "chat_id": str(OWNER), "chat_type": "dm", "user_id": str(OWNER)}
+    assert "Reply to Léa" in bot.edits[-1]["text"] and bot.edits[-1]["reply_markup"] is None
+    # guard reads that turn as the user's: it is not one of the gateway's notices.
+    import guard
+
+    assert not guard.internal(turn)
+    assert tap(1, OWNER).answers == ["Expired: answer in the chat."] and len(injected) == 1
 
     # Ids the result could be confused with are refused.
     for bad in ([], [("timeout", "x")], [("a:b", "x")]):

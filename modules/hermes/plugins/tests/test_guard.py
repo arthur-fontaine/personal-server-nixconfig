@@ -56,6 +56,7 @@ def main() -> None:
     # Read-only: no question asked.
     g = guard(port)
     assert g.pre_tool_call("read_file", {"path": "/tmp/x"}, session_id="s") is None
+    assert g.pre_tool_call("propose", {"message": "x", "options": ["a"]}, session_id="s") is None
     assert g.pre_tool_call("mcp__fsearch__search", {"query": "x"}, session_id="s") is None
     assert g.pre_tool_call("tool_search", {"query": "instagram"}, session_id="s") is None
     assert g.pre_tool_call("zoom", {"id": 386, "n": 1}, session_id="s") is None

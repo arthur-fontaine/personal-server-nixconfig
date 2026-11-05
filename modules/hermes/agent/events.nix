@@ -147,19 +147,25 @@ lib.mkIf cfg.enable {
           together what belongs together ("on se voit ?" then "ce soir" is one).
 
           Then write them one short Telegram message, in their language: for
-          each, what happened, what you found, and the two or three things you
-          could do now, as a question. For an invitation when they are free: book it and answer
+          each, what happened and what you found. Send it with the `propose`
+          tool, with the two or three things you could do now as its options,
+          each a short action that says it all ("Reply to Léa that I'm in for
+          8pm"): they become buttons, and the user's tap is their answer. Then
+          answer exactly [SILENT]. For an invitation when they are free: book it and answer
           yes, or ask for details. When they are busy: answer that they cannot,
-          with or without the reason, or say nothing. When there is nothing worth
-          their attention after all, answer exactly [SILENT].
+          with or without the reason, or say nothing. If `propose` fails, write
+          the message, options included, as your answer instead. When there is
+          nothing worth their attention after all, answer exactly [SILENT].
 
           You cannot act from here: they answer in the main chat, which has all
           your tools. Replying on {source} from there: {reply_hint}.
         '';
-        toolsets = [ "search" "mcp-imcp-read" ];
+        # propose: owner-approval.nix.
+        toolsets = [ "search" "mcp-imcp-read" "owner_proposal" ];
         deliver = "telegram";
         deliver_extra.chat_id = owner;
-        # So the main chat knows what it proposed when the user answers.
+        # So the main chat knows what it proposed when the user answers (a
+        # proposal sent with buttons is mirrored by the propose tool itself).
         mirror_to_session = true;
       };
       # This Mac's own alerts (disk, power, a service down): the daemon writes

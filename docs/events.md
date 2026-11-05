@@ -4,7 +4,8 @@ When something happens that may call for you, Hermes looks into it and
 proposes what to do, in the main chat. For example: Zoé asks on WhatsApp
 for a drink tonight. Hermes checks your calendar. Free: "Book it and tell him
 yes, or ask him where?". Busy: "Tell him you can't, with or without the
-reason, or say nothing?". You answer in the main chat, which acts: it replies
+reason, or say nothing?", each option a button. You tap one (or type your
+answer) in the main chat, which acts: it replies
 to Zoé, books the event. When he then writes "bobbolitas à 19h ?", Hermes
 finds the place near you, proposes to update the event, and its memory keeps
 where bobbolitas is.
@@ -32,10 +33,11 @@ pollers (calendar, mail, …) ┤
                   Hermes' webhook route "events" (127.0.0.1:8644)
                   · reads your main memory, looks things up (read-only tools)
                   · writes one proposal, one numbered item per independent topic, or stays silent
+                  · sends it with `propose` (plugins/owner_approval): its options are buttons
                             │
                             ▼
                   Telegram, your main chat (mirrored into its session)
-                            │ your answer
+                            │ your tap ("I picked option 1 …"), or a typed answer
                             ▼
                   the main chat, with every tool: replies, books, acts
 ```
@@ -53,7 +55,10 @@ injection). So the run that drafts the proposal has read-only tools only: web
 search, and iMCP's reading tools (calendar, contacts, maps, location, weather)
 through a second connection, `imcp-read`. No terminal, no files, no sending,
 no fetching of arbitrary pages (which could carry your data out in a URL). It
-can only write to you; acting takes your answer in the main chat.
+can only write to you; acting takes your answer in the main chat. A button
+says in full what it does, and your tap continues the main chat as your own
+turn: the auto-review takes it as yours, since you chose it, and still asks
+before anything that reaches other people.
 
 ## A message within its conversation
 
