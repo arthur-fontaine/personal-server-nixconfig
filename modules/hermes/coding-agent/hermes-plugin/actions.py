@@ -10,8 +10,12 @@ words (no action has a field for its reasons):
 - request_host {host, method?, pathPrefix?}: a network grant asked ahead. The
   review clearing it at low risk grants it; otherwise the owner's buttons.
 - request_folder {path}: a folder of this Mac, resolved here (the card shows
-  the absolute path), copied read-only into the VM by the sidecar. Hermes'
-  account reads only what it may.
+  the absolute path), copied read-only into the VM by the sidecar. A copy can
+  leave through any host the VM reaches, so secret locations (SECRET_IN_HOME
+  under Hermes' and the administrator's homes, SECRET_SYSTEM) and any folder
+  holding one are refused without asking, with the answer a missing folder
+  gets; so is a folder above MAX_FOLDER_FILES entries or MAX_FOLDER_BYTES.
+  The review clears it at low risk only; otherwise the owner's buttons.
 - git_push {branch}: the session's own branch (sandbox/<id>, or
   sandbox/<id>-…), out of the VM as a bundle, fetched into the review clone
   and pushed from there to the repository's origin: host git with hooks off,
@@ -37,6 +41,7 @@ import shutil
 import signal
 import subprocess
 import tempfile
+import unicodedata
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
@@ -47,6 +52,24 @@ logger = logging.getLogger(__name__)
 
 MAX_OUTPUT = 4096
 MAX_ASKS = 10
+# The sidecar's own limits (sidecar/src/folders.mjs LIMITS), checked here
+# first so the owner is never asked for a copy that would fail.
+MAX_FOLDER_FILES = 20000
+MAX_FOLDER_BYTES = 200 * 1024 * 1024
+# Where keys, tokens and sessions live, under each home Hermes reads (its own;
+# the administrator's, opened to it by system/access/read.nix). Application
+# Support holds browser profiles and password managers, Group Containers
+# 1Password's, .pi and .hermes the agents' own credentials.
+SECRET_IN_HOME = (
+    ".ssh", ".gnupg", ".aws", ".config", ".hermes", ".pi", ".docker", ".kube", ".password-store",
+    ".local/share/keyrings", "Library/Keychains", "Library/Application Support", "Library/Cookies",
+    "Library/Containers", "Library/Group Containers",
+)
+SECRET_SYSTEM = (
+    "/etc", "/private/etc", "/etc/hermes", "/Library/Hermes", "/Library/Keychains", "/var/root",
+    "/private/var/root", "/var/db", "/private/var/db",
+)
+NOT_READABLE = "not a folder Hermes can read"
 HOST = re.compile(r"(\*\.)?[a-z0-9.-]{1,253}")
 METHOD = re.compile(r"[A-Z]{1,16}")
 BRANCH = re.compile(r"sandbox/[A-Za-z0-9._/-]{1,200}")
@@ -151,6 +174,43 @@ def shell_env(env: dict, home: str, tmp: str) -> dict:
     }
 
 
+def folded(path: str) -> str:
+    path = unicodedata.normalize("NFC", path).casefold()
+    data = "/system/volumes/data"
+    if path == data or path.startswith(data + "/"):
+        path = path[len(data):] or "/"
+    return path
+
+
+def identity(path: Path) -> tuple[int, int]:
+    stat = os.stat(path)
+    return stat.st_dev, stat.st_ino
+
+
+def too_large(root: Path) -> bool:
+    """More entries or bytes than the sidecar copies, walked without
+    following links and stopped at the first excess."""
+    entries = size = 0
+    stack = [root]
+    while stack:
+        try:
+            with os.scandir(stack.pop()) as children:
+                for child in children:
+                    entries += 1
+                    try:
+                        if child.is_dir(follow_symlinks=False):
+                            stack.append(Path(child.path))
+                        elif child.is_file(follow_symlinks=False):
+                            size += child.stat(follow_symlinks=False).st_size
+                    except OSError:
+                        continue
+                    if entries > MAX_FOLDER_FILES or size > MAX_FOLDER_BYTES:
+                        return True
+        except OSError:
+            continue
+    return False
+
+
 class Actions:
     def __init__(
         self,
@@ -162,6 +222,7 @@ class Actions:
         env: dict | None = None,
         shell_timeout: float = 120,
         home: str | None = None,
+        homes: list[str] | None = None,
     ) -> None:
         self.approver = approver
         self.state_dir = Path(state_dir)
@@ -170,6 +231,7 @@ class Actions:
         self.env = os.environ if env is None else env
         self.shell_timeout = shell_timeout
         self.home = home or self.env.get("HOME") or str(Path.home())
+        self.homes = [self.home, *(homes or [])]
         self.asks: dict[str, int] = {}
 
     def handle(self, session: dict, message: dict) -> dict:
@@ -231,20 +293,52 @@ class Actions:
             return None
         return resolved
 
+    def _secret_paths(self) -> list[str]:
+        return [*SECRET_SYSTEM, *(str(Path(h) / rel) for h in self.homes for rel in SECRET_IN_HOME)]
+
+    def secret(self, resolved: Path) -> bool:
+        """Whether `resolved` is a secret location, is inside one, or holds
+        one. By name, the way APFS compares them (case and Unicode form
+        folded, the Data volume's firmlinked path as its usual one), and by
+        identity (device and inode), for a name that reaches one otherwise."""
+        target = folded(str(resolved))
+        names, ids, ancestors = set(), set(), set()
+        for raw in self._secret_paths():
+            path = Path(raw)
+            for name in {raw, str(path.resolve(strict=False))}:
+                names.add(folded(name))
+            try:
+                ids.add(identity(path))
+                ancestors.update(identity(parent) for parent in path.resolve(strict=True).parents)
+            except OSError:
+                pass
+        for name in names:
+            if target == name or target.startswith(name + "/") or name.startswith(target.rstrip("/") + "/"):
+                return True
+        try:
+            if identity(resolved) in ancestors:
+                return True
+            return any(identity(p) in ids for p in [resolved, *resolved.parents])
+        except OSError:
+            return True
+
     def _request_folder(self, session, args, message) -> dict:
         resolved = self._resolve(args["path"])
-        if resolved is None:
+        if resolved is None or self.secret(resolved):
             # The same answer for a missing folder and a forbidden one.
-            return answer("error", "policy", "not a folder Hermes can read", "nothing asked",
-                          result={"error": "not a folder Hermes can read"})
+            return answer("error", "policy", NOT_READABLE, "nothing asked", result={"error": NOT_READABLE})
+        if too_large(resolved):
+            limit = f"more than {MAX_FOLDER_FILES} entries or {MAX_FOLDER_BYTES // 1048576} MB"
+            return answer("error", "policy", f"too large: {limit}", "nothing asked",
+                          result={"error": f"too large: {limit}"})
         lines = ["for a read-only copy of a folder of this Mac.", f"Folder: {resolved}"]
         if str(resolved) != args["path"]:
             lines.append(f"(asked as {clean(args['path'], 300)})")
-        lines.append("Copied once into the VM under /host, never written back.")
+        lines.append("Copied once into the VM under /host, never written back; "
+                     "it can leave through any host the VM reaches.")
         choice, reply = self._decide(
             session, "sandbox_request_folder", {"session": session["id"], "path": str(resolved)},
-            "Sandbox: a folder of this Mac", lines, [("copy", "Copy it in, read-only"), ("deny", "Deny")],
-            grant_low_only=False)
+            "Sandbox: a folder of this Mac", lines, [("copy", "Copy it in, read-only"), ("deny", "Deny")])
         if choice is None:
             return reply
         if not session["alive"]():
@@ -351,8 +445,8 @@ class Actions:
         if args.get("cwd"):
             cwd = self._resolve(args["cwd"])
             if cwd is None:
-                return answer("error", "policy", "not a folder Hermes can read", "nothing asked",
-                              result={"error": "cwd: not a folder Hermes can read"})
+                return answer("error", "policy", NOT_READABLE, "nothing asked",
+                              result={"error": f"cwd: {NOT_READABLE}"})
         where = str(cwd) if cwd else "a new temporary folder"
         choice, reply = self._decide(
             session, "sandbox_shell", {"session": session["id"], "command": command, **({"cwd": str(cwd)} if cwd else {})},

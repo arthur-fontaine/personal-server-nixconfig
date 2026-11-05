@@ -635,7 +635,7 @@ test("broker: at most a few actions wait at once", async () => {
   assert.deepEqual((await Promise.all(waiting)).map((r) => r.status), [200, 200, 200, 200]);
 });
 
-test("folders: a read-only snapshot, files and directories only, bounded", async () => {
+test("folders: a read-only snapshot, links only inside it, bounded", async () => {
   const { MemoryProvider, ReadonlyProvider } = await import("@earendil-works/gondolin");
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-folder-")));
   const source = path.join(root, "my notes");
@@ -643,13 +643,23 @@ test("folders: a read-only snapshot, files and directories only, bounded", async
   fs.writeFileSync(path.join(source, "a.txt"), "A");
   fs.writeFileSync(path.join(source, "sub", "run.sh"), "#!/bin/sh\n", { mode: 0o755 });
   fs.symlinkSync("/etc/passwd", path.join(source, "link"));
+  fs.writeFileSync(path.join(root, "outside.txt"), "secret");
+  fs.symlinkSync("../outside.txt", path.join(source, "escape"));
+  fs.symlinkSync("nowhere", path.join(source, "dangling"));
+  fs.symlinkSync(path.join(source, "a.txt"), path.join(source, "sub", "a-link"));
+  fs.symlinkSync("sub", path.join(source, "sub-link"));
   const memory = new MemoryProvider();
   const first = copyFolder(source, memory);
-  assert.deepEqual(first, { name: "my_notes", files: 2, skipped: 1 }, "the symlink is left out");
+  assert.deepEqual(first, { name: "my_notes", files: 4, skipped: 3 }, "the links out of it are left out");
   const guest = new ReadonlyProvider(memory);
   assert.equal(guest.readFileSync("/my_notes/a.txt", "utf8"), "A");
   assert.equal(guest.readFileSync("/my_notes/sub/run.sh", "utf8"), "#!/bin/sh\n");
-  assert.throws(() => guest.statSync("/my_notes/link"), "no symlink comes in");
+  for (const name of ["link", "escape", "dangling"]) {
+    assert.throws(() => guest.lstatSync(`/my_notes/${name}`), `no ${name} comes in`);
+  }
+  assert.equal(guest.readlinkSync("/my_notes/sub/a-link"), "../a.txt", "relative, to the copy");
+  assert.equal(guest.readFileSync("/my_notes/sub/a-link", "utf8"), "A");
+  assert.equal(guest.readFileSync("/my_notes/sub-link/run.sh", "utf8"), "#!/bin/sh\n");
   assert.throws(() => guest.writeFileSync("/my_notes/a.txt", "B"));
   assert.throws(() => guest.mkdirSync("/x"));
   assert.equal(copyFolder(source, memory).name, "my_notes-2", "a second copy never overwrites the first");

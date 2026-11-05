@@ -144,6 +144,7 @@ class Sandbox:
             self.approver, state_dir=self.state_dir, sessions_dir=self.sessions_dir, env=self.env,
             safe_git=lambda args, cwd=None: _git(SAFE_GIT + args, cwd=cwd, env=SAFE_GIT_ENV),
             shell_timeout=float(config.get("shell_timeout", 120)),
+            homes=[str(h) for h in config.get("homes") or []],
         )
 
     # sandbox_run

@@ -110,6 +110,9 @@
           # it is on (../agent/guard.nix, its model and config), then the owner.
           auto_review = server.hermes.decision.approval.enable;
           approval_timeout = cfg.approvalTimeout;
+          # Whose secret folders request_folder refuses: Hermes' own and the
+          # administrator's, which Hermes reads (../system/access/read.nix).
+          homes = [ server.hermes.home server.admin.home ];
         };
       };
     };

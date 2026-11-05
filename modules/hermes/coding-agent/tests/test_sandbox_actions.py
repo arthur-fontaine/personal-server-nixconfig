@@ -165,9 +165,51 @@ def run(root: Path) -> None:
         reply = actions.handle(session(), action("request_folder", path=path))
         assert reply["status"] == "error" and reply["result"] == {"error": "not a folder Hermes can read"}, (path, reply)
     assert len(owner.cards) == 2
-    guard = Guard(verdict(True, "medium"))
-    reply = make(root, guard, Owner()).handle(session(), action("request_folder", path=str(root / "notes")))
+    guard = Guard(verdict(True, "low"), verdict(True, "medium"))
+    owner = Owner("deny")
+    actions = make(root, guard, owner)
+    reply = actions.handle(session(), action("request_folder", path=str(root / "notes")))
     assert reply["by"] == "guard" and guard.calls[0][2] == {"session": SID, "path": str(root / "notes")}
+    reply = actions.handle(session(), action("request_folder", path=str(root / "notes")))
+    assert reply["by"] == "owner" and len(owner.cards) == 1, "the review clears a folder at low risk only"
+
+    # Secret locations, of Hermes' home and the administrator's, are refused
+    # unasked, like a missing folder: by name (any case, through a link) and
+    # when the folder holds one.
+    admin = root / "admin"
+    for secret in [root / ".ssh", root / ".config" / "gh", admin / "Library" / "Application Support" / "Firefox",
+                   admin / ".gnupg", root / "Library" / "Keychains", root / ".hermes"]:
+        secret.mkdir(parents=True)
+    (root / "to-ssh").symlink_to(root / ".ssh")
+    (root / "notes" / "inner").mkdir()
+    guard, owner = Guard(), Owner()
+    actions = make(root, guard, owner, homes=[str(admin)])
+    refused = ["~/.ssh", "~/to-ssh", "~/.SSH", "~/.config", "~/.config/gh", "~", str(root), str(admin),
+               str(admin / "Library"), str(admin / "Library" / "Application Support" / "Firefox"),
+               str(admin / ".gnupg"), "~/Library/Keychains", "~/.hermes", "/etc", "/private/etc", "/", "/var/root"]
+    if Path("/System/Volumes/Data").is_dir():
+        refused.append("/System/Volumes/Data" + str(root / ".ssh"))
+    for path in refused:
+        reply = actions.handle(session(), action("request_folder", path=path))
+        assert reply["status"] == "error" and reply["result"] == {"error": "not a folder Hermes can read"}, (path, reply)
+    assert not guard.calls and not owner.cards, "never asked"
+    assert actions.secret(Path("/etc/hermes")) and not actions.secret((root / "notes" / "inner").resolve())
+    assert not actions.secret(Path("/nix/store")), "the Nix store holds no secret"
+
+    # Too large: refused before asking (the sidecar's own limits).
+    import sandbox.actions as module
+    big = root / "big"
+    big.mkdir()
+    for n in range(4):
+        (big / f"f{n}").write_bytes(b"x" * 10)
+    module.MAX_FOLDER_FILES, saved = 3, module.MAX_FOLDER_FILES
+    reply = actions.handle(session(), action("request_folder", path=str(big)))
+    assert reply["status"] == "error" and reply["result"]["error"].startswith("too large"), reply
+    module.MAX_FOLDER_FILES = saved
+    module.MAX_FOLDER_BYTES, saved = 30, module.MAX_FOLDER_BYTES
+    assert actions.handle(session(), action("request_folder", path=str(big)))["result"]["error"].startswith("too large")
+    module.MAX_FOLDER_BYTES = saved
+    assert not owner.cards
 
     # git_push: the session's branch only, from the review clone, no hooks, no force.
     origin = root / "origin.git"
