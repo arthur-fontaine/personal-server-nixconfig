@@ -6,11 +6,16 @@
 // refs, never hooks or config. The guest's environment holds no secret: the
 // OpenCode key is a Gondolin secret, a placeholder in the guest that the host
 // swaps for the real value in the headers of requests to opencode.ai only.
+// The guest does get one value of its own: the broker's token, which only
+// this process checks (broker.mjs), and which stops working when Pi is done.
 
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { NetworkPolicy, describeRequest } from "./policy.mjs";
+import { BROKER_PATH, Broker } from "./broker.mjs";
+import { copyFolder } from "./folders.mjs";
+import { NetworkPolicy, describeRequest, normalizeGrant, unaskable } from "./policy.mjs";
 import { PiProgress } from "./pi-events.mjs";
 import { PI_CLI, ensureImage } from "./image.mjs";
 
@@ -35,7 +40,16 @@ export const DEFAULTS = {
   // How long a question about a host may wait for Hermes' answer (its
   // approval system has its own, shorter timeout; this is the backstop).
   approvalTimeoutSeconds: 300,
+  // The broker's actions wait for the owner, then may run (a push, a
+  // command): their backstop is longer.
+  actionTimeoutSeconds: 900,
 };
+
+// What the guest is given to reach the broker; the token comes from the
+// plugin (HERMES_SANDBOX_TOKEN), a new one per session.
+export const BROKER_ENV = { url: "HERMES_BROKER_URL", token: "HERMES_BROKER_TOKEN" };
+// Folders of this Mac Pi asked for and Hermes gave: read-only copies.
+export const HOST_FILES = "/host";
 
 export function piArgv({ task, model, thinking }) {
   // Pi reads a leading @ as a file to attach.
@@ -51,9 +65,10 @@ export function piArgv({ task, model, thinking }) {
   ];
 }
 
-export function guestEnv(secretEnv) {
+export function guestEnv(secretEnv, broker = null) {
   return {
     ...secretEnv,
+    ...(broker ? { [BROKER_ENV.url]: broker.url, [BROKER_ENV.token]: broker.token } : {}),
     HOME: "/root",
     PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     // Gondolin's TLS interception CA; Node trusts only its own bundle.
@@ -70,22 +85,25 @@ export function guestEnv(secretEnv) {
 
 // The VM and the guest's environment. Shared by sessions and the smoke test,
 // so the smoke test checks what a session gets.
-export async function bootVm({ gondolin, imageDir, config, key, policy }) {
+export async function bootVm({ gondolin, imageDir, config, key, policy, broker = null, hostFiles = null }) {
   const hooks = gondolin.createHttpHooks({
     secrets: { [config.secretName]: { hosts: config.secretHosts, value: key } },
     // Gondolin runs onRequest before isRequestAllowed (and on every
     // redirect hop): the broker's requests are answered here and never
     // leave; any other request passes on to the policy untouched.
-    onRequest: (request) => brokerResponse(request, config, policy),
+    onRequest: (request) => brokerResponse(request, config, policy, broker),
     isRequestAllowed: policy.isRequestAllowed,
   });
-  const env = guestEnv(hooks.env);
+  const env = guestEnv(hooks.env, broker ? { url: `https://${config.brokerHost}${BROKER_PATH}`, token: broker.token } : null);
+  const mounts = { "/workspace": new gondolin.MemoryProvider() };
+  // Filled while the VM runs (request_folder); the guest only reads it.
+  if (hostFiles) mounts[HOST_FILES] = new gondolin.ReadonlyProvider(hostFiles);
   const vm = await gondolin.VM.create({
     sandbox: { imagePath: imageDir, ...(config.qemuPath ? { qemuPath: config.qemuPath } : {}) },
     httpHooks: hooks.httpHooks,
     dns: { mode: "synthetic" },
     allowWebSockets: false,
-    vfs: { mounts: { "/workspace": new gondolin.MemoryProvider() } },
+    vfs: { mounts },
     env,
     memory: config.memory,
     cpus: config.cpus,
@@ -94,14 +112,15 @@ export async function bootVm({ gondolin, imageDir, config, key, policy }) {
   return { vm, env };
 }
 
-// The broker's answer. Its actions come in a later stage: until then every
-// request to it gets a 503, or a 403 when its grant was revoked.
-export async function brokerResponse(request, config, policy) {
-  // The audit line is the policy's (by "grant" or "policy"); what the guest
-  // got instead of an upstream answer is the status below.
+// The broker's answer (broker.mjs), or a 403 when its grant was revoked, or
+// a 503 when this VM has no broker.
+export async function brokerResponse(request, config, policy, broker = null) {
+  // The audit line is the policy's (by "grant" or "policy"); the broker's
+  // own lines say what came of the action.
   if (describeRequest(request).host !== config.brokerHost) return undefined;
   const allowed = await policy.isRequestAllowed(request);
-  return new Response(allowed ? "the Hermes broker is not available yet\n" : "forbidden\n", {
+  if (allowed && broker) return broker.handler.handle(request);
+  return new Response(allowed ? "the Hermes broker is not available\n" : "forbidden\n", {
     status: allowed ? 503 : 403,
     headers: { "content-type": "text/plain; charset=utf-8" },
   });
@@ -140,6 +159,17 @@ export class Session {
       }),
       onGrants: (grants) => this.peer.send("grants", { grants }),
     });
+    // The broker's token: the plugin's (secrets.token_urlsafe, per session),
+    // or one of its own when run without the plugin.
+    const token = this.env.HERMES_SANDBOX_TOKEN || crypto.randomBytes(32).toString("base64url");
+    this.broker = {
+      token,
+      handler: new Broker({ token, perform: (action, args) => this.#perform(action, args), audit: (e) => this.audit(e) }),
+    };
+    this.hostFiles = null;
+    this.guestEnv = null;
+    this.base = null;
+    this.pushes = 0;
   }
 
   audit(entry) {
@@ -155,6 +185,7 @@ export class Session {
   stop(reason = "stopped") {
     if (this.stopReason) return;
     this.stopReason = reason;
+    this.broker.handler.revoke();
     this.abort.abort();
   }
 
@@ -170,6 +201,7 @@ export class Session {
       result = { status: this.stopReason ?? "failed", error: String(error?.message ?? error).slice(0, 2000) };
     } finally {
       clearTimeout(timer);
+      this.broker.handler.revoke();
       if (this.vm) {
         this.setPhase("closing");
         await this.vm.close().catch(() => {});
@@ -206,9 +238,13 @@ export class Session {
     this.#checkStopped();
 
     this.setPhase("boot");
-    const booted = await bootVm({ gondolin, imageDir: image.dir, config, key, policy: this.policy });
+    this.hostFiles = new gondolin.MemoryProvider();
+    const booted = await bootVm({
+      gondolin, imageDir: image.dir, config, key, policy: this.policy, broker: this.broker, hostFiles: this.hostFiles,
+    });
     this.vm = booted.vm;
     const { vm, env } = booted;
+    this.guestEnv = env;
     this.#checkStopped();
 
     this.setPhase("repo");
@@ -225,11 +261,14 @@ export class Session {
       await run(vm, [...GIT, "reset", "--quiet", "--hard", "FETCH_HEAD"], { env });
       base = await run(vm, [...GIT, "rev-parse", "HEAD"], { env });
     }
+    this.base = base;
     this.#checkStopped();
 
     this.setPhase("pi");
     this.audit({ event: "pi", model: config.model, thinking: config.thinking });
     const pi = await this.#runPi(vm, env);
+    // Pi is done: nothing in the guest may ask Hermes for anything now.
+    this.broker.handler.revoke();
 
     this.setPhase("export");
     const out = await this.#export(vm, env, base);
@@ -245,6 +284,129 @@ export class Session {
       ...(error ? { error } : {}),
       ...out,
     };
+  }
+
+  // One broker action, once its token and schema passed (broker.mjs):
+  // what the plugin's approval system decides, and what comes of it here.
+  // Returns {status, result?, by, reason?, outcome?}.
+  async #perform(action, args) {
+    if (action === "request_host") return this.#requestHost(args);
+    if (action === "git_push") return this.#gitPush(args);
+    if (action === "request_folder") return this.#requestFolder(args);
+    const answer = await this.#ask(action, args);
+    if (answer.status !== "allowed") return answer;
+    if (action === "ask_user") {
+      const choice = answer.result?.answer;
+      if (!args.choices.includes(choice)) return { ...answer, status: "error", result: undefined, outcome: "a bad answer" };
+      return { ...answer, result: { answer: choice }, outcome: "answered" };
+    }
+    if (action === "shell") {
+      const r = answer.result ?? {};
+      const result = {
+        exit_code: Number.isInteger(r.exit_code) ? r.exit_code : null,
+        ...(r.timed_out ? { timed_out: true } : {}),
+        output: String(r.output ?? "").slice(0, 4096),
+      };
+      return { ...answer, result, outcome: r.timed_out ? "ran, timed out" : `ran, exit ${result.exit_code}` };
+    }
+    return { status: "error", by: "broker", reason: `no such action ${action}` };
+  }
+
+  // The plugin's answer: {status, by, reason, result?, grant?, folder?}.
+  async #ask(action, args, extra = {}) {
+    let answer;
+    try {
+      answer = await this.peer.request("action", { ...extra, session: this.config.id, action, args }, {
+        timeoutMs: this.config.actionTimeoutSeconds * 1000,
+      });
+    } catch (error) {
+      return { status: "error", by: "error", reason: `no answer: ${error.message}` };
+    }
+    const status = ["allowed", "denied", "timeout", "error"].includes(answer?.status) ? answer.status : "error";
+    return {
+      status,
+      by: typeof answer?.by === "string" ? answer.by : "approval",
+      reason: typeof answer?.reason === "string" ? answer.reason.slice(0, 500) : "",
+      result: answer?.result && typeof answer.result === "object" ? answer.result : undefined,
+      grant: answer?.grant,
+      folder: answer?.folder,
+      outcome: typeof answer?.outcome === "string" ? answer.outcome.slice(0, 200) : undefined,
+    };
+  }
+
+  async #requestHost(args) {
+    const grant = normalizeGrant(args);
+    const bare = grant.host.replace(/^\*\./, "");
+    if (unaskable(bare) || this.policy.localHosts.has(bare)) {
+      return { status: "denied", by: "policy", reason: "not a host name to ask about", outcome: "refused" };
+    }
+    const same = JSON.stringify(grant);
+    if (this.policy.grants.list().some((g) => JSON.stringify(g) === same)) {
+      return { status: "allowed", by: "grant", outcome: "already granted", result: { grant } };
+    }
+    const answer = await this.#ask("request_host", grant);
+    if (answer.status !== "allowed") return { ...answer, result: undefined };
+    // Hermes grants what was asked, nothing wider.
+    let given;
+    try {
+      given = normalizeGrant(answer.grant ?? {});
+    } catch {
+      given = null;
+    }
+    if (!given || JSON.stringify(given) !== same) {
+      return { status: "error", by: "error", reason: "the answer granted something else", outcome: "nothing granted" };
+    }
+    this.policy.addGrant(given);
+    return { ...answer, result: { grant: given }, outcome: "granted for the session" };
+  }
+
+  async #gitPush({ branch }) {
+    const vm = this.vm;
+    if (!vm || this.phase !== "pi") {
+      return { status: "error", by: "broker", outcome: "not now", result: { error: "the session is not running Pi" } };
+    }
+    const env = this.guestEnv;
+    const ref = `refs/heads/${branch}`;
+    const exists = await vm.exec([...GIT, "rev-parse", "--verify", "--quiet", `${ref}^{commit}`], { env });
+    if (exists.exitCode !== 0) {
+      return { status: "error", by: "broker", outcome: "no such branch", result: { error: "no such branch in /workspace/repo" } };
+    }
+    // The branch leaves the VM as a bundle, as at the end of a session; the
+    // plugin pushes it from the review clone, never from the guest.
+    const name = `push-${++this.pushes}.bundle`;
+    const hostPath = path.join(this.config.workdir, name);
+    try {
+      await run(vm, [...GIT, "bundle", "create", "--quiet", `/tmp/${name}`, ref], { env });
+      fs.writeFileSync(hostPath, await vm.fs.readFile(`/tmp/${name}`), { mode: 0o600 });
+      await vm.exec(["rm", "-f", `/tmp/${name}`], { env }).catch(() => {});
+      const answer = await this.#ask("git_push", { branch }, { bundle: name, base: this.base });
+      if (answer.status !== "allowed") return answer;
+      return { ...answer, result: { pushed: branch }, outcome: answer.outcome ?? "pushed" };
+    } finally {
+      fs.rmSync(hostPath, { force: true });
+    }
+  }
+
+  async #requestFolder(args) {
+    const answer = await this.#ask("request_folder", args);
+    if (answer.status !== "allowed") return answer;
+    const source = answer.folder?.path;
+    if (typeof source !== "string" || !this.hostFiles) {
+      return { status: "error", by: "error", reason: "no folder to copy", outcome: "nothing copied" };
+    }
+    try {
+      const copied = copyFolder(source, this.hostFiles);
+      return {
+        ...answer,
+        result: { path: `${HOST_FILES}/${copied.name}`, files: copied.files, ...(copied.skipped ? { skipped: copied.skipped } : {}) },
+        outcome: `copied ${copied.files} file(s) to ${HOST_FILES}/${copied.name}`,
+      };
+    } catch (error) {
+      return {
+        status: "error", by: answer.by, reason: answer.reason, outcome: `not copied: ${error.message}`,
+        result: { error: error.name === "FolderTooLarge" ? `too large: ${error.message}` : "the folder could not be copied" },
+      };
+    }
   }
 
   #checkStopped() {

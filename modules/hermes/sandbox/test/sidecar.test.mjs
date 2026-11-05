@@ -13,6 +13,8 @@ import { Grants, NetworkPolicy, ambiguousPath, describeRequest, normalizeGrant }
 import { PiProgress } from "../src/pi-events.mjs";
 import { buildConfig, imageId, ensureImage } from "../src/image.mjs";
 import { Session, brokerResponse, piArgv } from "../src/session.mjs";
+import { Broker, InvalidAction, MAX_BODY, validateAction } from "../src/broker.mjs";
+import { FolderTooLarge, copyFolder } from "../src/folders.mjs";
 
 function peerPair() {
   const toSidecar = new PassThrough();
@@ -249,13 +251,15 @@ test("broker: hermes.sandbox is answered on the host, never asked about, and not
   assert.ok(session.policy.grants.list().some((g) => g.host === "hermes.sandbox"), "in the initial allow set");
   assert.ok(session.policy.grants.list().some((g) => g.host === "opencode.ai"));
   const answer = await brokerResponse(new Request("https://hermes.sandbox/v1/actions", { method: "POST", body: "{}" }), session.config, session.policy);
-  assert.equal(answer.status, 503);
+  assert.equal(answer.status, 503, "no broker given");
+  const unauthorized = await brokerResponse(new Request("https://hermes.sandbox/v1/actions", { method: "POST", body: "{}" }), session.config, session.policy, session.broker);
+  assert.equal(unauthorized.status, 401);
   assert.equal(await brokerResponse(new Request("https://example.com/"), session.config, session.policy), undefined);
   session.policy.revokeGrant("hermes.sandbox");
   assert.equal((await brokerResponse(new Request("https://hermes.sandbox/"), session.config, session.policy)).status, 403);
   assert.ok(!lines.some((l) => l.type === "request"), "never a question about the broker");
   const network = audit().filter((e) => e.event === "network");
-  assert.deepEqual(network.map((e) => [e.request.host, e.decision, e.by]), [["hermes.sandbox", "allow", "grant"], ["hermes.sandbox", "deny", "policy"]]);
+  assert.deepEqual(network.map((e) => [e.request.host, e.decision, e.by]), [["hermes.sandbox", "allow", "grant"], ["hermes.sandbox", "allow", "grant"], ["hermes.sandbox", "deny", "policy"]]);
   assert.ok(network.every((e) => e.session === "b" && e.time));
   fs.rmSync(workdir, { recursive: true, force: true });
 });
@@ -366,6 +370,7 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
   const gondolin = {
     VM: FakeVm,
     MemoryProvider: class {},
+    ReadonlyProvider: class { constructor(backend) { this.backend = backend; } },
     buildAssets: async (_c, { outputDir }) => {
       fs.mkdirSync(outputDir, { recursive: true });
       fs.writeFileSync(path.join(outputDir, "manifest.json"), "{}");
@@ -391,22 +396,26 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
   assert.ok(vm.closed);
   assert.equal(vm.options.dns.mode, "synthetic");
   assert.equal(vm.options.allowWebSockets, false);
-  assert.deepEqual(Object.keys(vm.options.vfs.mounts), ["/workspace"]);
+  assert.deepEqual(Object.keys(vm.options.vfs.mounts), ["/workspace", "/host"]);
+  assert.ok(vm.options.vfs.mounts["/host"] instanceof gondolin.ReadonlyProvider, "folders Pi gets are read-only");
   assert.equal(vm.options.httpHooks.secrets.OPENCODE_API_KEY.value, secret);
   assert.deepEqual(vm.options.httpHooks.secrets.OPENCODE_API_KEY.hosts, ["opencode.ai"]);
-  assert.equal((await vm.options.httpHooks.onRequest(new Request("https://hermes.sandbox/x"))).status, 503);
+  assert.equal((await vm.options.httpHooks.onRequest(new Request("https://hermes.sandbox/v1/actions", { method: "POST" }))).status, 401,
+    "the broker, its token revoked once Pi is done");
   assert.ok(!JSON.stringify(vm.options.env).includes(secret));
   assert.ok(!JSON.stringify(vm.commands).includes(secret));
   const fetch = vm.commands.find((c) => c.argv.includes("fetch"));
   assert.deepEqual(fetch.argv.slice(-2), ["/tmp/in.bundle", "refs/heads/main"]);
   const pi = vm.commands.find((c) => c.argv[0] === "node");
   assert.equal(pi.options.env.OPENCODE_API_KEY, "PLACEHOLDER");
+  assert.equal(pi.options.env.HERMES_BROKER_TOKEN, session.broker.token);
+  assert.equal(pi.options.env.HERMES_BROKER_URL, "https://hermes.sandbox/v1/actions");
   assert.ok(pi.argv.includes("opencode-go/deepseek-v4.1-flash"));
   assert.equal(pi.argv[pi.argv.indexOf("--thinking") + 1], "high");
   assert.ok(lines.some((l) => l.type === "done" && l.result.status === "finished"));
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(workdir, "result.json"), "utf8")).commits, 1);
   const audit = fs.readFileSync(path.join(workdir, "audit.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
-  assert.deepEqual(audit.map((a) => a.event), ["start", "pi", "end", "network"]);
+  assert.deepEqual(audit.map((a) => a.event), ["start", "pi", "end", "network", "action"]);
   assert.ok(!fs.readFileSync(path.join(workdir, "audit.jsonl"), "utf8").includes(secret));
   fs.rmSync(workdir, { recursive: true, force: true });
 });
@@ -427,7 +436,7 @@ test("session: Pi exiting 0 after its model refused every call is a failure", as
   }
   const session = new Session({ id: "r", task: "t", workdir, stateDir: path.join(workdir, "state"), guestDir: GUEST, branch: "sandbox/r" }, {
     gondolin: {
-      VM: RefusedVm, MemoryProvider: class {},
+      VM: RefusedVm, MemoryProvider: class {}, ReadonlyProvider: class {},
       buildAssets: async (_c, { outputDir }) => { fs.mkdirSync(outputDir, { recursive: true }); fs.writeFileSync(path.join(outputDir, "manifest.json"), "{}"); },
       verifyAssets: () => true,
       createHttpHooks: () => ({ httpHooks: {}, env: { OPENCODE_API_KEY: "P" } }),
@@ -468,5 +477,298 @@ test("session: a stop before boot ends it as stopped", async () => {
   const result = await session.run();
   assert.equal(result.status, "stopped");
   await tick();
+  fs.rmSync(workdir, { recursive: true, force: true });
+});
+
+// The broker: its token, its schemas, its sizes, its answers.
+
+const TOKEN = "t".repeat(43);
+
+function post(body, { token = TOKEN, type = "application/json", url = "https://hermes.sandbox/v1/actions", method = "POST" } = {}) {
+  const headers = { "content-type": type };
+  if (token !== null) headers.authorization = `Bearer ${token}`;
+  return new Request(url, { method, headers, ...(method === "POST" ? { body: typeof body === "string" ? body : JSON.stringify(body) } : {}) });
+}
+
+function broker(perform = async () => ({ status: "allowed", by: "guard", reason: "secret reasoning", result: { x: 1 } })) {
+  const audit = [];
+  const calls = [];
+  const b = new Broker({ token: TOKEN, perform: async (action, args) => { calls.push([action, args]); return perform(action, args); }, audit: (e) => audit.push(e) });
+  return { b, audit, calls };
+}
+
+test("broker: the session's token only, compared in constant time, and none once revoked", async () => {
+  const { b, audit, calls } = broker();
+  const action = { action: "ask_user", question: "Which?", choices: ["a", "b"] };
+  for (const token of [null, "", "x", TOKEN + "x", TOKEN.slice(1), `${TOKEN}=`]) {
+    const response = await b.handle(post(action, { token }));
+    assert.equal(response.status, 401, `token ${JSON.stringify(token)}`);
+    assert.deepEqual(await response.json(), { ok: false, status: "error", result: { error: "unauthorized" } });
+  }
+  const basic = new Request("https://hermes.sandbox/v1/actions", { method: "POST", headers: { authorization: `Basic ${TOKEN}`, "content-type": "application/json" }, body: JSON.stringify(action) });
+  assert.equal((await b.handle(basic)).status, 401);
+  assert.equal(calls.length, 0);
+  const ok = await b.handle(post(action));
+  assert.equal(ok.status, 200);
+  assert.deepEqual(await ok.json(), { ok: true, status: "allowed", result: { x: 1 } });
+  b.revoke();
+  assert.equal((await b.handle(post(action))).status, 401, "revoked: every later call");
+  assert.equal(calls.length, 1);
+  assert.ok(!JSON.stringify(audit).includes(TOKEN), "the token is never audited");
+  assert.throws(() => new Broker({ token: "short", perform: async () => ({}) }));
+});
+
+test("broker: a revocation while an action waits answers 401, whatever was decided", async () => {
+  let release;
+  const { b, audit } = broker(() => new Promise((resolve) => { release = resolve; }));
+  const pending = b.handle(post({ action: "shell", command: "ls" }));
+  await until(() => release, "the action to be asked");
+  b.revoke();
+  release({ status: "allowed", by: "owner", result: { exit_code: 0, output: "x" } });
+  const response = await pending;
+  assert.equal(response.status, 401);
+  assert.equal(audit.at(-1).outcome, "the session ended first");
+});
+
+test("broker: path, method, JSON only, body size", async () => {
+  const { b, calls } = broker();
+  assert.equal((await b.handle(post({}, { url: "https://hermes.sandbox/v1/other" }))).status, 404);
+  assert.equal((await b.handle(post({}, { method: "GET" }))).status, 405);
+  assert.equal((await b.handle(post({ action: "shell", command: "ls" }, { type: "text/plain" }))).status, 415);
+  assert.equal((await b.handle(post("{not json"))).status, 400);
+  const big = { action: "shell", command: "x".repeat(MAX_BODY) };
+  const tooLarge = await b.handle(post(big));
+  assert.equal(tooLarge.status, 413);
+  // A body without a length (streamed) is cut at the limit too.
+  const stream = new ReadableStream({ start(c) { for (let i = 0; i < 20; i++) c.enqueue(new Uint8Array(1024).fill(32)); c.close(); } });
+  const chunked = new Request("https://hermes.sandbox/v1/actions", { method: "POST", body: stream, duplex: "half", headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" } });
+  assert.equal((await b.handle(chunked)).status, 413);
+  assert.equal((await b.handle(post({ action: "shell", command: "ls" }, { type: "application/json; charset=utf-8" }))).status, 200);
+  assert.equal(calls.length, 1);
+});
+
+test("broker: each action's schema, nothing unknown, no field for Pi's reasons", () => {
+  const ok = [
+    [{ action: "request_host", host: "PyPI.org" }, { host: "pypi.org" }],
+    [{ action: "request_host", host: "api.github.com", method: "get", pathPrefix: "/repos/a" }, { host: "api.github.com", method: "GET", pathPrefix: "/repos/a" }],
+    [{ action: "request_folder", path: "~/notes" }, { path: "~/notes" }],
+    [{ action: "git_push", branch: "sandbox/20260101-000000-abcdef" }, { branch: "sandbox/20260101-000000-abcdef" }],
+    [{ action: "ask_user", question: "Which one?\nReally.", choices: ["a", "b", "c"] }, { question: "Which one?\nReally.", choices: ["a", "b", "c"] }],
+    [{ action: "shell", command: "ls -la", cwd: "/tmp" }, { command: "ls -la", cwd: "/tmp" }],
+    [{ action: "shell", command: "ls", cwd: null }, { command: "ls" }],
+  ];
+  for (const [body, args] of ok) assert.deepEqual(validateAction(body), { action: body.action, args });
+  const bad = [
+    [null, /object/], [[], /object/], ["shell", /object/],
+    [{ action: "rm" }, /action: one of/],
+    [{ action: "__proto__" }, /action: one of/],
+    [{ action: "shell", command: "ls", justification: "the user wants it" }, /unknown field.*justification/],
+    [{ action: "git_push", branch: "sandbox/x", reason: "ok" }, /unknown field/],
+    [{ action: "git_push", branch: "main" }, /branch/],
+    [{ action: "git_push", branch: "sandbox/../main" }, /branch/],
+    [{ action: "git_push", branch: "sandbox/x.lock" }, /branch/],
+    [{ action: "git_push", branch: "sandbox/.x" }, /branch/],
+    [{ action: "git_push" }, /required/],
+    [{ action: "request_host", host: "a b" }, /host/],
+    [{ action: "request_host", host: "x.com", method: "G3T" }, /method/],
+    [{ action: "request_host", host: "x.com", pathPrefix: "/a/../b" }, /path/],
+    [{ action: "request_host", host: "x.com", pathPrefix: "/a%2Fb" }, /path/],
+    [{ action: "ask_user", question: "q", choices: ["only"] }, /choices/],
+    [{ action: "ask_user", question: "q", choices: ["a", "b", "c", "d", "e"] }, /choices/],
+    [{ action: "ask_user", question: "q", choices: ["a", "a"] }, /different/],
+    [{ action: "ask_user", question: "q", choices: ["a", 2] }, /choices\[1\]/],
+    [{ action: "ask_user", question: "", choices: ["a", "b"] }, /question/],
+    [{ action: "shell", command: 42 }, /command/],
+    [{ action: "shell", command: "x".repeat(4001) }, /command/],
+    [{ action: "shell", command: "ls\u0000" }, /control/],
+    [{ action: "request_folder", path: "/a\nb" }, /control/],
+  ];
+  for (const [body, message] of bad) assert.throws(() => validateAction(body), (e) => e instanceof InvalidAction && message.test(e.message), JSON.stringify(body));
+});
+
+test("broker: minimal answers, no reviewer's reason; a denial is final for the session", async () => {
+  const answers = [
+    { status: "denied", by: "owner", reason: "the owner tapped Deny, guard said high risk" },
+    { status: "timeout", by: "timeout", reason: "no answer" },
+    { status: "error", by: "broker", result: { error: "no such branch in /workspace/repo" } },
+    { status: "weird", by: "x" },
+  ];
+  const { b, audit, calls } = broker(async () => answers.shift());
+  const read = async (body) => { const r = await b.handle(post(body)); return [r.status, await r.json()]; };
+  assert.deepEqual(await read({ action: "shell", command: "id" }), [200, { ok: false, status: "denied" }]);
+  assert.deepEqual(await read({ action: "shell", command: "id" }), [200, { ok: false, status: "denied" }], "not asked again");
+  assert.deepEqual(await read({ action: "shell", command: "whoami" }), [200, { ok: false, status: "timeout" }]);
+  assert.deepEqual(await read({ action: "git_push", branch: "sandbox/x" }), [200, { ok: false, status: "error", result: { error: "no such branch in /workspace/repo" } }]);
+  assert.deepEqual(await read({ action: "git_push", branch: "sandbox/y" }), [200, { ok: false, status: "error" }]);
+  assert.equal(calls.length, 4);
+  const lines = audit.filter((e) => e.event === "action");
+  assert.deepEqual(lines.map((e) => [e.action, e.decision, e.by]), [
+    ["shell", "denied", "owner"], ["shell", "denied", "final"], ["shell", "timeout", "timeout"],
+    ["git_push", "error", "broker"], ["git_push", "error", "x"],
+  ]);
+  assert.deepEqual(lines[0].args, { command: "id" });
+  assert.match(lines[0].reason, /guard said/, "the reviewer's reason is the audit's, never Pi's");
+});
+
+test("broker: at most a few actions wait at once", async () => {
+  const releases = [];
+  const { b } = broker(() => new Promise((resolve) => releases.push(resolve)));
+  const waiting = [1, 2, 3, 4].map((n) => b.handle(post({ action: "shell", command: `echo ${n}` })));
+  await until(() => releases.length === 4, "four questions");
+  assert.equal((await b.handle(post({ action: "shell", command: "echo 5" }))).status, 429);
+  releases.forEach((r) => r({ status: "allowed", by: "owner", result: {} }));
+  assert.deepEqual((await Promise.all(waiting)).map((r) => r.status), [200, 200, 200, 200]);
+});
+
+test("folders: a read-only snapshot, files and directories only, bounded", async () => {
+  const { MemoryProvider, ReadonlyProvider } = await import("@earendil-works/gondolin");
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-folder-")));
+  const source = path.join(root, "my notes");
+  fs.mkdirSync(path.join(source, "sub"), { recursive: true });
+  fs.writeFileSync(path.join(source, "a.txt"), "A");
+  fs.writeFileSync(path.join(source, "sub", "run.sh"), "#!/bin/sh\n", { mode: 0o755 });
+  fs.symlinkSync("/etc/passwd", path.join(source, "link"));
+  const memory = new MemoryProvider();
+  const first = copyFolder(source, memory);
+  assert.deepEqual(first, { name: "my_notes", files: 2, skipped: 1 }, "the symlink is left out");
+  const guest = new ReadonlyProvider(memory);
+  assert.equal(guest.readFileSync("/my_notes/a.txt", "utf8"), "A");
+  assert.equal(guest.readFileSync("/my_notes/sub/run.sh", "utf8"), "#!/bin/sh\n");
+  assert.throws(() => guest.statSync("/my_notes/link"), "no symlink comes in");
+  assert.throws(() => guest.writeFileSync("/my_notes/a.txt", "B"));
+  assert.throws(() => guest.mkdirSync("/x"));
+  assert.equal(copyFolder(source, memory).name, "my_notes-2", "a second copy never overwrites the first");
+  fs.writeFileSync(path.join(source, "a.txt"), "changed");
+  assert.equal(guest.readFileSync("/my_notes/a.txt", "utf8"), "A", "a snapshot");
+  assert.throws(() => copyFolder(source, memory, { files: 2, bytes: 1e9 }), FolderTooLarge);
+  assert.throws(() => copyFolder(source, memory, { files: 100, bytes: 3 }), FolderTooLarge);
+  assert.throws(() => copyFolder(path.join(source, "link"), memory), /resolved/);
+  assert.throws(() => copyFolder("relative", memory));
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+// A session whose Pi waits until the test says so, to call the broker
+// meanwhile as the guest would.
+class WaitingVm extends FakeVm {
+  static gate = null;
+  static async create(options) { return new WaitingVm(options); }
+  exec(argv, options = {}) {
+    if (argv[0] === "node") {
+      const proc = new Promise((resolve) => { WaitingVm.gate = () => resolve({ exitCode: 0, stdout: "", stderr: "" }); });
+      proc.output = async function* () {};
+      return proc;
+    }
+    if (argv.includes("--verify") && argv.some((a) => a.startsWith("refs/heads/"))) {
+      const exists = argv.some((a) => a.startsWith("refs/heads/sandbox/w^"));
+      return Promise.resolve({ exitCode: exists ? 0 : 1, stdout: exists ? "pushsha" : "", stderr: "" });
+    }
+    if (argv.includes("bundle") && argv.includes("create")) {
+      this.files.set(argv.at(-2), Buffer.from(`BUNDLE ${argv.at(-1)}`));
+      return Promise.resolve({ exitCode: 0, stdout: "", stderr: "" });
+    }
+    return super.exec(argv, options);
+  }
+}
+
+test("session: the broker's actions reach the plugin typed, and their answers act here", async () => {
+  const { MemoryProvider, ReadonlyProvider } = await import("@earendil-works/gondolin");
+  const workdir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-session-")));
+  const folder = path.join(workdir, "docs");
+  fs.mkdirSync(folder);
+  fs.writeFileSync(path.join(folder, "x.md"), "# x");
+  const { peer, lines, write } = peerPair();
+  WaitingVm.gate = null;
+  const session = new Session({ id: "w", task: "t", workdir, stateDir: path.join(workdir, "state"), guestDir: GUEST, branch: "sandbox/w" }, {
+    gondolin: {
+      VM: WaitingVm, MemoryProvider, ReadonlyProvider,
+      buildAssets: async (_c, { outputDir }) => { fs.mkdirSync(outputDir, { recursive: true }); fs.writeFileSync(path.join(outputDir, "manifest.json"), "{}"); },
+      verifyAssets: () => true,
+      createHttpHooks: ({ onRequest, isRequestAllowed }) => ({ httpHooks: { onRequest, isRequestAllowed }, env: { OPENCODE_API_KEY: "P" } }),
+    },
+    peer, env: { OPENCODE_GO_API_KEY: "k", HERMES_SANDBOX_TOKEN: TOKEN },
+  });
+  const running = session.run();
+  await until(() => WaitingVm.gate, "Pi to start");
+  const vm = WaitingVm.last;
+  const call = async (body, token = TOKEN) => {
+    const response = await vm.options.httpHooks.onRequest(post(body, { token }));
+    return [response.status, await response.json()];
+  };
+  const answerNext = async (fields) => {
+    const before = lines.filter((l) => l.type === "request").length;
+    await until(() => lines.filter((l) => l.type === "request").length > before, "a request");
+    const request = lines.filter((l) => l.type === "request").at(-1);
+    write({ type: "reply", id: request.id, ...fields });
+    return request;
+  };
+
+  // request_host: the plugin's grant becomes the session's.
+  let pending = call({ action: "request_host", host: "pypi.org", method: "GET", pathPrefix: "/simple" });
+  let request = await answerNext({ status: "allowed", by: "guard", reason: "low risk", grant: { host: "pypi.org", method: "GET", pathPrefix: "/simple" } });
+  assert.deepEqual([request.kind, request.session, request.action, request.args], ["action", "w", "request_host", { host: "pypi.org", method: "GET", pathPrefix: "/simple" }]);
+  assert.deepEqual(await pending, [200, { ok: true, status: "allowed", result: { grant: { host: "pypi.org", method: "GET", pathPrefix: "/simple" } } }]);
+  assert.ok(session.policy.grants.covers({ host: "pypi.org", method: "GET", path: "/simple/x" }));
+  // Hermes may not grant more than was asked.
+  pending = call({ action: "request_host", host: "files.example.com" });
+  await answerNext({ status: "allowed", by: "owner", grant: { host: "*.example.com" } });
+  assert.deepEqual(await pending, [200, { ok: false, status: "error" }]);
+  assert.equal(session.policy.grants.covers({ host: "files.example.com", method: "GET", path: "/" }), null);
+  // Never a question about what no one could judge.
+  assert.deepEqual(await call({ action: "request_host", host: "localhost" }), [200, { ok: false, status: "denied" }]);
+
+  // git_push: the branch must exist; it leaves as a bundle the plugin pushes.
+  assert.deepEqual(await call({ action: "git_push", branch: "sandbox/nope" }), [200, { ok: false, status: "error", result: { error: "no such branch in /workspace/repo" } }]);
+  pending = call({ action: "git_push", branch: "sandbox/w" });
+  request = await answerNext({ status: "allowed", by: "owner", outcome: "pushed" });
+  assert.equal(request.bundle, "push-1.bundle");
+  assert.deepEqual(await pending, [200, { ok: true, status: "allowed", result: { pushed: "sandbox/w" } }]);
+  assert.ok(!fs.existsSync(path.join(workdir, "push-1.bundle")), "the bundle is gone once pushed");
+
+  // request_folder: the plugin names the resolved folder; it lands read-only.
+  pending = call({ action: "request_folder", path: "~/docs" });
+  request = await answerNext({ status: "allowed", by: "owner", folder: { path: folder } });
+  assert.deepEqual(request.args, { path: "~/docs" });
+  assert.deepEqual(await pending, [200, { ok: true, status: "allowed", result: { path: "/host/docs", files: 1 } }]);
+  const mounted = vm.options.vfs.mounts["/host"];
+  assert.ok(mounted instanceof ReadonlyProvider);
+  assert.equal(mounted.readFileSync("/docs/x.md", "utf8"), "# x");
+
+  // ask_user and shell: only what the schema says comes back.
+  pending = call({ action: "ask_user", question: "Which?", choices: ["a", "b"] });
+  await answerNext({ status: "allowed", by: "owner", result: { answer: "b", extra: "dropped" } });
+  assert.deepEqual(await pending, [200, { ok: true, status: "allowed", result: { answer: "b" } }]);
+  pending = call({ action: "shell", command: "uname" });
+  await answerNext({ status: "allowed", by: "owner", result: { exit_code: 0, output: "x".repeat(5000) } });
+  const [, shell] = await pending;
+  assert.equal(shell.result.output.length, 4096);
+  pending = call({ action: "shell", command: "id" });
+  await answerNext({ status: "denied", by: "owner", reason: "no" });
+  assert.deepEqual(await pending, [200, { ok: false, status: "denied" }]);
+
+  // Pi done: the token is revoked, before the export.
+  WaitingVm.gate();
+  await running;
+  assert.equal((await call({ action: "shell", command: "id" }))[0], 401);
+  const audit = fs.readFileSync(path.join(workdir, "audit.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+  const actions = audit.filter((e) => e.event === "action");
+  assert.deepEqual(actions.map((e) => [e.action, e.decision, e.by]), [
+    ["request_host", "allowed", "guard"], ["request_host", "error", "error"], ["request_host", "denied", "policy"],
+    ["git_push", "error", "broker"], ["git_push", "allowed", "owner"], ["request_folder", "allowed", "owner"],
+    ["ask_user", "allowed", "owner"], ["shell", "allowed", "owner"], ["shell", "denied", "owner"], [null, "error", "broker"],
+  ]);
+  assert.ok(actions.every((e) => e.session === "w" && e.time && e.outcome));
+  assert.ok(!fs.readFileSync(path.join(workdir, "audit.jsonl"), "utf8").includes(TOKEN));
+  fs.rmSync(workdir, { recursive: true, force: true });
+});
+
+test("session: a stop revokes the broker's token at once", async () => {
+  const { peer } = peerPair();
+  const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-session-"));
+  const session = new Session({ id: "s", task: "t", workdir, stateDir: workdir, guestDir: GUEST, branch: "sandbox/s" },
+    { gondolin: {}, peer, env: { HERMES_SANDBOX_TOKEN: TOKEN } });
+  const body = { action: "ask_user", question: "q", choices: ["a", "b"] };
+  session.stop();
+  const response = await brokerResponse(post(body), session.config, session.policy, session.broker);
+  assert.equal(response.status, 401);
   fs.rmSync(workdir, { recursive: true, force: true });
 });
