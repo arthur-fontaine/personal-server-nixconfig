@@ -121,12 +121,34 @@ imcp_mail_reads() {
     | timeout 20 /Applications/iMCP.app/Contents/MacOS/imcp-server | grep -m1 '\"id\":2' | grep -qv '\"isError\":true'" 2>/dev/null
 }
 
+# iMCP reads Mail's own index, ~/Library/Mail/V<n>/MailData/Envelope Index
+# (Envelope 0.4.0's Database.location, https://github.com/mattt/Envelope/blob/a90202c94df24b985d101ab5d2cfdf8162bbe9c9/Sources/Envelope/Mail/Database.swift),
+# which Mail creates once it has run with an account. Without it, granting
+# ~/Library/Mail fails ("no local Envelope Index was found") and iMCP keeps
+# no grant, so the index must exist before the folder is chosen.
+# Read through the launcher: ~/Library/Mail takes Full Disk Access.
+mail_index() {
+  as_gateway "ls '$agent_home'/Library/Mail/V*/MailData/'Envelope Index'" >/dev/null 2>&1
+}
+
+mail_store() {
+  while ! mail_index; do
+    warn "Mail has no mailbox on this Mac yet: iMCP has nothing to read."
+    note "In Mail, which opens on the Mac's screen, add your mail account (or turn on Mail in"
+    note "System Settings → Apple Account → iCloud), and wait until messages show up."
+    hermes_gui /usr/bin/open -a Mail || true
+    gum confirm --affirmative "Check again" --negative "Skip" "Done?" || return 0
+  done
+  ok "Mail has a mailbox on this Mac"
+}
+
 imcp_mail() {
+  mail_index || return 0
   while ! imcp_mail_reads; do
     warn "iMCP cannot read Mail yet."
-    note "On the Mac's screen, open Mail once and add the account if it asks. Then in iMCP's menu,"
-    note "switch Mail off and on, and in its dialog choose ~/Library/Mail itself (Shift-Cmd-G,"
-    note "type ~/Library/Mail), not a folder inside it."
+    note "On the Mac's screen, in iMCP's menu, switch Mail off and on, and in its dialog choose"
+    note "~/Library/Mail itself (Shift-Cmd-G, type ~/Library/Mail), not a folder inside it."
+    note "If it said \"no local Envelope Index was found\" before, choose it again now: it kept nothing."
     gum confirm --affirmative "Check again" --negative "Skip" "Done?" || return 0
   done
   ok "iMCP reads Mail"
@@ -135,6 +157,7 @@ imcp_mail() {
 imcp_apps() {
   local missing init
   note "iMCP: Calendar, Contacts, Mail, Maps, Music, Shortcuts, Voice Memos, Weather, Phone, Voicemail:"
+  mail_store
   # iMCP asks for Voice Memos' Recordings folder, which the app creates at
   # its first launch: launched hidden, it is there by the time iMCP asks.
   hermes_gui /usr/bin/open -g -j -a /System/Applications/VoiceMemos.app 2>/dev/null || true
