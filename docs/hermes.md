@@ -135,7 +135,8 @@ provides a Cua Driver new enough (0.38.0; Hermes pins 0.21.0).
 With `server.hermes.decision.approval` on (the bootstrap's Models section;
 Baseten's mammoth-1 by default), the `guard` plugin (`modules/hermes/plugins/guard`)
 reviews every action Hermes is about to take, but reads (files, searches, tool
-searches, the read-only MCP servers, screenshots). A decision model rates two
+searches, the read-only MCP servers, screenshots; opening a web page is reviewed,
+its address can carry data out). A decision model rates two
 things at once, as Codex's automatic approval review does: how clearly your own
 messages authorize the action, and how risky it is. Low risk (a click that
 navigates, a draft) runs at once, bounded risk when you asked for it, and high

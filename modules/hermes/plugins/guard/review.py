@@ -22,10 +22,12 @@ from typing import Any, Mapping
 from . import systemone
 
 # Read-only, or acting only on Hermes' own state: no review. Everything else,
-# built in or MCP, is reviewed.
+# built in or MCP, is reviewed. Opening a page (web_extract) is not a read:
+# its URL can carry data out, and it is what a message asking Hermes to
+# "check this site" leads to.
 READ_ONLY = frozenset({
     "read_file", "search_files", "session_search", "skill_view", "skills_list",
-    "web_search", "web_extract", "x_search", "vision_analyze", "video_analyze",
+    "web_search", "x_search", "vision_analyze", "video_analyze",
     "clarify", "todo_list", "read_terminal", "read_window_below", "show_tip",
     "memory", "react_to_message", "tool_search", "tool_describe",
     # unii's own tools (plugins/unii/engine.py): they open its memory's view.
