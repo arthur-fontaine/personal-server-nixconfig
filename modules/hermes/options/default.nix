@@ -12,5 +12,6 @@
     ./integrations.nix
     ./homeassistant.nix
     ./decision.nix
+    ./sandbox.nix
   ];
 }

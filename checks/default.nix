@@ -5,8 +5,9 @@ let
 in
 {
   # The plugins' tests (unii, guard against a fake System One server on
-  # loopback), in the interpreter Hermes runs them with.
-  unii = pkgs.runCommand "unii-tests" { __darwinAllowLocalNetworking = true; } ''
+  # loopback, sandbox against a fake sidecar), in the interpreter Hermes runs
+  # them with.
+  unii = pkgs.runCommand "unii-tests" { __darwinAllowLocalNetworking = true; nativeBuildInputs = [ pkgs.git ]; } ''
     cp -R ${../modules/hermes/plugins} plugins
     chmod -R u+w plugins
     # guard's System One client, as agent/guard.nix puts it.
@@ -21,6 +22,10 @@ in
     done
     touch $out
   '';
+
+  # The sandbox sidecar's tests (protocol, network policy, Pi's events, a
+  # session against a fake VM) run in its build; the plugin's are in unii's.
+  sandbox = pkgs.hermes-sandbox;
 
   # The events daemon's tests: fake uzu and Hermes servers on loopback, and
   # Hermes' own signature check.
