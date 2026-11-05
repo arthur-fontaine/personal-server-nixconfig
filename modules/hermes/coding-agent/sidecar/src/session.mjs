@@ -54,6 +54,24 @@ export const BROKER_ENV = { url: "HERMES_BROKER_URL", token: "HERMES_BROKER_TOKE
 export const PI_AGENT_DIR = "/root/.pi/agent";
 // Folders of this Mac Pi asked for and Hermes gave: read-only copies.
 export const HOST_FILES = "/host";
+// What a refused request gets, instead of Gondolin's "blocked by request
+// policy": what it means and the one thing to do about it.
+export const REFUSED = "403 Forbidden: not granted for this sandbox session; ask Hermes with request_host_action, once\n";
+
+// The facts ../pi/extensions/sandbox-environment renders into Pi's system
+// prompt (<agentDir>/sandbox.json): this session's, never the defaults'.
+export function piFacts(config) {
+  return {
+    repo: REPO,
+    branch: config.branch,
+    hosts: config.grants.map((grant) => {
+      const { host, method, pathPrefix } = normalizeGrant(grant);
+      return { host, ...(method ? { method } : {}), ...(pathPrefix ? { pathPrefix } : {}) };
+    }),
+    broker: config.brokerHost,
+    hostFiles: HOST_FILES,
+  };
+}
 
 export function piArgv({ task }) {
   // Pi reads a leading @ as a file to attach.
@@ -131,9 +149,10 @@ export async function bootVm({ gondolin, imageDir, config, key, policy, broker =
     secrets: { [config.secretName]: { hosts: config.secretHosts, value: key } },
     // Gondolin runs onRequest before isRequestAllowed (and on every
     // redirect hop): the broker's requests are answered here and never
-    // leave; any other request passes on to the policy untouched.
-    onRequest: (request) => brokerResponse(request, config, policy, broker),
-    isRequestAllowed: policy.isRequestAllowed,
+    // leave; any other is decided here too, so its refusal is ours
+    // (policy.decide), and isRequestAllowed admits what was let through.
+    onRequest: (request) => guard(request, config, policy, broker),
+    isRequestAllowed: policy.admit,
   });
   const env = guestEnv(hooks.env, broker ? { url: `https://${config.brokerHost}${BROKER_PATH}`, token: broker.token } : null);
   const mounts = { "/workspace": new gondolin.MemoryProvider() };
@@ -165,6 +184,15 @@ export async function brokerResponse(request, config, policy, broker = null) {
     status: allowed ? 503 : 403,
     headers: { "content-type": "text/plain; charset=utf-8" },
   });
+}
+
+// onRequest: the broker's answer, a refusal that tells Pi what to do, or
+// undefined to let the request go on (to isRequestAllowed, then out).
+export async function guard(request, config, policy, broker = null) {
+  const answered = await brokerResponse(request, config, policy, broker);
+  if (answered) return answered;
+  if (await policy.decide(request)) return undefined;
+  return new Response(REFUSED, { status: 403, headers: { "content-type": "text/plain; charset=utf-8" } });
 }
 
 async function run(vm, argv, options = {}) {
@@ -308,6 +336,7 @@ export class Session {
     this.setPhase("pi");
     await run(vm, ["mkdir", "-p", PI_AGENT_DIR], { env });
     await vm.fs.writeFile(`${PI_AGENT_DIR}/settings.json`, JSON.stringify(piSettings(config.guestDir, config), null, 2));
+    await vm.fs.writeFile(`${PI_AGENT_DIR}/sandbox.json`, JSON.stringify(piFacts(config), null, 2));
     const advisor = piAdvisor(config.guestDir, config);
     await vm.fs.writeFile(`${PI_AGENT_DIR}/advisor.json`, JSON.stringify(advisor, null, 2));
     this.audit({

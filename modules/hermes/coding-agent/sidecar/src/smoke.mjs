@@ -1,18 +1,25 @@
 // `hermes-sandbox smoke`: boots the guest as a session would, with a made-up
 // key, and checks what the isolation promises: the guest's environment holds
-// the placeholder, never the key; a host without a grant gets 403; the
+// the placeholder, never the key; a host without a grant gets our 403; the
 // granted one goes through; the broker answers on the host, only with the
-// session's token, and not once it is revoked; Pi starts. Needs network for the image build and
+// session's token, and not once it is revoked; Pi's environment section
+// renders from a session's facts; Pi starts. Needs network for the image build and
 // the granted request, not a real key.
 
 import crypto from "node:crypto";
 
 import { Broker } from "./broker.mjs";
 import { NetworkPolicy } from "./policy.mjs";
-import { DEFAULTS, bootVm } from "./session.mjs";
-import { PI_CLI, ensureImage } from "./image.mjs";
+import { DEFAULTS, REFUSED, bootVm, piFacts } from "./session.mjs";
+import { PI_CLI, PI_DIR, ensureImage } from "./image.mjs";
 
 const FETCH = `fetch(process.argv[1]).then((r) => console.log(r.status), (e) => console.log("error " + (e.cause?.code ?? e.message)))`;
+const FETCH_TEXT = `fetch(process.argv[1]).then(async (r) => console.log(r.status, (await r.text()).trim()), (e) => console.log("error " + e.message))`;
+// The prompt section Pi gets: its extension, as the image has it, from a session's facts.
+const ENVIRONMENT = `import("${PI_DIR}/extensions/sandbox-environment/index.js").then((m) => {
+  const handlers = []; process.env.PI_CODING_AGENT_DIR = process.argv[1]; m.default({ on: (e, h) => handlers.push(h) });
+  const event = { systemPromptOptions: { sections: {} } }; handlers.forEach((h) => h(event));
+  console.log(event.systemPromptOptions.sections[m.SECTION] ?? "none") }, (e) => console.log("error " + e.message))`;
 // POSTs an action to the broker: with the guest's token, or none ("-").
 const ACTION = `const [url, token, body] = process.argv.slice(1);
 fetch(url, { method: "POST", body, headers: { "content-type": "application/json",
@@ -50,8 +57,8 @@ export async function smoke({ gondolin, stateDir, guestDir, log = (line) => proc
     check("the guest sees a placeholder", printed !== "" && printed !== key && printed === env[config.secretName]);
     const all = (await vm.exec(["sh", "-c", "env; cat /proc/1/environ 2>/dev/null"], { env })).stdout;
     check("the key is nowhere in the guest's environment", !all.includes(key));
-    const denied = (await vm.exec(["node", "-e", FETCH, "https://example.com/"], { env })).stdout.trim();
-    check("a host without a grant gets 403", denied === "403", denied);
+    const denied = (await vm.exec(["node", "-e", FETCH_TEXT, "https://example.com/"], { env })).stdout.trim();
+    check("a host without a grant gets 403, saying what to do", denied === `403 ${REFUSED.trim()}`, denied);
     const allowed = (await vm.exec(["node", "-e", FETCH, "https://opencode.ai/"], { env })).stdout.trim();
     check("opencode.ai goes through", /^\d+$/.test(allowed) && allowed !== "403", allowed);
     const url = `https://${config.brokerHost}/v1/actions`;
@@ -67,6 +74,11 @@ export async function smoke({ gondolin, stateDir, guestDir, log = (line) => proc
     broker.handler.revoke();
     const revoked = await post("HERMES_BROKER_TOKEN", action);
     check("a revoked token gets 401", revoked === "401 error", revoked);
+    await vm.exec(["mkdir", "-p", "/tmp/agent"], { env });
+    await vm.fs.writeFile("/tmp/agent/sandbox.json", JSON.stringify(piFacts({ ...config, branch: "sandbox/smoke" })));
+    const section = (await vm.exec(["node", "-e", ENVIRONMENT, "/tmp/agent"], { env })).stdout.trim();
+    check("Pi's environment section renders in the guest", section.includes("on branch sandbox/smoke") &&
+      section.includes(config.grants[0]), section.slice(0, 200));
     const version = await vm.exec(["node", PI_CLI, "--version"], { env });
     check("Pi starts", version.exitCode === 0, version.stdout.trim() || version.stderr.trim().slice(-200));
     check("the policy logged both decisions",

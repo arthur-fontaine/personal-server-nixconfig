@@ -124,6 +124,14 @@ export function unaskable(host) {
 }
 
 const DENIED = { allow: false };
+// How long a decision made in onRequest waits for Gondolin's isRequestAllowed
+// on the same hop (decide, admit).
+const PASS_MS = 30_000;
+
+function passKey(request) {
+  const { method, scheme, host, path } = describeRequest(request);
+  return `${method} ${scheme}://${host}${path}`;
+}
 
 export class NetworkPolicy {
   constructor({ grants = [], audit = () => {}, approve = null, onGrants = () => {}, localHosts = [] } = {}) {
@@ -138,7 +146,37 @@ export class NetworkPolicy {
     this.localHosts = new Set(localHosts.map((host) => host.toLowerCase()));
     // host -> the pending question's answer: one question per host at a time.
     this.asking = new Map();
+    // key -> expiry times of requests decide() let through, not yet admitted.
+    this.passes = new Map();
     this.isRequestAllowed = this.isRequestAllowed.bind(this);
+    this.admit = this.admit.bind(this);
+  }
+
+  // Gondolin calls onRequest, then isRequestAllowed, on every hop. A refusal
+  // from isRequestAllowed is its own "403 Forbidden: blocked by request
+  // policy"; onRequest may answer with any Response. So the decision is made
+  // in onRequest (decide), where the refusal can say what to do about it, and
+  // isRequestAllowed only admits what decide let through, once each: one
+  // decision, one audit line, one question per request.
+  async decide(request) {
+    const allowed = await this.isRequestAllowed(request);
+    if (allowed) {
+      const key = passKey(request);
+      this.passes.set(key, [...(this.passes.get(key) ?? []), Date.now() + PASS_MS]);
+    }
+    return allowed;
+  }
+
+  admit(request) {
+    const key = passKey(request);
+    const now = Date.now();
+    const live = (this.passes.get(key) ?? []).filter((expiry) => expiry > now);
+    const allowed = live.length > 0;
+    live.shift();
+    if (live.length) this.passes.set(key, live);
+    else this.passes.delete(key);
+    if (!allowed) this.#log(describeRequest(request), "deny", "policy", "not decided before");
+    return allowed;
   }
 
   addGrant(grant) {

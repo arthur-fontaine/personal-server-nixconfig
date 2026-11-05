@@ -13,8 +13,9 @@ import { Peer } from "../src/protocol.mjs";
 import { Grants, NetworkPolicy, ambiguousPath, describeRequest, normalizeGrant } from "../src/policy.mjs";
 import { PiProgress } from "../src/pi-events.mjs";
 import { buildConfig, imageId, ensureImage } from "../src/image.mjs";
-import { Session, brokerResponse, piAdvisor, piArgv, piSettings } from "../src/session.mjs";
-import { Broker, InvalidAction, MAX_BODY, validateAction } from "../src/broker.mjs";
+import { REFUSED, Session, brokerResponse, guard, piAdvisor, piArgv, piFacts, piSettings } from "../src/session.mjs";
+import { ACTIONS as BROKER_ACTIONS, Broker, InvalidAction, MAX_BODY, validateAction } from "../src/broker.mjs";
+import environment, { ACTIONS as PROMPT_ACTIONS, SECTION, renderEnvironment } from "../../pi/extensions/sandbox-environment/index.js";
 import { FolderTooLarge, copyFolder } from "../src/folders.mjs";
 
 function peerPair() {
@@ -267,6 +268,66 @@ test("broker: hermes.sandbox is answered on the host, never asked about, and not
   fs.rmSync(workdir, { recursive: true, force: true });
 });
 
+test("guard: a refusal tells Pi what it means; what it lets through is admitted once", async () => {
+  const audit = [];
+  const policy = new NetworkPolicy({ grants: ["opencode.ai", "hermes.sandbox"], localHosts: ["hermes.sandbox"], audit: (e) => audit.push(e) });
+  const config = { brokerHost: "hermes.sandbox" };
+  const refused = await guard(new Request("https://example.com/x?q=1"), config, policy);
+  assert.equal(refused.status, 403);
+  assert.equal(await refused.text(), REFUSED);
+  assert.match(REFUSED, /not granted for this sandbox session; ask Hermes with request_host_action, once/);
+  assert.equal(policy.admit(new Request("https://example.com/x")), false, "never admitted without a decision");
+  assert.equal(await guard(new Request("https://opencode.ai/v1/chat", { method: "POST", body: "{}" }), config, policy), undefined);
+  // Gondolin's isRequestAllowed sees the request with its secrets put in.
+  const sent = new Request("https://opencode.ai/v1/chat?k=v", { method: "POST", headers: { authorization: "Bearer real" } });
+  assert.equal(policy.admit(sent), true);
+  assert.equal(policy.admit(sent), false, "once per decision");
+  const broker = await guard(new Request("https://hermes.sandbox/v1/actions", { method: "POST", body: "{}" }), config, policy);
+  assert.equal(broker.status, 503, "the broker's host is answered here (no broker given), never let out");
+  const network = audit.filter((e) => e.event === "network");
+  assert.deepEqual(network.slice(0, 4).map((e) => [e.request.host, e.decision, e.by]),
+    [["example.com", "deny", "policy"], ["example.com", "deny", "policy"], ["opencode.ai", "allow", "grant"], ["opencode.ai", "deny", "policy"]]);
+});
+
+test("environment: Pi's prompt section, from the session's own facts", async () => {
+  const config = {
+    branch: "sandbox/e1", brokerHost: "hermes.sandbox",
+    grants: ["api.anthropic.com", { host: "pypi.org", method: "get", pathPrefix: "/simple" }],
+  };
+  const facts = piFacts(config);
+  const text = renderEnvironment(facts);
+  assert.match(text, /\/workspace\/repo, on branch sandbox\/e1/);
+  assert.match(text, /At the start: api\.anthropic\.com, pypi\.org \(GET \/simple only\), hermes\.sandbox \(Hermes' broker\)\./);
+  assert.ok(!text.includes("opencode"), "no host the session was not given");
+  assert.match(text, /not granted for this sandbox/);
+  assert.ok(text.includes(REFUSED.split(";")[0].slice(0, 40)), "names the refusal Pi will see");
+  assert.match(text, /read-only under \/host\/<name>/);
+  assert.deepEqual(Object.keys(PROMPT_ACTIONS), Object.keys(BROKER_ACTIONS), "one line per action the broker takes");
+  const words = text.split(/\s+/).filter(Boolean).length;
+  assert.ok(words <= 350, `${words} words`);
+
+  // The extension: a section through before_agent_start, only with the facts.
+  const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-agent-"));
+  const saved = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  try {
+    const handlers = [];
+    environment({ on: (event, handler) => handlers.push([event, handler]) });
+    assert.deepEqual(handlers, [], "no facts, no section");
+    fs.writeFileSync(path.join(agentDir, "sandbox.json"), JSON.stringify(facts));
+    environment({ on: (event, handler) => handlers.push([event, handler]) });
+    assert.deepEqual(handlers.map(([event]) => event), ["before_agent_start"]);
+    const event = { systemPromptOptions: { sections: {} } };
+    handlers[0][1](event);
+    assert.equal(event.systemPromptOptions.sections[SECTION], text);
+    assert.match(SECTION, /^[a-z][a-z0-9_-]*$/, "a name Pi accepts (core/system-prompt.js)");
+  } finally {
+    if (saved === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = saved;
+    fs.rmSync(agentDir, { recursive: true, force: true });
+  }
+});
+
 test("pi events: counters, last answer, framing across chunks", () => {
   const progress = new PiProgress();
   const lines = [
@@ -470,7 +531,10 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
   assert.deepEqual([pi.options.env.GIT_CONFIG_KEY_0, pi.options.env.GIT_CONFIG_VALUE_0], ["safe.directory", "*"], "Pi's git takes the repository");
   const settings = JSON.parse(vm.files.get("/root/.pi/agent/settings.json").toString());
   assert.deepEqual([settings.defaultProvider, settings.defaultModel, settings.defaultThinkingLevel], ["opencode-go", "deepseek-v4.1-flash", "high"]);
-  assert.deepEqual(settings.extensions, ["/opt/pi/extensions/request-host-action"]);
+  assert.deepEqual(settings.extensions, ["/opt/pi/extensions/request-host-action", "/opt/pi/extensions/sandbox-environment"]);
+  assert.deepEqual(JSON.parse(vm.files.get("/root/.pi/agent/sandbox.json").toString()), {
+    repo: "/workspace/repo", branch: "sandbox/abc", hosts: [{ host: "opencode.ai" }], broker: "hermes.sandbox", hostFiles: "/host",
+  });
   const advisor = JSON.parse(vm.files.get("/root/.pi/agent/advisor.json").toString());
   assert.deepEqual([advisor.executor, advisor.advisor, advisor.alwaysOn], ["opencode-go/deepseek-v4.1-flash", "opencode-go/deepseek-v4.1-flash", true]);
   assert.ok(lines.some((l) => l.type === "done" && l.result.status === "finished"));

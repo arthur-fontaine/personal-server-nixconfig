@@ -48,13 +48,15 @@ let
     installPhase = ''
       mkdir -p $out
       # Pi's settings and pi-advisor-flow's (the session's agent directory
-      # starts from them), and its own extensions (request_host_action),
+      # starts from them), and its own extensions (request_host_action, the
+      # sandbox_environment prompt section),
       # which the settings load by path, as they do pi-advisor-flow.
       cp -R package.json settings.json advisor.json node_modules extensions $out/
       # Its only symlinks; the guest runs Pi's cli.js by path.
       rm -rf $out/node_modules/.bin
       test -f $out/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js
       test -f $out/extensions/request-host-action/index.js
+      test -f $out/extensions/sandbox-environment/index.js
       test -f $out/node_modules/pi-advisor-flow/dist/index.js
     '';
     dontFixup = true;

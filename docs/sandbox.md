@@ -33,7 +33,11 @@ never counts a notice as your message.
   off), with synthetic DNS. Every request is checked on the host against the
   session's grants: at first `server.hermes.sandbox.allowedHosts`
   (`opencode.ai`) and `hermes.sandbox`, Hermes' broker as the guest names
-  it; anything else Pi asks Hermes for (below), and a refusal is a 403.
+  it; anything else Pi asks Hermes for (below), and a refusal is a 403
+  whose body tells Pi what it means: `403 Forbidden: not granted for this
+  sandbox session; ask Hermes with request_host_action, once` (decided in
+  Gondolin's `onRequest`, which may answer with a body of ours; its
+  `isRequestAllowed` only admits what that decision let through).
   `hermes.sandbox` is answered by the sidecar itself, before any lookup, so
   its requests never leave this Mac: it is Hermes' broker (below). Each decision goes to the session's `audit.jsonl`,
   with the host, method and path, never headers or query. A grant can be
@@ -53,8 +57,25 @@ never counts a notice as your message.
 - **Pi**: 1.5.0, headless (`--mode json --print`), on
   `opencode-go/deepseek-v4.1-flash` with thinking `high` (this model has no
   medium), set in Pi's own settings, the repository's `.pi/` configuration
-  ignored (`--no-approve`), with one extension of ours: `request_host_action`
-  (below), and an advisor (next section).
+  ignored (`--no-approve`), with two extensions of ours: `request_host_action`
+  (below) and `sandbox-environment`, and an advisor (next section).
+
+## What Pi is told
+
+`pi/extensions/sandbox-environment` adds a `<sandbox_environment>` section
+to Pi's system prompt (Pi's `before_agent_start`, its
+`systemPromptOptions.sections`), rendered from the facts the session writes
+to `/root/.pi/agent/sandbox.json`: the repository and its branch, the hosts
+granted at the start, the broker's host, `/host`. It says that Pi runs
+headless in an isolated VM with no one watching; that its committed branch
+is the result, whose diff Hermes shows you; that there is no file of this
+Mac and no secret in the VM; that a 403 means not granted, not a network
+fault to debug, and that it asks once with `request_host_action` and works
+without what was denied; that registries are blocked until granted; what
+each action is for (`shell` runs on this Mac, only with your yes); and to
+finish with a summary. Not `APPEND_SYSTEM.md` in Pi's agent directory: a
+trusted repository's `.pi/APPEND_SYSTEM.md` would replace it, and the
+repository is the task's content, not its configuration.
 
 ## Pi's advisor
 
@@ -209,8 +230,9 @@ All in `modules/hermes/coding-agent`:
   their own lockfile, installed by Nix for linux-arm64; `settings.json` (its
   model, thinking level, packages and extensions; a session writes it to
   Pi's agent directory with `server.hermes.sandbox.model` and `thinking`
-  over it); `advisor.json`, the advisor's (above); and
-  `extensions/request-host-action`, the `request_host_action` tool.
+  over it); `advisor.json`, the advisor's (above);
+  `extensions/request-host-action`, the `request_host_action` tool; and
+  `extensions/sandbox-environment`, what Pi is told (above).
 - `tests/`: the plugin's tests, against a fake sidecar
   (`nix build .#checks.aarch64-darwin.coding-agent`); the sidecar's run in
   its build (`checks.aarch64-darwin.sandbox`).
@@ -225,6 +247,7 @@ at a time, stopped after `timeout` (two hours).
 
 `sudo -iu hermes hermes-sandbox smoke` builds the image if need be and checks
 the isolation with a made-up key: the guest sees only the placeholder, a host
-without a grant gets 403, opencode.ai answers, `hermes.sandbox` is answered
+without a grant gets the 403 above, opencode.ai answers, `hermes.sandbox` is answered
 by the sidecar: 401 without the token, an answer with it, 400 for an unknown
-field, 401 once the token is revoked. Last, Pi starts.
+field, 401 once the token is revoked; Pi's environment section renders in
+the guest. Last, Pi starts.
