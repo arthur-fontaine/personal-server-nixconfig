@@ -33,7 +33,7 @@ let
     inherit version;
     src = fs.toSource {
       root = root + "/guest";
-      fileset = fs.unions (map (f: root + "/guest/${f}") [ "package.json" "pnpm-lock.yaml" "pnpm-workspace.yaml" ]);
+      fileset = fs.unions (map (f: root + "/guest/${f}") [ "package.json" "pnpm-lock.yaml" "pnpm-workspace.yaml" "extensions" ]);
     };
     nativeBuildInputs = [ nodejs_24 pnpmConfigHook pnpm ];
     pnpmDeps = fetchPnpmDeps {
@@ -44,10 +44,12 @@ let
     };
     installPhase = ''
       mkdir -p $out
-      cp -R package.json node_modules $out/
+      # Pi's own extensions (request_host_action), loaded by path.
+      cp -R package.json node_modules extensions $out/
       # Its only symlinks; the guest runs Pi's cli.js by path.
       rm -rf $out/node_modules/.bin
       test -f $out/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js
+      test -f $out/extensions/request-host-action/index.js
     '';
     dontFixup = true;
   });

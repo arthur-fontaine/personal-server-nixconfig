@@ -17,7 +17,7 @@ import { BROKER_PATH, Broker } from "./broker.mjs";
 import { copyFolder } from "./folders.mjs";
 import { NetworkPolicy, describeRequest, normalizeGrant, unaskable } from "./policy.mjs";
 import { PiProgress } from "./pi-events.mjs";
-import { PI_CLI, ensureImage } from "./image.mjs";
+import { PI_CLI, PI_DIR, ensureImage } from "./image.mjs";
 
 const REPO = "/workspace/repo";
 const GIT = ["git", "-c", "safe.directory=*", "-c", "core.hooksPath=/dev/null", "-C", REPO];
@@ -48,6 +48,9 @@ export const DEFAULTS = {
 // What the guest is given to reach the broker; the token comes from the
 // plugin (HERMES_SANDBOX_TOKEN), a new one per session.
 export const BROKER_ENV = { url: "HERMES_BROKER_URL", token: "HERMES_BROKER_TOKEN" };
+// Pi's side of the broker (guest/extensions), loaded explicitly: the
+// repository's own .pi/ stays ignored.
+export const BROKER_EXTENSION = `${PI_DIR}/extensions/request-host-action/index.js`;
 // Folders of this Mac Pi asked for and Hermes gave: read-only copies.
 export const HOST_FILES = "/host";
 
@@ -61,6 +64,7 @@ export function piArgv({ task, model, thinking }) {
     // The repository is the task's subject, not configuration: its .pi/
     // settings and extensions are ignored.
     "--no-approve",
+    "--extension", BROKER_EXTENSION,
     "--", message,
   ];
 }

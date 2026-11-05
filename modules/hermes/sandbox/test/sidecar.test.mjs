@@ -410,6 +410,7 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
   assert.equal(pi.options.env.OPENCODE_API_KEY, "PLACEHOLDER");
   assert.equal(pi.options.env.HERMES_BROKER_TOKEN, session.broker.token);
   assert.equal(pi.options.env.HERMES_BROKER_URL, "https://hermes.sandbox/v1/actions");
+  assert.equal(pi.argv[pi.argv.indexOf("--extension") + 1], "/opt/pi/extensions/request-host-action/index.js");
   assert.ok(pi.argv.includes("opencode-go/deepseek-v4.1-flash"));
   assert.equal(pi.argv[pi.argv.indexOf("--thinking") + 1], "high");
   assert.ok(lines.some((l) => l.type === "done" && l.result.status === "finished"));
