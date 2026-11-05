@@ -183,13 +183,15 @@ export class Session {
     let base = null;
     if (config.bundleIn) {
       await vm.fs.writeFile("/tmp/in.bundle", fs.readFileSync(config.bundleIn));
-      await run(vm, ["git", "-c", "safe.directory=*", "clone", "--quiet", "/tmp/in.bundle", REPO], { env });
+    }
+    // Pi's branch starts at the bundle's one ref (bundleRef, from
+    // `git bundle list-heads`), with no remote pointing back anywhere.
+    await run(vm, ["mkdir", "-p", REPO], { env });
+    await run(vm, [...GIT, "init", "--quiet", "-b", config.branch], { env });
+    if (config.bundleIn) {
+      await run(vm, [...GIT, "fetch", "--quiet", "/tmp/in.bundle", config.bundleRef], { env });
+      await run(vm, [...GIT, "reset", "--quiet", "--hard", "FETCH_HEAD"], { env });
       base = await run(vm, [...GIT, "rev-parse", "HEAD"], { env });
-      await run(vm, [...GIT, "checkout", "--quiet", "-b", config.branch], { env });
-      await run(vm, [...GIT, "remote", "remove", "origin"], { env });
-    } else {
-      await run(vm, ["mkdir", "-p", REPO], { env });
-      await run(vm, [...GIT, "init", "--quiet", "-b", config.branch], { env });
     }
     this.#checkStopped();
 

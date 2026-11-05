@@ -255,7 +255,7 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
     }),
   };
   const session = new Session(
-    { id: "abc", task: "fix the README", workdir, stateDir, guestDir: GUEST, bundleIn, branch: "sandbox/abc" },
+    { id: "abc", task: "fix the README", workdir, stateDir, guestDir: GUEST, bundleIn, bundleRef: "refs/heads/main", branch: "sandbox/abc" },
     { gondolin, peer, env: { OPENCODE_GO_API_KEY: secret } },
   );
   const result = await session.run();
@@ -274,6 +274,8 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
   assert.deepEqual(vm.options.httpHooks.secrets.OPENCODE_API_KEY.hosts, ["opencode.ai"]);
   assert.ok(!JSON.stringify(vm.options.env).includes(secret));
   assert.ok(!JSON.stringify(vm.commands).includes(secret));
+  const fetch = vm.commands.find((c) => c.argv.includes("fetch"));
+  assert.deepEqual(fetch.argv.slice(-2), ["/tmp/in.bundle", "refs/heads/main"]);
   const pi = vm.commands.find((c) => c.argv[0] === "node");
   assert.equal(pi.options.env.OPENCODE_API_KEY, "PLACEHOLDER");
   assert.ok(pi.argv.includes("opencode-go/deepseek-v4.1-flash"));
