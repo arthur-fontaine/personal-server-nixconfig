@@ -174,6 +174,17 @@ The skills' permissions belong to `/Library/Hermes/hermes-launcher`, which
 starts the gateway, so they hold across Hermes updates. A revoked one: run the bootstrap
 again over SSH, looking at the Mac.
 
+## Coding tasks in a sandbox
+
+With `server.hermes.sandbox.enable` (the bootstrap asks, in its Models
+section), Hermes can hand a coding task on one of your git repositories to Pi,
+another coding agent, in a microVM: `sandbox_run` copies one ref in as a git
+bundle, Pi works there with no access to this Mac, no secret (its OpenCode Go
+key is swapped in by the host, for opencode.ai only) and no network but its
+model, and `sandbox_result` reads its branch from a review clone where nothing
+it wrote can run. You take the branch with `git fetch`, after reading it. The
+details: [sandbox.md](sandbox.md).
+
 ## Integrations: WhatsApp, Instagram, Discord, 1Password…
 
 Each of your other services is an integration, off until you turn it on

@@ -80,6 +80,7 @@ integrations, ...) go under
 
 - [`docs/hermes.md`](./docs/hermes.md): the single chat, sub-chats, what Hermes may touch
 - [`docs/events.md`](./docs/events.md): Hermes writing first, when a message may call for you
+- [`docs/sandbox.md`](./docs/sandbox.md): coding tasks handed to Pi in a microVM, reviewed before anything runs
 - [`docs/repository-layout.md`](./docs/repository-layout.md): where things are, and the checks
 - [`docs/uninstall.md`](./docs/uninstall.md): disabling Hermes, removing it, or uninstalling everything (`scripts/uninstall-macos.sh`)
 - [`modules/hermes/plugins/unii/README.md`](./modules/hermes/plugins/unii/README.md): the memory plugin and its sources

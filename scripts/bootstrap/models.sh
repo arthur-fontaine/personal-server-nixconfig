@@ -350,3 +350,24 @@ else
     decision_off approval
   fi
 fi
+
+# Sandboxed Pi sessions (server.hermes.sandbox, docs/sandbox.md): their model
+# is OpenCode Go's, whose key the host keeps and the VM never sees.
+echo
+sandbox_key_env="$(setting server.hermes.sandbox.keyEnv)"
+if [ "$(setting server.hermes.sandbox.enable)" = 1 ] && [ -n "$(secret_value "$sandbox_key_env")" ] \
+  && keep "Sandbox: Hermes hands coding tasks to Pi in a microVM"; then
+  :
+else
+  note "Hermes can hand a coding task on one of your git repositories to Pi, another coding agent,"
+  note "in a microVM with a copy of that repository only and no network but its model (OpenCode Go):"
+  note "Pi's branch comes back for you to review, and nothing it wrote runs on this Mac before you do."
+  if ask "Let Hermes run Pi sessions in a sandbox?"; then
+    set_host '{"server":{"hermes":{"sandbox":{"enable":true}}}}'
+    ask_key opencode-go "OpenCode Go" "$sandbox_key_env"
+    [ -n "$(secret_value "$sandbox_key_env")" ] || warn "Without its key, each sandbox session fails at once."
+  elif [ "$(setting server.hermes.sandbox.enable)" = 1 ]; then
+    set_host '{"server":{"hermes":{"sandbox":{"enable":false}}}}'
+  fi
+fi
+unset sandbox_key_env
