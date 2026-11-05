@@ -155,6 +155,15 @@ posts in your chat itself (a background process or a subagent finishing, a
 watch pattern matching). Hermes' own checks stay underneath:
 its pattern-matched dangerous commands, and its hardline blocklist.
 
+Hermes' own questions belong to a turn: its approval card (Once, Session,
+Always, Deny) and the `clarify` tool's choices are buttons in the chat the
+turn runs in. A plugin that must ask you outside any turn, as the sandbox
+does for a request its guest makes, uses the `owner_approval` plugin
+(`modules/hermes/plugins/owner_approval`; its Python API is in its
+docstring): a message with buttons in the main chat that only you can
+answer, edited to show your answer, and refused when you do not answer in
+time, or when Telegram is not connected.
+
 iMCP's own Reminders, Notes and Messages services stay off (Nix sets them, with
 Hermes trusted as a client and its self-updates off): the skills do more there.
 The skills' permissions belong to `/Library/Hermes/hermes-launcher`, which

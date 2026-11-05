@@ -1,0 +1,4 @@
+name: owner_approval
+version: 1.0.0
+description: "Asks the owner a question with Telegram buttons from anywhere in the gateway, outside any turn: the shared helper for the approvals plugins need."
+author: "personal-server-nixconfig"

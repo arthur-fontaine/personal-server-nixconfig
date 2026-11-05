@@ -18,6 +18,7 @@ in
     ./computer-use.nix
     ./fast-act.nix
     ./guard.nix
+    ./owner-approval.nix
     ./apple.nix
     ./whatsapp.nix
     ./browser.nix

@@ -34,6 +34,7 @@ modules/
       session/            its GUI session: launchd agents, display, fsearch, defaults, the setup at login
     plugins/unii/         the single-chat memory and sub-chats (Python)
     plugins/guard/        the auto-review of Hermes' actions by a decision model (Python)
+    plugins/owner_approval/  asks you with Telegram buttons from outside a turn, for other plugins (Python)
     events/               hermes_events: screens incoming messages, posts proposals (Python)
     fast-act/             fast_act: browser_fast_act, a decision model driving Chrome through Cua (Python)
   uzu/                    local models: options, the mirai server
@@ -44,7 +45,7 @@ modules/
 
 ```sh
 nix flake check                                   # everything below
-nix build .#checks.aarch64-darwin.unii            # the plugin's tests
+nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval)
 nix build .#checks.aarch64-darwin.events          # the events daemon's tests
 nix build .#checks.aarch64-darwin.freeze          # what hermes-freeze picks
 nix build .#darwinConfigurations.Personal-Server.system   # the whole system, without switching
