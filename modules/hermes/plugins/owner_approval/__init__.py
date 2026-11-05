@@ -386,9 +386,24 @@ def telegram_handlers(app, adapter) -> None:
     app.add_handler(CallbackQueryHandler(on_callback, pattern=r"^o[ap]:"))
 
 
+def no_reply_expected(event=None, **_) -> None:
+    """An event run speaks through `propose`, then answers [SILENT]. The webhook
+    adapter leaves `reply_expected` unset, and the gateway then replaces a bare
+    silence with "The model returned only a silence marker…" (gateway/
+    response_filters.py `silence_allowed`, hermes-agent 74885f9). A webhook
+    delivery has no one waiting for an answer: say so before it is admitted,
+    which persists the field with the turn."""
+    source = getattr(event, "source", None)
+    platform = getattr(source, "platform", None)
+    if getattr(platform, "value", platform) == "webhook":
+        event.reply_expected = False
+    return None
+
+
 def register(ctx) -> None:
     # One module, one state: other plugins import it by this name.
     sys.modules.setdefault("owner_approval", sys.modules[__name__])
     STATE.ctx = ctx
     ctx.register_telegram_handler(telegram_handlers)
     ctx.register_tool(name="propose", toolset="owner_proposal", schema=PROPOSE_SCHEMA, handler=propose)
+    ctx.register_hook("pre_gateway_dispatch", no_reply_expected)

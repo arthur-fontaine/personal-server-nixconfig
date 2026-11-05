@@ -73,14 +73,30 @@ def main() -> None:
     assert oa.ask("Network", "GET https://pypi.org/", choices, timeout=1) == oa.UNAVAILABLE
 
     # The plugin registers one scoped handler and publishes its module.
-    registered, tools, injected = [], {}, []
+    registered, tools, injected, hooks = [], {}, [], {}
     ctx = types.SimpleNamespace(
         register_telegram_handler=registered.append,
         register_tool=lambda **kw: tools.__setitem__(kw["name"], kw),
+        register_hook=hooks.__setitem__,
         inject_message=lambda content, **kw: injected.append((content, kw)) or True)
     oa.register(ctx)
     assert sys.modules["owner_approval"] is oa and registered == [oa.telegram_handlers]
     assert tools["propose"]["toolset"] == "owner_proposal"
+
+    # A webhook delivery (an event's run) may end in [SILENT]; a chat message still expects a reply.
+    from gateway.config import Platform
+    from gateway.platforms.base import MessageEvent
+    from gateway.session import SessionSource
+
+    def event(platform):
+        return MessageEvent(text="x", source=SessionSource(platform=platform, chat_id="1"))
+
+    webhook, telegram = event(Platform.WEBHOOK), event(Platform.TELEGRAM)
+    for e in (webhook, telegram):
+        assert hooks["pre_gateway_dispatch"](event=e, gateway=None, session_store=None) is None
+    assert webhook.reply_expected is False and telegram.reply_expected is None
+    from gateway.response_filters import silence_allowed
+    assert silence_allowed(None, webhook.reply_expected)
     assert "error" in json.loads(tools["propose"]["handler"]({"message": "x", "options": ["a"]}))
     bot = Bot()
     app = App(bot)
