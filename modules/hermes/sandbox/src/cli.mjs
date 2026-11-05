@@ -26,6 +26,9 @@ function guestDir() {
 
 async function main(argv) {
   const [command, ...rest] = argv;
+  // Gondolin keeps its downloads under XDG_CACHE_HOME (~/.cache by default),
+  // where Hermes' account may not keep writing: its state, then.
+  process.env.XDG_CACHE_HOME ??= path.join(stateDir(), "cache");
   const gondolin = await import("@earendil-works/gondolin");
   if (command === "run") {
     const config = JSON.parse(fs.readFileSync(rest[0], "utf8"));

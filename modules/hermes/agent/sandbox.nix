@@ -12,6 +12,8 @@ let
   '';
 in
 lib.mkIf cfg.enable {
+  # On Hermes' PATH for `hermes-sandbox smoke` and `build-image`.
+  home.packages = [ pkgs.hermes-sandbox ];
   services.hermes-agent = {
     extraPlugins = [ plugin ];
     hermesHomeFiles."sandbox/config.json" = builtins.toJSON {
