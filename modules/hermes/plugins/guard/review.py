@@ -45,12 +45,21 @@ LOOKING = frozenset({"capture", "wait", "list_apps", "list_windows"})
 # fsearch only finds files, imcp-read is iMCP's read-only tools
 # (agent/events.nix).
 READ_ONLY_SERVERS = ("mcp__fsearch__", "mcp__imcp_read__")
+# cua-driver's own tools that only look (`cua-driver list-tools`), when Hermes
+# drives them instead of computer_use (agent/computer-use.nix). Not
+# clipboard_read: the clipboard may hold what the user copied.
+CUA_LOOKING = frozenset("mcp__cua__" + t for t in (
+    "get_window_state", "get_desktop_state", "get_accessibility_tree", "zoom",
+    "list_windows", "list_apps", "get_screen_size", "get_cursor_position",
+    "get_config", "get_guide", "check_permissions", "health_report",
+    "get_session", "list_sessions", "parse_visual_regions", "verify_state",
+))
 
 
 def read_only(tool: str, args: Mapping[str, Any]) -> bool:
     if tool == "computer_use":
         return args.get("action") in LOOKING
-    return tool in READ_ONLY or tool.startswith(READ_ONLY_SERVERS)
+    return tool in READ_ONLY or tool in CUA_LOOKING or tool.startswith(READ_ONLY_SERVERS)
 
 AUTHORIZATION = {
     "high": "The user's own messages ask for this exact action, side effects included, or it is a "

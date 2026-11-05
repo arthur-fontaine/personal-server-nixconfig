@@ -61,7 +61,13 @@ def main() -> None:
     assert g.pre_tool_call("tool_search", {"query": "instagram"}, session_id="s") is None
     assert g.pre_tool_call("zoom", {"id": 386, "n": 1}, session_id="s") is None
     assert g.pre_tool_call("computer_use", {"action": "capture"}, session_id="s") is None
+    assert g.pre_tool_call("mcp__cua__get_window_state", {"pid": 1, "window_id": 2}, session_id="s") is None
     assert REQUESTS == []
+    # A click is reviewed.
+    ANSWER.update(authorization="high", risk="low")
+    assert g.pre_tool_call("mcp__cua__click", {"element_token": "s00000001:3"}, session_id="s") is None
+    assert len(REQUESTS) == 1
+    REQUESTS.clear()
 
     # Low risk runs, asked for or not: it cannot hurt.
     ANSWER.update(authorization="unknown", risk="low")

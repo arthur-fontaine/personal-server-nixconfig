@@ -25,6 +25,12 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     ln -s $out/cua-driver $out/bin/cua-driver
   '';
 
+  # Hermes' computer_use tool speaks the contract of the driver it pins
+  # (0.21): this one's click refuses its element_index and takes x,y only off
+  # a get_window_state read, so every click failed. Hermes then gets this
+  # driver's own tools instead (modules/hermes/agent/computer-use.nix).
+  passthru.hermesComputerUse = false;
+
   meta = {
     description = "Cua's computer-use driver";
     homepage = "https://github.com/trycua/cua";

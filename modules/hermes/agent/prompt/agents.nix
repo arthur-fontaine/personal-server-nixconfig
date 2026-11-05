@@ -142,6 +142,15 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     "only for a send or a delete the user asked for, then check the page"
     "yourself. Computer use stays for what it cannot do."
     ""
+  ])}${lib.optionalString (lib.elem "cua" mcpServers) (lib.concatMapStrings (line: "\n  ${line}") [
+    "Computer use is the `cua` MCP tools, Cua Driver's own (its `get_guide`"
+    "is the manual: read it once). `get_window_state` reads a window: its"
+    "elements, each with an `element_token`, and a screenshot. Act on a token"
+    "(`click`, `set_value`, `type_text`), or on x,y of that same read's"
+    "screenshot for what the tree lacks; a new read makes older tokens stale."
+    "`run_steps` chains actions in one call. A sheet or a dialog is a window of"
+    "its own: find it with `list_windows`, read it, then act on it."
+    ""
   ])}${lib.optionalString server.hermes.events.enable (lib.concatMapStrings (line: "\n  ${line}") [
     "The user's incoming messages and notifications (WhatsApp, iMessage,"
     "Instagram, Discord, mail, calendar, calls, their home) are watched for you:"

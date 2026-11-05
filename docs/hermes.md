@@ -108,7 +108,13 @@ own permissions (`modules/hermes/agent/apple.nix`):
 | Find My | FindMy.app's window, `peekaboo` ([steipete/Peekaboo](https://github.com/steipete/Peekaboo)) | Screen Recording, Accessibility |
 | Calendar, Contacts, Mail (reading), Maps, Music, Shortcuts, Voice Memos, Weather, Phone (call history, calls you confirm), Voicemail | [iMCP](https://github.com/mattt/iMCP), MCP over stdio | each to iMCP itself, as you turn its services on; Local Network to the launcher |
 | HomeKit | [HomeClaw](https://github.com/omarshahine/HomeClaw) (Mac App Store), MCP over HTTP on 127.0.0.1:9090 | home data, to HomeClaw |
-| Anything else | AppleScript (`osascript`), `shortcuts run`, computer use | Automation |
+| Anything else | AppleScript (`osascript`, System Events for other apps' windows), `shortcuts run`, computer use | Automation |
+
+Computer use is Cua Driver (`modules/hermes/agent/computer-use.nix`). While
+the repository runs a newer driver than Hermes pins (`pkgs/cua-driver.nix`),
+Hermes' own `computer_use` tool is off, since its clicks no longer reach that
+driver, and Hermes drives the driver's own MCP tools (`mcp__cua__*`) instead;
+the guard lets the ones that only look run without review.
 
 Web search is OpenAI's own, run server-side by the Codex model; reading a page
 (`web_extract`) goes through Firecrawl's keyless tier (`modules/hermes/agent/tools.nix`),
@@ -150,7 +156,8 @@ buttons, whose reason line shows the action (the command, or the tool's
 arguments, cut to fit the card and with credentials masked). So does any error of the model: nothing
 is refused outright, nothing unclear runs. A short answer ("oui") is read with
 Hermes' question it answers. The review replaces computer_use's own question
-for each click or key, so one action asks at most once.
+for each click or key (the `cua` server's clicks are reviewed like any tool),
+so one action asks at most once.
 
 As in Claude Code's auto mode, the reviewer sees your messages and Hermes'
 actions, never what the tools returned: a WhatsApp message, an email or a web
