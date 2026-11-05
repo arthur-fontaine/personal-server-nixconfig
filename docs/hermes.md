@@ -150,7 +150,9 @@ As in Claude Code's auto mode, the reviewer sees your messages and Hermes'
 actions, never what the tools returned: a WhatsApp message, an email or a web
 page telling Hermes to act cannot argue with it. Only Telegram turns count as
 yours (Telegram answers its owner only); a turn the events daemon starts, about
-an incoming message, authorizes nothing. Hermes' own checks stay underneath:
+an incoming message, authorizes nothing, and neither does a notice the gateway
+posts in your chat itself (a background process or a subagent finishing, a
+watch pattern matching). Hermes' own checks stay underneath:
 its pattern-matched dangerous commands, and its hardline blocklist.
 
 iMCP's own Reminders, Notes and Messages services stay off (Nix sets them, with
