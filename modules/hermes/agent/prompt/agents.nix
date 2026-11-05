@@ -178,9 +178,12 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     skills for those.${lib.optionalString on.homekit "\n- HomeKit: the `homeclaw` MCP tools (HomeClaw, a menu bar app)."}
   - Anything else: AppleScript (`osascript`), `shortcuts run`, computer use.
   Each works once the user allowed it on this Mac. Check before you promise
-  (`imsg chats --limit 1`, `remindctl status`, an MCP tool listing); when one
-  fails for a permission or an app that is not running, tell the user to run
-  scripts/bootstrap-macos.sh again, over SSH while looking at the Mac.
+  (`imsg chats --limit 1`, `remindctl status`, an MCP tool listing). "Application
+  isn't running" (-600) from AppleScript (`osascript`, `memo`, `imsg send`) only
+  means the app was still starting: `open -g -j -a <App>`, wait a few seconds,
+  and try again. When one fails for a permission (not authorized, -1743), or
+  iMCP's Mail says it has no Envelope Index or no folder access, tell the user
+  to run scripts/bootstrap-macos.sh again, over SSH while looking at the Mac.
 
   ${lib.optionalString (accounts != [ ]) ("The user's other accounts, where you act as them:\n" + lib.concatStrings accounts + "\n"
     + "Before you write in a conversation as them, read its latest messages, both\n"
