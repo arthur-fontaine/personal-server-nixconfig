@@ -156,7 +156,6 @@ done
 # A ChatGPT subscription in the chain logs in with a device code. Hermes keeps
 # the login in its home's auth.json: before its account exists, the login is
 # made in a throwaway home and kept root-only until system.sh moves it in.
-codex_staged="$(dirname "$secrets")/openai-codex-auth.json"
 hermes_bin="$(nix build --no-link --print-out-paths \
   "$flake.config.home-manager.users.$agent.services.hermes-agent.package")/bin/hermes"
 hermes_cli() { sudo -u "$agent" -H env HERMES_HOME="$agent_home/.hermes" "$hermes_bin" "$@"; }

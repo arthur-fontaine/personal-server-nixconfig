@@ -63,6 +63,9 @@ fi
 
 flake="path:$REPO_DIR#darwinConfigurations.$HOST"
 secrets="$(setting server.hermes.secretsFile)"
+# A ChatGPT login made before Hermes' account exists (models.sh), moved in by
+# system.sh: here, so system.sh runs without models.sh (`bootstrap-macos.sh xcode system`).
+codex_staged="$(dirname "$secrets")/openai-codex-auth.json"
 agent="$(setting server.hermes.user)"
 agent_home="$(setting server.hermes.home)"
 agent_uid="$(id -u "$agent" 2>/dev/null || true)" # once the account exists (system.sh)
