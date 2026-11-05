@@ -1,7 +1,7 @@
 # Sandboxed Pi sessions
 
-With `server.hermes.sandbox.enable` (off by default; the bootstrap's Models
-section asks), Hermes can hand a coding task on one of your git repositories
+With `server.hermes.sandbox.enable` (off by default; the bootstrap's Coding
+agent section asks), Hermes can hand a coding task on one of your git repositories
 to [Pi](https://pi.dev) running in a [Gondolin](https://github.com/earendil-works/gondolin)
 microVM, and read back what Pi did. Hermes is the only bridge between the VM
 and this Mac: nothing Pi writes runs here before you review it.
@@ -31,8 +31,9 @@ never counts a notice as your message.
   pointing back. Never your working directory, never a mount.
 - **Network**: HTTP and HTTPS only (Gondolin blocks other TCP; WebSockets are
   off), with synthetic DNS. Every request is checked on the host against the
-  session's grants: at first `server.hermes.sandbox.allowedHosts`
-  (`opencode.ai`) and `hermes.sandbox`, Hermes' broker as the guest names
+  session's grants: at first the provider's hosts
+  (`server.hermes.sandbox.keyHosts`, `opencode.ai` by default), `allowedHosts`
+  (none by default) and `hermes.sandbox`, Hermes' broker as the guest names
   it; anything else Pi asks Hermes for (below), and a refusal is a 403
   whose body tells Pi what it means: `403 Forbidden: not granted for this
   sandbox session; ask Hermes with request_host_action, once` (decided in
@@ -48,15 +49,20 @@ never counts a notice as your message.
   path under `/repos/a`.
 - **Secrets**: none of this Mac's. The one value the guest holds is the
   broker's token (`HERMES_BROKER_TOKEN`), made for the session and dead once
-  Pi is done. Pi reads `OPENCODE_API_KEY`, which in the guest is a
-  random placeholder; the host swaps it for the real key
-  (`server.hermes.sandbox.keyEnv`, `OPENCODE_GO_API_KEY` in the secrets
-  file) in the headers of requests to opencode.ai only, and blocks it to any
-  other host. The sidecar itself gets that key and no other variable of
-  Hermes' environment.
+  Pi is done. Pi reads its provider's key from its own variable for it
+  (`server.hermes.sandbox.piKeyEnv`, pi-ai's `env-api-keys`:
+  `OPENCODE_API_KEY` by default), which in the guest is a random
+  placeholder; the host swaps it for the real key (`keyEnv` in the secrets
+  file, `OPENCODE_GO_API_KEY` by default) in the headers of requests to the
+  provider's hosts only (`keyHosts`: the hosts of its models' `baseUrl` in
+  Pi's catalog), and blocks it to any other host. The sidecar itself gets
+  that key and no other variable of Hermes' environment. Only providers
+  taking an API key can work this way: a placeholder cannot stand in for a
+  login's refreshing token.
 - **Pi**: 1.5.0, headless (`--mode json --print`), on
-  `opencode-go/deepseek-v4.1-flash` with thinking `high` (this model has no
-  medium), set in Pi's own settings, the repository's `.pi/` configuration
+  `server.hermes.sandbox.model` and `thinking` (by default
+  `opencode-go/deepseek-v4.1-flash` at `high`: this model takes low, high or
+  max), set in Pi's own settings, the repository's `.pi/` configuration
   ignored (`--no-approve`), with two extensions of ours: `request_host_action`
   (below) and `sandbox-environment`, and an advisor (next section).
 
@@ -77,6 +83,22 @@ finish with a summary. Not `APPEND_SYSTEM.md` in Pi's agent directory: a
 trusted repository's `.pi/APPEND_SYSTEM.md` would replace it, and the
 repository is the task's content, not its configuration.
 
+## Choosing the model
+
+The bootstrap's Coding agent section asks whether to set it up, then the
+provider, the model, its thinking level, the advisor (off, Pi's model, or
+another model of the same provider) with its effort, and the key. The lists
+are Pi's own, read offline from the pi-ai of the guest image
+(`scripts/lib/pi-models.mjs`): the providers taking an API key (not those
+logging in with OAuth only, nor Bedrock, Azure, Vertex, Cloudflare, whose
+key or address is more than one value, nor GitHub Copilot, whose token is
+exchanged), their chat models, and the thinking levels each model supports
+(every level for a model id typed in). It writes `model`, `thinking`,
+`keyEnv`, `piKeyEnv`, `keyHosts` and `advisor` to `hosts/local.nix`. The key
+goes to the secrets file under Pi's variable for it, or under Hermes' when
+Hermes has the same service (`OPENCODE_GO_API_KEY`, `OPENCODE_ZEN_API_KEY`,
+`GOOGLE_API_KEY`), so one key serves both.
+
 ## Pi's advisor
 
 Pi runs with [pi-advisor-flow](https://github.com/philipbrembeck/pi-advisor)
@@ -96,7 +118,7 @@ and `thinking` as the executor's and `server.hermes.sandbox.advisor` over it:
 
 | Setting | Value | Why |
 | --- | --- | --- |
-| `advisor.model` (`advisor`) | `opencode-go/deepseek-v4.1-flash`, Pi's own | through the same provider, so the same placeholder key and host, opencode.ai: no new grant. `advisorDisableSameModel` is `false`, or the flow would skip a same-model advisor |
+| `advisor.model` (`advisor`) | `opencode-go/deepseek-v4.1-flash`, Pi's own | on Pi's provider (an assertion checks it), so the same placeholder key and hosts: no new grant. `advisorDisableSameModel` is `false`, or the flow would skip a same-model advisor |
 | `advisor.effort` (`advisorEffort`) | `max` | this model takes `low`, `high` or `max` (pi-ai's opencode-go catalog); the executor stays at `high` |
 | `advisor.maxCalls` (`advisorMaxCallsPerSession`) | 5 | Pi's calls and the automatic gate's together; later ones are refused and Pi goes on alone |
 | `advisor.contextMaxChars` (`contextMaxChars`) | 15,000 | how much of the conversation one call carries |

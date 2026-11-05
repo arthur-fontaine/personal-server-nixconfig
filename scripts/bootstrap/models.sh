@@ -16,34 +16,6 @@ provider_rows="$(hermes_models providers)" # id<TAB>label<TAB>key variable
 provider_names="$(hermes_models names)"
 provider_field() { awk -F'\t' -v id="$1" -v f="$2" '$1 == id { print $f; exit }' <<< "$provider_rows"; }
 
-key_page() {
-  case "$1" in
-    opencode-zen | opencode-go) echo "https://opencode.ai/auth" ;;
-    openrouter) echo "https://openrouter.ai/settings/keys" ;;
-    anthropic) echo "https://console.anthropic.com/settings/keys" ;;
-    openai-api) echo "https://platform.openai.com/api-keys" ;;
-    deepseek) echo "https://platform.deepseek.com/api_keys" ;;
-    gemini) echo "https://aistudio.google.com/apikey" ;;
-    xai) echo "https://console.x.ai" ;;
-  esac
-}
-ask_key() { # provider label variable: its key, unless the secrets file has it
-  local value page
-  [ -n "$3" ] || return 0
-  if [ -n "$(secret_value "$3")" ]; then
-    ok "$2: its key is in the secrets file"
-    return 0
-  fi
-  page="$(key_page "$1")"
-  value="$(gum input --password --header "$2 API key ($3${page:+, from $page}; empty to skip)" | tr -d '[:space:]')"
-  if [ -n "$value" ]; then
-    set_secret "$3" "$value"
-    ok "$2: key written"
-  else
-    warn "$2 has no key: Hermes skips it in the chain."
-  fi
-}
-
 # What a provider is best used with; otherwise its list's own order.
 preferred_model() {
   case "$1" in
@@ -351,24 +323,3 @@ else
     decision_off approval
   fi
 fi
-
-# Sandboxed Pi sessions (server.hermes.sandbox, docs/sandbox.md): their model
-# is OpenCode Go's, whose key the host keeps and the VM never sees.
-echo
-sandbox_key_env="$(setting server.hermes.sandbox.keyEnv)"
-if [ "$(setting server.hermes.sandbox.enable)" = 1 ] && [ -n "$(secret_value "$sandbox_key_env")" ] \
-  && keep "Sandbox: Hermes hands coding tasks to Pi in a microVM"; then
-  :
-else
-  note "Hermes can hand a coding task on one of your git repositories to Pi, another coding agent,"
-  note "in a microVM with a copy of that repository only and no network but its model (OpenCode Go):"
-  note "Pi's branch comes back for you to review, and nothing it wrote runs on this Mac before you do."
-  if ask "Let Hermes run Pi sessions in a sandbox?"; then
-    set_host '{"server":{"hermes":{"sandbox":{"enable":true}}}}'
-    ask_key opencode-go "OpenCode Go" "$sandbox_key_env"
-    [ -n "$(secret_value "$sandbox_key_env")" ] || warn "Without its key, each sandbox session fails at once."
-  elif [ "$(setting server.hermes.sandbox.enable)" = 1 ]; then
-    set_host '{"server":{"hermes":{"sandbox":{"enable":false}}}}'
-  fi
-fi
-unset sandbox_key_env

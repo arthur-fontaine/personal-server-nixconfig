@@ -4,8 +4,9 @@
 // The VM has no host mount: /workspace is a MemoryProvider in this process,
 // and files cross only through vm.fs, as git bundles, which carry objects and
 // refs, never hooks or config. The guest's environment holds no secret: the
-// OpenCode key is a Gondolin secret, a placeholder in the guest that the host
-// swaps for the real value in the headers of requests to opencode.ai only.
+// provider's key is a Gondolin secret (secretName, Pi's variable for it), a
+// placeholder in the guest that the host swaps for the real value in the
+// headers of requests to the provider's hosts (secretHosts) only.
 // The guest does get one value of its own: the broker's token, which only
 // this process checks (broker.mjs), and which stops working when Pi is done.
 
@@ -25,7 +26,7 @@ const STDERR_TAIL = 4000;
 
 export const DEFAULTS = {
   model: "opencode-go/deepseek-v4.1-flash",
-  // The model takes off, high or max; medium would be clamped to high.
+  // The model takes low, high or max; medium would be clamped to high.
   thinking: "high",
   memory: "3G",
   cpus: 2,
@@ -292,7 +293,7 @@ export class Session {
   async #run() {
     const { config, gondolin } = this;
     const key = this.env[config.keyEnv];
-    if (!key) throw new Error(`${config.keyEnv} is not set: the OpenCode Go key, in the secrets file`);
+    if (!key) throw new Error(`${config.keyEnv} is not set: the model provider's key, in the secrets file`);
     this.audit({ event: "start", grants: this.policy.grants.list() });
     this.peer.send("grants", { grants: this.policy.grants.list() });
 

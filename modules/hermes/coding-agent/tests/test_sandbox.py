@@ -68,6 +68,7 @@ def main() -> None:
     config = {
         "command": str(sidecar), "state_dir": str(root / "state"), "model": "opencode-go/deepseek-v4.1-flash",
         "thinking": "high", "memory": "3G", "cpus": 2, "timeout_seconds": 600, "key_env": "OPENCODE_GO_API_KEY",
+        "pi_key_env": "OPENCODE_API_KEY", "key_hosts": ["opencode.ai"],
         "grants": ["opencode.ai"], "max_diff_chars": 30000,
         "advisor": {"enable": True, "model": "opencode-go/deepseek-v4.1-flash", "effort": "max", "maxCalls": 5,
                     "contextMaxChars": 15000},
@@ -104,6 +105,9 @@ def main() -> None:
     workdir = root / "state" / "sessions" / session_id
     assert json.loads((workdir / "session.json").read_text())["bundleRef"] == "refs/heads/main"
     assert json.loads((workdir / "session.json").read_text())["advisor"] == config["advisor"], "Hermes' advisor settings"
+    written = json.loads((workdir / "session.json").read_text())
+    assert (written["keyEnv"], written["secretName"], written["secretHosts"]) == (
+        "OPENCODE_GO_API_KEY", "OPENCODE_API_KEY", ["opencode.ai"]), "the provider's key: its names and hosts"
     event = events[0]
     assert event["type"] == "watch_match"
     assert event["session_key"] == "agent:main:telegram:dm:42" and event["chat_id"] == "42" and event["platform"] == "telegram"

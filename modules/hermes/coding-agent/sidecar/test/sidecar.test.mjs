@@ -13,7 +13,7 @@ import { Peer } from "../src/protocol.mjs";
 import { Grants, NetworkPolicy, ambiguousPath, describeRequest, normalizeGrant } from "../src/policy.mjs";
 import { PiProgress } from "../src/pi-events.mjs";
 import { buildConfig, imageId, ensureImage } from "../src/image.mjs";
-import { REFUSED, Session, brokerResponse, guard, piAdvisor, piArgv, piFacts, piSettings } from "../src/session.mjs";
+import { DEFAULTS, REFUSED, Session, bootVm, brokerResponse, guard, piAdvisor, piArgv, piFacts, piSettings } from "../src/session.mjs";
 import { ACTIONS as BROKER_ACTIONS, Broker, InvalidAction, MAX_BODY, validateAction } from "../src/broker.mjs";
 import environment, { ACTIONS as PROMPT_ACTIONS, SECTION, renderEnvironment } from "../../pi/extensions/sandbox-environment/index.js";
 import { FolderTooLarge, copyFolder } from "../src/folders.mjs";
@@ -543,6 +543,24 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
   assert.deepEqual(audit.map((a) => a.event), ["start", "pi", "end", "network", "action"]);
   assert.ok(!fs.readFileSync(path.join(workdir, "audit.jsonl"), "utf8").includes(secret));
   fs.rmSync(workdir, { recursive: true, force: true });
+});
+
+test("session: another provider's key, under Pi's name for it, to its hosts only", async () => {
+  let hooks;
+  const gondolin = {
+    VM: FakeVm,
+    MemoryProvider: class {},
+    createHttpHooks: (options) => {
+      hooks = options;
+      return { httpHooks: {}, env: { [Object.keys(options.secrets)[0]]: "PLACEHOLDER" } };
+    },
+  };
+  const config = { ...DEFAULTS, id: "p", secretName: "ANTHROPIC_API_KEY", secretHosts: ["api.anthropic.com"], keyEnv: "ANTHROPIC_API_KEY" };
+  const policy = new NetworkPolicy({ grants: ["api.anthropic.com", "hermes.sandbox"] });
+  const { env } = await bootVm({ gondolin, imageDir: "/nowhere", config, key: "sk-ant-real", policy });
+  assert.deepEqual(hooks.secrets, { ANTHROPIC_API_KEY: { hosts: ["api.anthropic.com"], value: "sk-ant-real" } });
+  assert.equal(env.ANTHROPIC_API_KEY, "PLACEHOLDER");
+  assert.ok(!("OPENCODE_API_KEY" in env));
 });
 
 test("session: Pi exiting 0 after its model refused every call is a failure", async () => {

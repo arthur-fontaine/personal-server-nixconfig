@@ -10,9 +10,11 @@
 # wiring (imported by ../agent). The plugin is listed in plugins.enabled by
 # ../agent/memory.nix, which holds that list.
 {
-  options = { lib, ... }:
+  options = { config, lib, ... }:
     let
       inherit (lib) mkOption types;
+      cfg = config.server.hermes.sandbox;
+      provider = model: builtins.head (lib.splitString "/" model);
     in
     {
       options.server.hermes.sandbox = {
@@ -22,25 +24,29 @@
           description = ''
             Give Hermes sandbox_run and its companions: Pi sessions in a microVM
             with no access to this Mac but a copy of one git repository, and the
-            network to its model only. The OpenCode Go key (keyEnv) must be in
+            network to its model only. The provider's key (keyEnv) must be in
             the secrets file; the guest image is built at the first session.
           '';
         };
         model = mkOption {
           type = types.str;
           default = "opencode-go/deepseek-v4.1-flash";
-          description = "Pi's model, as Pi names it (provider/id).";
+          description = ''
+            Pi's model, as Pi names it (provider/id), from Pi's catalog: the
+            bootstrap lists them (scripts/lib/pi-models.mjs). The provider's key
+            is keyEnv, Pi reads it from piKeyEnv, and it goes to keyHosts only.
+          '';
         };
         thinking = mkOption {
           type = types.enum [ "off" "minimal" "low" "medium" "high" "xhigh" "max" ];
-          # This model has no medium: Pi would clamp it to high anyway.
+          # This model takes low, high or max: Pi would clamp medium to high anyway.
           default = "high";
-          description = "Pi's thinking level.";
+          description = "Pi's thinking level, one the model supports (Pi clamps another to the nearest).";
         };
         # pi-advisor-flow in the guest: Pi (the executor) asks a second call
         # of a model for a review at its plan, its failures and its end, and
-        # when it repeats a tool call. Through the same provider, so the same
-        # key and host (opencode.ai); the rest is ./pi/advisor.json.
+        # when it repeats a tool call. Through Pi's provider, so the same key
+        # and hosts (keyHosts); the rest is ./pi/advisor.json.
         advisor = {
           enable = mkOption {
             type = types.bool;
@@ -52,8 +58,8 @@
             default = "opencode-go/deepseek-v4.1-flash";
             description = ''
               The advisor's model (provider/id). It may be Pi's own: the
-              advisor reviews at a higher effort. Keep it on opencode-go, the
-              one provider the guest reaches with a key.
+              advisor reviews at a higher effort. On Pi's provider, the one the
+              guest reaches with a key.
             '';
           };
           effort = mkOption {
@@ -80,21 +86,37 @@
           type = types.str;
           default = "OPENCODE_GO_API_KEY";
           description = ''
-            The variable of the secrets file holding the OpenCode Go key. The
+            The variable of the secrets file holding the provider's key. The
             guest gets a placeholder; the host puts the key in the requests to
-            opencode.ai only.
+            keyHosts only.
+          '';
+        };
+        piKeyEnv = mkOption {
+          type = types.str;
+          default = "OPENCODE_API_KEY";
+          description = ''
+            The variable Pi reads the provider's key from (pi-ai's
+            env-api-keys): in the guest, it holds the placeholder.
+          '';
+        };
+        keyHosts = mkOption {
+          type = types.listOf types.str;
+          default = [ "opencode.ai" ];
+          description = ''
+            The hosts of the provider's API (its models' baseUrl in Pi's
+            catalog): the only ones the key is put in requests to.
           '';
         };
         allowedHosts = mkOption {
           type = types.listOf types.str;
-          default = [ "opencode.ai" ];
-          example = [ "opencode.ai" "*.npmjs.org" ];
+          default = [ ];
+          example = [ "*.npmjs.org" ];
           description = ''
-            The hosts the guest may reach over HTTP(S) from the start, exact or
-            "*.domain" for its subdomains, besides hermes.sandbox (Hermes' broker,
-            answered on the host). For any other, Pi asks Hermes for access and
-            Hermes' approval system decides; a refusal is a 403. Nothing but
-            HTTP leaves it.
+            Hosts the guest may reach over HTTP(S) from the start besides the
+            provider's (keyHosts) and hermes.sandbox (Hermes' broker, answered
+            on the host): exact, or "*.domain" for its subdomains. For any
+            other, Pi asks Hermes for access and Hermes' approval system
+            decides; a refusal is a 403. Nothing but HTTP leaves it.
           '';
         };
         approvalTimeout = mkOption {
@@ -120,6 +142,12 @@
           description = "Seconds a session may run before it is stopped (what Pi committed stays).";
         };
       };
+      # One provider's key reaches the guest: the advisor's requests go
+      # through it too.
+      config.assertions = lib.optional (cfg.enable && cfg.advisor.enable) {
+        assertion = provider cfg.advisor.model == provider cfg.model;
+        message = "server.hermes.sandbox.advisor.model (${cfg.advisor.model}) must be on Pi's provider (${provider cfg.model}).";
+      };
     };
 
   # Everything a session keeps is under ~/.hermes/sandbox: the guest image,
@@ -142,9 +170,13 @@
           inherit (cfg) model thinking memory cpus;
           advisor = { inherit (cfg.advisor) enable model effort maxCalls contextMaxChars; };
           timeout_seconds = cfg.timeout;
-          # Read from Hermes' environment (the secrets file) by name.
+          # Read from Hermes' environment (the secrets file) by name; a
+          # placeholder under Pi's name in the guest, the key on the way to
+          # the provider's hosts only.
           key_env = cfg.keyEnv;
-          grants = cfg.allowedHosts;
+          pi_key_env = cfg.piKeyEnv;
+          key_hosts = cfg.keyHosts;
+          grants = lib.unique (cfg.keyHosts ++ cfg.allowedHosts);
           max_diff_chars = 30000;
           # Pi asks Hermes for access to other hosts: guard's review first when
           # it is on (../agent/guard.nix, its model and config), then the owner.

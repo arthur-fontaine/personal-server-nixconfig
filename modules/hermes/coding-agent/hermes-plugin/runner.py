@@ -180,6 +180,10 @@ class Sandbox:
                 "cpus": self.config["cpus"],
                 "timeoutSeconds": self.config["timeout_seconds"],
                 "keyEnv": self.config["key_env"],
+                # The provider's key: Pi's variable for it (a placeholder in
+                # the guest) and the hosts it is put in requests to.
+                "secretName": self.config.get("pi_key_env", "OPENCODE_API_KEY"),
+                "secretHosts": self.config.get("key_hosts", ["opencode.ai"]),
                 "grants": self.config["grants"],
                 "approvalTimeoutSeconds": self.config.get("approval_timeout", 300),
             }

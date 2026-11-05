@@ -119,6 +119,38 @@ set_secret() {
   printf '%s\n%s=%s\n' "$others" "$1" "$2" | sed '/^$/d' | write_secret "$secrets"
 }
 
+# Where a provider's API keys are made: Hermes' ids (models.sh) and Pi's
+# (coding-agent.sh).
+key_page() {
+  case "$1" in
+    opencode | opencode-zen | opencode-go) echo "https://opencode.ai/auth" ;;
+    openrouter) echo "https://openrouter.ai/settings/keys" ;;
+    anthropic) echo "https://console.anthropic.com/settings/keys" ;;
+    openai | openai-api) echo "https://platform.openai.com/api-keys" ;;
+    deepseek) echo "https://platform.deepseek.com/api_keys" ;;
+    gemini | google) echo "https://aistudio.google.com/apikey" ;;
+    xai) echo "https://console.x.ai" ;;
+  esac
+}
+# A provider's key, unless the secrets file has it; $4 says what happens
+# without one.
+ask_key() { # provider label variable [without it]
+  local value page
+  [ -n "$3" ] || return 0
+  if [ -n "$(secret_value "$3")" ]; then
+    ok "$2: its key is in the secrets file"
+    return 0
+  fi
+  page="$(key_page "$1")"
+  value="$(gum input --password --header "$2 API key ($3${page:+, from $page}; empty to skip)" | tr -d '[:space:]')"
+  if [ -n "$value" ]; then
+    set_secret "$3" "$value"
+    ok "$2: key written"
+  else
+    warn "$2 has no key: ${4:-Hermes skips it in the chain.}"
+  fi
+}
+
 # A part already set up: says so, and offers to change it. True when it stays.
 keep() {
   ok "$1"
