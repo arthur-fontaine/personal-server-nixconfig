@@ -8,6 +8,7 @@
     ./ssh.nix
     ./quiet.nix
     ./local-network.nix
+    ./xcode.nix
   ];
 
   nixpkgs.overlays = [ (import ../../pkgs { inherit inputs; }) ];

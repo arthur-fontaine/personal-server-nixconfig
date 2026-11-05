@@ -65,6 +65,12 @@ reaches Hermes and everything it runs, across updates.
   its garbage collection (30 days), and the copy uzu downloaded itself before,
   `~/.cache/mirai/models`, is deleted at each activation.
 - DigUp downloads its embedding model at the first `digup index`.
+- Each activation brings the Command Line Tools and Xcode to their latest
+  release (`modules/system/xcode.nix`). Xcode comes through `xcodes`, as the
+  administrator: the first time, it asks for your Apple Account and its
+  two-factor code in the terminal running `server-rebuild`. It needs about
+  12 GB to download and twice that to unpack. Skipped or failed, it
+  prints the `xcodes install` command to run instead.
 - Keep the lid open: the backlight is off, but a closed lid turns the display
   off and computer use sees a black screen. The Mac never sleeps either way.
 - Talk to the bot in its DM, outside any topic: that is the main chat.

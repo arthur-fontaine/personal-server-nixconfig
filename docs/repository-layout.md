@@ -20,6 +20,7 @@ modules/
     ssh.nix               SSH with keys only, server.ssh.authorizedKeys
     quiet.nix             Spotlight, Bluetooth, Siri, background downloads off
     local-network.nix     the local network open to Hermes' agents (no permission dialog)
+    xcode.nix             the latest Command Line Tools and Xcode (xcodes), at each activation
     nix.nix
   hermes/                 Hermes Agent
     options/              server.hermes.*: account, model, memory, sub-chats, access (the sandbox's: coding-agent/)
