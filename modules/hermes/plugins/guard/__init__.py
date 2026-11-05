@@ -42,6 +42,33 @@ FOOTER = (
 HEADERS = ("[IMPORTANT:", "[ASYNC DELEGATION", "[Background process ", "[SYSTEM")
 
 
+# The approval card shows its reason in 500 characters, escaped
+# (plugins/platforms/telegram/adapter.py, _EA_REASON_BUDGET) and its command
+# box only "<tool> (plugin approval rule)": the action itself goes in the
+# reason, short enough that the card always fits and stays a card.
+CARD_ACTION = 300
+
+
+def summary(tool_name: str, args: dict) -> str:
+    """What the action does, for the user's eyes: a command as is, other
+    arguments as key: value."""
+    args = args or {}
+    if set(args) == {"command"} or (tool_name == "terminal" and "command" in args):
+        text = str(args["command"])
+    else:
+        text = "; ".join(
+            f"{k}: {v if isinstance(v, str) else json.dumps(v, ensure_ascii=False, default=str)}"
+            for k, v in args.items())
+    try:
+        from agent.redact import redact_sensitive_text
+
+        text = redact_sensitive_text(text, force=True)
+    except Exception:
+        pass
+    text = " ".join(text.split())
+    return f"{tool_name}: {text[:CARD_ACTION] + '…' if len(text) > CARD_ACTION else text}"
+
+
 def internal(message) -> bool:
     text = message if isinstance(message, str) else ""
     return FOOTER in text or text.lstrip().startswith(HEADERS)
@@ -152,7 +179,7 @@ class Guard:
             json.dumps(args, sort_keys=True, default=str).encode()).hexdigest()[:16]
         return {
             "action": "approve",
-            "message": f"Auto-review: {verdict.reason}. Run it?",
+            "message": f"{summary(tool_name, args)} (auto-review: {verdict.reason})",
             "rule_key": f"guard:{tool_name}:{grain}",
         }
 

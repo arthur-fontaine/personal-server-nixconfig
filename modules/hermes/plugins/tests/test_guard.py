@@ -82,6 +82,8 @@ def main() -> None:
     ANSWER.update(authorization="medium", risk="high")
     directive = g.pre_tool_call("terminal", {"command": "wacli send --to Zoé 'Salut'"}, session_id="s")
     assert directive["action"] == "approve" and "high risk" in directive["message"], directive
+    # The card shows what it approves, and fits the card's 500 characters.
+    assert directive["message"].startswith("terminal: wacli send --to Zoé 'Salut'"), directive
 
     # A short answer is read with the question it answers.
     g.pre_llm_call(session_id="s", user_message="Oui", platform="telegram", conversation_history=[
@@ -166,6 +168,11 @@ def main() -> None:
         assert not n.sessions["n"].turn_from_user and len(n.sessions["n"].messages) == 1, notice
     n.pre_llm_call(session_id="n", user_message="Oui, vas-y", platform="telegram")
     assert n.sessions["n"].turn_from_user and list(n.sessions["n"].messages)[-1] == "Oui, vas-y"
+
+    # However long its arguments, the action fits the card.
+    ANSWER.update(authorization="low", risk="high")
+    long = g.pre_tool_call("mcp__fast_act__browser_fast_act", {"goal": "x" * 5000, "url": "https://a"}, session_id="long")
+    assert long["message"].startswith("mcp__fast_act__browser_fast_act: goal: xxx") and len(long["message"]) < 450
 
     # Bounded risk needs clear authorization.
     from guard.review import allowed

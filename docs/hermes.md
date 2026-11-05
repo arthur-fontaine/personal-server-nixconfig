@@ -141,7 +141,9 @@ messages authorize the action, and how risky it is. Low risk (a click that
 navigates, a draft) runs at once, bounded risk when you asked for it, and high
 risk (a send, a post) only when you asked for that exact action; anything else,
 and anything critical, waits for your yes in Telegram, through Hermes' own approval
-gate (a no, or no answer, refuses it). So does any error of the model: nothing
+gate (a no, or no answer, refuses it): a card with Once, Session, Always and Deny
+buttons, whose reason line shows the action (the command, or the tool's
+arguments, cut to fit the card and with credentials masked). So does any error of the model: nothing
 is refused outright, nothing unclear runs. A short answer ("oui") is read with
 Hermes' question it answers. The review replaces computer_use's own question
 for each click or key, so one action asks at most once.
