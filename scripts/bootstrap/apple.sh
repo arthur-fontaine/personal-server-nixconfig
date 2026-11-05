@@ -16,10 +16,21 @@ apple_account() {
 }
 
 # One app: run its check, which also brings up its dialog, until it passes.
+# `tell application` launches an app that is not running, but may send it the
+# command before it is ready: AppleScript then fails with "Application isn't
+# running" (-600), which is not a refusal, so that is retried for a while.
 apple_app() {
-  local what="$1" check="$2" out
+  local what="$1" check="$2" out tries passed
   while :; do
-    if out="$(as_gateway "$check" 2>&1)"; then
+    tries=0
+    while :; do
+      passed=0
+      out="$(as_gateway "$check" 2>&1)" && passed=1
+      [ "$passed" = 1 ] || [[ "$out" != *"(-600)"* ]] || [ "$tries" -ge 15 ] && break
+      tries=$((tries + 1))
+      sleep 2
+    done
+    if [ "$passed" = 1 ]; then
       ok "$what"
       return 0
     fi
