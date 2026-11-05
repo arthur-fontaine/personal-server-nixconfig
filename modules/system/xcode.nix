@@ -1,16 +1,22 @@
-# Keeps the Command Line Tools and Xcode at their latest release, as the
-# administrator's own Mac does (arthur-fontaine/nixconfig,
-# modules/darwin/core/xcode.nix), with xcodes and aria2 from Nix instead of
-# Homebrew. Last in the activation: no step here waits on it, and installing
-# Xcode can take a while.
+# Keeps the Command Line Tools and Xcode at their latest release on each
+# activation, with nothing to type.
+#
+# Xcode comes from the App Store, not xcodes (as the administrator's own Mac
+# does): Apple's developer downloads want a password and a two-factor code for
+# each new session, and xcodes cannot keep its login over SSH (the keychain is
+# locked), so every rebuild would ask. The App Store is already signed in, in
+# Hermes' session (scripts/bootstrap/apple.sh), and mas installs from it
+# without asking, as for HomeClaw (scripts/bootstrap/integrations/homekit.sh).
+# Its automatic updates are off (quiet.nix): this updates it instead.
+# Last in the activation: no step here waits on it, and Xcode is a few GB.
 { config, lib, pkgs, ... }:
 let
-  admin = config.server.admin.user;
+  hermes = config.server.hermes;
+  # https://apps.apple.com/app/xcode/id497799835
+  xcodeId = "497799835";
+  xcode = "/Applications/Xcode.app";
 in
 {
-  # xcodes in the administrator's PATH, to log in or pick another version.
-  environment.systemPackages = [ pkgs.xcodes ];
-
   system.activationScripts.postActivation.text = lib.mkAfter ''
     (
       echo "checking Command Line Tools..." >&2
@@ -29,32 +35,36 @@ in
         if [ "$newest" != "$installed_clt" ]; then
           echo "installing $clt_label..." >&2
           softwareupdate --install "$clt_label" \
-            || echo "warning: could not install $clt_label; run: sudo softwareupdate --install '$clt_label'" >&2
+            || echo "warning: could not install $clt_label" >&2
         fi
       fi
 
       echo "checking Xcode..." >&2
-      # As the administrator: xcodes keeps their Apple Account session, and
-      # asks for it (with its two-factor code) the first time. aria2 in PATH
-      # makes it download in parallel.
-      run_as_user() {
-        sudo -u ${admin} -H env PATH="${lib.makeBinPath [ pkgs.aria2 ]}:$PATH" ${lib.getExe pkgs.xcodes} "$@"
-      }
-      latest_xcode=$(run_as_user update 2>/dev/null | grep -E '^[0-9.]+ \(' | tail -1 | awk '{ print $1 }')
-      if [ -n "$latest_xcode" ]; then
-        if ! run_as_user installed 2>/dev/null | grep -q "^$latest_xcode ("; then
-          echo "installing Xcode $latest_xcode..." >&2
-          run_as_user install "$latest_xcode" --no-superuser --experimental-unxip --empty-trash \
-            || echo "warning: could not install Xcode $latest_xcode; run: xcodes install $latest_xcode --select" >&2
+      if ${if hermes.enable then "launchctl print gui/${toString hermes.uid} >/dev/null 2>&1" else "false"}; then
+        # mas installs as root for the App Store account of SUDO_UID: Hermes'.
+        mas() {
+          launchctl asuser ${toString hermes.uid} env SUDO_UID=${toString hermes.uid} SUDO_GID=${toString hermes.gid} \
+            SUDO_USER=${hermes.user} HOME=${hermes.home} ${lib.getExe pkgs.mas} "$@"
+        }
+        if [ ! -d ${xcode} ]; then
+          echo "installing Xcode from the App Store (a few GB, this takes a while)..." >&2
+          mas get ${xcodeId} || echo "warning: could not install Xcode; is the App Store signed in, in Hermes' session?" >&2
+        else
+          mas update ${xcodeId} || echo "warning: could not update Xcode" >&2
         fi
-        xcode_path=$(run_as_user installed 2>/dev/null | awk -F'\t' -v v="$latest_xcode" 'index($1, v " (") == 1 { print $NF }')
-        if [ -n "$xcode_path" ] && [ "$(xcode-select -p 2>/dev/null)" != "$xcode_path/Contents/Developer" ]; then
-          echo "selecting $xcode_path..." >&2
-          xcode-select -s "$xcode_path" \
-            && xcodebuild -license accept \
-            && xcodebuild -runFirstLaunch \
-            || echo "warning: could not select $xcode_path" >&2
+      else
+        echo "Xcode: waiting for Hermes' session (its App Store account); the next rebuild installs it" >&2
+      fi
+
+      if [ -d ${xcode} ]; then
+        if [ "$(xcode-select -p 2>/dev/null)" != ${xcode}/Contents/Developer ]; then
+          echo "selecting ${xcode}..." >&2
+          xcode-select -s ${xcode} || echo "warning: could not select ${xcode}" >&2
         fi
+        # Again after each update: a new Xcode has a new license and new first-launch packages.
+        xcodebuild -license check >/dev/null 2>&1 || xcodebuild -license accept || true
+        xcodebuild -checkFirstLaunchStatus >/dev/null 2>&1 || xcodebuild -runFirstLaunch \
+          || echo "warning: Xcode's first launch failed" >&2
       fi
     )
   '';
