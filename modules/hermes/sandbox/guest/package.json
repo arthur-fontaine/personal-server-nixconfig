@@ -1,0 +1,8 @@
+{
+  "name": "hermes-sandbox-guest",
+  "private": true,
+  "description": "Pi and its extensions, installed for the sandbox VM (Alpine, linux-arm64, musl)",
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "1.5.0"
+  }
+}

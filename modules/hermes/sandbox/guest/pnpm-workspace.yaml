@@ -1,0 +1,6 @@
+# Installed for the guest, not for this Mac: linux, arm64, musl (Alpine).
+supportedArchitectures:
+  os: [linux]
+  cpu: [arm64]
+  libc: [musl]
+nodeLinker: hoisted

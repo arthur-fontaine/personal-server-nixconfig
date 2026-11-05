@@ -15,6 +15,7 @@ in
   imcp = final.callPackage ./apple/imcp.nix { };
   wacli = final.callPackage ./wacli.nix { };
   hermes-homeassistant = final.callPackage ./hermes-homeassistant.nix { };
+  hermes-sandbox = final.callPackage ./hermes-sandbox.nix { };
   # Hermes' pinned computer-use driver (its pm/lock.json), or ./cua-driver.nix
   # while that one is older: once Hermes pins a newer driver, its own is used
   # again and ./cua-driver.nix can go.

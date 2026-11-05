@@ -3,3 +3,4 @@ result-*
 hosts/local.nix
 __pycache__/
 .pytest_cache/
+node_modules/
