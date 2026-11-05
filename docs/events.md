@@ -22,6 +22,8 @@ pollers (calendar, mail, …) ┤
                   · drops replays and messages older than 10 minutes
                   · gathers a chat's messages until it is quiet for 45 s (capped at 5 min);
                     drops them if you answer there yourself
+                  · reads what was said before in that chat, your replies included, from
+                    the source itself (the last 15 messages of the past week)
                   · asks the local model (uzu) a typed question: may this need you? how urgent?
                   · writes every event and its outcome to recent.jsonl (two days), which Hermes
                     reads when you ask whether something arrived
@@ -52,6 +54,30 @@ search, and iMCP's reading tools (calendar, contacts, maps, location, weather)
 through a second connection, `imcp-read`. No terminal, no files, no sending,
 no fetching of arbitrary pages (which could carry your data out in a URL). It
 can only write to you; acting takes your answer in the main chat.
+
+## A message within its conversation
+
+A message alone often means nothing ("Il faut le faire sur l'ordinateur ?").
+So when a chat's batch is screened, the daemon reads the conversation before
+it, from the source itself, and the triage and Hermes both get it, marked
+apart from the new messages (`hermes_events/history.py`):
+
+- WhatsApp: `wacli messages list --chat … --before …`, read-only, on the store
+  `wacli sync` keeps.
+- iMessage, SMS: `imsg history --chat-id … --end …`.
+- Instagram: its notifications carry the message but not who sent it. The
+  daemon finds the thread, by the id in the notification's link or else by
+  the message among the inbox's latest (and the requests'), through
+  Instagram's web API in the logged-in browser: a background tab on
+  instagram.com/robots.txt, which runs none of Instagram's scripts, fetches it
+  with the browser's cookies and closes. Reading a thread through the API
+  does not mark it seen (that is its own call, never made), unlike opening it.
+  The thread gives the sender's and the group's names, one chat per thread
+  (two people no longer batch together), its history, and whether you already
+  answered from your phone (then nothing is proposed).
+- Discord: none yet.
+
+When a source cannot be read, the event goes on without its history.
 
 ## Every event source in this setup
 

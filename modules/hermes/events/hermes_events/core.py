@@ -101,6 +101,7 @@ class Journal:
             "chat": event.get("chat"),
             "summary": event.get("summary"),
             "messages": event.get("messages"),
+            "context": event.get("context") or None,
             "outcome": outcome,
         }
         try:
@@ -118,8 +119,10 @@ class Journal:
 class Pipeline:
     def __init__(self, *, triage, sink, seen: Seen, batch_seconds: float, max_age_seconds: float,
                  max_batch_seconds: float | None = None, max_chars: int = 4000, clock=time.time,
-                 journal: Journal | None = None):
+                 journal: Journal | None = None, history=None):
         self.triage, self.sink, self.seen, self.journal = triage, sink, seen, journal
+        # (chat, messages) -> history.Context | None: the conversation before them.
+        self.history = history
         self.batch_seconds, self.max_age, self.max_chars = batch_seconds, max_age_seconds, max_chars
         self.max_batch = max_batch_seconds if max_batch_seconds is not None else 5 * batch_seconds
         self.clock = clock
@@ -164,7 +167,7 @@ class Pipeline:
         if id is not None and not self.seen.add(f"{source}:{id}"):
             return
         event = {"source": source, "key": f"{source}:{key}", "summary": summary,
-                 "messages": details[: self.max_chars], "reply_hint": "", "is_group": False}
+                 "messages": details[: self.max_chars], "context": "", "reply_hint": "", "is_group": False}
         self.spawn(self._send(event, screen, fail_open))
 
     def system(self, key: str, text: str) -> None:
@@ -202,16 +205,36 @@ class Pipeline:
             await self.flush(batch)
 
     async def flush(self, batch: Batch) -> None:
-        await self._send(self.event(batch), True, not batch.chat.is_group)
+        context = None
+        if self.history is not None:
+            try:
+                context = await self.history(batch.chat, batch.messages)
+            except Exception as error:
+                log.warning("%s: no history (%s)", batch.chat.key, error)
+        event = self.event(batch, context)
+        if context is not None and context.answered:
+            log.info("%s: the user answered, dropped %d message(s)", batch.chat.key, len(batch.messages))
+            self._journal(event, "not proposed (the user answered in the chat)")
+            return
+        await self._send(event, True, not batch.chat.is_group)
 
-    def event(self, batch: Batch) -> dict:
+    def lines(self, messages: list[Message]) -> str:
+        today = datetime.fromtimestamp(self.clock()).date()
+
+        def stamp(m: Message) -> str:
+            moment = datetime.fromtimestamp(m.time)
+            return moment.strftime("%H:%M" if moment.date() == today else "%a %d %b %H:%M")
+
+        text = "\n".join(f"[{stamp(m)}] {m.sender}: {m.text}" for m in messages)
+        return "…" + text[-self.max_chars:] if len(text) > self.max_chars else text
+
+    def event(self, batch: Batch, context=None) -> dict:
         chat, messages = batch.chat, batch.messages
-        lines = [
-            f"[{datetime.fromtimestamp(m.time).strftime('%H:%M')}] {m.sender}: {m.text}" for m in messages
-        ]
-        text = "\n".join(lines)
-        if len(text) > self.max_chars:
-            text = "…" + text[-self.max_chars:]
+        text = self.lines(messages)
+        earlier = ""
+        if context is not None and context.earlier:
+            earlier = ("Earlier in this conversation, oldest first (\"me\" is the user):\n"
+                       + self.lines(context.earlier) + "\n\nThe new messages:")
         where = f"the group {chat.name}" if chat.is_group else chat.name
         count = f"{len(messages)} new messages" if len(messages) > 1 else "A new message"
         return {
@@ -222,5 +245,6 @@ class Pipeline:
             "is_group": chat.is_group,
             "summary": f"{count} on {chat.source} from {where}",
             "messages": text,
+            "context": earlier,
             "reply_hint": chat.reply_hint,
         }

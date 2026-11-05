@@ -14,7 +14,8 @@ from aiohttp import web
 from . import pollers
 from .core import Journal, Pipeline, Seen
 from .hermes import HermesSink
-from .browser import instagram_watch
+from .browser import Instagram, instagram_watch
+from .history import History
 from .homeassistant import homeassistant_watch
 from .sources import imessage_watch, whatsapp_app
 from .triage import UzuTriage
@@ -37,6 +38,10 @@ async def main(config: dict) -> None:
         raise SystemExit("no WEBHOOK_SECRET in the secrets file: run scripts/bootstrap-macos.sh")
     owner = secrets.get("TELEGRAM_ALLOWED_USERS", "").split(",")[0].strip()
 
+    sources = config["sources"]
+    on = lambda name: sources.get(name, {}).get("enabled")
+    instagram = Instagram() if on("instagram") else None
+    history = config.get("history", {})
     pipeline = Pipeline(
         triage=UzuTriage(config["triage"]["url"], config["triage"]["model"], config["triage"]["timeout"]),
         sink=HermesSink(config["hermes_url"], secret, owner),
@@ -45,9 +50,9 @@ async def main(config: dict) -> None:
         max_batch_seconds=config["max_batch_seconds"],
         max_age_seconds=config["max_age_seconds"],
         journal=Journal(os.path.join(config["state_dir"], "recent.jsonl")),
+        history=History(wacli=history.get("wacli") or None, imsg=history.get("imsg") or None,
+                        instagram=instagram, limit=history.get("limit", 15)),
     )
-    sources = config["sources"]
-    on = lambda name: sources.get(name, {}).get("enabled")
     tasks = []
     # WhatsApp and HomeKit post here.
     runner = web.AppRunner(whatsapp_app(pipeline, secret))
@@ -65,7 +70,7 @@ async def main(config: dict) -> None:
     if on("instagram") or on("discord"):
         tasks.append(asyncio.create_task(instagram_watch(
             pipeline, sources["instagram"]["devtools"],
-            discord=sources["discord"]["url"] if on("discord") else None)))
+            discord=sources["discord"]["url"] if on("discord") else None, instagram=instagram)))
 
     state = pollers.State(os.path.join(config["state_dir"], "pollers.json"))
     imcp = pollers.MCP(config.get("imcp_command", []))

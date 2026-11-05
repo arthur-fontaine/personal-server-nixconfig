@@ -21,7 +21,9 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 import time
+from dataclasses import dataclass, field
 
 import aiohttp
 
@@ -106,9 +108,10 @@ def notification_message(payload: dict, now: float) -> tuple[Chat, Message] | No
         who = ""
     fields = _data_fields(payload.get("data", ""))
     if fields and fields not in _logged_fields:
-        # Where the sender may be, for a later fix: the names, never the values.
+        # The names, never the values; the uri's shape, its digits masked.
         _logged_fields.add(fields)
-        log.info("%s notification data fields: %s", source, ", ".join(fields))
+        log.info("%s notification data fields: %s; uri like %s", source, ", ".join(fields),
+                 re.sub(r"\d", "9", str(_data(payload).get("uri", "")))[:120])
     digest = hashlib.sha256(f"{payload.get('tag', '')}\0{title}\0{body}".encode()).hexdigest()[:16]
     chat = Chat(source, who or source, who or source.capitalize(), reply_hint=REPLY[source])
     sender = who or "someone (the notification does not name them)"
@@ -116,6 +119,207 @@ def notification_message(payload: dict, now: float) -> tuple[Chat, Message] | No
 
 
 instagram_message = notification_message
+
+
+def _data(payload: dict) -> dict:
+    try:
+        value = json.loads(payload.get("data") or "null")
+    except ValueError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+# A DM's notification carries no sender (its data: details, notifType, pushId,
+# targetUserId, uri), but its uri may name the thread, as Instagram's own push
+# links do (direct_v2?id=<thread>&x=<item>, or /direct/t/<thread>).
+_THREAD_IN_URI = re.compile(r"(?:direct_v2\?(?:[^ ]*&)?id=|/direct/t/|thread_id=)(\d{6,})")
+
+
+def thread_id_of(payload: dict) -> str | None:
+    match = _THREAD_IN_URI.search(str(_data(payload).get("uri", "")))
+    return match.group(1) if match else None
+
+
+# Instagram's web app id, which its pages send with every call to its API.
+APP_ID = "936619743392459"
+
+
+def item_text(item: dict) -> str:
+    kind = item.get("item_type", "")
+    if item.get("text"):
+        return item["text"]
+    if kind == "link":
+        return (item.get("link") or {}).get("text") or "[link]"
+    if kind == "reel_share":
+        return f"[replied to a story] {(item.get('reel_share') or {}).get('text') or ''}".strip()
+    if kind == "action_log":
+        return (item.get("action_log") or {}).get("description") or ""
+    return {"voice_media": "[voice message]", "like": "❤️", "media": "[photo]", "raven_media": "[photo]",
+            "animated_media": "[GIF]", "media_share": "[shared post]", "clip": "[shared reel]",
+            "story_share": "[shared story]"}.get(kind, f"[{kind}]" if kind else "")
+
+
+def _same(a: str, b: str) -> bool:
+    a, b = " ".join(a.split()).casefold(), " ".join(b.split()).casefold()
+    return bool(a and b) and (a == b or (len(b) >= 12 and a.startswith(b.rstrip("…."))))
+
+
+@dataclass
+class Thread:
+    id: str
+    name: str
+    is_group: bool
+    users: dict[str, str]  # user id -> their name
+    items: list[Message] = field(default_factory=list)  # oldest first; sender "me" for the user
+
+    @classmethod
+    def parse(cls, raw: dict, viewer: str = "") -> "Thread | None":
+        tid = str(raw.get("thread_id") or raw.get("thread_v2_id") or "")
+        if not tid:
+            return None
+        viewer = str(raw.get("viewer_id") or viewer)
+        users = {str(u.get("pk") or u.get("pk_id") or ""): (u.get("full_name") or u.get("username") or "")
+                 for u in raw.get("users") or [] if isinstance(u, dict)}
+        items = []
+        for item in raw.get("items") or []:
+            text = item_text(item)
+            try:
+                moment = int(item.get("timestamp")) / 1e6
+            except (TypeError, ValueError):
+                continue
+            if not text:
+                continue
+            sender = "me" if str(item.get("user_id")) == viewer else users.get(str(item.get("user_id")), "them")
+            items.append(Message(str(item.get("item_id", "")), moment, sender, text))
+        items.sort(key=lambda m: m.time)
+        others = [n for n in users.values() if n]
+        name = raw.get("thread_title") or ", ".join(others) or "Instagram"
+        return cls(tid, name, bool(raw.get("is_group")), users, items)
+
+    def sender_of(self, text: str) -> str | None:
+        """Who sent the newest item reading `text`; in a one-to-one thread, the other."""
+        for item in reversed(self.items):
+            if item.sender != "me" and _same(item.text, text):
+                return item.sender
+        others = [n for n in self.users.values() if n]
+        return others[0] if len(others) == 1 and not self.is_group else None
+
+    def context(self, messages: list[Message], limit: int, cutoff: float):
+        """Earlier items, before the ones the new messages are; answered when
+        the user wrote after them."""
+        from .history import Context
+
+        pending = [m.text for m in messages]
+        first = min(m.time for m in messages)
+        oldest_new = None
+        for item in reversed(self.items):
+            if item.time < first - 300 or not pending:
+                break
+            match = next((t for t in pending if item.sender != "me" and _same(item.text, t)), None)
+            if match is not None:
+                pending.remove(match)
+                oldest_new = item.time
+        # Not found in the thread: the new ones are whatever came since `first`.
+        boundary = oldest_new if oldest_new is not None else first
+        answered = oldest_new is not None and any(
+            i.sender == "me" and i.time > oldest_new for i in self.items)
+        earlier = [i for i in self.items if i.time < boundary and i.time >= cutoff]
+        return Context(earlier[-limit:], answered)
+
+
+class Instagram:
+    """Instagram's web API, read only (the inbox and a thread, never the call
+    that marks a message seen), through the logged-in browser: a background
+    tab on instagram.com/robots.txt, which runs none of Instagram's scripts,
+    fetches it with the browser's own cookies, then closes."""
+
+    def __init__(self, origin: str = ORIGIN):
+        self.origin = origin
+        self.cdp: CDP | None = None
+
+    async def api(self, *paths: str) -> list[dict | None]:
+        cdp = self.cdp
+        if cdp is None:
+            return [None] * len(paths)
+        target = (await cdp.call("Target.createTarget", {"url": f"{self.origin}/robots.txt", "background": True}))["result"]["targetId"]
+        try:
+            session = (await cdp.call("Target.attachToTarget", {"targetId": target, "flatten": True}))["result"]["sessionId"]
+            for _ in range(50):
+                here = await cdp.call("Runtime.evaluate", {"expression": "location.origin", "returnByValue": True}, session)
+                if here.get("result", {}).get("result", {}).get("value") == self.origin:
+                    break
+                await asyncio.sleep(0.2)
+            expression = """Promise.all(%s.map(async (p) => {
+                try {
+                  const r = await fetch(p, {credentials: 'include', headers: {'X-IG-App-ID': '%s', 'X-Requested-With': 'XMLHttpRequest'}});
+                  return r.ok ? await r.text() : '';
+                } catch (e) { return ''; }
+              }))""" % (json.dumps(list(paths)), APP_ID)
+            answer = await cdp.call("Runtime.evaluate", {"expression": expression, "awaitPromise": True,
+                                                         "returnByValue": True}, session)
+            bodies = answer.get("result", {}).get("result", {}).get("value") or [""] * len(paths)
+        finally:
+            try:
+                await cdp.call("Target.closeTarget", {"targetId": target})
+            except Exception:
+                pass
+        out = []
+        for body in bodies:
+            try:
+                out.append(json.loads(body) if body else None)
+            except ValueError:
+                out.append(None)
+        return out
+
+    async def thread(self, thread_id: str) -> Thread | None:
+        if not thread_id.isdigit():
+            return None
+        try:
+            (raw,) = await self.api(f"/api/v1/direct_v2/threads/{thread_id}/?limit=20")
+        except Exception as err:
+            log.warning("instagram thread %s: %s", thread_id, err)
+            return None
+        return Thread.parse(raw["thread"]) if raw and isinstance(raw.get("thread"), dict) else None
+
+    async def find(self, text: str) -> Thread | None:
+        """The thread whose latest items include `text`: the inbox, then the
+        requests from people the user does not follow."""
+        try:
+            answers = await self.api("/api/v1/direct_v2/inbox/?limit=20&thread_message_limit=5",
+                                     "/api/v1/direct_v2/pending_inbox/?limit=20")
+        except Exception as err:
+            log.warning("instagram inbox: %s", err)
+            return None
+        for raw in answers:
+            if not raw:
+                continue
+            viewer = str((raw.get("viewer") or {}).get("pk") or "")
+            for t in (raw.get("inbox") or {}).get("threads") or []:
+                thread = Thread.parse(t, viewer)
+                if thread and any(i.sender != "me" and _same(i.text, text) for i in thread.items):
+                    return thread
+        return None
+
+
+async def resolve_instagram(instagram: Instagram, pipeline: Pipeline, payload: dict, chat: Chat,
+                            message: Message) -> None:
+    """The notification's thread, for its sender's name, one chat per thread
+    and its history; the notification alone when it cannot be found."""
+    try:
+        tid = thread_id_of(payload)
+        thread = await instagram.thread(tid) if tid else None
+        thread = thread or await instagram.find(message.text)
+    except Exception as err:
+        log.warning("instagram: could not find the thread: %s", err)
+        thread = None
+    if thread is None:
+        log.info("instagram: no thread found for a notification (%s)", "uri" if thread_id_of(payload) else "no uri")
+        pipeline.message(chat, message)
+        return
+    sender = thread.sender_of(message.text) or (message.sender if chat.chat_id != "instagram" else
+                                                "someone (the notification does not name them)")
+    pipeline.message(Chat("instagram", thread.id, thread.name, thread.is_group, reply_hint=REPLY["instagram"]),
+                     Message(message.id, message.time, sender, message.text))
 
 
 class CDP:
@@ -198,7 +402,8 @@ async def keep_discord(cdp: CDP, url: str, every: float = 60, host: str = "disco
 
 async def instagram_watch(pipeline: Pipeline, devtools: str, host: str = "instagram.com",
                           origin: str = ORIGIN, discord: str | None = None,
-                          discord_host: str = "discord.com", discord_origin: str = "https://discord.com") -> None:
+                          discord_host: str = "discord.com", discord_origin: str = "https://discord.com",
+                          instagram: Instagram | None = None) -> None:
     """Stays attached to the browser at `devtools` (http://127.0.0.1:<port>), reconnecting."""
     delay = 5
     while True:
@@ -208,7 +413,9 @@ async def instagram_watch(pipeline: Pipeline, devtools: str, host: str = "instag
                     url = (await response.json())["webSocketDebuggerUrl"]
                 async with http.ws_connect(url, max_msg_size=0) as ws:
                     cdp = CDP(ws)
-                    reader = asyncio.create_task(read(ws, cdp, pipeline, host))
+                    if instagram:
+                        instagram.cdp = cdp
+                    reader = asyncio.create_task(read(ws, cdp, pipeline, host, instagram))
                     await cdp.call("Browser.grantPermissions", {"origin": origin, "permissions": ["notifications"]})
                     await cdp.call("Target.setAutoAttach", {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True})
                     log.info("watching Instagram's notifications")
@@ -223,7 +430,7 @@ async def instagram_watch(pipeline: Pipeline, devtools: str, host: str = "instag
         delay = min(delay * 2, 300)
 
 
-async def read(ws, cdp: CDP, pipeline: Pipeline, host: str) -> None:
+async def read(ws, cdp: CDP, pipeline: Pipeline, host: str, instagram: Instagram | None = None) -> None:
     async for frame in ws:
         if frame.type != aiohttp.WSMsgType.TEXT:
             continue
@@ -237,8 +444,11 @@ async def read(ws, cdp: CDP, pipeline: Pipeline, host: str) -> None:
             cdp.spawn(paused(cdp, message["sessionId"], host))
         elif method == "Runtime.bindingCalled" and params.get("name") == BINDING:
             try:
-                parsed = notification_message(json.loads(params.get("payload", "{}")), time.time())
+                payload = json.loads(params.get("payload", "{}"))
+                parsed = notification_message(payload, time.time())
             except ValueError:
                 continue
-            if parsed:
+            if parsed and instagram and parsed[0].source == "instagram":
+                cdp.spawn(resolve_instagram(instagram, pipeline, payload, *parsed))
+            elif parsed:
                 pipeline.message(*parsed)
