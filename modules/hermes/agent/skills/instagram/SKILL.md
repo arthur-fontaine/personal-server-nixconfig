@@ -12,9 +12,9 @@ metadata:
 
 # Instagram
 
-There is no API for a personal account: you use https://www.instagram.com in
-your browser tools, like a person would. The browser keeps one profile, so the
-user's session stays logged in between tasks.
+There is no public API for a personal account: you use https://www.instagram.com
+in your browser tools, like a person would. The browser keeps one profile, so
+the user's session stays logged in between tasks.
 
 ## Logged in?
 
@@ -32,8 +32,26 @@ Open https://www.instagram.com/. If it shows the login form:
 
 ## Do
 
-- DMs: https://www.instagram.com/direct/inbox/ (a thread: click it; read the
-  messages from the page). Requests are under "Requests".
+- Reading DMs: opening a thread marks its messages seen, and the user then
+  gets no notification on their phone. So read them without opening anything,
+  through the site's own API, from any instagram.com page you have open, in
+  `browser_exec`:
+
+  ```python
+  api = lambda path: js(f"""fetch('{path}', {{headers: {{'X-IG-App-ID': '936619743392459'}}}})
+                          .then(r => r.json())""")
+  inbox = api('/api/v1/direct_v2/inbox/?limit=20')           # .inbox.threads[]: thread_id, thread_title, users, items
+  thread = api('/api/v1/direct_v2/threads/<thread_id>/?limit=30')['thread']
+  ```
+
+  `items` are newest first: `user_id` (the user's own is `viewer_id`),
+  `timestamp` (microseconds), `text` or `item_type`. Requests from people they
+  do not follow: `/api/v1/direct_v2/pending_inbox/`. Read the conversation
+  this way before you write in it, to answer in context. Never call an API
+  path with `seen` in it.
+- Sending: https://www.instagram.com/direct/t/<thread_id>/ (or the inbox,
+  then the thread; requests are under "Requests"). Once sent, leave the
+  thread for the inbox.
 - Stories: the circles at the top of the home feed; a person's at
   https://www.instagram.com/stories/<username>/.
 - Profiles and posts: https://www.instagram.com/<username>/.

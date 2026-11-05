@@ -318,7 +318,8 @@ async def resolve_instagram(instagram: Instagram, pipeline: Pipeline, payload: d
         return
     sender = thread.sender_of(message.text) or (message.sender if chat.chat_id != "instagram" else
                                                 "someone (the notification does not name them)")
-    pipeline.message(Chat("instagram", thread.id, thread.name, thread.is_group, reply_hint=REPLY["instagram"]),
+    hint = f"your instagram skill, in the thread https://www.instagram.com/direct/t/{thread.id}/"
+    pipeline.message(Chat("instagram", thread.id, thread.name, thread.is_group, reply_hint=hint),
                      Message(message.id, message.time, sender, message.text))
 
 
