@@ -46,6 +46,14 @@ async def eventually(check, timeout=3.0):
         await asyncio.sleep(0.02)
 
 
+def line_count(path):
+    try:
+        with open(path) as f:
+            return len(f.readlines())
+    except OSError:
+        return 0
+
+
 class FakeTriage:
     def __init__(self, verdict={"urgency": "today"}):
         self.verdict, self.events = verdict, []
@@ -180,7 +188,7 @@ class PipelineTest(unittest.IsolatedAsyncioTestCase):
         # A profile's reason lands in the journal.
         p.triage = FakeTriage({"dropped": "newsletter"})
         p.notice("mail", "m1", "New mail", "From: news@x", id="m1", triage="mail")
-        await eventually(lambda: len(open(p.journal.path).readlines()) == 2)
+        await eventually(lambda: line_count(p.journal.path) == 2)
         with open(p.journal.path) as f:
             last = json.loads(f.readlines()[-1])
         self.assertEqual(last["outcome"], "not proposed (triage: newsletter)")
@@ -354,7 +362,31 @@ class FakeMCP:
         self.answers = answers
 
     async def call(self, tool, arguments):
-        return self.answers[tool]
+        answer = self.answers[tool]
+        if callable(answer):
+            return answer(arguments)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+
+MAILBOXES = {"itemListElement": [
+    {"@id": "V10:1", "name": None, "url": "imap://ABC-123/INBOX", "account": {"@id": "a", "email": "me@icloud.com"}},
+    {"@id": "V10:2", "name": "Junk", "url": "imap://ABC-123/Junk"},
+    {"@id": "V10:3", "name": "Boîte de réception", "url": "ews://x/Bo%C3%AEte%20de%20r%C3%A9ception"},
+    {"@id": "V10:4", "name": "Trash", "url": "imap://ABC-123/Deleted%20Messages"},
+]}
+
+
+def search_record(id, mailbox, sender, subject):
+    return {"@type": "EmailMessage", "@id": id, "mailbox": mailbox, "subject": subject,
+            "sender": {"@type": "Person", "email": sender}, "dateReceived": ISO_NOW, "isRead": False}
+
+
+def mail_content(from_, text, html=False, **headers):
+    return {"@type": "EmailMessage", "headers": [{"name": "From", "value": from_}]
+            + [{"name": k.replace("_", "-"), "value": v} for k, v in headers.items()],
+            "text": text, "encodingFormat": "text/html" if html else "text/plain", "attachment": []}
 
 
 class PollersTest(unittest.IsolatedAsyncioTestCase):
@@ -439,6 +471,111 @@ class PollersTest(unittest.IsolatedAsyncioTestCase):
         texts = [e["text"] for e in await self.drain() if e["key"].startswith("system:login:")]
         self.assertEqual(len(texts), 1)
         self.assertIn("10.0.0.5", texts[0])
+
+    async def test_mail_inbox_only_read_and_sorted(self):
+        asked = []
+
+        async def uzu(request):
+            body = await request.json()
+            content = body["messages"][1]["content"]
+            asked.append(content)
+            category = ("spam_or_phishing" if "faraasha" in content else "newsletter" if "List-Unsubscribe" in content
+                        else "payment_problem" if "prélèvement" in content else "personal")
+            return web.json_response({"choices": [{"message": {"content": json.dumps({"category": category, "urgency": "today"})}}]})
+
+        app = web.Application()
+        app.router.add_post("/v1/chat/completions", uzu)
+        server = TestServer(app)
+        await server.start_server()
+        self.addAsyncCleanup(server.close)
+        self.p.triage = UzuTriage(str(server.make_url("/v1/chat/completions")), "qwen")
+        self.p.journal = Journal(os.path.join(self.tmp, "recent.jsonl"))
+
+        old = search_record("m0", "V10:1", "old@x.fr", "old")
+        imcp = FakeMCP({"mail_mailboxes_list": MAILBOXES, "mail_messages_search": {"itemListElement": [old]}})
+        await pollers.mail(self.p, self.state, imcp)  # seeds
+        contents = {
+            "m1": mail_content("=?UTF-8?Q?L=C3=A9a_Zoé?= <lea@gmail.com>",
+                               "<html><head><style>p{}</style></head><body><p>Tu viens samedi ?</p>"
+                               "<a href='https://example.com/a/very/long/tracking?x=1'>ici</a></body></html>", html=True,
+                               Authentication_Results="mx.icloud.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass; dmarc=pass"),
+            "m3": mail_content("Medium <noreply@medium.com>", "Today's highlights", List_Unsubscribe="<mailto:u@medium.com>"),
+            "m4": mail_content("Free <facture@free.fr>", "Votre prélèvement a échoué."),
+        }
+
+        def read(arguments):
+            if arguments["id"] == "m5":
+                raise RuntimeError("not in the local index")
+            return contents[arguments["id"]]
+
+        imcp.answers.update({"mail_messages_read": read, "mail_messages_search": {"itemListElement": [
+            old,
+            search_record("m1", "V10:1", "lea@gmail.com", "Samedi"),
+            search_record("m2", "V10:2", "orders@faraasha.com", "Fin de service pour arthurfontaine.fr"),
+            search_record("m3", "V10:3", "noreply@medium.com", "Highlights"),
+            search_record("m4", "V10:1", "facture@free.fr", "Échec de prélèvement"),
+            search_record("m5", "V10:1", "bob@x.fr", "Unreadable"),
+            search_record("m6", "V10:4", "bin@x.fr", "Deleted"),
+            search_record("m7", "V99:9", "who@x.fr", "Nowhere"),
+        ]}})
+        await pollers.mail(self.p, self.state, imcp)
+        await eventually(lambda: len(asked) == 4 and len(self.sink.events) == 3)
+        await eventually(lambda: line_count(self.p.journal.path) == 4)
+        # Junk, Trash and an unknown mailbox never reach the model.
+        self.assertFalse(any("faraasha" in a or "Deleted" in a or "Nowhere" in a for a in asked))
+        summaries = sorted(e["summary"] for e in self.sink.events)
+        self.assertEqual(summaries, ["New mail from Free <facture@free.fr>: Échec de prélèvement",
+                                     "New mail from Léa Martin <lea@gmail.com>: Samedi",
+                                     "New mail from bob@x.fr: Unreadable"])
+        lea = next(e for e in self.sink.events if "Léa" in e["summary"])
+        self.assertEqual(lea["category"], "personal")
+        self.assertIn("Tu viens samedi ?", lea["messages"])
+        self.assertIn("[link: example.com]", lea["messages"])
+        self.assertNotIn("<p>", lea["messages"])
+        self.assertNotIn("p{}", lea["messages"])
+        self.assertIn("Authentication: dkim=pass, dmarc=pass, spf=pass", lea["messages"])
+        with open(self.p.journal.path) as f:
+            outcomes = {json.loads(line)["summary"].split(":")[0]: json.loads(line)["outcome"] for line in f}
+        self.assertEqual(outcomes["New mail from Medium <noreply@medium.com>"], "not proposed (triage: newsletter)")
+        self.assertEqual(outcomes["New mail from Free <facture@free.fr>"], "proposed to the user (payment_problem, today)")
+
+    async def test_mail_failures(self):
+        triage = FakeTriage({"urgency": "unknown"})
+        self.p.triage = triage
+        imcp = FakeMCP({"mail_mailboxes_list": MAILBOXES,
+                        "mail_messages_read": lambda a: mail_content("x <x@x.fr>", "hi")})
+        old = search_record("m0", "V10:1", "old@x.fr", "old")
+        imcp.answers["mail_messages_search"] = {"itemListElement": [old]}
+        await pollers.mail(self.p, self.state, imcp)  # seeds
+        imcp.answers["mail_messages_search"] = {"itemListElement": [old, search_record("m1", "V10:1", "x@x.fr", "Hi")]}
+        # No mailbox list: the poll fails and records nothing...
+        imcp.answers["mail_mailboxes_list"] = RuntimeError("no folder access")
+        with self.assertRaises(RuntimeError):
+            await pollers.mail(self.p, self.state, imcp)
+        self.assertEqual(triage.events, [])
+        # ...so the mail comes once the list does.
+        imcp.answers["mail_mailboxes_list"] = MAILBOXES
+        await pollers.mail(self.p, self.state, imcp)
+        await eventually(lambda: triage.events)
+        event, fail_open = triage.events[0]
+        self.assertEqual((event["triage"], fail_open), ("mail", True))
+        # Bulk or forged mail is dropped if the triage fails.
+        imcp.answers["mail_messages_search"]["itemListElement"] += [
+            search_record("m2", "V10:1", "n@x.fr", "News"), search_record("m3", "V10:1", "f@x.fr", "Renew")]
+        imcp.answers["mail_messages_read"] = lambda a: {
+            "m2": mail_content("n@x.fr", "hi", Precedence="bulk"),
+            "m3": mail_content("f@x.fr", "hi", Authentication_Results="mx; dmarc=fail")}[a["id"]]
+        await pollers.mail(self.p, self.state, imcp)
+        await eventually(lambda: len(triage.events) == 3)
+        self.assertEqual([fo for _, fo in triage.events[1:]], [False, False])
+
+    def test_inbox_names(self):
+        self.assertTrue(pollers.is_inbox({"url": "imap://u@h/INBOX"}))
+        self.assertTrue(pollers.is_inbox({"url": "ews://h/Inbox/", "name": None}))
+        self.assertTrue(pollers.is_inbox({"name": "Posteingang"}))
+        for box in ({"url": "imap://h/%5BGmail%5D/Spam"}, {"url": "imap://h/INBOX/Receipts", "name": "Receipts"},
+                    {"url": "imap://h/Junk", "name": "Courrier indésirable"}, {"name": "Archive"}, {}):
+            self.assertFalse(pollers.is_inbox(box), box)
 
     def test_items(self):
         self.assertEqual(pollers.items({"events": [{"id": 1}]}), [{"id": 1}])

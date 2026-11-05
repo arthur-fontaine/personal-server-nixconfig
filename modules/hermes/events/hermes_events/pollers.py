@@ -2,8 +2,9 @@
 already seen kept in the state directory. A first poll only records what is
 there, so a restart never replays the past.
 
-- calendar, mail: iMCP's tools (events_fetch, mail_messages_search), over its
-  stdio MCP server, as the trusted client "hermes-events"
+- calendar, mail: iMCP's tools (events_fetch; mail_mailboxes_list,
+  mail_messages_search and mail_messages_read, inbox only), over its stdio MCP
+  server, as the trusted client "hermes-events"
 - reminders: `remindctl show --json`
 - calls: macOS' call history database (Full Disk Access)
 - files: new files in the folders given
@@ -20,10 +21,15 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import sqlite3
 import time
 from datetime import datetime, timedelta, timezone
+from email.header import decode_header, make_header
+from email.utils import parseaddr
+from html.parser import HTMLParser
+from urllib.parse import unquote
 
 import aiohttp
 
@@ -186,19 +192,151 @@ async def calendar(pipeline: Pipeline, state: State, imcp: MCP, lead_minutes: in
                             id=f"soon:{key}", screen=False)
 
 
+# What an inbox is called, by its URL's last component or its name; anything
+# else (Junk, Spam, Trash, Sent, Drafts, Archive, a user's folder) is skipped:
+# an allowlist, since Mail's and each provider's names for the others vary.
+INBOX_NAMES = {"inbox", "boîte de réception", "boite de reception", "réception", "posteingang",
+               "bandeja de entrada", "posta in arrivo", "caixa de entrada", "postvak in", "inkorgen",
+               "indbakke", "innboks", "saapuneet", "odebrane", "doručená pošta", "входящие", "受信",
+               "受信トレイ", "收件箱", "받은편지함"}
+
+
+def is_inbox(mailbox: dict) -> bool:
+    url = str(mailbox.get("url") or "")
+    last = unquote(url.rstrip("/").rsplit("/", 1)[-1]) if url else ""
+    return any(str(n).strip().casefold() in INBOX_NAMES for n in (last, mailbox.get("name") or "") if n)
+
+
+class _Text(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts, self.skip = [], 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style", "head", "title"):
+            self.skip += 1
+        elif tag in ("br", "p", "div", "tr", "li", "h1", "h2", "h3"):
+            self.parts.append("\n")
+        elif tag == "a" and (href := dict(attrs).get("href") or "").startswith("http"):
+            self.parts.append(f" {href} ")
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "head", "title") and self.skip:
+            self.skip -= 1
+
+    def handle_data(self, data):
+        if not self.skip:
+            self.parts.append(data)
+
+
+def plain(text: str, html: bool, limit: int = 600) -> str:
+    """A short excerpt: no markup, links shortened to their host (which still
+    tells a phishing mail apart), whitespace folded. uzu prefills ~35 tokens/s
+    with a 60 s timeout, and the mail instructions already take ~20 s."""
+    if html or re.search(r"<(html|body|div|table|p)\b", text[:2000], re.I):
+        parser = _Text()
+        try:
+            parser.feed(text)
+            parser.close()
+            text = "".join(parser.parts)
+        except Exception:
+            text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"https?://([^/\s>\"')]+)\S*", r"[link: \1]", text)
+    text = re.sub(r"[ \t\u00a0\u200b\u200c\u034f]+", " ", text)
+    text = re.sub(r"\s*\n\s*", "\n", text).strip()
+    return text[:limit] + ("…" if len(text) > limit else "")
+
+
+def header_signals(headers: list[dict]) -> tuple[list[str], bool, bool]:
+    """What the headers say about a mail, as short lines for the triage, and
+    whether it is bulk and whether its authentication failed."""
+    by_name: dict[str, list[str]] = {}
+    for h in headers:
+        if isinstance(h, dict) and h.get("name"):
+            by_name.setdefault(str(h["name"]).lower(), []).append(str(h.get("value") or ""))
+    first = lambda name: (by_name.get(name) or [""])[0].strip()
+    signals, bulk = [], False
+    if by_name.get("list-unsubscribe"):
+        signals.append("List-Unsubscribe: present")
+        bulk = True
+    if first("list-id"):
+        signals.append(f"List-Id: {first('list-id')[:80]}")
+        bulk = True
+    if first("precedence").lower() in ("bulk", "list", "junk"):
+        signals.append(f"Precedence: {first('precedence').lower()}")
+        bulk = True
+    if first("auto-submitted") and first("auto-submitted").lower() != "no":
+        signals.append(f"Auto-Submitted: {first('auto-submitted')[:40]}")
+    if first("x-spam-flag").lower() == "yes":
+        signals.append("X-Spam-Flag: YES")
+    # The receiving server's verdicts, the topmost (its own) header first.
+    results = {}
+    for value in by_name.get("authentication-results", []):
+        for method, result in re.findall(r"\b(spf|dkim|dmarc)=(\w+)", value, re.I):
+            results.setdefault(method.lower(), result.lower())
+    if results:
+        signals.append("Authentication: " + ", ".join(f"{m}={r}" for m, r in sorted(results.items())))
+    failed = any(r in ("fail", "softfail", "permerror") for r in results.values())
+    return signals, bulk, failed or first("x-spam-flag").lower() == "yes"
+
+
+def sender_of(headers: list[dict], fallback: str) -> tuple[str, str]:
+    """(name, address) from the From header, decoded; the search's address
+    when there is none."""
+    raw = next((str(h.get("value") or "") for h in headers if isinstance(h, dict)
+                and str(h.get("name", "")).lower() == "from"), "")
+    try:
+        raw = str(make_header(decode_header(raw)))
+    except Exception:
+        pass
+    name, address = parseaddr(raw)
+    return name.strip(), (address or fallback).strip()
+
+
 async def mail(pipeline: Pipeline, state: State, imcp: MCP) -> None:
     since = datetime.now(timezone.utc) - timedelta(days=2)
-    messages = items(await imcp.call("mail_messages_search", {"isRead": False, "start": iso(since), "limit": 30}))
+    # If the list fails, the poll fails before recording anything: the mail
+    # waits for the next poll (it stays in the two days searched) rather than
+    # going out unfiltered, Junk included, which is what this list is for.
+    mailboxes = {str(field(b, "@id", "id")): b for b in items(await imcp.call("mail_mailboxes_list", {}))}
+    # The most iMCP returns: unread Junk would otherwise crowd the inbox out of the page.
+    messages = items(await imcp.call("mail_messages_search", {"isRead": False, "start": iso(since), "limit": 100}))
     by_id = {str(field(m, "@id", "id", "identifier", default=hashlib.sha1(json.dumps(m, sort_keys=True).encode()).hexdigest())): m
              for m in messages}
     for key in state.new("mail", list(by_id), wait_for_data=True):
         m = by_id[key]
-        sender = field(m, "sender", "from", "author", default="someone")
-        if isinstance(sender, dict):
-            sender = field(sender, "name", "email", default="someone")
-        subject = field(m, "subject", "name", "headline", default="(no subject)")
-        pipeline.notice("mail", key, f"New mail from {sender}: {subject}",
-                        str(field(m, "snippet", "preview", "description", "text"))[:1500], id=key)
+        box = mailboxes.get(str(m.get("mailbox")))
+        if box is None or not is_inbox(box):
+            where = f"{box.get('name') or box.get('url')}" if box else f"unknown mailbox {m.get('mailbox')}"
+            log.info("mail %s: in %s, skipped", key, where)
+            continue
+        await mail_one(pipeline, imcp, key, m)
+
+
+async def mail_one(pipeline: Pipeline, imcp: MCP, key: str, m: dict) -> None:
+    sender = field(m, "sender", "from", "author", default="")
+    address = str(field(sender, "email", "name", default="")) if isinstance(sender, dict) else str(sender)
+    subject = field(m, "subject", "name", "headline", default="(no subject)")
+    headers, excerpt = [], ""
+    try:
+        content = await imcp.call("mail_messages_read", {"id": key})
+        if isinstance(content, dict):
+            headers = [h for h in content.get("headers") or [] if isinstance(h, dict)]
+            html = "html" in str(content.get("encodingFormat") or "").lower()
+            excerpt = plain(str(content.get("text") or ""), html)
+    except Exception as err:
+        # Its metadata still goes to the triage, with no excerpt nor signals.
+        log.warning("mail %s: not read (%s)", key, err)
+    name, address = sender_of(headers, address)
+    signals, bulk, failed = header_signals(headers)
+    who = f"{name} <{address}>" if name else (address or "someone")
+    lines = [f"From: {who}", f"Subject: {subject}", *signals]
+    if excerpt:
+        lines += ["", excerpt]
+    # Triage down: a mail from a person (no bulk headers, nothing failed)
+    # goes through; a mass mailing or a forged one does not.
+    pipeline.notice("mail", key, f"New mail from {who}: {subject}", "\n".join(lines), id=key,
+                    triage="mail", fail_open=not bulk and not failed)
 
 
 async def reminders(pipeline: Pipeline, state: State, remindctl: str, lead_minutes: int = 15) -> None:
