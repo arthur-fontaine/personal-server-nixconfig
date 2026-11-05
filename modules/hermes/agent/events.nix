@@ -27,7 +27,8 @@ let
       url = "http://127.0.0.1:${toString server.uzu.port}/v1/chat/completions";
       model = server.uzu.model;
       # ~6 s for a message alone on the server; its conversation adds a few
-      # lines (triage.py, recent).
+      # lines (triage.py, recent). A mail, with its longer instructions and
+      # excerpt (~1000 tokens), should take ~30 s at ~35 tokens/s (pollers.py, plain).
       timeout = 60;
     };
     batch_seconds = cfg.batchSeconds;
@@ -156,6 +157,9 @@ lib.mkIf cfg.enable {
           with or without the reason, or say nothing. If `propose` fails, write
           the message, options included, as your answer instead. When there is
           nothing worth their attention after all, answer exactly [SILENT].
+          For a mail, that includes spam or phishing (a warning or renewal from
+          a domain that is not the service's), advertising, newsletters and
+          social-network notifications: answer exactly [SILENT], propose nothing.
 
           You cannot act from here: they answer in the main chat, which has all
           your tools. Replying on {source} from there: {reply_hint}.
