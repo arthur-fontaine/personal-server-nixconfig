@@ -170,7 +170,10 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     "(`click`, `set_value`, `type_text`), or on x,y of that same read's"
     "screenshot for what the tree lacks; a new read makes older tokens stale."
     "`run_steps` chains actions in one call. A sheet or a dialog is a window of"
-    "its own: find it with `list_windows`, read it, then act on it."
+    "its own: find it with `list_windows`, read it, then act on it. An Open or"
+    "Save panel is drawn by another process, and input aimed at its window can"
+    "be refused (`off_space_or_ax_unresolved`): send the keys with `scope:"
+    "\"desktop\"` to the app in front, or go around the panel (see above)."
     ""
   ])}${lib.optionalString server.hermes.events.enable (lib.concatMapStrings (line: "\n  ${line}") [
     "The user's incoming messages and notifications (WhatsApp, iMessage,"
