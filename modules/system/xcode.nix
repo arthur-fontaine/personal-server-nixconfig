@@ -1,71 +1,111 @@
-# Keeps the Command Line Tools and Xcode at their latest release on each
-# activation, with nothing to type.
+# Keeps the Command Line Tools and Xcode at their latest release, as the
+# administrator's own Mac does (arthur-fontaine/nixconfig,
+# modules/darwin/core/xcode.nix), with xcodes from Nix instead of Homebrew.
 #
-# Xcode comes from the App Store, not xcodes (as the administrator's own Mac
-# does): Apple's developer downloads want a password and a two-factor code for
-# each new session, and xcodes cannot keep its login over SSH (the keychain is
-# locked), so every rebuild would ask. The App Store is already signed in, in
-# Hermes' session (scripts/bootstrap/apple.sh), and mas installs from it
-# without asking, as for HomeClaw (scripts/bootstrap/integrations/homekit.sh).
-# Its automatic updates are off (quiet.nix): this updates it instead.
-# Last in the activation: no step here waits on it, and Xcode is a few GB.
+# Xcode comes from Apple's developer downloads, which need an Apple Account.
+# xcodes keeps the account's two-factor trust in the administrator's cookies,
+# but not its sign-in, and cannot keep the password over SSH (the login
+# keychain is locked there): the bootstrap's xcode section keeps it in
+# `credentialsFile`, root only, so a rebuild downloads a new Xcode unattended.
+# A two-factor code is asked only when Apple wants a new one, and only with a
+# terminal to type it in; otherwise Xcode waits for the next rebuild.
 { config, lib, pkgs, ... }:
 let
-  hermes = config.server.hermes;
-  # https://apps.apple.com/app/xcode/id497799835
-  xcodeId = "497799835";
-  xcode = "/Applications/Xcode.app";
+  cfg = config.server.xcode;
+  admin = config.server.admin;
+  # Where xcodes keeps its archives (XcodesKit Path+.swift, xcodesApplicationSupport).
+  archives = "${admin.home}/Library/Application Support/com.robotsandpencils.xcodes";
 in
 {
-  system.activationScripts.postActivation.text = lib.mkAfter ''
-    (
-      echo "checking Command Line Tools..." >&2
-      installed_clt=$(pkgutil --pkg-info=com.apple.pkg.CLTools_Executables 2>/dev/null \
-        | awk '/^version:/ { split($2, v, "."); print v[1] "." v[2] }')
-      # softwareupdate lists the Command Line Tools only while this file exists.
-      placeholder=/tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
-      touch "$placeholder"
-      clt_label=$(softwareupdate --list 2>/dev/null \
-        | sed -n 's/^\* Label: \(Command Line Tools for Xcode .*[^[:space:]]\)[[:space:]]*$/\1/p' \
-        | sort -V | tail -1)
-      rm -f "$placeholder"
-      if [ -n "$clt_label" ]; then
-        clt_version=$(printf '%s' "$clt_label" | sed 's/.*Xcode \([0-9.]*\).*/\1/')
-        newest=$(printf '%s\n' "$installed_clt" "$clt_version" | sort -V | tail -1)
-        if [ "$newest" != "$installed_clt" ]; then
-          echo "installing $clt_label..." >&2
-          softwareupdate --install "$clt_label" \
-            || echo "warning: could not install $clt_label" >&2
-        fi
-      fi
+  options.server.xcode = {
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Install the latest Xcode with xcodes at each activation (the Command Line Tools are updated either way).";
+    };
+    credentialsFile = lib.mkOption {
+      type = lib.types.str;
+      default = "/etc/xcodes.env";
+      description = ''
+        XCODES_USERNAME= and XCODES_PASSWORD= lines, root only, written by the
+        bootstrap's xcode section. Not Hermes' secrets file: Hermes reads that
+        one, and has no use for the Apple Account's password.
+      '';
+    };
+  };
 
-      echo "checking Xcode..." >&2
-      if ${if hermes.enable then "launchctl print gui/${toString hermes.uid} >/dev/null 2>&1" else "false"}; then
-        # mas installs as root for the App Store account of SUDO_UID: Hermes'.
-        mas() {
-          launchctl asuser ${toString hermes.uid} env SUDO_UID=${toString hermes.uid} SUDO_GID=${toString hermes.gid} \
-            SUDO_USER=${hermes.user} HOME=${hermes.home} ${lib.getExe pkgs.mas} "$@"
+  config = {
+    environment.systemPackages = lib.mkIf cfg.enable [ pkgs.xcodes ];
+
+    # Last in the activation: no step here waits on it, and installing Xcode
+    # takes a while.
+    system.activationScripts.postActivation.text = lib.mkAfter ''
+      (
+        echo "checking Command Line Tools..." >&2
+        installed_clt=$(pkgutil --pkg-info=com.apple.pkg.CLTools_Executables 2>/dev/null \
+          | awk '/^version:/ { split($2, v, "."); print v[1] "." v[2] }')
+        # softwareupdate lists the Command Line Tools only while this file exists.
+        placeholder=/tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+        touch "$placeholder"
+        clt_label=$(softwareupdate --list 2>/dev/null \
+          | sed -n 's/^\* Label: \(Command Line Tools for Xcode .*[^[:space:]]\)[[:space:]]*$/\1/p' \
+          | sort -V | tail -1)
+        rm -f "$placeholder"
+        if [ -n "$clt_label" ]; then
+          clt_version=$(printf '%s' "$clt_label" | sed 's/.*Xcode \([0-9.]*\).*/\1/')
+          newest=$(printf '%s\n' "$installed_clt" "$clt_version" | sort -V | tail -1)
+          if [ "$newest" != "$installed_clt" ]; then
+            echo "installing $clt_label..." >&2
+            softwareupdate --install "$clt_label" \
+              || echo "warning: could not install $clt_label; run: sudo softwareupdate --install '$clt_label'" >&2
+          fi
+        fi
+      ${lib.optionalString cfg.enable ''
+
+        echo "checking Xcode..." >&2
+        if [ -r ${cfg.credentialsFile} ]; then
+          XCODES_USERNAME=$(sed -n 's/^XCODES_USERNAME=//p' ${cfg.credentialsFile} | head -n 1)
+          XCODES_PASSWORD=$(sed -n 's/^XCODES_PASSWORD=//p' ${cfg.credentialsFile} | head -n 1)
+          export XCODES_USERNAME XCODES_PASSWORD
+        fi
+        # As the administrator, whose cookies keep the two-factor trust. The
+        # password goes through the environment, never on a command line (ps).
+        # No aria2: with it, Xcode's download gets Apple's Unauthorized page
+        # (xcodes 2.1.0), which xcodes then keeps as the archive.
+        run_xcodes() {
+          sudo --preserve-env=XCODES_USERNAME,XCODES_PASSWORD -u ${admin.user} -H ${lib.getExe pkgs.xcodes} "$@"
         }
-        if [ ! -d ${xcode} ]; then
-          echo "installing Xcode from the App Store (a few GB, this takes a while)..." >&2
-          mas get ${xcodeId} || echo "warning: could not install Xcode; is the App Store signed in, in Hermes' session?" >&2
-        else
-          mas update ${xcodeId} || echo "warning: could not update Xcode" >&2
+        # Such an error page, or any download cut short, would be reused as
+        # the archive by the next install, which then fails to unpack it.
+        if [ -d "${archives}" ]; then
+          find "${archives}" -maxdepth 1 -name '*.xip' -size -100M -delete
         fi
-      else
-        echo "Xcode: waiting for Hermes' session (its App Store account); the next rebuild installs it" >&2
-      fi
-
-      if [ -d ${xcode} ]; then
-        if [ "$(xcode-select -p 2>/dev/null)" != ${xcode}/Contents/Developer ]; then
-          echo "selecting ${xcode}..." >&2
-          xcode-select -s ${xcode} || echo "warning: could not select ${xcode}" >&2
+        latest_xcode=$(run_xcodes update 2>/dev/null </dev/null | grep -E '^[0-9.]+ \(' | tail -1 | awk '{ print $1 }')
+        if [ -n "$latest_xcode" ] && ! run_xcodes installed 2>/dev/null </dev/null | grep -q "^$latest_xcode ("; then
+          if [ -t 0 ]; then
+            echo "installing Xcode $latest_xcode (a two-factor code is asked only if Apple wants one)..." >&2
+            run_xcodes install "$latest_xcode" --no-aria2 --no-superuser --experimental-unxip --empty-trash \
+              || echo "warning: could not install Xcode $latest_xcode" >&2
+          elif [ -n "''${XCODES_PASSWORD:-}" ]; then
+            echo "installing Xcode $latest_xcode..." >&2
+            run_xcodes install "$latest_xcode" --no-aria2 --no-superuser --experimental-unxip --empty-trash </dev/null \
+              || echo "warning: could not install Xcode $latest_xcode; if Apple wants a two-factor code, run sudo server-rebuild in a terminal" >&2
+          else
+            echo "Xcode $latest_xcode: no Apple Account to download it (bootstrap-macos.sh xcode); skipped" >&2
+          fi
         fi
-        # Again after each update: a new Xcode has a new license and new first-launch packages.
-        xcodebuild -license check >/dev/null 2>&1 || xcodebuild -license accept || true
-        xcodebuild -checkFirstLaunchStatus >/dev/null 2>&1 || xcodebuild -runFirstLaunch \
-          || echo "warning: Xcode's first launch failed" >&2
-      fi
-    )
-  '';
+        if [ -n "$latest_xcode" ]; then
+          xcode_path=$(run_xcodes installed 2>/dev/null </dev/null | awk -F'\t' -v v="$latest_xcode" 'index($1, v " (") == 1 { print $NF }')
+          if [ -n "$xcode_path" ] && [ "$(xcode-select -p 2>/dev/null)" != "$xcode_path/Contents/Developer" ]; then
+            echo "selecting $xcode_path..." >&2
+            xcode-select -s "$xcode_path" \
+              && xcodebuild -license accept \
+              && xcodebuild -runFirstLaunch \
+              || echo "warning: could not select $xcode_path" >&2
+          fi
+        fi
+      ''}
+      )
+    '';
+  };
 }

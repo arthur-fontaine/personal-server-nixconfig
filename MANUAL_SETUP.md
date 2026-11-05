@@ -35,6 +35,7 @@ reach over SSH) does not get in the way.
 | Home Assistant *(integration)* | asks for its address and checks from this Mac that it answers (nothing at all: a wrong address, another network, or the terminal not allowed on the local network; a 401: it is there), opens its token page, checks the token against `/api/`, then keeps the address in `hosts/local.nix` and the token as `HASS_TOKEN`; checks both again on every run | give the address; create a long-lived access token (profile → Security); allow the terminal on the local network if macOS asks |
 | 1Password *(integration)* | checks that the service account token reads the "Hermes" vault (again on every run), then keeps it in the secrets file | create the vault, the service account (read access to that vault only) and its token; put in the vault the logins Hermes may use, Instagram's with the website `https://www.instagram.com` |
 | GitHub notifications *(integration)* | opens a pre-filled page for a classic token with only the notifications scope, checks it, keeps it for Hermes' events | create it |
+| Xcode | asks for the Apple Account Xcode is downloaded with and its password, and keeps them in `/etc/xcodes.env` (root only; not Hermes' secrets file); applying the configuration then installs the latest Xcode with `xcodes` and selects it | accept the Apple Developer Agreement once at developer.apple.com; type the two-factor code when the configuration asks |
 | The configuration | runs `darwin-rebuild switch`: always the first time and after a change above, otherwise only if you ask; then moves a ChatGPT login made before the account existed into it | |
 | Hermes' login at boot | gives the `hermes` account a random password and writes `/etc/kcpassword`, so macOS logs it in at boot (the login user itself is in Nix); on every run, checks that the password it replays is still the account's (`dscl -authonly`) and that FileVault is off, and sets a new one when it is not. A daemon (Nix) clears `autoLoginUserScreenLocked`, which would lock the session right after the automatic login | confirm turning FileVault off, which auto-login needs |
 | GitHub access | opens GitHub's token page pre-filled (Contents: read and write, a year), then `gh auth login` for Hermes | create it; pick this repository under Repository access (a link cannot) |
@@ -66,9 +67,10 @@ reaches Hermes and everything it runs, across updates.
   `~/.cache/mirai/models`, is deleted at each activation.
 - DigUp downloads its embedding model at the first `digup index`.
 - Each activation brings the Command Line Tools and Xcode to their latest
-  release (`modules/system/xcode.nix`), with nothing to type: Xcode comes from
-  the App Store signed in in Hermes' session, so the first rebuild after Hermes
-  logs in installs it (a few GB to download, about 15 GB installed).
+  release (`modules/system/xcode.nix`). Xcode comes through `xcodes` with the
+  Apple Account of the Xcode step; a new version downloads unattended, and
+  only when Apple asks for a new two-factor code does it wait for a
+  `sudo server-rebuild` in a terminal. About 3 GB to download, 15 GB installed.
 - Keep the lid open: the backlight is off, but a closed lid turns the display
   off and computer use sees a black screen. The Mac never sleeps either way.
 - Talk to the bot in its DM, outside any topic: that is the main chat.
