@@ -60,8 +60,9 @@ reaches Hermes and everything it runs, across updates.
 
 - uzu's model (Qwen 3.5 9B, about 5 GB) is pinned in Nix (`pkgs/uzu-models.nix`), so
   `server-rebuild` downloads it once, not uzu at each start. Its log:
-  `tail -f /Users/hermes/Library/Logs/uzu.log`. The copy uzu downloaded itself before,
-  `/Users/hermes/.cache/mirai`, is no longer used.
+  `tail -f /Users/hermes/Library/Logs/uzu.log`. Old versions leave the Nix store with
+  its garbage collection (30 days), and the copy uzu downloaded itself before,
+  `~/.cache/mirai/models`, is deleted at each activation.
 - DigUp downloads its embedding model at the first `digup index`.
 - Keep the lid open: the backlight is off, but a closed lid turns the display
   off and computer use sees a black screen. The Mac never sleeps either way.
