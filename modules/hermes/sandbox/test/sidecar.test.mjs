@@ -12,7 +12,7 @@ import { Peer } from "../src/protocol.mjs";
 import { Grants, NetworkPolicy, ambiguousPath, describeRequest, normalizeGrant } from "../src/policy.mjs";
 import { PiProgress } from "../src/pi-events.mjs";
 import { buildConfig, imageId, ensureImage } from "../src/image.mjs";
-import { Session, piArgv } from "../src/session.mjs";
+import { Session, brokerResponse, piArgv } from "../src/session.mjs";
 
 function peerPair() {
   const toSidecar = new PassThrough();
@@ -233,6 +233,24 @@ test("session: Pi's requests become network questions to the plugin, and grants 
   fs.rmSync(workdir, { recursive: true, force: true });
 });
 
+test("broker: hermes.sandbox is answered on the host, never asked about, and nothing else is touched", async () => {
+  const { peer, lines } = peerPair();
+  const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-session-"));
+  const audit = () => fs.readFileSync(path.join(workdir, "audit.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+  const session = new Session({ id: "b", task: "t", workdir, stateDir: workdir, guestDir: GUEST, branch: "sandbox/b" },
+    { gondolin: {}, peer, env: {} });
+  assert.ok(session.policy.grants.list().some((g) => g.host === "hermes.sandbox"), "in the initial allow set");
+  assert.ok(session.policy.grants.list().some((g) => g.host === "opencode.ai"));
+  const answer = await brokerResponse(new Request("https://hermes.sandbox/v1/actions", { method: "POST", body: "{}" }), session.config, session.policy);
+  assert.equal(answer.status, 503);
+  assert.equal(await brokerResponse(new Request("https://example.com/"), session.config, session.policy), undefined);
+  session.policy.revokeGrant("hermes.sandbox");
+  assert.equal((await brokerResponse(new Request("https://hermes.sandbox/"), session.config, session.policy)).status, 403);
+  assert.ok(!lines.some((l) => l.type === "request"), "never a question about the broker");
+  assert.deepEqual(audit().map((e) => [e.host, e.decision]), [["hermes.sandbox", "allow"], ["hermes.sandbox", "deny"]]);
+  fs.rmSync(workdir, { recursive: true, force: true });
+});
+
 test("pi events: counters, last answer, framing across chunks", () => {
   const progress = new PiProgress();
   const lines = [
@@ -344,8 +362,8 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
       fs.writeFileSync(path.join(outputDir, "manifest.json"), "{}");
     },
     verifyAssets: () => true,
-    createHttpHooks: ({ secrets, isRequestAllowed }) => ({
-      httpHooks: { isRequestAllowed, secrets },
+    createHttpHooks: ({ secrets, isRequestAllowed, onRequest }) => ({
+      httpHooks: { isRequestAllowed, secrets, onRequest },
       env: { OPENCODE_API_KEY: "PLACEHOLDER" },
     }),
   };
@@ -367,6 +385,7 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
   assert.deepEqual(Object.keys(vm.options.vfs.mounts), ["/workspace"]);
   assert.equal(vm.options.httpHooks.secrets.OPENCODE_API_KEY.value, secret);
   assert.deepEqual(vm.options.httpHooks.secrets.OPENCODE_API_KEY.hosts, ["opencode.ai"]);
+  assert.equal((await vm.options.httpHooks.onRequest(new Request("https://hermes.sandbox/x"))).status, 503);
   assert.ok(!JSON.stringify(vm.options.env).includes(secret));
   assert.ok(!JSON.stringify(vm.commands).includes(secret));
   const fetch = vm.commands.find((c) => c.argv.includes("fetch"));
@@ -378,7 +397,7 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
   assert.ok(lines.some((l) => l.type === "done" && l.result.status === "finished"));
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(workdir, "result.json"), "utf8")).commits, 1);
   const audit = fs.readFileSync(path.join(workdir, "audit.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
-  assert.deepEqual(audit.map((a) => a.event), ["start", "pi", "end"]);
+  assert.deepEqual(audit.map((a) => a.event), ["start", "pi", "end", "network"]);
   assert.ok(!fs.readFileSync(path.join(workdir, "audit.jsonl"), "utf8").includes(secret));
   fs.rmSync(workdir, { recursive: true, force: true });
 });

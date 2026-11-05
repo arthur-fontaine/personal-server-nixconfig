@@ -126,13 +126,16 @@ export function unaskable(host) {
 const DENIED = { allow: false };
 
 export class NetworkPolicy {
-  constructor({ grants = [], audit = () => {}, approve = null, onGrants = () => {} } = {}) {
+  constructor({ grants = [], audit = () => {}, approve = null, onGrants = () => {}, localHosts = [] } = {}) {
     this.grants = grants instanceof Grants ? grants : new Grants(grants);
     this.audit = audit;
     // async ({host, method, path, scheme, ambiguous}) =>
     //   { allow: bool, grant?: Grant, by?: string, reason?: string }
     this.approve = approve;
     this.onGrants = onGrants;
+    // Answered on the host (the broker): allowed by a grant or refused,
+    // never asked about.
+    this.localHosts = new Set(localHosts.map((host) => host.toLowerCase()));
     // host -> the pending question's answer: one question per host at a time.
     this.asking = new Map();
     this.isRequestAllowed = this.isRequestAllowed.bind(this);
@@ -176,6 +179,7 @@ export class NetworkPolicy {
       // request: this one gets its own question.
     }
     if (!this.approve) return this.#log(what, "deny", "policy", "no grant");
+    if (this.localHosts.has(what.host)) return this.#log(what, "deny", "policy", "Hermes' own host, not granted");
     if (unaskable(what.host)) return this.#log(what, "deny", "policy", "not a host name to ask about");
     const question = this.#ask(what);
     this.asking.set(what.host, question);

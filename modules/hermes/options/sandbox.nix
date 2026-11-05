@@ -41,8 +41,11 @@ in
       default = [ "opencode.ai" ];
       example = [ "opencode.ai" "*.npmjs.org" ];
       description = ''
-        The hosts the guest may reach over HTTP(S), exact or "*.domain" for
-        its subdomains; everything else gets 403. Nothing but HTTP leaves it.
+        The hosts the guest may reach over HTTP(S) from the start, exact or
+        "*.domain" for its subdomains, besides hermes.sandbox (Hermes' broker,
+        answered on the host). For any other, Pi asks Hermes for access and
+        Hermes' approval system decides; a refusal is a 403. Nothing but
+        HTTP leaves it.
       '';
     };
     approvalTimeout = mkOption {

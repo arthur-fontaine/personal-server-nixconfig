@@ -10,7 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { NetworkPolicy } from "./policy.mjs";
+import { NetworkPolicy, describeRequest } from "./policy.mjs";
 import { PiProgress } from "./pi-events.mjs";
 import { PI_CLI, ensureImage } from "./image.mjs";
 
@@ -29,6 +29,9 @@ export const DEFAULTS = {
   keyEnv: "OPENCODE_GO_API_KEY",
   grants: ["opencode.ai"],
   secretHosts: ["opencode.ai"],
+  // Hermes' broker, as the guest names it: answered by this process, never
+  // looked up nor reached anywhere (brokerResponse). Always in the grants.
+  brokerHost: "hermes.sandbox",
   // How long a question about a host may wait for Hermes' answer (its
   // approval system has its own, shorter timeout; this is the backstop).
   approvalTimeoutSeconds: 300,
@@ -70,6 +73,10 @@ export function guestEnv(secretEnv) {
 export async function bootVm({ gondolin, imageDir, config, key, policy }) {
   const hooks = gondolin.createHttpHooks({
     secrets: { [config.secretName]: { hosts: config.secretHosts, value: key } },
+    // Gondolin runs onRequest before isRequestAllowed (and on every
+    // redirect hop): the broker's requests are answered here and never
+    // leave; any other request passes on to the policy untouched.
+    onRequest: (request) => brokerResponse(request, config, policy),
     isRequestAllowed: policy.isRequestAllowed,
   });
   const env = guestEnv(hooks.env);
@@ -85,6 +92,17 @@ export async function bootVm({ gondolin, imageDir, config, key, policy }) {
     sessionLabel: `hermes-sandbox ${config.id}`,
   });
   return { vm, env };
+}
+
+// The broker's answer. Its actions come in a later stage: until then every
+// request to it gets a 503, or a 403 when its grant was revoked.
+export async function brokerResponse(request, config, policy) {
+  if (describeRequest(request).host !== config.brokerHost) return undefined;
+  const allowed = await policy.isRequestAllowed(request);
+  return new Response(allowed ? "the Hermes broker is not available yet\n" : "forbidden\n", {
+    status: allowed ? 503 : 403,
+    headers: { "content-type": "text/plain; charset=utf-8" },
+  });
 }
 
 async function run(vm, argv, options = {}) {
@@ -109,7 +127,9 @@ export class Session {
     this.vm = null;
     this.auditPath = path.join(this.config.workdir, "audit.jsonl");
     this.policy = new NetworkPolicy({
-      grants: this.config.grants,
+      grants: [...this.config.grants, this.config.brokerHost],
+      // Never a question about the broker: it is Hermes itself.
+      localHosts: [this.config.brokerHost],
       audit: (entry) => this.audit(entry),
       // Pi asks Hermes for access: its approval system decides (the
       // plugin's approval.py), and the answer may add a grant.

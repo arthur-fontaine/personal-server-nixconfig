@@ -29,8 +29,12 @@ never counts a notice as your message.
   pointing back. Never your working directory, never a mount.
 - **Network**: HTTP and HTTPS only (Gondolin blocks other TCP; WebSockets are
   off), with synthetic DNS. Every request is checked on the host against the
-  session's grants, `server.hermes.sandbox.allowedHosts` (`opencode.ai`); any
-  other host gets a 403. Each decision goes to the session's `audit.jsonl`,
+  session's grants: at first `server.hermes.sandbox.allowedHosts`
+  (`opencode.ai`) and `hermes.sandbox`, Hermes' broker as the guest names
+  it; anything else Pi asks Hermes for (below), and a refusal is a 403.
+  `hermes.sandbox` is answered by the sidecar itself, before any lookup, so
+  its requests never leave this Mac; until the broker comes (a later stage)
+  its answer is a 503. Each decision goes to the session's `audit.jsonl`,
   with the host, method and path, never headers or query. A grant can be
   narrowed to a method and a path prefix; paths are compared as the URL
   parser leaves them, never percent-decoded, and one still holding an

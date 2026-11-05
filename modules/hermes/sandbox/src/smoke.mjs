@@ -16,7 +16,11 @@ export async function smoke({ gondolin, stateDir, guestDir, log = (line) => proc
   const config = { ...DEFAULTS, id: "smoke", memory: "1G" };
   const key = `smoke-${crypto.randomBytes(12).toString("hex")}`;
   const audit = [];
-  const policy = new NetworkPolicy({ grants: config.grants, audit: (entry) => audit.push(entry) });
+  const policy = new NetworkPolicy({
+    grants: [...config.grants, config.brokerHost],
+    localHosts: [config.brokerHost],
+    audit: (entry) => audit.push(entry),
+  });
   const image = await ensureImage({
     stateDir, guestDir,
     buildAssets: gondolin.buildAssets, verifyAssets: gondolin.verifyAssets,
@@ -37,6 +41,8 @@ export async function smoke({ gondolin, stateDir, guestDir, log = (line) => proc
     check("a host without a grant gets 403", denied === "403", denied);
     const allowed = (await vm.exec(["node", "-e", FETCH, "https://opencode.ai/"], { env })).stdout.trim();
     check("opencode.ai goes through", /^\d+$/.test(allowed) && allowed !== "403", allowed);
+    const broker = (await vm.exec(["node", "-e", FETCH, `https://${config.brokerHost}/v1/actions`], { env })).stdout.trim();
+    check("the broker host is answered on the host", broker === "503", broker);
     const version = await vm.exec(["node", PI_CLI, "--version"], { env });
     check("Pi starts", version.exitCode === 0, version.stdout.trim() || version.stderr.trim().slice(-200));
     check("the policy logged both decisions",
