@@ -96,6 +96,31 @@ imcp_missing() {
   done
 }
 
+# Mail on in iMCP's settings is not Mail read: iMCP is sandboxed and reads
+# ~/Library/Mail only through the folder its dialog was given, and without it
+# every search failed ("Mail access is unavailable. The index and its live
+# WAL files must be readable", Envelope's MailError.indexNotReadable) while
+# the switch said on. So this asks iMCP's server for one message, as Hermes
+# does, through the launcher (Local Network).
+imcp_mail_reads() {
+  local init call
+  init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"hermes-agent","version":"0"}}}'
+  call='{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"mail_messages_search","arguments":{"limit":1}}}'
+  as_gateway "(printf '%s\n' '$init' '{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}' '$call'; sleep 15) \
+    | timeout 20 /Applications/iMCP.app/Contents/MacOS/imcp-server | grep -m1 '\"id\":2' | grep -qv '\"isError\":true'" 2>/dev/null
+}
+
+imcp_mail() {
+  while ! imcp_mail_reads; do
+    warn "iMCP cannot read Mail yet."
+    note "On the Mac's screen, open Mail once and add the account if it asks. Then in iMCP's menu,"
+    note "switch Mail off and on, and in its dialog choose ~/Library/Mail itself (Shift-Cmd-G,"
+    note "type ~/Library/Mail), not a folder inside it."
+    gum confirm --affirmative "Check again" --negative "Skip" "Done?" || return 0
+  done
+  ok "iMCP reads Mail"
+}
+
 imcp_apps() {
   local missing init
   note "iMCP: Calendar, Contacts, Mail, Maps, Music, Shortcuts, Voice Memos, Weather, Phone, Voicemail:"
@@ -131,13 +156,14 @@ imcp_apps() {
   init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"hermes-agent","version":"0"}}}'
   apple_app "iMCP reachable from Hermes (Local Network)" \
     "(printf '%s\n' '$init'; sleep 15) | timeout 20 /Applications/iMCP.app/Contents/MacOS/imcp-server | grep -m1 -q serverInfo"
+  imcp_mail
 }
 
 step "Hermes' Apple Account and apps"
 if ! on_hermes_screen; then
   warn "They need Hermes' desktop on the Mac's screen: it asks for them once macOS has logged it in (reboot)."
 elif apple_account && as_gateway 'imsg chats --limit 1 | grep -q .' >/dev/null 2>&1 && [ -z "$(imcp_missing)" ] \
-  && keep "$agent is signed in to an Apple Account, Hermes reads your messages, iMCP serves its apps"; then
+  && imcp_mail_reads && keep "$agent is signed in to an Apple Account, Hermes reads your messages, iMCP serves its apps"; then
   :
 elif needs "Hermes' Apple Account and apps" \
   && gum confirm "Set up Hermes' Apple apps (iMessage, Notes, Reminders, Contacts, Calendar, Find My)?"; then
