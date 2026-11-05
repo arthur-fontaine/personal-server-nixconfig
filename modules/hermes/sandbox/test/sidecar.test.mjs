@@ -288,6 +288,35 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
   fs.rmSync(workdir, { recursive: true, force: true });
 });
 
+test("session: Pi exiting 0 after its model refused every call is a failure", async () => {
+  const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-session-"));
+  const { peer } = peerPair();
+  class RefusedVm extends FakeVm {
+    static async create(options) { return new RefusedVm(options); }
+    exec(argv, options) {
+      if (argv[0] !== "node") return super.exec(argv, options);
+      const proc = Promise.resolve({ exitCode: 0, stdout: "", stderr: "" });
+      proc.output = async function* () {
+        yield { stream: "stdout", text: JSON.stringify({ type: "message_end", message: { role: "assistant", content: [], stopReason: "error", errorMessage: "401: Invalid credential" } }) + "\n" };
+      };
+      return proc;
+    }
+  }
+  const session = new Session({ id: "r", task: "t", workdir, stateDir: path.join(workdir, "state"), guestDir: GUEST, branch: "sandbox/r" }, {
+    gondolin: {
+      VM: RefusedVm, MemoryProvider: class {},
+      buildAssets: async (_c, { outputDir }) => { fs.mkdirSync(outputDir, { recursive: true }); fs.writeFileSync(path.join(outputDir, "manifest.json"), "{}"); },
+      verifyAssets: () => true,
+      createHttpHooks: () => ({ httpHooks: {}, env: { OPENCODE_API_KEY: "P" } }),
+    },
+    peer, env: { OPENCODE_GO_API_KEY: "k" },
+  });
+  const result = await session.run();
+  assert.equal(result.status, "failed");
+  assert.match(result.error, /401/);
+  fs.rmSync(workdir, { recursive: true, force: true });
+});
+
 test("session: no key is a clear failure, and nothing boots", async () => {
   const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-session-"));
   const { peer } = peerPair();

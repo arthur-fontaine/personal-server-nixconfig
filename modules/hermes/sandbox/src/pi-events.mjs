@@ -15,6 +15,8 @@ export class PiProgress {
     this.lastText = "";
     this.errors = [];
     this.settled = false;
+    // How Pi's last answer ended: "error" when its model never answered.
+    this.lastStopReason = null;
     this.aborted = false;
     this.cost = 0;
     this.tokens = 0;
@@ -58,6 +60,7 @@ export class PiProgress {
       case "message_end": {
         const message = event.message ?? {};
         if (message.role !== "assistant") break;
+        this.lastStopReason = typeof message.stopReason === "string" ? message.stopReason : null;
         const text = assistantText(message);
         if (text) this.lastText = text.slice(-TEXT_LIMIT);
         const usage = message.usage ?? {};

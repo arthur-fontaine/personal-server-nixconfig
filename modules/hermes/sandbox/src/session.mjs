@@ -201,12 +201,16 @@ export class Session {
 
     this.setPhase("export");
     const out = await this.#export(vm, env, base);
+    // Pi exits 0 even when its model refused every call (a bad key, a
+    // limit): an answer that ended in an error is a failure.
+    const modelFailed = this.progress.lastStopReason === "error";
     const status = this.stopReason
-      ?? (pi.exitCode === 0 && !this.progress.aborted ? "finished" : "failed");
+      ?? (pi.exitCode === 0 && !this.progress.aborted && !modelFailed ? "finished" : "failed");
+    const error = pi.exitCode !== 0 ? pi.stderr : modelFailed ? this.progress.errors.at(-1) : null;
     return {
       status,
       exit_code: pi.exitCode,
-      ...(pi.exitCode !== 0 && pi.stderr ? { error: pi.stderr } : {}),
+      ...(error ? { error } : {}),
       ...out,
     };
   }
