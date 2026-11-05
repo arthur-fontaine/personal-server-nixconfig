@@ -151,7 +151,9 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     "`${server.hermes.home}/.local/state/hermes-events/recent.jsonl` (one JSON a"
     "line: time, source, chat, messages, outcome). When the user asks whether"
     "something arrived, read it there first: opening the app or the site marks"
-    "their messages read."
+    "their messages read. Only inbox mail is there, its outcome naming its kind"
+    "(e.g. newsletter): for Junk and other folders, search with iMCP's mail"
+    "tools."
     ""
   ])}${lib.optionalString server.hermes.sandbox.enable (lib.concatMapStrings (line: "\n  ${line}") [
     "A self-contained coding task on a git repository can go to Pi, another"

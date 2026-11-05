@@ -26,6 +26,7 @@ pollers (calendar, mail, …) ┤
                   · reads what was said before in that chat, your replies included, from
                     the source itself (the last 15 messages of the past week)
                   · asks the local model (uzu) a typed question: may this need you? how urgent?
+                    (for mail: what kind of mail is it? see "Mail: only what matters")
                   · writes every event and its outcome to recent.jsonl (two days), which Hermes
                     reads when you ask whether something arrived
                             │ only what passes, signed
@@ -95,7 +96,7 @@ When a source cannot be read, the event goes on without its history.
 | Home Assistant | state changes in the watched domains (locks, the alarm, binary sensors, people) and entities, one per entity per 30 s | its WebSocket API (`state_changed`), with `HASS_TOKEN`; `server.hermes.homeassistant.watchDomains` / `watchEntities` | done |
 | HomeKit | accessory changes you choose (door, motion, leak…) | HomeClaw's webhook | done |
 | Calendar | new events, events starting within 30 min | iMCP `events_fetch`, every 5 min | done |
-| Mail | new unread mail | iMCP `mail_messages_search`, every 5 min | done |
+| Mail | new unread mail in an inbox, if it matters (see below) | iMCP `mail_mailboxes_list`, `mail_messages_search`, `mail_messages_read`, every 5 min | done |
 | Reminders | falling due | `remindctl show`, every minute | done |
 | Phone | missed calls | the call history database iCloud syncs (Full Disk Access) | done |
 | Files | new files in `~/Downloads` and iCloud Drive's Downloads | polled every minute | done |
@@ -105,6 +106,32 @@ When a source cannot be read, the event goes on without its history.
 | Telegram | | already the chat itself | not an event |
 | Find My | a device or person moving | FindMy.app's window only, no API | not planned |
 | iPhone | Shortcuts automations (arriving home, an alarm, a Focus) | would need the Mac reachable from outside (a tunnel) | not planned |
+
+## Mail: only what matters
+
+Most mail is automated, so the mail source is pickier than the chats
+(`hermes_events/pollers.py`, `mail`):
+
+- Only the inbox: each message's mailbox is looked up in
+  `mail_mailboxes_list` and kept only when its URL's last component or its
+  name is an inbox ("INBOX", "Boîte de réception", "Posteingang"…). Junk,
+  Trash, Sent, Archive and your own folders are skipped, and the log says so.
+  When the mailbox list fails, the poll fails and records nothing: the mail
+  comes at the next poll that can filter it, never unfiltered.
+- The mail itself: `mail_messages_read` gives the sender's name, a
+  600-character plain-text excerpt (HTML stripped, links cut to their host)
+  and what the headers say: `List-Unsubscribe`, `List-Id`, `Precedence:
+  bulk`, `Auto-Submitted`, and the SPF, DKIM and DMARC results from
+  `Authentication-Results`.
+- Its own question (`hermes_events/triage.py`, the `mail` profile): the local
+  model names a category. Personal mail, deliveries, failed payments, bills
+  due, security alerts, appointments and admin letters go on; newsletters,
+  promotions, social-network notifications, other automated mail, spam and
+  phishing are only written to `recent.jsonl`, with their category.
+- If the triage fails, a mail with no bulk headers and nothing failed in its
+  authentication goes on; a mass mailing or a forged one does not.
+- Hermes' route still answers `[SILENT]` for spam, phishing, ads,
+  newsletters and social notifications that get through.
 
 Instagram's notifications need a Google build of Chrome: Hermes' pinned
 Chrome for Testing gets a push endpoint that Firebase refuses (`410`), so
