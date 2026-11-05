@@ -31,7 +31,12 @@ never counts a notice as your message.
   off), with synthetic DNS. Every request is checked on the host against the
   session's grants, `server.hermes.sandbox.allowedHosts` (`opencode.ai`); any
   other host gets a 403. Each decision goes to the session's `audit.jsonl`,
-  with the host, method and path, never headers or query.
+  with the host, method and path, never headers or query. A grant can be
+  narrowed to a method and a path prefix; paths are compared as the URL
+  parser leaves them, never percent-decoded, and one still holding an
+  encoded `/`, `\` or `.` (`%2F`, `%5C`, `%2E`) matches no path prefix, only
+  a grant for the whole host: decoded, `/repos/a%2F..%2Fb` would pass for a
+  path under `/repos/a`.
 - **Secrets**: none. Pi reads `OPENCODE_API_KEY`, which in the guest is a
   random placeholder; the host swaps it for the real key
   (`server.hermes.sandbox.keyEnv`, `OPENCODE_GO_API_KEY` in the secrets

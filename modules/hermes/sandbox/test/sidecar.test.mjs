@@ -9,7 +9,7 @@ import { PassThrough } from "node:stream";
 import { after, test } from "node:test";
 
 import { Peer } from "../src/protocol.mjs";
-import { Grants, NetworkPolicy, describeRequest, normalizeGrant } from "../src/policy.mjs";
+import { Grants, NetworkPolicy, ambiguousPath, describeRequest, normalizeGrant } from "../src/policy.mjs";
 import { PiProgress } from "../src/pi-events.mjs";
 import { buildConfig, imageId, ensureImage } from "../src/image.mjs";
 import { Session, piArgv } from "../src/session.mjs";
@@ -103,6 +103,26 @@ test("grants: host, wildcard, method and path boundaries", () => {
   assert.throws(() => normalizeGrant({ host: "x.com", pathPrefix: "relative" }));
   assert.ok(grants.revoke("opencode.ai"));
   assert.ok(!at("opencode.ai"));
+});
+
+test("grants: paths match as parsed, never decoded; ambiguous ones match no path grant", () => {
+  const grants = new Grants([{ host: "api.example.com", pathPrefix: "/repos/a" }, "whole.example"]);
+  const at = (url) => grants.covers(describeRequest(new Request(url))) !== null;
+  assert.ok(at("https://api.example.com/repos/a/x"));
+  assert.ok(at("https://api.example.com/repos/a/./x/../y"), "dot segments are resolved by the parser");
+  assert.ok(!at("https://api.example.com/repos/a/../b"));
+  assert.ok(!at("https://api.example.com/repos/a/%2e%2E/b"), "encoded dot segments too");
+  for (const sneaky of ["/repos/a/..%2Fb", "/repos/a%2F..%2F..%2Fadmin", "/repos/a/x%5C..%5Cy", "/repos/a/%2E%2e%2fz", "/repos/a/.%2e"]) {
+    assert.ok(!at(`https://api.example.com${sneaky}`), sneaky);
+  }
+  assert.ok(!at("https://api.example.com/repos/%61/x"), "an encoded letter is another path, never a match");
+  assert.equal(describeRequest(new Request("https://api.example.com/repos/a%2Fb")).path, "/repos/a%2Fb");
+  assert.ok(at("https://whole.example/x%2F..%2Fy"), "a host grant does not look at the path");
+  for (const bad of ["/a/../b", "/a/%2e%2e", "/a%2fb", "/a\\b", "/a b"]) {
+    assert.throws(() => normalizeGrant({ host: "x.com", pathPrefix: bad }), undefined, bad);
+  }
+  assert.equal(ambiguousPath("/@scope%2Fpkg"), true);
+  assert.equal(ambiguousPath("/simple/requests/"), false);
 });
 
 test("policy: denies what no grant covers, audits without headers or query", async () => {

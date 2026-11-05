@@ -9,6 +9,14 @@
 // method means any method, no pathPrefix any path. Stage 1 only has the
 // static grants; stage 2 sets `approve`, an async callback asking Hermes
 // about what no grant covers, whose answer may add a grant for the session.
+//
+// Paths are compared as the URL parser leaves them: dot segments resolved,
+// a backslash turned into "/", everything else still percent-encoded. Never decoded:
+// /repos/a%2F..%2Fb decoded would pass for a path under /repos/a while the
+// server reads another. A path still holding an encoded "/", backslash or "." (or
+// a dot segment, which the parser should already have resolved) is matched
+// by no path grant: only a grant for the whole host, or a question, lets it
+// through.
 
 export function normalizeGrant(grant) {
   if (typeof grant === "string") grant = { host: grant };
@@ -19,8 +27,26 @@ export function normalizeGrant(grant) {
   const method = grant.method ? String(grant.method).toUpperCase() : null;
   if (method !== null && !/^[A-Z]+$/.test(method)) throw new Error(`invalid grant method: ${grant.method}`);
   const pathPrefix = grant.pathPrefix ? String(grant.pathPrefix) : null;
-  if (pathPrefix !== null && !pathPrefix.startsWith("/")) throw new Error(`invalid grant path: ${pathPrefix}`);
+  if (pathPrefix !== null && (!pathPrefix.startsWith("/") || canonicalPath(pathPrefix) !== pathPrefix ||
+      ambiguousPath(pathPrefix))) {
+    throw new Error(`invalid grant path: ${pathPrefix}`);
+  }
   return { host, method, pathPrefix };
+}
+
+function canonicalPath(path) {
+  try {
+    return new URL(path, "http://h").pathname;
+  } catch {
+    return null;
+  }
+}
+
+// What a server may read as another path than the one a prefix was checked
+// against.
+export function ambiguousPath(path) {
+  return /%(2f|5c|2e)/i.test(path) || path.includes("\\") ||
+    path.split("/").some((segment) => segment === "." || segment === "..");
 }
 
 function hostMatches(pattern, host) {
@@ -32,6 +58,7 @@ function hostMatches(pattern, host) {
 // /repos/a/x, not /repos/ab.
 function pathMatches(prefix, path) {
   if (prefix === null) return true;
+  if (ambiguousPath(path)) return false;
   if (path === prefix) return true;
   const base = prefix.endsWith("/") ? prefix : prefix + "/";
   return path.startsWith(base);
@@ -81,17 +108,10 @@ export function describeRequest(request) {
   return {
     host: url.hostname.toLowerCase().replace(/\.$/, ""),
     method: String(request.method ?? "GET").toUpperCase(),
-    path: decodeURIComponentSafe(url.pathname),
+    // As parsed, never decoded (see the top of this file).
+    path: url.pathname,
     scheme: url.protocol.replace(/:$/, ""),
   };
-}
-
-function decodeURIComponentSafe(path) {
-  try {
-    return decodeURIComponent(path);
-  } catch {
-    return path;
-  }
 }
 
 export class NetworkPolicy {
