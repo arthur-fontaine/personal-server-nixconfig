@@ -69,6 +69,8 @@ def main() -> None:
         "command": str(sidecar), "state_dir": str(root / "state"), "model": "opencode-go/deepseek-v4.1-flash",
         "thinking": "high", "memory": "3G", "cpus": 2, "timeout_seconds": 600, "key_env": "OPENCODE_GO_API_KEY",
         "grants": ["opencode.ai"], "max_diff_chars": 30000,
+        "advisor": {"enable": True, "model": "opencode-go/deepseek-v4.1-flash", "effort": "max", "maxCalls": 5,
+                    "contextMaxChars": 15000},
     }
     env = {"PATH": os.environ["PATH"], "HOME": str(home), "OPENCODE_GO_API_KEY": "go-key", "TELEGRAM_BOT_TOKEN": "tg"}
     asked: list[tuple] = []
@@ -101,6 +103,7 @@ def main() -> None:
     until(lambda: events, "the completion")
     workdir = root / "state" / "sessions" / session_id
     assert json.loads((workdir / "session.json").read_text())["bundleRef"] == "refs/heads/main"
+    assert json.loads((workdir / "session.json").read_text())["advisor"] == config["advisor"], "Hermes' advisor settings"
     event = events[0]
     assert event["type"] == "watch_match"
     assert event["session_key"] == "agent:main:telegram:dm:42" and event["chat_id"] == "42" and event["platform"] == "telegram"

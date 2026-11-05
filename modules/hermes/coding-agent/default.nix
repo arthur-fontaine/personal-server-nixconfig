@@ -37,6 +37,45 @@
           default = "high";
           description = "Pi's thinking level.";
         };
+        # pi-advisor-flow in the guest: Pi (the executor) asks a second call
+        # of a model for a review at its plan, its failures and its end, and
+        # when it repeats a tool call. Through the same provider, so the same
+        # key and host (opencode.ai); the rest is ./pi/advisor.json.
+        advisor = {
+          enable = mkOption {
+            type = types.bool;
+            default = true;
+            description = "Give Pi an advisor (pi-advisor-flow), active from the start of each session.";
+          };
+          model = mkOption {
+            type = types.str;
+            default = "opencode-go/deepseek-v4.1-flash";
+            description = ''
+              The advisor's model (provider/id). It may be Pi's own: the
+              advisor reviews at a higher effort. Keep it on opencode-go, the
+              one provider the guest reaches with a key.
+            '';
+          };
+          effort = mkOption {
+            type = types.enum [ "minimal" "low" "medium" "high" "xhigh" "max" ];
+            # deepseek-v4.1-flash takes low, high or max (pi-ai's opencode-go catalog).
+            default = "max";
+            description = "The advisor's thinking level.";
+          };
+          maxCalls = mkOption {
+            type = types.ints.unsigned;
+            default = 5;
+            description = ''
+              Advisor calls per session, Pi's own and the automatic gates'
+              together; then Pi goes on alone.
+            '';
+          };
+          contextMaxChars = mkOption {
+            type = types.ints.positive;
+            default = 15000;
+            description = "Characters of the session's conversation an advisor call carries at most.";
+          };
+        };
         keyEnv = mkOption {
           type = types.str;
           default = "OPENCODE_GO_API_KEY";
@@ -101,6 +140,7 @@
           command = lib.getExe pkgs.hermes-sandbox;
           state_dir = "${server.hermes.home}/.hermes/sandbox";
           inherit (cfg) model thinking memory cpus;
+          advisor = { inherit (cfg.advisor) enable model effort maxCalls contextMaxChars; };
           timeout_seconds = cfg.timeout;
           # Read from Hermes' environment (the secrets file) by name.
           key_env = cfg.keyEnv;

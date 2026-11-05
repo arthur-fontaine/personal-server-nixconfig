@@ -1,0 +1,18 @@
+{
+  "advisor": "opencode-go/deepseek-v4.1-flash",
+  "advisorEffort": "max",
+  "executor": "opencode-go/deepseek-v4.1-flash",
+  "executorEffort": "high",
+  "advisorDisableSameModel": false,
+  "contextMaxChars": 15000,
+  "advisorSessionSummary": true,
+  "advisorMaxCallsPerSession": 5,
+  "advisorRedactSecrets": true,
+  "advisorToolResultMaxBytes": 20000,
+  "alwaysOn": true,
+  "simpleMode": false,
+  "gateFailureMode": "block-tool",
+  "advisorHerdrIntegration": false,
+  "advisorScoutEnabled": false,
+  "advisorJevFilterEnabled": false
+}

@@ -80,6 +80,26 @@ export function piSettings(guestDir, { model, thinking }) {
   };
 }
 
+// pi-advisor-flow's configuration (<agentDir>/advisor.json, read at each
+// session start: its src/config/storage.ts): the image's ../pi/advisor.json,
+// with the session's model and thinking as the executor's and Hermes'
+// advisor settings (server.hermes.sandbox.advisor) over it. Off, the flow
+// stays inactive and its tools unregistered.
+export function piAdvisor(guestDir, { model, thinking, advisor = {} }) {
+  const baked = JSON.parse(fs.readFileSync(path.join(guestDir, "advisor.json"), "utf8"));
+  if (advisor.enable === false) return { ...baked, alwaysOn: false, advisorToolsEnabled: false };
+  const set = (key, value) => (value === undefined || value === null ? {} : { [key]: value });
+  return {
+    ...baked,
+    executor: model,
+    executorEffort: thinking,
+    ...set("advisor", advisor.model),
+    ...set("advisorEffort", advisor.effort),
+    ...set("advisorMaxCallsPerSession", advisor.maxCalls),
+    ...set("contextMaxChars", advisor.contextMaxChars),
+  };
+}
+
 export function guestEnv(secretEnv, broker = null) {
   return {
     ...secretEnv,
@@ -288,7 +308,12 @@ export class Session {
     this.setPhase("pi");
     await run(vm, ["mkdir", "-p", PI_AGENT_DIR], { env });
     await vm.fs.writeFile(`${PI_AGENT_DIR}/settings.json`, JSON.stringify(piSettings(config.guestDir, config), null, 2));
-    this.audit({ event: "pi", model: config.model, thinking: config.thinking });
+    const advisor = piAdvisor(config.guestDir, config);
+    await vm.fs.writeFile(`${PI_AGENT_DIR}/advisor.json`, JSON.stringify(advisor, null, 2));
+    this.audit({
+      event: "pi", model: config.model, thinking: config.thinking,
+      advisor: advisor.alwaysOn ? { model: advisor.advisor, effort: advisor.advisorEffort, maxCalls: advisor.advisorMaxCallsPerSession } : null,
+    });
     const pi = await this.#runPi(vm, env);
     // Pi is done: nothing in the guest may ask Hermes for anything now.
     this.broker.handler.revoke();

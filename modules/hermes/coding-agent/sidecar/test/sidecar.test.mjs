@@ -13,7 +13,7 @@ import { Peer } from "../src/protocol.mjs";
 import { Grants, NetworkPolicy, ambiguousPath, describeRequest, normalizeGrant } from "../src/policy.mjs";
 import { PiProgress } from "../src/pi-events.mjs";
 import { buildConfig, imageId, ensureImage } from "../src/image.mjs";
-import { Session, brokerResponse, piArgv, piSettings } from "../src/session.mjs";
+import { Session, brokerResponse, piAdvisor, piArgv, piSettings } from "../src/session.mjs";
 import { Broker, InvalidAction, MAX_BODY, validateAction } from "../src/broker.mjs";
 import { FolderTooLarge, copyFolder } from "../src/folders.mjs";
 
@@ -40,6 +40,7 @@ function readOnlyGuest() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-guest-"));
   fs.mkdirSync(path.join(dir, "node_modules"));
   fs.copyFileSync(new URL("../../pi/settings.json", import.meta.url), path.join(dir, "settings.json"));
+  fs.copyFileSync(new URL("../../pi/advisor.json", import.meta.url), path.join(dir, "advisor.json"));
   fs.writeFileSync(path.join(dir, "node_modules", "x.js"), "");
   fs.chmodSync(path.join(dir, "node_modules", "x.js"), 0o444);
   fs.chmodSync(path.join(dir, "node_modules"), 0o555);
@@ -299,6 +300,49 @@ test("pi settings: the image's, under the session's model and thinking; the exte
   }
   assert.deepEqual(piSettings(pi, { model: "opencode-go/other-model", thinking: "max" }),
     { ...baked, defaultProvider: "opencode-go", defaultModel: "other-model", defaultThinkingLevel: "max" });
+  // pi-advisor-flow, from the guest's node_modules by path: an npm: source
+  // would be installed at startup, which Pi cannot do offline.
+  assert.deepEqual(baked.packages, ["/opt/pi/node_modules/pi-advisor-flow"]);
+  const lock = fs.readFileSync(path.join(pi, "pnpm-lock.yaml"), "utf8");
+  assert.match(lock, /\n {6}pi-advisor-flow:\n {8}specifier: 0\.14\.4\n/, "pinned");
+});
+
+// pi-advisor-flow 0.14.4's keys and values, as its src/config/schema.ts,
+// defaults.ts and model-stream.ts take them (read, never run, here).
+const ADVISOR_KEYS = new Set([
+  "advisor", "advisorEffort", "executor", "executorEffort", "advisorDisableSameModel", "contextMaxChars",
+  "advisorSessionSummary", "advisorMaxCallsPerSession", "advisorRedactSecrets", "advisorToolResultMaxBytes",
+  "alwaysOn", "simpleMode", "gateFailureMode", "advisorHerdrIntegration", "advisorScoutEnabled",
+  "advisorJevFilterEnabled", "advisorToolsEnabled",
+]);
+const EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max"];
+
+test("advisor: the image's advisor.json, headless and bounded, the session's model as executor", () => {
+  const pi = fileURLToPath(new URL("../../pi", import.meta.url));
+  const baked = JSON.parse(fs.readFileSync(path.join(pi, "advisor.json"), "utf8"));
+  for (const key of Object.keys(baked)) assert.ok(ADVISOR_KEYS.has(key), `pi-advisor-flow knows ${key}`);
+  assert.equal(baked.alwaysOn, true, "active without /advisor, which -p never runs");
+  assert.equal(baked.simpleMode, false, "Simple mode would lift the call budget");
+  assert.equal(baked.advisorDisableSameModel, false, "the advisor is the executor's model");
+  assert.equal(baked.gateFailureMode, "block-tool", "a failed or spent gate never aborts the run");
+  assert.ok(EFFORTS.includes(baked.advisorEffort) && EFFORTS.includes(baked.executorEffort));
+  assert.equal(baked.advisorRedactSecrets, true);
+  for (const key of ["advisorHerdrIntegration", "advisorScoutEnabled", "advisorJevFilterEnabled"]) {
+    assert.equal(baked[key], false, `${key}: nothing but the model`);
+  }
+  assert.ok(baked.advisor.startsWith("opencode-go/"), "the one provider the guest reaches");
+
+  const advisor = piAdvisor(pi, {
+    model: "opencode-go/other", thinking: "low",
+    advisor: { enable: true, model: "opencode-go/big", effort: "high", maxCalls: 2, contextMaxChars: 1000 },
+  });
+  assert.deepEqual(advisor, { ...baked, executor: "opencode-go/other", executorEffort: "low", advisor: "opencode-go/big",
+    advisorEffort: "high", advisorMaxCallsPerSession: 2, contextMaxChars: 1000 });
+  assert.deepEqual(piAdvisor(pi, { model: "m/x", thinking: "high" }),
+    { ...baked, executor: "m/x", executorEffort: "high" }, "the image's values when Hermes sets none");
+  const off = piAdvisor(pi, { model: "m/x", thinking: "high", advisor: { enable: false } });
+  assert.equal(off.alwaysOn, false);
+  assert.equal(off.advisorToolsEnabled, false);
 });
 
 test("image: identity follows the guest tree, builds once, never half", async () => {
@@ -427,6 +471,8 @@ test("session: bundle in, Pi headless, bundle out, the key never in the guest", 
   const settings = JSON.parse(vm.files.get("/root/.pi/agent/settings.json").toString());
   assert.deepEqual([settings.defaultProvider, settings.defaultModel, settings.defaultThinkingLevel], ["opencode-go", "deepseek-v4.1-flash", "high"]);
   assert.deepEqual(settings.extensions, ["/opt/pi/extensions/request-host-action"]);
+  const advisor = JSON.parse(vm.files.get("/root/.pi/agent/advisor.json").toString());
+  assert.deepEqual([advisor.executor, advisor.advisor, advisor.alwaysOn], ["opencode-go/deepseek-v4.1-flash", "opencode-go/deepseek-v4.1-flash", true]);
   assert.ok(lines.some((l) => l.type === "done" && l.result.status === "finished"));
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(workdir, "result.json"), "utf8")).commits, 1);
   const audit = fs.readFileSync(path.join(workdir, "audit.jsonl"), "utf8").trim().split("\n").map(JSON.parse);

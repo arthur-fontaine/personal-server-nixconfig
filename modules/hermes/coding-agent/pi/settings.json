@@ -2,5 +2,6 @@
   "defaultProvider": "opencode-go",
   "defaultModel": "deepseek-v4.1-flash",
   "defaultThinkingLevel": "high",
+  "packages": ["/opt/pi/node_modules/pi-advisor-flow"],
   "extensions": ["/opt/pi/extensions/request-host-action"]
 }

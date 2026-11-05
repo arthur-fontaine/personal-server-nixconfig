@@ -175,6 +175,7 @@ class Sandbox:
                 "bundleRef": bundle_ref,
                 "model": self.config["model"],
                 "thinking": self.config["thinking"],
+                "advisor": self.config.get("advisor") or {"enable": False},
                 "memory": self.config["memory"],
                 "cpus": self.config["cpus"],
                 "timeoutSeconds": self.config["timeout_seconds"],
