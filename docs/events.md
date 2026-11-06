@@ -81,9 +81,13 @@ apart from the new messages (`hermes_events/history.py`):
   and its newest message: enough for the sender's name in a one-to-one
   thread, one chat per thread, and the group's name in a group. Its earlier
   messages are not read: opening a thread is what marks them seen, and the
-  user would then get no notification on their phone. So an Instagram event
-  arrives without the conversation before it, and the daemon cannot tell
-  whether you already answered it from your phone.
+  user would then get no notification on their phone. What the daemon does
+  keep is the last eight previews the inbox showed for each thread, on disk
+  (`instagram-tails.json` in its state folder): a burst that the inbox split
+  into "Bubble tea ?" and, later, "?" is then screened as one exchange
+  instead of two fragments nothing can be answered from. So an Instagram
+  event arrives with what the inbox said before it, and the daemon still
+  cannot tell whether you already answered it from your phone.
 - Discord: none yet.
 
 When a source cannot be read, the event goes on without its history.

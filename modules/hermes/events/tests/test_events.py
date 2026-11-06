@@ -667,7 +667,8 @@ class HistoryTest(unittest.IsolatedAsyncioTestCase):
         # The small model gets the last lines only.
         long = {**event, "context": "Earlier:\n" + "\n".join(f"[1{i}:00] me: m{i}" for i in range(10)) + "\n\nThe new messages:"}
         content = UzuTriage("u", "m").request(long)["messages"][1]["content"]
-        self.assertNotIn("m3", content)
+        self.assertNotIn("m1", content)
+        self.assertIn("m2", content)  # eight lines: the tail, not the whole thread
         self.assertIn("m9", content)
         self.assertIn("The new messages:\n[", content)
         # A notice has no conversation, but the field the route's prompt names.
@@ -756,6 +757,51 @@ class InstagramInboxTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ig.reads, 1)
         await ig.inbox(refresh=True)
         self.assertEqual(ig.reads, 2)
+
+    def test_a_row_carries_what_the_inbox_showed_before(self):
+        """The screening reads the exchange, not one fragment: the earlier
+        previews come back with the newest message."""
+        tail = [{"text": "Bubble tea ?", "at": 1767225000000}, {"text": "ok", "at": 1767225300000}]
+        thread = thread_from_inbox(INBOX_ROW, tail)
+        self.assertEqual([m.text for m in thread.items],
+                         ["Bubble tea ?", "ok", "On se voit toujours à 20 h ?"])
+        self.assertEqual(thread.items[0].sender, "")  # a precedence, not a sender
+        # A malformed entry is skipped rather than breaking the read.
+        self.assertEqual(len(thread_from_inbox(INBOX_ROW, [{"text": "x"}, {"at": 1}]).items), 1)
+
+    async def test_the_tail_is_kept_across_reads_and_restarts(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "instagram-tails.json")
+
+            class Inbox(Instagram):
+                def __init__(self):
+                    super().__init__(tails_path=path)
+                    self.rows = [{**INBOX_ROW, "text": f"message {i}", "at": 1767225600000 + i} for i in range(11)]
+
+                async def _read(self):
+                    return self.rows
+
+            ig = Inbox()
+            ig.cdp = object()
+            await ig.inbox()
+            # Capped to the last TAIL previews, oldest first, and no duplicate.
+            await ig.inbox(refresh=True)
+            self.assertEqual([e["text"] for e in ig._tails["1000000000000001"]],
+                             [f"message {i}" for i in range(3, 11)])
+            # Written down: a notification that lands after a restart still
+            # finds what came before it.
+            again = Inbox()
+            self.assertEqual(again._tails["1000000000000001"], ig._tails["1000000000000001"])
+
+            # The history the screening gets is the tail plus the newest line.
+            row = {**INBOX_ROW, "text": "?", "at": 1767225700000}
+            ig.rows = [row]
+            await ig.inbox(refresh=True)
+            thread = await ig.thread("1000000000000001")
+            self.assertEqual([m.text for m in thread.items][-2:], ["message 10", "?"])
+            context = thread.context([thread.items[-1]], 15, 0)
+            self.assertEqual([m.text for m in context.earlier][-2:], ["message 9", "message 10"])
+            self.assertEqual(context.earlier[-1].text, "message 10")
 
 
 class InstagramThreadTest(unittest.IsolatedAsyncioTestCase):

@@ -22,6 +22,7 @@ import contextlib
 import hashlib
 import json
 import logging
+import os
 import pathlib
 import re
 import time
@@ -241,12 +242,15 @@ class Thread:
         return Context(earlier[-limit:], answered)
 
 
-def thread_from_inbox(row: dict) -> Thread | None:
-    """An inbox row as a Thread: its name, its people, its newest message.
+def thread_from_inbox(row: dict, tail: list[dict] = ()) -> Thread | None:
+    """An inbox row as a Thread: its name, its people, its newest message, and
+    the previews the inbox showed before them.
 
-    The inbox is all this reads. A thread's earlier messages are what opening
-    it marks seen, and the user would then get no notification on their phone:
-    they stay where they are.
+    Nothing here opens a thread: that marks its messages seen, and the user
+    would then get no notification on their phone. The inbox is what this
+    reads, so `tail` is the thread's last few previews as earlier passed them
+    — enough for the screening to read "Bubble tea ?" and "?" as one exchange
+    instead of two unanswerable fragments.
     """
     tid = str(row.get("id") or "")
     if not tid:
@@ -255,7 +259,12 @@ def thread_from_inbox(row: dict) -> Thread | None:
     users = {f"u{i}": name for i, name in enumerate(names)}
     text = str(row.get("text") or "").strip()
     group = bool(row.get("group"))
-    items = []
+    # The tail was recorded from this same read, so its last entry is the
+    # newest message itself: appended again below, it would read as two.
+    at = row.get("at")
+    items = [_tail_message(entry) for entry in tail
+             if not (str(entry.get("text") or "").strip() == text and entry.get("at") == at)]
+    items = [m for m in items if m is not None]
     if text:
         millis = row.get("at")
         when = float(millis) / 1000 if isinstance(millis, (int, float)) else time.time()
@@ -265,8 +274,16 @@ def thread_from_inbox(row: dict) -> Thread | None:
             sender = "me"
         else:
             sender = names[0] if len(names) == 1 and not group else ""
-        items = [Message("", when, sender, text)]
+        items.append(Message("", when, sender, text))
     return Thread(tid, str(row.get("name") or ""), group, users, items)
+
+
+def _tail_message(entry: dict) -> Message | None:
+    text = str(entry.get("text") or "").strip()
+    at = entry.get("at")
+    if not text or not isinstance(at, (int, float)):
+        return None
+    return Message("", float(at) / 1000, "me" if _OWN.match(text) else "", text)
 
 
 INBOX_JS = "typeof __ig === 'object' ? JSON.stringify(__ig.inbox()) : ''"
@@ -306,13 +323,22 @@ class Instagram:
     """
 
     CACHE_SECONDS = 120
+    # How many of a thread's previews to remember: a burst ("Bubble tea ?",
+    # then "?" an hour later) is one exchange, and the screening needs the
+    # earlier line to see the second as a question rather than a fragment.
+    TAIL = 8
 
-    def __init__(self, origin: str = ORIGIN):
+    def __init__(self, origin: str = ORIGIN, tails_path: str | None = None):
         self.origin = origin
         self.cdp: CDP | None = None
         self._rows: list[dict] = []
         self._read_at = 0.0
         self._reading = asyncio.Lock()
+        # thread id -> the inbox previews seen so far, oldest first. Kept on
+        # disk: a notification that lands hours after the one it answers still
+        # finds what came before it.
+        self.tails_path = tails_path
+        self._tails: dict[str, list[dict]] = self._load_tails()
 
     async def inbox(self, refresh: bool = False) -> list[dict]:
         """The inbox rows, read at most once per CACHE_SECONDS: a burst of
@@ -325,6 +351,7 @@ class Instagram:
                 if refresh or time.monotonic() - self._read_at > self.CACHE_SECONDS:
                     self._rows = await self._read()
                     self._read_at = time.monotonic()
+                    self._remember(self._rows)
         return self._rows
 
     async def _read(self) -> list[dict]:
@@ -349,7 +376,7 @@ class Instagram:
     async def find(self, text: str) -> Thread | None:
         """The thread whose newest message is `text`."""
         for row in await self.inbox():
-            thread = thread_from_inbox(row)
+            thread = thread_from_inbox(row, self._tail(row))
             if thread and any(_same(item.text, text) for item in thread.items):
                 return thread
         return None
@@ -359,8 +386,54 @@ class Instagram:
             return None
         for row in await self.inbox():
             if thread_id in (str(row.get("id")), str(row.get("v2"))):
-                return thread_from_inbox(row)
+                return thread_from_inbox(row, self._tail(row))
         return None
+
+    def _tail(self, row: dict) -> list[dict]:
+        return self._tails.get(str(row.get("id") or ""), [])
+
+    def _remember(self, rows: list[dict]) -> None:
+        moved = False
+        for row in rows:
+            tid = str(row.get("id") or "")
+            text = str(row.get("text") or "").strip()
+            at = row.get("at")
+            if not tid or not text or not isinstance(at, (int, float)):
+                continue
+            tail = self._tails.setdefault(tid, [])
+            entry = {"text": text, "at": at}
+            if entry in tail:
+                continue
+            tail.append(entry)
+            tail.sort(key=lambda e: e["at"])
+            del tail[:-self.TAIL]
+            moved = True
+        if moved:
+            self._save_tails()
+
+    def _load_tails(self) -> dict[str, list[dict]]:
+        if not self.tails_path:
+            return {}
+        try:
+            with open(self.tails_path) as f:
+                loaded = json.load(f)
+        except (OSError, ValueError):
+            return {}
+        if not isinstance(loaded, dict):
+            return {}
+        return {str(k): [e for e in v if isinstance(e, dict)][-self.TAIL:]
+                for k, v in loaded.items() if isinstance(v, list)}
+
+    def _save_tails(self) -> None:
+        if not self.tails_path:
+            return
+        tmp = self.tails_path + ".tmp"
+        try:
+            with open(tmp, "w") as f:
+                json.dump(self._tails, f, ensure_ascii=False)
+            os.replace(tmp, self.tails_path)
+        except OSError as err:
+            log.warning("instagram: could not keep the thread tails: %s", err)
 
     @contextlib.asynccontextmanager
     async def _tab(self, path: str = "/direct/inbox/"):

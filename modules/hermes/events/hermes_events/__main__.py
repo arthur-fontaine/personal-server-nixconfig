@@ -40,7 +40,7 @@ async def main(config: dict) -> None:
 
     sources = config["sources"]
     on = lambda name: sources.get(name, {}).get("enabled")
-    instagram = Instagram() if on("instagram") else None
+    instagram = Instagram(tails_path=os.path.join(config["state_dir"], "instagram-tails.json")) if on("instagram") else None
     history = config.get("history", {})
     pipeline = Pipeline(
         triage=UzuTriage(config["triage"]["url"], config["triage"]["model"], config["triage"]["timeout"]),
