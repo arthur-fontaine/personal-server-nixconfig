@@ -45,6 +45,8 @@ in
   events = pkgs.runCommand "hermes-events-tests" { __darwinAllowLocalNetworking = true; } ''
     cp -R ${../modules/hermes/events} events
     chmod -R u+w events
+    # The DM script the daemon reads the inbox with, as agent/events.nix puts it.
+    cp ${../modules/hermes/agent/skills/instagram/direct.js} events/hermes_events/direct.js
     cd events
     export HOME=$TMPDIR
     ${hermes.hermesVenv}/bin/python3 -I tests/test_events.py

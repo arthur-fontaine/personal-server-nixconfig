@@ -18,9 +18,11 @@ is what anti-bot scripts look for, so Instagram's tab is left alone.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import json
 import logging
+import pathlib
 import re
 import time
 from dataclasses import dataclass, field
@@ -30,6 +32,13 @@ import aiohttp
 from .core import Chat, Message, Pipeline
 
 log = logging.getLogger("hermes_events")
+
+# Hermes' skill loads it into a page to read and send DMs; the daemon loads it
+# to read the inbox the same way (hermes_events/../agent/skills/instagram).
+DIRECT_JS = (pathlib.Path(__file__).with_name("direct.js")).read_text()
+
+# A thread's newest message, as the app previews it: "You: …" is the user's own.
+_OWN = re.compile(r"^(?:you|vous)\b", re.IGNORECASE)
 
 BINDING = "hermesNotify"
 HOOK = """(() => {
@@ -141,10 +150,6 @@ def thread_id_of(payload: dict) -> str | None:
     return match.group(1) if match else None
 
 
-# Instagram's web app id, which its pages send with every call to its API.
-APP_ID = "936619743392459"
-
-
 def item_text(item: dict) -> str:
     kind = item.get("item_type", "")
     if item.get("text"):
@@ -236,78 +241,175 @@ class Thread:
         return Context(earlier[-limit:], answered)
 
 
+def thread_from_inbox(row: dict) -> Thread | None:
+    """An inbox row as a Thread: its name, its people, its newest message.
+
+    The inbox is all this reads. A thread's earlier messages are what opening
+    it marks seen, and the user would then get no notification on their phone:
+    they stay where they are.
+    """
+    tid = str(row.get("id") or "")
+    if not tid:
+        return None
+    names = [str(u) for u in row.get("users") or [] if u]
+    users = {f"u{i}": name for i, name in enumerate(names)}
+    text = str(row.get("text") or "").strip()
+    group = bool(row.get("group"))
+    items = []
+    if text:
+        millis = row.get("at")
+        when = float(millis) / 1000 if isinstance(millis, (int, float)) else time.time()
+        # One person, one name: the sender. A group, or the user's own message,
+        # leaves the row carrying the name of the thread and nothing more.
+        if _OWN.match(text):
+            sender = "me"
+        else:
+            sender = names[0] if len(names) == 1 and not group else ""
+        items = [Message("", when, sender, text)]
+    return Thread(tid, str(row.get("name") or ""), group, users, items)
+
+
+INBOX_JS = "typeof __ig === 'object' ? JSON.stringify(__ig.inbox()) : ''"
+
+# Instagram's own control for turning its notifications on, in the page.
+PUSH_JS = """(async () => {
+  const reg = await navigator.serviceWorker.getRegistration();
+  const sub = reg ? await reg.pushManager.getSubscription() : null;
+  const label = /^(turn on notifications?|enable notifications?|activer les notifications?)$/i;
+  const control = [...document.querySelectorAll('[role="button"], button, a')]
+    .find((el) => label.test((el.getAttribute('aria-label') || el.innerText || '').trim()));
+  return JSON.stringify({
+    permission: typeof Notification === 'undefined' ? 'unsupported' : Notification.permission,
+    subscribed: Boolean(sub),
+    control: control ? (control.getAttribute('aria-label') || control.innerText || '').trim() : null,
+  });
+})()"""
+
+CLICK_JS = """(() => {
+  const label = /^(turn on notifications?|enable notifications?|activer les notifications?)$/i;
+  const control = [...document.querySelectorAll('[role="button"], button, a')]
+    .find((el) => label.test((el.getAttribute('aria-label') || el.innerText || '').trim()));
+  if (!control) return 'gone';
+  control.click();
+  return 'clicked';
+})()"""
+
+
 class Instagram:
-    """Instagram's web API, read only (the inbox and a thread, never the call
-    that marks a message seen), through the logged-in browser: a background
-    tab on instagram.com/robots.txt, which runs none of Instagram's scripts,
-    fetches it with the browser's own cookies, then closes."""
+    """Instagram's DM inbox, read from the page itself.
+
+    Its DM API is gone (`/api/v1/direct_v2/…` answers 404, with the logged-out
+    page), and the calls the app makes now are signed: a hand-built request
+    would be an unofficial client that breaks with every release. So the same
+    script Hermes' skill uses (direct.js) goes into a background tab as a
+    document-start script, reads the app's own traffic, and the tab closes.
+    """
+
+    CACHE_SECONDS = 120
 
     def __init__(self, origin: str = ORIGIN):
         self.origin = origin
         self.cdp: CDP | None = None
+        self._rows: list[dict] = []
+        self._read_at = 0.0
+        self._reading = asyncio.Lock()
 
-    async def api(self, *paths: str) -> list[dict | None]:
-        cdp = self.cdp
-        if cdp is None:
-            return [None] * len(paths)
-        target = (await cdp.call("Target.createTarget", {"url": f"{self.origin}/robots.txt", "background": True}))["result"]["targetId"]
+    async def inbox(self, refresh: bool = False) -> list[dict]:
+        """The inbox rows, read at most once per CACHE_SECONDS: a burst of
+        notifications is one read, not one tab each."""
+        if self.cdp is None:
+            return []
+        fresh = time.monotonic() - self._read_at <= self.CACHE_SECONDS
+        if refresh or not fresh:
+            async with self._reading:
+                if refresh or time.monotonic() - self._read_at > self.CACHE_SECONDS:
+                    self._rows = await self._read()
+                    self._read_at = time.monotonic()
+        return self._rows
+
+    async def _read(self) -> list[dict]:
         try:
-            session = (await cdp.call("Target.attachToTarget", {"targetId": target, "flatten": True}))["result"]["sessionId"]
-            for _ in range(50):
-                here = await cdp.call("Runtime.evaluate", {"expression": "location.origin", "returnByValue": True}, session)
-                if here.get("result", {}).get("result", {}).get("value") == self.origin:
-                    break
-                await asyncio.sleep(0.2)
-            expression = """Promise.all(%s.map(async (p) => {
-                try {
-                  const r = await fetch(p, {credentials: 'include', headers: {'X-IG-App-ID': '%s', 'X-Requested-With': 'XMLHttpRequest'}});
-                  return r.ok ? await r.text() : '';
-                } catch (e) { return ''; }
-              }))""" % (json.dumps(list(paths)), APP_ID)
-            answer = await cdp.call("Runtime.evaluate", {"expression": expression, "awaitPromise": True,
-                                                         "returnByValue": True}, session)
-            bodies = answer.get("result", {}).get("result", {}).get("value") or [""] * len(paths)
-        finally:
-            try:
-                await cdp.call("Target.closeTarget", {"targetId": target})
-            except Exception:
-                pass
-        out = []
-        for body in bodies:
-            try:
-                out.append(json.loads(body) if body else None)
-            except ValueError:
-                out.append(None)
-        return out
+            async with self._tab() as session:
+                for _ in range(40):  # the app has to load and ask for its inbox
+                    await asyncio.sleep(0.5)
+                    body = await self._evaluate(session, INBOX_JS)
+                    try:
+                        rows = json.loads(body).get("threads") or []
+                    except (ValueError, AttributeError):
+                        continue
+                    if rows:
+                        log.debug("instagram: %d threads in the inbox", len(rows))
+                        return rows
+        except Exception as err:
+            log.warning("instagram: could not read the inbox: %s", err)
+            return []
+        log.info("instagram: the inbox came back empty (logged out, or the page did not load)")
+        return []
+
+    async def find(self, text: str) -> Thread | None:
+        """The thread whose newest message is `text`."""
+        for row in await self.inbox():
+            thread = thread_from_inbox(row)
+            if thread and any(_same(item.text, text) for item in thread.items):
+                return thread
+        return None
 
     async def thread(self, thread_id: str) -> Thread | None:
         if not thread_id.isdigit():
             return None
-        try:
-            (raw,) = await self.api(f"/api/v1/direct_v2/threads/{thread_id}/?limit=20")
-        except Exception as err:
-            log.warning("instagram thread %s: %s", thread_id, err)
-            return None
-        return Thread.parse(raw["thread"]) if raw and isinstance(raw.get("thread"), dict) else None
-
-    async def find(self, text: str) -> Thread | None:
-        """The thread whose latest items include `text`: the inbox, then the
-        requests from people the user does not follow."""
-        try:
-            answers = await self.api("/api/v1/direct_v2/inbox/?limit=20&thread_message_limit=5",
-                                     "/api/v1/direct_v2/pending_inbox/?limit=20")
-        except Exception as err:
-            log.warning("instagram inbox: %s", err)
-            return None
-        for raw in answers:
-            if not raw:
-                continue
-            viewer = str((raw.get("viewer") or {}).get("pk") or "")
-            for t in (raw.get("inbox") or {}).get("threads") or []:
-                thread = Thread.parse(t, viewer)
-                if thread and any(i.sender != "me" and _same(i.text, text) for i in thread.items):
-                    return thread
+        for row in await self.inbox():
+            if thread_id in (str(row.get("id")), str(row.get("v2"))):
+                return thread_from_inbox(row)
         return None
+
+    @contextlib.asynccontextmanager
+    async def _tab(self, path: str = "/direct/inbox/"):
+        """A background tab with direct.js in place, closed however it ends."""
+        cdp, target = self.cdp, None
+        try:
+            target = (await cdp.call("Target.createTarget", {"url": "about:blank", "background": True}))["result"]["targetId"]
+            session = (await cdp.call("Target.attachToTarget", {"targetId": target, "flatten": True}))["result"]["sessionId"]
+            await cdp.call("Page.enable", {}, session)
+            await cdp.call("Page.addScriptToEvaluateOnNewDocument", {"source": DIRECT_JS}, session)
+            await cdp.call("Page.navigate", {"url": f"{self.origin}{path}"}, session)
+            yield session
+        finally:
+            if target:
+                with contextlib.suppress(Exception):
+                    await cdp.call("Target.closeTarget", {"targetId": target})
+
+    async def _evaluate(self, session: str, expression: str) -> str:
+        answer = await self.cdp.call("Runtime.evaluate", {"expression": expression, "awaitPromise": True,
+                                                          "returnByValue": True}, session)
+        return answer.get("result", {}).get("result", {}).get("value") or ""
+
+    async def prepare(self) -> None:
+        """Whether Instagram can actually push, and turning it on if it is one
+        click away. The watcher grants the permission each session
+        (`Browser.grantPermissions`); the push subscription is Instagram's own
+        to create, from its own control, and it then lives in the profile — so
+        a fresh setup only needs that control used once."""
+        try:
+            async with self._tab() as session:
+                await asyncio.sleep(4)
+                state = json.loads(await self._evaluate(session, PUSH_JS) or "{}")
+                if state.get("subscribed"):
+                    log.info("instagram: push notifications are on")
+                    return
+                control = state.get("control")
+                if control:
+                    log.info("instagram: turning notifications on (%s)", control)
+                    if await self._evaluate(session, CLICK_JS) == "clicked":
+                        await asyncio.sleep(3)
+                        after = json.loads(await self._evaluate(session, PUSH_JS) or "{}")
+                        if after.get("subscribed"):
+                            log.info("instagram: push notifications are on")
+                            return
+                log.warning("instagram: no push subscription, so its notifications never reach Hermes: "
+                            "open instagram.com in Hermes' Chrome and turn its notifications on "
+                            "(%s here)", state.get("permission", "unknown"))
+        except Exception as err:
+            log.warning("instagram: could not check push notifications: %s", err)
 
 
 async def resolve_instagram(instagram: Instagram, pipeline: Pipeline, payload: dict, chat: Chat,
@@ -438,6 +540,7 @@ async def instagram_watch(pipeline: Pipeline, devtools: str, host: str = "instag
                     cdp = CDP(ws)
                     if instagram:
                         instagram.cdp = cdp
+                        cdp.spawn(instagram.prepare())
                     reader = asyncio.create_task(read(ws, cdp, pipeline, host, instagram))
                     await cdp.call("Browser.grantPermissions", {"origin": origin, "permissions": ["notifications"]})
                     await cdp.call("Target.setAutoAttach", {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True})

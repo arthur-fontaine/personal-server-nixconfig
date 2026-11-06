@@ -13,6 +13,10 @@ let
   daemon = pkgs.runCommand "hermes-events" { } ''
     mkdir -p $out
     cp -R ${../events/hermes_events} $out/hermes_events
+    chmod -R u+w $out/hermes_events
+    # The DM script the daemon reads Instagram's inbox with: one source, the
+    # one the Instagram skill loads into the page (../agent/skills/instagram).
+    cp ${../agent/skills/instagram/direct.js} $out/hermes_events/direct.js
   '';
 
   imcp = "/Applications/iMCP.app/Contents/MacOS/imcp-server";

@@ -73,14 +73,17 @@ apart from the new messages (`hermes_events/history.py`):
 - iMessage, SMS: `imsg history --chat-id … --end …`.
 - Instagram: its notifications carry the message but not who sent it. The
   daemon finds the thread, by the id in the notification's link or else by
-  the message among the inbox's latest (and the requests'), through
-  Instagram's web API in the logged-in browser: a background tab on
-  instagram.com/robots.txt, which runs none of Instagram's scripts, fetches it
-  with the browser's cookies and closes. Reading a thread through the API
-  does not mark it seen (that is its own call, never made), unlike opening it.
-  The thread gives the sender's and the group's names, one chat per thread
-  (two people no longer batch together), its history, and whether you already
-  answered from your phone (then nothing is proposed).
+  the message among the inbox's latest, by loading `direct.js` — the script
+  the `instagram` skill uses — in a background tab: it reads the app's own
+  traffic and the tab closes. Its DM API is gone (404 with the logged-out
+  page) and the calls it makes now are signed, so a hand-built request would
+  be an unofficial client. The row gives the thread's name, its participants
+  and its newest message: enough for the sender's name in a one-to-one
+  thread, one chat per thread, and the group's name in a group. Its earlier
+  messages are not read: opening a thread is what marks them seen, and the
+  user would then get no notification on their phone. So an Instagram event
+  arrives without the conversation before it, and the daemon cannot tell
+  whether you already answered it from your phone.
 - Discord: none yet.
 
 When a source cannot be read, the event goes on without its history.
@@ -91,7 +94,7 @@ When a source cannot be read, the event goes on without its history.
 | --- | --- | --- | --- |
 | WhatsApp | messages to you | `wacli sync --webhook` | done |
 | iMessage, SMS | messages to you | `imsg watch --json` | done |
-| Instagram | its notifications (DMs, comments, mentions…) | Web Push to Hermes' always-open Google Chrome; the daemon hooks `showNotification` in Instagram's service worker over CDP | done |
+| Instagram | its notifications (DMs, comments, mentions…) | Web Push to Hermes' always-open Google Chrome; the daemon hooks `showNotification` in Instagram's service worker over CDP, then reads the inbox from the page itself (`direct.js`) for the sender | done |
 | Discord | its notifications (DMs, mentions) | a Discord tab the daemon keeps open in that Chrome, hooked on each document (Discord notifies from the open tab, not through push); logged out, it says so once in the main chat | done |
 | Home Assistant | state changes in the watched domains (locks, the alarm, binary sensors, people) and entities, one per entity per 30 s | its WebSocket API (`state_changed`), with `HASS_TOKEN`; `server.hermes.homeassistant.watchDomains` / `watchEntities` | done |
 | HomeKit | accessory changes you choose (door, motion, leak…) | HomeClaw's webhook | done |

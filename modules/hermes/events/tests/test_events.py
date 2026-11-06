@@ -24,7 +24,8 @@ from hermes_events.hermes import HermesSink  # noqa: E402
 from hermes_events.sources import imessage_message, whatsapp_app, whatsapp_message  # noqa: E402
 from hermes_events.triage import UzuTriage  # noqa: E402
 from hermes_events.browser import (  # noqa: E402
-    Instagram, keep_discord, Thread, instagram_message, notification_message, resolve_instagram, thread_id_of)
+    Instagram, keep_discord, Thread, instagram_message, notification_message, resolve_instagram,
+    thread_from_inbox, thread_id_of)
 from hermes_events.history import Context, History, imessage_earlier, whatsapp_earlier  # noqa: E402
 from hermes_events import pollers  # noqa: E402
 import sqlite3  # noqa: E402
@@ -697,6 +698,66 @@ class HistoryTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(sink.events), 1)
 
 
+# Invented: the app's inbox shape, no real thread, person or message.
+INBOX_ROW = {
+    "id": "1000000000000001",
+    "v2": "340282366841710300949128000000000000001",
+    "name": "Zoé",
+    "users": ["zoe.martin"],
+    "text": "On se voit toujours à 20 h ?",
+    "at": 1767225600123,
+    "group": False,
+    "unread": False,
+}
+
+
+class InstagramInboxTest(unittest.IsolatedAsyncioTestCase):
+    """The inbox row, which is all the daemon reads now: Instagram's own
+    preview is the newest message, and the row names the thread."""
+
+    def test_a_row_becomes_a_thread(self):
+        thread = thread_from_inbox(INBOX_ROW)
+        self.assertEqual((thread.id, thread.name, thread.is_group), ("1000000000000001", "Zoé", False))
+        self.assertEqual(thread.sender_of("On se voit toujours à 20 h ?"), "zoe.martin")
+        self.assertAlmostEqual(thread.items[0].time, 1767225600.123)
+        # The user's own last message: theirs, so nothing to answer.
+        mine = thread_from_inbox({**INBOX_ROW, "text": "You: ok"})
+        self.assertEqual(mine.items[0].sender, "me")
+        mine_fr = thread_from_inbox({**INBOX_ROW, "text": "Vous : ok"})
+        self.assertEqual(mine_fr.items[0].sender, "me")
+        # A group names the thread, not who in it wrote.
+        group = thread_from_inbox({**INBOX_ROW, "group": True, "users": ["a", "b"], "text": "oui"})
+        self.assertFalse(group.sender_of("oui"))
+        # No id: no chat to key on.
+        self.assertIsNone(thread_from_inbox({"name": "x", "text": "y"}))
+        # No preview (a photo, a video): the thread, without an item.
+        self.assertEqual(thread_from_inbox({**INBOX_ROW, "text": ""}).items, [])
+
+    def test_the_notification_names_its_sender(self):
+        thread = thread_from_inbox(INBOX_ROW)
+        self.assertEqual(thread.sender_of("On se voit toujours à 20 h ?"), "zoe.martin")
+
+    async def test_one_read_serves_a_burst(self):
+        class Counting(Instagram):
+            def __init__(self):
+                super().__init__()
+                self.rows, self.reads = [INBOX_ROW, {**INBOX_ROW, "id": "1000000000000002", "name": "Nino",
+                                                     "users": ["nino.dupont"], "text": "à tout à l’heure"}], 0
+
+            async def _read(self):
+                self.reads += 1
+                return self.rows
+
+        ig = Counting()
+        ig.cdp = object()  # inbox() only asks that the browser is there
+        self.assertEqual((await ig.find("à tout à l’heure")).name, "Nino")
+        self.assertEqual((await ig.thread("1000000000000001")).name, "Zoé")
+        self.assertIsNone(await ig.find("un message qui n’est dans aucune ligne"))
+        self.assertEqual(ig.reads, 1)
+        await ig.inbox(refresh=True)
+        self.assertEqual(ig.reads, 2)
+
+
 class InstagramThreadTest(unittest.IsolatedAsyncioTestCase):
     def test_thread_and_its_context(self):
         thread = Thread.parse(ig_thread([("2", NOW - 3600, "tu viens ce soir ?"), ("1", NOW - 3500, "oui"),
@@ -762,33 +823,42 @@ class InstagramThreadTest(unittest.IsolatedAsyncioTestCase):
         await resolve_instagram(Fake(None), P(), {"data": json.dumps({"uri": "direct_v2?id=12345678"})}, chat, message)
         self.assertEqual((got[1][0].key, got[1][1].sender), ("instagram:instagram", message.sender))
 
-    async def test_api_through_a_tab(self):
+    async def test_the_inbox_through_a_tab(self):
+        """One background tab, direct.js in it, the app's own inbox out of it."""
         calls = []
 
         class FakeCDP:
+            expression = ""
+
             async def call(self, method, params=None, session=None):
                 calls.append(method)
                 if method == "Target.createTarget":
                     return {"result": {"targetId": "T"}}
                 if method == "Target.attachToTarget":
                     return {"result": {"sessionId": "S"}}
-                if method == "Runtime.evaluate" and params["expression"] == "location.origin":
-                    return {"result": {"result": {"value": "https://www.instagram.com"}}}
                 if method == "Runtime.evaluate":
-                    self.expression = params["expression"]
-                    return {"result": {"result": {"value": [json.dumps({"thread": ig_thread([("2", NOW, "yo")])})]}}}
+                    FakeCDP.expression = params["expression"]
+                    if "__ig" not in FakeCDP.expression:
+                        return {"result": {"result": {"value": ""}}}
+                    return {"result": {"result": {"value": json.dumps({"count": 1, "threads": [INBOX_ROW]})}}}
                 return {"result": {}}
 
         ig = Instagram()
-        self.assertIsNone(await ig.thread("123"))  # not connected yet
+        self.assertEqual(await ig.inbox(), [])  # not connected yet
         ig.cdp = FakeCDP()
-        thread = await ig.thread("340282366841710300949128")
-        self.assertEqual(thread.items[0].text, "yo")
-        self.assertIn("/api/v1/direct_v2/threads/340282366841710300949128/", ig.cdp.expression)
-        self.assertNotIn("seen", ig.cdp.expression)
+        rows = await ig.inbox()
+        self.assertEqual([r["id"] for r in rows], ["1000000000000001"])
+        self.assertIn("__ig.inbox()", FakeCDP.expression)
+        self.assertNotIn("seen", FakeCDP.expression)
+        # The script goes in before the page runs, and the tab closes.
+        self.assertIn("Page.addScriptToEvaluateOnNewDocument", calls)
         self.assertEqual(calls[-1], "Target.closeTarget")
+        # The same read serves find() and thread(): one tab for a burst.
+        self.assertEqual((await ig.find("On se voit toujours à 20 h ?")).name, "Zoé")
+        self.assertEqual((await ig.thread("1000000000000001")).name, "Zoé")
+        self.assertEqual(calls.count("Target.createTarget"), 1)
+        # An id that is not one is refused before anything opens.
         self.assertIsNone(await ig.thread("1; alert(1)"))
-
 
 
 class DiscordTest(unittest.IsolatedAsyncioTestCase):
