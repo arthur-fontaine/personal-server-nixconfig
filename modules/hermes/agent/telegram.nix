@@ -43,5 +43,12 @@
     # Telegram's default already, kept here so the prompt does not rest on it
     # (gateway/display_config.py, _TIER_HIGH).
     display.platforms.telegram.interim_assistant_messages = true;
+
+    # A message sent while a turn runs waits for that turn and runs as the
+    # next one (website/docs/user-guide/messaging/index.md, "busy input").
+    # Hermes' default redirects the running turn instead, which derails a long
+    # task — the user asking where a build stood was told the agent would be
+    # redirected, and the task went on from wherever the message landed.
+    display.busy_input_mode = "queue";
   };
 }

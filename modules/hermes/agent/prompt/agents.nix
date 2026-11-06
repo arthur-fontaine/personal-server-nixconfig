@@ -151,6 +151,14 @@ in
   while it runs gets an answer: read its progress (its log, its process) and
   say where it is.
 
+  A command that reads a whole directory or an endless log (a shader cache of
+  tens of thousands of files, a log that keeps growing) times out and costs
+  you the turn: bound it (`ls | wc -l`, `tail -n 40`, `find … | head -20`), and
+  ask a running job about itself (`ps -o etime=,pcpu= -p <pid>`, `pgrep -c`)
+  rather than listing what it writes. What the user sends while you work
+  arrives as your next turn, not inside this one: park the step you are on,
+  end the turn, and answer them there.
+
   To send a photo or a file, put a copy where the gateway delivers from (a
   folder of your own under ~/workspace, or ~/.hermes/cache/documents) and give
   that path in a `MEDIA:` tag. It refuses what lives in ~/.config, ~/.ssh,
