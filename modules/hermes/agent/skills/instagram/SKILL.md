@@ -1,7 +1,7 @@
 ---
 name: instagram
 description: Read and send the user's Instagram DMs, browse their feed and stories, and post, through instagram.com in your browser, where they are logged in.
-version: 1.0.0
+version: 1.1.0
 author: personal-server-nixconfig
 license: MIT
 platforms: [macos]
@@ -50,10 +50,11 @@ print(js('__ig.inbox()'))   # js() awaits, so send() and clear() come back settl
 ```
 
 - `__ig.inbox()`: `{count, unread, threads, rows}`. `threads` are the app's own
-  inbox rows: `{id, v2, name, users, text, at, unread}`, newest first. `id` is
-  what `/direct/t/<id>/` takes (`v2` is the 128-bit form of the same thread);
-  `text` is the preview the app itself shows — a real snippet, or "You sent a
-  video."; `at` is milliseconds since the epoch. `rows` are the page's texts
+  inbox rows: `{id, v2, name, users, group, text, at, unread}`, newest first.
+  `id` is what `/direct/t/<id>/` takes (`v2` is the 128-bit form of the same
+  thread); `text` is the preview the app itself shows — a real snippet, or "You
+  sent a video."; `at` is milliseconds since the epoch; `group` is true when
+  the thread has more than one other person. `rows` are the page's texts
   ("Camille 2 nouveaux messages · 17m Non lu"), for confirming a name or when
   `threads` comes back empty.
 - A push notification that names no sender is answered from `threads`: the row
@@ -61,13 +62,26 @@ print(js('__ig.inbox()'))   # js() awaits, so send() and clear() come back settl
 - `__ig.diag()`: `url`, `title`, `fromTraffic`, `rows`, the captured request
   URLs, the first one's key paths (`shape`), and whether a message box and a
   Send button are on the page. Read it first whenever something looks empty.
-- `__ig.thread()`: `{id, text}` for the thread open in the tab — the transcript
-  as the page shows it, names and times included.
+- `__ig.thread()`: `{id, me, messages, text}` for the thread open in the tab.
+  `messages` is oldest first, each `{sender, me, text, at}`: `me` is true for
+  the user's own lines, `sender` is the username the payload names, "me", or
+  "someone" when the app never said who the viewer is. **Who wrote what comes
+  from `messages`, never from reading `text` in order**: a transcript shows the
+  user's own bubbles the same way as everyone else's, so guessing an author
+  there is how you tell them a message of theirs was someone else's. `text` is
+  the visible transcript, for a layout question only.
 - `__ig.send('text')`: types into the open thread's box, clicks the page's own
-  Send button, waits, and returns `{sent, how, after}`. Read `after` to confirm
-  it landed. The Send button only exists once the box has text (an empty box
-  shows emoji, voice clip, photo and GIF instead), so `sendButton: false` in an
-  empty thread is normal.
+  Send button, waits, and reads the box back. `{sent: true, how, after}` means
+  the app took it, `after` being the tail of the transcript. `{sent: false,
+  needsRealClick: true, point}` means the app **ignored the scripted click**
+  and the text is still in the box: click `point` with a real pointer
+  (`cdp('Input.dispatchMouseEvent', type='mousePressed', x=point['x'],
+  y=point['y'], button='left', clickCount=1)`, then `mouseReleased`), then
+  confirm with `thread()`. Never report a message as sent on the strength of
+  `send()` alone — `sent` or a `You:` line in the thread, nothing else. The
+  Send button only exists once the box has text (an empty box shows emoji,
+  voice clip, photo and GIF instead), so `sendButton: false` in an empty
+  thread is normal. `__ig.sendPoint()` gives the button's `{x, y}` on its own.
 - `__ig.clear()`: empties the box without sending (`{cleared}`). Use it when a
   draft must not go out.
 

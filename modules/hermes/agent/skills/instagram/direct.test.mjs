@@ -23,9 +23,17 @@ const check = (name, got, want) => {
 };
 
 // ── the page, as the script sees it ────────────────────────────────────────
-const state = { clicks: 0, typed: null, backspace: false, range: false };
+const state = { clicks: 0, typed: null, backspace: false, range: false, ignoreClicks: false };
 const sendIcon = { getAttribute: (k) => (k === "aria-label" ? "Send" : null), closest: () => sendButtonNode };
-const sendButtonNode = { click: () => state.clicks++, dispatchEvent: () => true };
+const sendButtonNode = {
+  // The app empties the box when it sends, and ignores a scripted click.
+  click: () => {
+    state.clicks++;
+    if (!state.ignoreClicks) box.textContent = "";
+  },
+  dispatchEvent: () => true,
+  getBoundingClientRect: () => ({ left: 1200, top: 850, width: 30, height: 30 }),
+};
 
 const box = {
   tagName: "DIV",
@@ -74,7 +82,7 @@ globalThis.document = {
 };
 
 // ── what the app fetched, shaped like the real inbox response ──────────────
-const payload = {
+let payload = {
   data: {
     inbox: {
       threads: [
@@ -163,6 +171,40 @@ const thread = ig.thread();
 check("thread id from the URL", thread.id, "1000000000000001");
 check("thread text", thread.text.includes("On se voit toujours"), true);
 
+// ── the thread the page has open: who said what ────────────────────────────
+// Instagram stamps items in microseconds and names their author by `user_id`;
+// `viewer_id` is the app saying which of them is the user.
+const openPayload = {
+  data: {
+    viewer_id: "4242",
+    thread: {
+      id: "1000000000000001",
+      thread_id: "340282366841710300949128000000000000001",
+      thread_title: "Zoé, Nino et Sam",
+      users: [{ pk: "4242", username: "azur.exemple" }, { pk: "7", username: "zoe.martin" }],
+      items: [
+        { item_id: "1", user_id: "7", timestamp: 1767225000000000, item_type: "text", text: "Bubble tea ?" },
+        { item_id: "2", user_id: "4242", timestamp: 1767225600000000, item_type: "text", text: "?" },
+        { item_id: "3", user_id: "7", timestamp: 1767225660000000, item_type: "like" },
+      ],
+    },
+  },
+};
+// The response the hook's own fetch returns: swap what it answers with.
+payload = openPayload;
+globalThis.fetch("https://www.instagram.com/api/graphql/thread");
+await settle();
+await settle();
+
+const open = ig.thread();
+check("thread: id from the URL", open.id, "1000000000000001");
+check("thread: the user, as the app named them", open.me, "4242");
+check("thread: each message with its sender", open.messages, [
+  { sender: "zoe.martin", me: false, text: "Bubble tea ?", at: 1767225000000 },
+  { sender: "me", me: true, text: "?", at: 1767225600000 },
+  { sender: "zoe.martin", me: false, text: "❤️", at: 1767225660000 },
+]);
+
 // ── sending ────────────────────────────────────────────────────────────────
 check("empty send refused", await ig.send("   "), { sent: false, reason: "empty text" });
 
@@ -171,6 +213,17 @@ check("typed into the box", state.typed, "On se retrouve à 20 h 30 ?");
 check("clicked the page's Send button", state.clicks, 1);
 check("reported how", sent.how, "the page's Send button");
 check("reported sent", sent.sent, true);
+check("where the button is, for a real click", ig.sendPoint(), { found: true, x: 1215, y: 865 });
+
+// The app's handler wants a real pointer: a scripted click leaves the text in
+// the box, and the answer must say so (with the point to click) instead of
+// claiming it went.
+state.ignoreClicks = true;
+const refused = await ig.send("On se retrouve à 20 h 30 ?");
+check("a click that was ignored is not a send", refused.sent, false);
+check("it asks for a real click", refused.needsRealClick, true);
+check("with the button's point", refused.point, { found: true, x: 1215, y: 865 });
+state.ignoreClicks = false;
 
 // ── a draft that must not be sent can be emptied ───────────────────────────
 const cleared = await ig.clear();

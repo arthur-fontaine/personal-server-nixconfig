@@ -21,7 +21,7 @@
   "use strict";
   if (typeof globalThis === "undefined") return "no globalThis";
 
-  const VERSION = 2;
+  const VERSION = 3;
   const ig = (globalThis.__ig = globalThis.__ig || {});
   if (ig.version === VERSION) return "already installed";
   ig.version = VERSION;
@@ -30,6 +30,26 @@
   const INTERESTING = /direct|inbox|thread|graphql/i;
   const MAX_RESPONSES = 40;
   const responses = [];
+
+  // Who the user is, out of whatever the app says about itself: `viewer_id`
+  // on an inbox payload, `viewer.pk` on a thread's. Without it an item's
+  // sender stays unknown rather than guessed.
+  let viewer = null;
+  const noteViewer = (node, depth) => {
+    if (viewer || !node || typeof node !== "object" || depth > 12) return;
+    if (!Array.isArray(node)) {
+      const id = node.viewer_id != null
+        ? node.viewer_id
+        : node.viewer && typeof node.viewer === "object"
+          ? node.viewer.pk ?? node.viewer.pk_id ?? node.viewer.id
+          : null;
+      if (id != null) {
+        viewer = String(id);
+        return;
+      }
+    }
+    for (const value of Array.isArray(node) ? node : Object.values(node)) noteViewer(value, depth + 1);
+  };
 
   const keep = (url, body) => {
     if (!body || typeof body !== "object") return;
@@ -40,6 +60,7 @@
     }
     responses.push({ url: String(url), at: Date.now(), body });
     if (responses.length > MAX_RESPONSES) responses.shift();
+    noteViewer(body, 0);
   };
 
   const hookFetch = () => {
@@ -230,6 +251,24 @@
     return labelled.closest('[role="button"], button, [role="link"]') || labelled;
   };
 
+  // What is still typed in the box, and where the button is on screen.
+  const draft = (box) => String(box.value ?? box.textContent ?? "").trim();
+  const pointOf = (el) => {
+    const rect = el && typeof el.getBoundingClientRect === "function" ? el.getBoundingClientRect() : null;
+    if (!rect || (!rect.width && !rect.height)) return null;
+    return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+  };
+
+  // Where to click, for a caller that can send a real pointer (SKILL.md,
+  // "sending"): the app's own handler ignores a scripted click.
+  ig.sendPoint = () => {
+    const button = sendButton();
+    if (!button) return { found: false, reason: "no Send button on this page: the text is not typed yet" };
+    const point = pointOf(button);
+    if (!point) return { found: false, reason: "the Send button has no box on screen" };
+    return { found: true, ...point };
+  };
+
   const insert = (box, text) => {
     if (box.tagName === "TEXTAREA") {
       const setter = Object.getOwnPropertyDescriptor(globalThis.HTMLTextAreaElement.prototype, "value")?.set;
@@ -291,10 +330,52 @@
     };
   };
 
-  ig.thread = () => ({
-    id: (String(globalThis.location?.href || "").match(/\/direct\/t\/(\d+)/) || [])[1] || null,
-    text: visible().slice(-4000),
-  });
+  // The open thread's messages, each with the sender the payload names: read
+  // in order, a transcript cannot tell the user's own line from the others'.
+  const itemText = (item) => {
+    if (item.text) return String(item.text);
+    const kind = item.item_type || "";
+    if (kind === "link") return String((item.link || {}).text || "[link]");
+    if (kind === "reel_share") return `[replied to a story] ${(item.reel_share || {}).text || ""}`.trim();
+    if (kind === "action_log") return String((item.action_log || {}).description || "");
+    return {
+      voice_media: "[voice message]", like: "❤️", media: "[photo]", raven_media: "[photo]",
+      animated_media: "[GIF]", media_share: "[shared post]", clip: "[shared reel]", story_share: "[shared story]",
+    }[kind] || (kind ? `[${kind}]` : "");
+  };
+
+  const openThread = () => {
+    const found = [];
+    for (const { body } of responses) walk(body, found, 0);
+    const withItems = found.filter((t) => Array.isArray(t.items) && t.items.length);
+    return withItems.length ? withItems[withItems.length - 1] : null;
+  };
+
+  ig.thread = () => {
+    const opened = openThread();
+    const id = (String(globalThis.location?.href || "").match(/\/direct\/t\/(\d+)/) || [])[1]
+      || (opened ? idOf(opened) : null);
+    const out = { id, me: viewer, messages: null, text: visible().slice(-4000) };
+    if (!opened) return out;
+    const users = new Map(
+      (Array.isArray(opened.users) ? opened.users : Object.values(opened.users || {}))
+        .map((u) => [String(u.pk ?? u.pk_id ?? u.id ?? ""), u.username || u.full_name || ""]),
+    );
+    out.messages = opened.items.map((item) => {
+      // Instagram stamps items in microseconds.
+      const raw = Number(item.timestamp || 0);
+      const at = raw ? (raw > 1e14 ? Math.round(raw / 1000) : raw) : null;
+      const uid = String(item.user_id ?? "");
+      const mine = Boolean(viewer) && uid === viewer;
+      return {
+        sender: mine ? "me" : users.get(uid) || "someone",
+        me: mine,
+        text: itemText(item),
+        at,
+      };
+    }).filter((m) => m.text);
+    return out;
+  };
 
   // Type and click Send. Nothing else clicks anything: the app's own button
   // sends, with the app's own request.
@@ -307,15 +388,24 @@
     if (!button) {
       return { sent: false, reason: "typed, but no Send button appeared: press Enter yourself or check the box" };
     }
-    button.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-    button.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    if (!draft(box)) {
+      return { sent: false, reason: "the text did not reach the box: open the thread and try again" };
+    }
+    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+      button.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
+    }
     button.click();
     await pause(700);
+    // Read back, never assume: the app empties the box when it sends, and
+    // ignores a scripted click on this button (it wants a real pointer).
+    if (!draft(box)) {
+      return { sent: true, how: "the page's Send button", after: visible().slice(-400) };
+    }
     return {
-      sent: true,
-      how: "the page's Send button",
-      // Read back: the transcript is what says whether it went.
-      after: visible().slice(-400),
+      sent: false,
+      reason: "the text is still in the box: the app ignored the scripted click",
+      needsRealClick: true,
+      point: ig.sendPoint(),
     };
   };
 
