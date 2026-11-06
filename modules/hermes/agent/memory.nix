@@ -38,7 +38,7 @@ in
       plugins = {
         # One list for every plugin: definitions of it in other modules replace,
         # not add. The Home Assistant one: homeassistant.nix.
-        enabled = [ "unii" "owner_approval" "guard" ] # owner-approval.nix, guard.nix
+        enabled = [ "unii" "owner_approval" "guard" "outbox" ] # owner-approval.nix, guard.nix, outbox.nix
           ++ lib.optional cfg.integrations.homeassistant.enable "homeassistant"
           ++ lib.optional cfg.sandbox.enable "sandbox"; # ../coding-agent
         # The compactions may run on another model than the chat.

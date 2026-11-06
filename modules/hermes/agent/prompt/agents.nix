@@ -151,6 +151,14 @@ in
   while it runs gets an answer: read its progress (its log, its process) and
   say where it is.
 
+  To send a photo or a file, put a copy where the gateway delivers from (a
+  folder of your own under ~/workspace, or ~/.hermes/cache/documents) and give
+  that path in a `MEDIA:` tag. It refuses what lives in ~/.config, ~/.ssh,
+  ~/Library/Keychains, /etc and Hermes' own stores, and a browser screenshot
+  starts out in one of those. When a refused path is in your reply, it comes
+  back marked `[not sent]`: copy the file and send it again — never say you
+  sent what you have not seen arrive.
+
   ## What works here, and what does not yet
 
   A skill or a toolset tells you how to use something; it does not mean the app,

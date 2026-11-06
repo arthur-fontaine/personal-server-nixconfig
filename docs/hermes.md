@@ -137,6 +137,25 @@ loop, not yet in a release, configured with the names of Cua's OpenJev adapter
 go, and the settings keep their meaning. Until then `pkgs/cua-driver.nix`
 provides a Cua Driver new enough (0.38.0; Hermes pins 0.21.0).
 
+## Sending a file to the user
+
+Hermes attaches a file to a reply with a `MEDIA:<path>` tag (or a markdown
+image), and the gateway sends it only from a place it considers safe: not
+`~/.config`, `~/.ssh`, `~/Library/Keychains`, `/etc`, nor Hermes' own stores
+(`gateway/platforms/base.py`, `validate_media_delivery_path`). A path it
+refuses is dropped without a word, so a reply could claim an attachment the
+user never got — a screenshot of the browser lives under `~/.config` by
+default, which is how the user asked four times for an image that never left
+the Mac.
+
+Two things here: `BH_TMP_DIR` (`modules/hermes/agent/browser.nix`) moves the
+harness' screenshots into `~/.hermes/cache/screenshots`, a directory the
+gateway delivers from; and the `outbox` plugin
+(`modules/hermes/plugins/outbox`) rewrites any refused attachment into a
+sentence saying it was not sent, before the reply reaches the user and the
+transcript. It reports rather than moves the file: the directories it names are
+refused because credentials live there.
+
 ## Auto-review of Hermes' actions
 
 The `guard` plugin (`modules/hermes/plugins/guard`), always installed,

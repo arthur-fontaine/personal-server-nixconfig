@@ -36,6 +36,7 @@ modules/
     plugins/unii/         the single-chat memory and sub-chats (Python)
     plugins/guard/        the auto-review of Hermes' actions by a decision model (Python)
     plugins/owner_approval/  asks you with Telegram buttons from outside a turn, for other plugins (Python)
+    plugins/outbox/       says so when the gateway will not send an attachment of a reply (Python)
     coding-agent/         Pi sessions in a microVM, their branch reviewed (docs/sandbox.md)
       default.nix         server.hermes.sandbox, and its wiring into Hermes (imported by options/ and agent/)
       hermes-plugin/      the plugin "sandbox": sandbox_run…, the broker's actions (Python)
@@ -52,7 +53,7 @@ modules/
 
 ```sh
 nix flake check                                   # everything below
-nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval)
+nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval, outbox)
 nix build .#checks.aarch64-darwin.coding-agent    # the coding agent's plugin, against a fake sidecar
 nix build .#checks.aarch64-darwin.sandbox         # the coding agent's sidecar tests, in its build
 nix build .#checks.aarch64-darwin.events          # the events daemon's tests

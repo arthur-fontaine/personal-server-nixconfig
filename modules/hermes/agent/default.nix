@@ -18,6 +18,7 @@ in
     ./computer-use.nix
     ./fast-act.nix
     ./guard.nix
+    ./outbox.nix
     (import ../coding-agent).agent
     ./owner-approval.nix
     ./apple.nix

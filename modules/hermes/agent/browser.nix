@@ -36,6 +36,15 @@ in
 
   services.hermes-agent.settings.browser.cdp_url = "http://127.0.0.1:${port}";
 
+  # Where the browser harness writes its screenshots (BH_TMP_DIR,
+  # tools/browser_harness_dirs.py). Its default, ~/.config/browser-harness/tmp,
+  # is one of the directories the gateway refuses to deliver files from
+  # (gateway/platforms/base.py, _MEDIA_DELIVERY_DENIED_HOME_SUBPATHS): asked for
+  # one, Hermes could take the screenshot and never send it. A cache root is
+  # deliverable in every mode, and pruned as the cache it is.
+  services.hermes-agent.environment.BH_TMP_DIR =
+    "${server.hermes.home}/.hermes/cache/screenshots/browser-harness";
+
   home.activation.browserProfile = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     run mkdir -p ${profile}
     run chmod 0700 ${profile}

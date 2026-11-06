@@ -1,0 +1,6 @@
+name: outbox
+version: 1.0.0
+description: "A reply says when an attachment was not sent, instead of leaving the user with a tag the gateway dropped and no file."
+author: "personal-server-nixconfig"
+provides_hooks:
+  - transform_llm_output
