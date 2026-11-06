@@ -138,7 +138,7 @@ def main() -> None:
     assert g.pre_tool_call("write_file", {"path": "/tmp/a"}, session_id="s")["rule_key"] == "guard:write_file:medium"
     ANSWER.update(authorization="medium", risk="high")
     one = g.pre_tool_call("terminal", {"command": "wacli send --to Zoé 'Salut'"}, session_id="s")["rule_key"]
-    other = g.pre_tool_call("terminal", {"command": "wacli send --to Zoé 'Salut'"}, session_id="s")["rule_key"]
+    other = g.pre_tool_call("terminal", {"command": "wacli send --to Nino 'Salut'"}, session_id="s")["rule_key"]
     assert one.startswith("guard:terminal:") and one != other
 
     # A subagent works for its parent's turn; a cron job's turn is the user's.

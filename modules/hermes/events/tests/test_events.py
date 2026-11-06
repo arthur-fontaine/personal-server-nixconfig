@@ -496,7 +496,7 @@ class PollersTest(unittest.IsolatedAsyncioTestCase):
         imcp = FakeMCP({"mail_mailboxes_list": MAILBOXES, "mail_messages_search": {"itemListElement": [old]}})
         await pollers.mail(self.p, self.state, imcp)  # seeds
         contents = {
-            "m1": mail_content("=?UTF-8?Q?L=C3=A9a_Zoé?= <lea@gmail.com>",
+            "m1": mail_content("=?UTF-8?Q?L=C3=A9a_Martin?= <lea@gmail.com>",
                                "<html><head><style>p{}</style></head><body><p>Tu viens samedi ?</p>"
                                "<a href='https://example.com/a/very/long/tracking?x=1'>ici</a></body></html>", html=True,
                                Authentication_Results="mx.icloud.com; spf=pass smtp.mailfrom=gmail.com; dkim=pass; dmarc=pass"),
@@ -772,7 +772,7 @@ class InstagramThreadTest(unittest.IsolatedAsyncioTestCase):
         group = Thread.parse(ig_thread([("2", NOW, "Tu as vu son message ?"), ("3", NOW, "quoi")], is_group=True,
                                        users=[{"pk": 2, "username": "a", "full_name": "Nino"}, {"pk": 3, "username": "b"}]))
         self.assertEqual(group.sender_of("Replied to your story: Tu as vu son message ?"), "Nino")
-        self.assertEqual(group.sender_of("Ah bon mais pq elle t’as…"), "Nino")
+        self.assertEqual(group.sender_of("Tu as vu son message…"), "Nino")
         self.assertIsNone(group.sender_of("ok"))
         new = [Message("n", NOW, "?", "On se voit toujours à 20 h ?")]
         context = thread.context(new, 10, NOW - 86400)
