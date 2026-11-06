@@ -37,5 +37,11 @@
       enabled = true;
       transport = "auto";
     };
+
+    # What Hermes writes between its tool calls reaches the chat as its own
+    # message: the progress news the prompt asks for (prompt/agents.nix).
+    # Telegram's default already, kept here so the prompt does not rest on it
+    # (gateway/display_config.py, _TIER_HIGH).
+    display.platforms.telegram.interim_assistant_messages = true;
   };
 }
