@@ -32,38 +32,62 @@ Open https://www.instagram.com/. If it shows the login form:
 
 ## Do
 
-- Reading DMs: opening a thread marks its messages seen, and the user then
-  gets no notification on their phone. So read the inbox without opening
-  anything, in `browser_exec`. The site's old DM API answers 404 now
-  (`/api/v1/direct_v2/inbox/` returns the logged-out page): read the page's
-  own thread list instead, which carries who wrote, the last message and when.
+DMs go through `direct.js`, which sits next to this file and runs inside the
+page: it reads the inbox out of the app's own traffic and writes with the
+app's own message box. Never call an Instagram endpoint yourself — its DM
+paths are signed and renamed between releases, and a hand-built one is an
+unofficial client.
 
-  ```python
-  # A narrow page shows only the empty "Your messages" panel: render wide.
-  cdp('Emulation.setDeviceMetricsOverride', width=1280, height=900,
-      deviceScaleFactor=1, mobile=False)
-  goto_url('https://www.instagram.com/direct/inbox/')
-  wait_for_load()
-  print(page_info(), js('document.title'))
-  print(js('''[...document.querySelectorAll('a[href^="/direct/t/"]')].map(a => {
-    const text = (a.innerText || '').replace(/\\s+/g, ' ').trim();
-    return text + '  ->  ' + a.getAttribute('href');
-  })'''))
-  ```
+```python
+SCRIPT = open('/Users/hermes/.hermes/skills/social-media/instagram/direct.js').read()
+cdp('Page.addScriptToEvaluateOnNewDocument', source=SCRIPT)  # every page load
+# A narrow page only renders its empty state: work wide.
+cdp('Emulation.setDeviceMetricsOverride', width=1280, height=900,
+    deviceScaleFactor=1, mobile=False)
+goto_url('https://www.instagram.com/direct/inbox/')
+wait_for_load()
+print(js('__ig.inbox()'))   # js() awaits, so send() and clear() come back settled
+```
 
-  One line per thread: the names, the newest message and its time, then the
-  thread id the URL needs. Messages in a thread come from its `[role="main"]`
-  text, which is why opening one marks it seen. A notification that names no
-  sender (Instagram's own pushes rarely do) is answered from this list: find
-  the line whose text matches the notification, and its names are who wrote.
-  Requests from people the user does not follow are under "Requests" at the
-  top of that page.
-  An empty list means the page has not loaded (wait for it and read again) or
-  the account is not logged in; `document.title` tells the two apart. Conclude
-  nothing before both are ruled out.
-- Sending: https://www.instagram.com/direct/t/<thread_id>/ (or the inbox,
-  then the thread). Send with the thread's message box, then leave for the
-  inbox.
+- `__ig.inbox()`: `{count, unread, threads, rows}`. `threads` are the app's own
+  inbox rows: `{id, v2, name, users, text, at, unread}`, newest first. `id` is
+  what `/direct/t/<id>/` takes (`v2` is the 128-bit form of the same thread);
+  `text` is the preview the app itself shows — a real snippet, or "You sent a
+  video."; `at` is milliseconds since the epoch. `rows` are the page's texts
+  ("Camille 2 nouveaux messages · 17m Non lu"), for confirming a name or when
+  `threads` comes back empty.
+- A push notification that names no sender is answered from `threads`: the row
+  whose snippet matches is who wrote, and `name`/`users` say who they are.
+- `__ig.diag()`: `url`, `title`, `fromTraffic`, `rows`, the captured request
+  URLs, the first one's key paths (`shape`), and whether a message box and a
+  Send button are on the page. Read it first whenever something looks empty.
+- `__ig.thread()`: `{id, text}` for the thread open in the tab — the transcript
+  as the page shows it, names and times included.
+- `__ig.send('text')`: types into the open thread's box, clicks the page's own
+  Send button, waits, and returns `{sent, how, after}`. Read `after` to confirm
+  it landed. The Send button only exists once the box has text (an empty box
+  shows emoji, voice clip, photo and GIF instead), so `sendButton: false` in an
+  empty thread is normal.
+- `__ig.clear()`: empties the box without sending (`{cleared}`). Use it when a
+  draft must not go out.
+
+Open a thread with `goto_url('https://www.instagram.com/direct/t/<id>/')`.
+Opening one marks its messages seen, and the user then gets no notification on
+their phone; reading `inbox()` does not. So read the inbox first, and open a
+thread only when the task needs what is inside it. Requests from people the
+user does not follow are under "Requests" at the top of the inbox.
+
+When it is empty:
+
+1. `diag().fromTraffic` 0 with a login form in `inbox().page`: not logged in
+   (see above). With `title` "Instagram • Messages" and nothing captured, the
+   page loaded before the script was installed — load it again with the script
+   in place.
+2. `fromTraffic` 0 and `rows` 0: the page is still loading. Wait and ask again.
+3. `shape` shows a payload but no threads: the app renamed its fields. Tell the
+   user, with the `shape` you see, and read the open thread with `__ig.thread()`
+   — do not invent a parser.
+
 - Stories: the circles at the top of the home feed; a person's at
   https://www.instagram.com/stories/<username>/.
 - Profiles and posts: https://www.instagram.com/<username>/.

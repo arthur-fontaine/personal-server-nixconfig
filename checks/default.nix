@@ -71,4 +71,13 @@ in
     ${pkgs.python3}/bin/python3 -I test_freeze.py
     touch $out
   '';
+
+  # The DM script the Instagram skill loads into the page, against stand-ins
+  # for the page: the inbox merge, the composer, the send path, no browser.
+  instagram = pkgs.runCommand "instagram-script-tests" { } ''
+    cp ${../modules/hermes/agent/skills/instagram/direct.js} direct.js
+    cp ${../modules/hermes/agent/skills/instagram/direct.test.mjs} direct.test.mjs
+    ${pkgs.nodejs}/bin/node direct.test.mjs
+    touch $out
+  '';
 }

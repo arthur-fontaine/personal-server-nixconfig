@@ -12,6 +12,10 @@ in
   services.hermes-agent.hermesHomeFiles =
     lib.optionalAttrs (on "instagram") {
       "skills/social-media/instagram/SKILL.md" = confirm.skill ./skills/instagram/SKILL.md;
+      # Read and written in the page itself (skills/instagram/direct.js): the
+      # skill loads it into the tab over CDP, so the DM code stays out of the
+      # prompt and out of the model's hands.
+      "skills/social-media/instagram/direct.js" = ./skills/instagram/direct.js;
     }
     # Discord the same way: discord.com in that browser (docs/hermes.md).
     // lib.optionalAttrs (on "discord") {
