@@ -33,25 +33,37 @@ Open https://www.instagram.com/. If it shows the login form:
 ## Do
 
 - Reading DMs: opening a thread marks its messages seen, and the user then
-  gets no notification on their phone. So read them without opening anything,
-  through the site's own API, from any instagram.com page you have open, in
-  `browser_exec`:
+  gets no notification on their phone. So read the inbox without opening
+  anything, in `browser_exec`. The site's old DM API answers 404 now
+  (`/api/v1/direct_v2/inbox/` returns the logged-out page): read the page's
+  own thread list instead, which carries who wrote, the last message and when.
 
   ```python
-  api = lambda path: js(f"""fetch('{path}', {{headers: {{'X-IG-App-ID': '936619743392459'}}}})
-                          .then(r => r.json())""")
-  inbox = api('/api/v1/direct_v2/inbox/?limit=20')           # .inbox.threads[]: thread_id, thread_title, users, items
-  thread = api('/api/v1/direct_v2/threads/<thread_id>/?limit=30')['thread']
+  # A narrow page shows only the empty "Your messages" panel: render wide.
+  cdp('Emulation.setDeviceMetricsOverride', width=1280, height=900,
+      deviceScaleFactor=1, mobile=False)
+  goto_url('https://www.instagram.com/direct/inbox/')
+  wait_for_load()
+  print(page_info(), js('document.title'))
+  print(js('''[...document.querySelectorAll('a[href^="/direct/t/"]')].map(a => {
+    const text = (a.innerText || '').replace(/\\s+/g, ' ').trim();
+    return text + '  ->  ' + a.getAttribute('href');
+  })'''))
   ```
 
-  `items` are newest first: `user_id` (the user's own is `viewer_id`),
-  `timestamp` (microseconds), `text` or `item_type`. Requests from people they
-  do not follow: `/api/v1/direct_v2/pending_inbox/`. Read the conversation
-  this way before you write in it, to answer in context. Never call an API
-  path with `seen` in it.
+  One line per thread: the names, the newest message and its time, then the
+  thread id the URL needs. Messages in a thread come from its `[role="main"]`
+  text, which is why opening one marks it seen. A notification that names no
+  sender (Instagram's own pushes rarely do) is answered from this list: find
+  the line whose text matches the notification, and its names are who wrote.
+  Requests from people the user does not follow are under "Requests" at the
+  top of that page.
+  An empty list means the page has not loaded (wait for it and read again) or
+  the account is not logged in; `document.title` tells the two apart. Conclude
+  nothing before both are ruled out.
 - Sending: https://www.instagram.com/direct/t/<thread_id>/ (or the inbox,
-  then the thread; requests are under "Requests"). Once sent, leave the
-  thread for the inbox.
+  then the thread). Send with the thread's message box, then leave for the
+  inbox.
 - Stories: the circles at the top of the home feed; a person's at
   https://www.instagram.com/stories/<username>/.
 - Profiles and posts: https://www.instagram.com/<username>/.
