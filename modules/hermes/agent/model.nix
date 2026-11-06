@@ -20,6 +20,14 @@ in
   }];
 
   services.hermes-agent.settings = {
+    # uzu is a local endpoint, and Hermes waits up to 900s (its ceiling for
+    # local prefill) before calling a silent stream dead. A turn that falls
+    # back to the on-device model this chat's context is too large for then
+    # hangs for a quarter of an hour before failing, on every attempt: three
+    # minutes is enough for a prefill that is going to finish
+    # (website/docs/user-guide/configuration.md, "Timeouts").
+    agent.local_stream_stale_timeout = 180;
+
     model = {
       provider = cfg.model.provider;
       default = cfg.model.name;
