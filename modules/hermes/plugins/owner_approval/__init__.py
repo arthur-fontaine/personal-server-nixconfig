@@ -128,6 +128,17 @@ def _gateway_loop() -> Optional[asyncio.AbstractEventLoop]:
     return loop
 
 
+def _app(name: str, *args) -> None:
+    """Tell the app_topic plugin (the owner's iOS app), when loaded, about a
+    question it cannot see: these go through the bot, not Hermes' adapter."""
+    fn = getattr(sys.modules.get("app_topic"), name, None)
+    if fn is not None:
+        try:
+            fn(*args)
+        except Exception:
+            logger.debug("owner_approval: app_topic.%s failed", name, exc_info=True)
+
+
 def _render(title: str, details: str) -> str:
     # Cut before escaping, so no entity is split, until the escaped text fits.
     title, body, cut = html.escape(title[:200]), html.escape(details), len(details)
@@ -170,6 +181,7 @@ async def _ask_on_loop(title, details, choices, timeout, chat_id) -> str:
             logger.warning("owner_approval: send failed: %s", error)
             return UNAVAILABLE
         pending.message_id = getattr(message, "message_id", None)
+        _app("question_card", target, None, pending.message_id, text, InlineKeyboardMarkup(rows), details)
         try:
             return await asyncio.wait_for(asyncio.shield(pending.future), timeout)
         except (asyncio.TimeoutError, asyncio.CancelledError) as error:
@@ -181,6 +193,8 @@ async def _ask_on_loop(title, details, choices, timeout, chat_id) -> str:
     finally:
         with STATE.lock:
             STATE.pending.pop(request, None)
+        if pending.message_id is not None:
+            _app("question_done", target, pending.message_id)
 
 
 async def _edit(pending, outcome: str) -> None:
@@ -319,6 +333,7 @@ async def _propose_on_loop(message: str, options: list[str]) -> str:
     except Exception as error:
         return f"send failed: {error}"
     proposal.message_id = getattr(sent, "message_id", None)
+    _app("question_card", owner, None, proposal.message_id, text, InlineKeyboardMarkup(rows))
     with STATE.lock:
         STATE.proposals[key] = proposal
         while len(STATE.proposals) > MAX_PROPOSALS:
