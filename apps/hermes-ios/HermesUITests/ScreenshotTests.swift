@@ -44,6 +44,33 @@ final class ScreenshotTests: XCTestCase {
         ("call", ["-noQuestion", "-call"]),
     ]
 
+    /// A reply mid-stream, and the Live Activity (Dynamic Island) once the app is in the background.
+    func testStreamingAndLiveActivity() throws {
+        guard let dir else { throw XCTSkip("SCREENSHOT_DIR not set") }
+        XCUIDevice.shared.orientation = .portrait
+        let device = UIDevice.current.userInterfaceIdiom == .pad ? "ipad" : "iphone"
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-noQuestion"]
+        app.launch()
+        let field = app.textFields["Message Hermes"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText("How's the server doing?")
+        app.buttons["Send"].tap()
+        Thread.sleep(forTimeInterval: 1.6)
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: dir.appending(path: "\(device)-port-streaming.png"))
+        Thread.sleep(forTimeInterval: 4)
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: dir.appending(path: "\(device)-port-streamed.png"))
+        app.terminate()
+
+        app.launchArguments = ["-demo"]
+        app.launch()
+        Thread.sleep(forTimeInterval: 3)
+        XCUIDevice.shared.press(.home)
+        Thread.sleep(forTimeInterval: 2)
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: dir.appending(path: "\(device)-port-liveactivity.png"))
+    }
+
     func testPortrait() throws {
         for (name, args) in Self.screens { try shoot(name, args, orientation: .portrait) }
     }

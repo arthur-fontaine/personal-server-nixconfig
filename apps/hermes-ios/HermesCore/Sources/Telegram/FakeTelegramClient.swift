@@ -192,7 +192,7 @@ public final class FakeTelegramClient: TelegramClient {
             if stopped.contains(draftID) { break }
             shown += (shown.isEmpty ? "" : " ") + word
             if topic == .main {
-                emit(.draft(chat, StreamingDraft(draftID: draftID, topic: topic, text: FormattedText(shown), canStop: true)))
+                emit(.draft(chat, StreamingDraft(draftID: draftID, topic: topic, text: Markdownish.parse(shown), canStop: true)))
             }
             try? await Task.sleep(for: streamDelay)
         }
