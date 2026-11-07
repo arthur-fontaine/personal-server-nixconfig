@@ -1,0 +1,7 @@
+// Copy to Config/Local.xcconfig (git-ignored) and fill in.
+HERMES_TEAM_ID = ABCDE12345
+HERMES_BUNDLE_ID_PREFIX = com.example.hermes
+HERMES_PAID_TEAM = 0
+HERMES_BOT_USERNAME = my_hermes_bot
+HERMES_TG_API_ID = 1234567
+HERMES_TG_API_HASH = 0123456789abcdef0123456789abcdef

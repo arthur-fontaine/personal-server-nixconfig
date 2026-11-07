@@ -1,0 +1,170 @@
+# Generated into Hermes.xcodeproj with `xcodegen generate` (the project file is not committed).
+# Every machine-specific value is a build setting from Config/*.xcconfig, or passed to
+# xcodebuild as KEY=value by the server (see README.md).
+name: Hermes
+options:
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  preGenCommand: scripts/fetch-llama.sh
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: $(HERMES_TEAM_ID)
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1,2"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+packages:
+  TDLibKit:
+    url: https://github.com/Swiftgram/TDLibKit
+    exactVersion: 1.5.2-tdlib-1.8.69-4c6377aa
+targets:
+  HermesCore:
+    type: framework
+    platform: iOS
+    sources:
+      - path: HermesCore/Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).core
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) $(HERMES_PAID_FLAG)
+  HermesApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: HermesApp
+      - path: Shared
+      - path: Pet
+        type: folder
+        buildPhase: resources
+        optional: true
+    dependencies:
+      - target: HermesCore
+      - target: HermesWidgets
+      - package: TDLibKit
+    info:
+      path: HermesApp/Info.plist
+      properties:
+        CFBundleDisplayName: Hermes
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UIBackgroundModes: [audio, fetch, processing, remote-notification]
+        BGTaskSchedulerPermittedIdentifiers: [$(HERMES_BUNDLE_ID_PREFIX).app.refresh]
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
+        NSFaceIDUsageDescription: Hermes uses Face ID to open your private sub-chats.
+        NSMicrophoneUsageDescription: Hermes uses the microphone in call mode, to talk with your agent.
+        NSSpeechRecognitionUsageDescription: Without the voice model, calls use Apple's speech recognition, on this device when it can, to turn what you say into messages for Hermes.
+        NSPhotoLibraryUsageDescription: Hermes lets you send photos and videos to your agent.
+        NSCameraUsageDescription: Hermes lets you send photos you take to your agent.
+        NSUserActivityTypes: [INSendMessageIntent, INStartCallIntent]
+        ITSAppUsesNonExemptEncryption: false
+        HermesBotUsername: $(HERMES_BOT_USERNAME)
+        HermesTelegramApiId: $(HERMES_TG_API_ID)
+        HermesTelegramApiHash: $(HERMES_TG_API_HASH)
+        HermesAppGroup: $(HERMES_APP_GROUP)
+        HermesPaidTeam: $(HERMES_PAID_TEAM)
+        HermesSwissTransferToken: $(HERMES_SWISSTRANSFER_TOKEN)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).app
+        PRODUCT_NAME: Hermes
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_ENTITLEMENTS: HermesApp/App$(HERMES_ENTITLEMENTS_SUFFIX).entitlements
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) $(HERMES_PAID_FLAG)
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        LD_RUNPATH_SEARCH_PATHS: $(inherited) @executable_path/Frameworks
+        # llama.cpp has no simulator slice: device builds only (Call/LFMVoiceEngine.swift checks canImport).
+        "FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]": $(inherited) $(SRCROOT)/Vendor/llama.xcframework/ios-arm64
+        "OTHER_LDFLAGS[sdk=iphoneos*]": $(inherited) -framework llama
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    postBuildScripts:
+      - name: Embed llama.framework (device)
+        basedOnDependencyAnalysis: false
+        script: |
+          [ "$PLATFORM_NAME" = iphoneos ] || exit 0
+          src="$SRCROOT/Vendor/llama.xcframework/ios-arm64/llama.framework"
+          dst="$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH"
+          mkdir -p "$dst"
+          rsync -a --delete "$src" "$dst/"
+          if [ "${CODE_SIGNING_ALLOWED:-YES}" = YES ] && [ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ]; then
+            codesign --force --sign "$EXPANDED_CODE_SIGN_IDENTITY" --preserve-metadata=identifier,entitlements "$dst/llama.framework"
+          fi
+  HermesWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: HermesWidgets
+      - path: Shared
+    dependencies:
+      - target: HermesCore
+    info:
+      path: HermesWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Hermes
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        HermesAppGroup: $(HERMES_APP_GROUP)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).app.widgets
+        CODE_SIGN_ENTITLEMENTS: HermesWidgets/Widgets.entitlements
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) $(HERMES_PAID_FLAG)
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        LD_RUNPATH_SEARCH_PATHS: $(inherited) @executable_path/Frameworks @executable_path/../../Frameworks
+  HermesCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: HermesCore/Tests
+    dependencies:
+      - target: HermesCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).core.tests
+        GENERATE_INFOPLIST_FILE: YES
+  HermesUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: HermesUITests
+    dependencies:
+      - target: HermesApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: HermesApp
+        SWIFT_VERSION: "5.0"
+schemes:
+  HermesApp:
+    build:
+      targets:
+        HermesApp: all
+        HermesCoreTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets: [HermesCoreTests, HermesUITests]
+    archive:
+      config: Release

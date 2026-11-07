@@ -1,0 +1,7 @@
+Hermes.xcodeproj/
+Config/Local.xcconfig
+.build/
+*.xcresult
+HermesApp/Info.plist
+HermesWidgets/Info.plist
+Vendor/
