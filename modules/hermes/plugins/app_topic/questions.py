@@ -72,12 +72,23 @@ class Questions:
         self.lock = threading.Lock()
         self.items: dict[str, dict] = {}
         self.summaries: dict[str, str] = {}
+        self.last_summary: tuple[str, float] | None = None
 
     def add_summary(self, command: str, summary: str) -> None:
         with self.lock:
             self.summaries[command.strip()] = summary
+            self.last_summary = (summary, time.time())
             while len(self.summaries) > 50:
                 self.summaries.pop(next(iter(self.summaries)))
+
+    def _summary_for(self, command: str | None) -> str | None:
+        if command and command.strip() in self.summaries:
+            return self.summaries[command.strip()]
+        # The card cuts and masks a long command: the summary reported for the
+        # approval asked a moment ago is this card's.
+        if self.last_summary and time.time() - self.last_summary[1] < 15:
+            return self.last_summary[0]
+        return None
 
     def from_card(self, *, chat: int, message_id: int, text_html: str, markup, command: str | None = None,
                   summary: str | None = None) -> dict | None:
@@ -92,8 +103,9 @@ class Questions:
             match = _PRE.search(text_html or "")
             command = html.unescape(match.group(1)).strip() if match else None
         with self.lock:
-            if summary is None and command:
-                summary = self.summaries.get(command.strip())
+            if summary is None and prefix == "ea":
+                summary = self._summary_for(command)
+                self.last_summary = None
         labels = [o["label"] for o in options]
         item = {
             "id": qid, "kind": kind, "chat": chat, "message_id": message_id,

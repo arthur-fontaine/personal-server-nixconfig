@@ -79,6 +79,22 @@ def approval_summary(command: str, summary: str) -> None:
         app.questions.add_summary(command, summary)
 
 
+def pre_approval_request(command: str = "", description: str = "", **_) -> None:
+    """guard (app-delivery's change) writes a plain-language summary above a
+    command it escalates; Hermes' own pattern cards have none (their
+    description is the pattern's name), and stay without."""
+    guard = sys.modules.get("guard")
+    summarize = getattr(guard, "card_summary", None)
+    if summarize is None or not command:
+        return
+    try:
+        summary = summarize(description)
+    except Exception:
+        return
+    if summary:
+        approval_summary(command, summary)
+
+
 def question_card(chat_id, thread, message_id, text_html, markup, command=None, summary=None) -> None:
     app = STATE["app"]
     if app is not None:
@@ -175,6 +191,7 @@ def register(ctx) -> None:
 
     ctx.register_hook("on_human_input_resolved", resolved)
     ctx.register_hook("on_session_end", status.end)
+    ctx.register_hook("pre_approval_request", pre_approval_request)
     ctx.register_hook("post_api_request", app.post_api_request)
     ctx.register_hook("api_request_error", app.api_request_error)
     ctx.register_hook("post_auxiliary_call", app.post_auxiliary_call)

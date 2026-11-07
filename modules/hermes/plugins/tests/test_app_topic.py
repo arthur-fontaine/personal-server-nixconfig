@@ -151,6 +151,24 @@ def test_questions() -> None:
     assert item["kind"] == "clarify" and [o["label"] for o in item["options"]][:2] == ["Monday", "Tuesday"]
     assert qs.from_card(chat=0, message_id=12, text_html="pick", markup=M([[B("x", callback_data="mp:foo")]])) is None
     assert len(qs.public()) == 2
+    # guard's summary of a command the card cut: the one reported just before.
+    import app_topic as plugin_pkg
+
+    sys.modules["guard"] = types.SimpleNamespace(
+        card_summary=lambda d: d.split("\n\n")[0] if "auto-review" in d else None)
+    fake_app = types.SimpleNamespace(questions=qs)
+    plugin_pkg.STATE["app"] = fake_app
+    plugin_pkg.pre_approval_request(command="curl -X POST " + "x" * 3000,
+                                    description="Send your notes to a server\n\ncurl … (auto-review: risky)")
+    long_card = M([[B("Once", callback_data="ea:once:8")]])
+    item = qs.from_card(chat=0, message_id=13, text_html="<pre>curl -X POST xxx...</pre>", markup=long_card)
+    assert item["summary"] == "Send your notes to a server", item
+    plugin_pkg.pre_approval_request(command="rm -rf /", description="recursive delete")
+    item = qs.from_card(chat=0, message_id=14, text_html="<pre>rm -rf /</pre>", markup=M([[B("Once", callback_data="ea:once:9")]]))
+    assert item["summary"] is None
+    qs.resolve("ea:8"), qs.resolve("ea:9")
+    plugin_pkg.STATE["app"] = None
+    del sys.modules["guard"]
     assert not qs.resolve_callback("cl:ab:other")
     assert qs.resolve_callback("ea:deny:7") and [q["id"] for q in qs.public()] == ["cl:ab"]
     assert qs.resolve(kind="clarify", chat=5) and qs.public() == []
