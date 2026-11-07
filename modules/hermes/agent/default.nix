@@ -25,6 +25,7 @@ in
     ./owner-approval.nix
     ./lost-turns.nix
     ./front-desk.nix
+    ./app.nix
     ./apple.nix
     ./whatsapp.nix
     ./browser.nix

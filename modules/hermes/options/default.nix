@@ -12,6 +12,7 @@
     ./integrations.nix
     ./homeassistant.nix
     ./decision.nix
+    ./app.nix
     (import ../coding-agent).options
   ];
 }
