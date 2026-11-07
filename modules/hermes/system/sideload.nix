@@ -20,6 +20,13 @@ let
   home = hermes.home;
   source = ../../../apps/hermes-ios;
   sideload = config.server.sideload;
+  # The pet app_topic mirrors (../plugins/app_topic/pet.py), copied over the
+  # app's bundled one (apps/hermes-ios/README.md, "Build inputs").
+  petInputs = [
+    { from = "${home}/.hermes/app/pet/icon.png"; to = "HermesApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png"; }
+    { from = "${home}/.hermes/app/pet/pet.json"; to = "Pet/pet.json"; }
+    { from = "${home}/.hermes/app/pet/spritesheet.webp"; to = "Pet/spritesheet.webp"; }
+  ];
   hermesApp = pkgs.writeShellScriptBin "hermes-app" ''
     # The Hermes app's commands, as app-backend calls them (hermes-app-work/DECISIONS.md).
     cmd="''${1:-status}"; shift || true
@@ -65,6 +72,12 @@ in
 
   config = lib.mkMerge [
     (lib.mkIf cfg.enable {
+      # sideload writes an input wherever it is told; were the app to read its
+      # icon or pet elsewhere, builds would silently keep the bundled pet.
+      assertions = map (input: {
+        assertion = cfg.source == null || builtins.pathExists (cfg.source + "/${input.to}");
+        message = "server.hermes.app.delivery: the app has no ${input.to} for the pet to replace.";
+      }) petInputs;
       server.sideload.enable = true;
       server.sideload.apps.hermes = {
         name = "Hermes";
@@ -78,11 +91,7 @@ in
           . ${hermes.secretsFile} 2>/dev/null; [ -n "$TELEGRAM_BOT_TOKEN" ] \
             && /usr/bin/curl -fsS --max-time 15 "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getMe" \
             | ${lib.getExe pkgs.jq} -r '.result.username // empty' '';
-        inputs = [
-          { from = "${home}/.hermes/app/pet/icon.png"; to = "HermesApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png"; }
-          { from = "${home}/.hermes/app/pet/pet.json"; to = "Pet/pet.json"; }
-          { from = "${home}/.hermes/app/pet/spritesheet.webp"; to = "Pet/spritesheet.webp"; }
-        ];
+        inputs = petInputs;
         versionFile = "${home}/.hermes/app/pet/pet.json";
         statusFile = "${home}/.hermes/app/delivery.json";
       };
