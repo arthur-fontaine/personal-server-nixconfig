@@ -1,6 +1,8 @@
 name: tinyfish
-version: 1.0.0
-description: "TinyFish Search as Hermes' web_search backend (free up to 12,000 searches a day, TINYFISH_API_KEY); web_extract stays on its own backend."
+version: 2.0.0
+description: "web_search, web_fetch (Markdown, images and links, 40k cut) and view_image through TinyFish (TINYFISH_API_KEY), ported from the Pi extension web."
 author: "personal-server-nixconfig"
-provides_web_providers:
-  - tinyfish
+provides_tools:
+  - web_search
+  - web_fetch
+  - view_image

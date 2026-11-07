@@ -39,7 +39,7 @@ modules/
     plugins/outbox/       says so when the gateway will not send an attachment of a reply (Python)
     plugins/lost_turns/   settles your Telegram turn cut off by a gateway crash, so the chat never waits for /discard (Python)
     plugins/cache_warm/   keeps a chat's prompt cache warm between the owner's turns, on OpenAI-style routes (Python)
-    plugins/tinyfish/     TinyFish Search as web_search's backend, with the tinyfish integration (Python)
+    plugins/tinyfish/     web_search, web_fetch and view_image through TinyFish, with the tinyfish integration (Python)
     plugins/front_desk/   caps a turn of the main chat: past it, only handing the work to a background subagent (Python)
     coding-agent/         Pi sessions in a microVM, their branch reviewed (docs/sandbox.md)
       default.nix         server.hermes.sandbox, and its wiring into Hermes (imported by options/ and agent/)

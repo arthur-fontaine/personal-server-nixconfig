@@ -126,12 +126,18 @@ Hermes' own `computer_use` tool is off, since its clicks no longer reach that
 driver, and Hermes drives the driver's own MCP tools (`mcp__cua__*`) instead;
 the guard lets the ones that only look run without review.
 
-Web search is TinyFish Search with the `tinyfish` integration (free up to
-12,000 searches a day with an API key; `modules/hermes/plugins/tinyfish`, since
-Hermes' pinned revision has no such backend), a failed search retried once on
-Hermes' keyless providers; without it, OpenAI's own, run server-side by the
-Codex model, or Hermes' keyless providers on other models. Reading a page
-(`web_extract`) goes through Firecrawl's keyless tier either way
+The web is TinyFish with the `tinyfish` integration (free up to 12,000
+searches a day with an API key; `modules/hermes/plugins/tinyfish`, Arthur's Pi
+extension web ported): `web_search` (ranked results, with domain filters, a
+freshness window, news or papers, a language and a page; it replaces Hermes'
+own, whose backends take only a query), `web_fetch` (up to 10 pages as
+Markdown, cut at 40,000 characters with a note saying so, each page's image
+URLs and links on request) and `view_image` (an image from a URL handed to the
+model as an image; over 3.5 MB shrunk by `sips` to a JPEG at most 1568 px
+wide; on a route that takes no images in a tool result, saved for
+`vision_analyze`). Without it, web search is OpenAI's own, run server-side by
+the Codex model, or Hermes' keyless providers on other models. Hermes'
+`web_extract` reads pages through Firecrawl's keyless tier either way
 (`modules/hermes/agent/tools.nix`).
 
 Web pages go faster through `browser_fast_act` (`modules/hermes/fast-act`), once

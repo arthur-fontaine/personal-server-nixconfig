@@ -1,4 +1,4 @@
-# TinyFish: its key, for web_search (modules/hermes/plugins/tinyfish).
+# TinyFish: its key, for web_search, web_fetch and view_image (modules/hermes/plugins/tinyfish).
 # Checked with one search, here and on every run.
 integration_on tinyfish || return 0
 step "Integration · TinyFish"
@@ -16,7 +16,7 @@ show_link "https://agent.tinyfish.ai/api-keys"
 while :; do
   tinyfish="$(gum input --password --header "TinyFish API key (free account; empty to skip)" | tr -d '[:space:]')"
   if [ -z "$tinyfish" ]; then
-    warn "TinyFish has no key: web_search falls back to Hermes' keyless providers."
+    warn "TinyFish has no key: its web tools answer with an error until one is set."
     break
   fi
   if tinyfish_works "$tinyfish"; then
