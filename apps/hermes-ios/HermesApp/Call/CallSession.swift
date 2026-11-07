@@ -91,6 +91,8 @@ final class CallSession {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP])
         try session.setActive(true)
+        // Touching inputNode without an input aborts inside AudioToolbox: check first.
+        guard session.isInputAvailable else { throw VoiceEngineError.unavailable("No microphone is available.") }
         let input = audio.inputNode
         // The system's echo cancellation: without it Hermes' own voice would trigger barge-in.
         try input.setVoiceProcessingEnabled(true)
