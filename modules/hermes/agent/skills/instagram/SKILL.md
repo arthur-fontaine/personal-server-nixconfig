@@ -77,7 +77,9 @@ print(js('__ig.inbox()'))   # js() awaits, so send() and clear() come back settl
   is often the user's. When you still cannot tell, say so rather than guess.
 - `__ig.send('text')`: types into the open thread's box, presses the page's
   own Send button the way a mouse does (pointer events at its centre: the app
-  ignores a plain `.click()`), waits, and reads the box back. `{sent: true,
+  ignores a plain `.click()`), waits up to 3 s for the box to empty, and reads
+  it back. Called again with the same text after a `sent: false`, it presses
+  what is already typed rather than typing it twice. `{sent: true,
   how, after}` means the app took it, `after` being the tail of the
   transcript; do not press or click anything more. `{sent: false,
   needsRealClick: true, point}` means the app **ignored the press** and the

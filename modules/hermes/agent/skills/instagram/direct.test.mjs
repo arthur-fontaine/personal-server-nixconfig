@@ -38,6 +38,7 @@ const sendButtonNode = {
       state.pressedAt = { x: event.clientX, y: event.clientY };
       if (!state.ignoreClicks && box.textContent) {
         state.sends++;
+        state.sent = box.textContent;
         box.textContent = "";
       }
     }
@@ -79,8 +80,10 @@ globalThis.document = {
   execCommand: (command, _ui, text) => {
 
     if (command !== "insertText") return false;
+    // Typing appends to whatever is in the box, as the app's does.
     state.typed = text;
-    box.textContent = text;
+    state.inserts = (state.inserts || 0) + 1;
+    box.textContent += text;
     return true;
   },
   querySelector: (s) => (s.includes("textbox") || s.includes("contenteditable") ? box : null),
@@ -252,6 +255,19 @@ check("a click that was ignored is not a send", refused.sent, false);
 check("it asks for a real click", refused.needsRealClick, true);
 check("with the button's point", refused.point, { found: true, x: 1215, y: 865 });
 state.ignoreClicks = false;
+
+// Sending the same text again presses what is there instead of typing it twice.
+const inserts = state.inserts;
+const again = await ig.send("On se retrouve à 20 h 30 ?");
+check("a retry does not type the text again", [again.sent, state.inserts], [true, inserts]);
+check("and sends it once", [state.sends, state.sent], [2, "On se retrouve à 20 h 30 ?"]);
+
+// Another draft left in the box goes before the new text is typed.
+state.ignoreClicks = true;
+await ig.send("brouillon");
+state.ignoreClicks = false;
+const other = await ig.send("Autre chose");
+check("a stale draft is cleared first", [other.sent, state.sent, state.sends], [true, "Autre chose", 3]);
 
 // ── a draft that must not be sent can be emptied ───────────────────────────
 const cleared = await ig.clear();

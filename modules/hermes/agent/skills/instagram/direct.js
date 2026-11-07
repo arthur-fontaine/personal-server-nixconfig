@@ -417,7 +417,15 @@
     if (!text || !String(text).trim()) return { sent: false, reason: "empty text" };
     const box = composer();
     if (!box) return { sent: false, reason: "no message box on this page: open the thread first" };
-    insert(box, String(text));
+    // A send that came back unsent leaves its text in the box: typing again
+    // would double it. The same text is pressed as it is; anything else goes.
+    const wanted = String(text).trim();
+    const left = draft(box);
+    if (left && left !== wanted) {
+      const { cleared } = await ig.clear();
+      if (!cleared) return { sent: false, reason: "the box holds another draft that would not clear", draft: left };
+    }
+    if (draft(box) !== wanted) insert(box, String(text));
     const button = sendButton();
     if (!button) {
       return { sent: false, reason: "typed, but no Send button appeared: press Enter yourself or check the box" };
@@ -426,10 +434,13 @@
       return { sent: false, reason: "the text did not reach the box: open the thread and try again" };
     }
     press(button);
-    await pause(700);
-    // Read back, never assume: the app empties the box when it sends.
-    if (!draft(box)) {
-      return { sent: true, how: "the page's Send button", after: visible().slice(-400) };
+    // Read back, never assume: the app empties the box when it sends, which
+    // can take more than a moment on a slow page.
+    for (let waited = 0; waited < 3000; waited += 250) {
+      await pause(250);
+      if (!draft(box)) {
+        return { sent: true, how: "the page's Send button", after: visible().slice(-400) };
+      }
     }
     return {
       sent: false,
