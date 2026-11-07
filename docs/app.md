@@ -23,7 +23,7 @@ It needs BotFather's Threaded Mode, as the sub-chats do.
 | Stats | model usage per provider and model, fallbacks apart, over 24 h / 7 d / 30 d; CPU, memory, storage, power, battery, uptime | `usage.py`, `machine.py` |
 | Pets | the pet's needs and level, `pet_generate`, its files for the app's build | `pet.py` |
 | Big files | `[fichier: <url>]` links: `bigfile_fetch`, `bigfile_send` | `bigfiles.py` |
-| Call mode | a WebSocket where the owner talks to Hermes | `call.py` |
+| Call turns | a message starting with 🎙 is answered as on the phone | `__init__.py` (`call_turn`) |
 | Pushes | APNs, with a paid Apple Developer team | `push.py` |
 
 ### What Hermes is doing
@@ -108,22 +108,20 @@ without notice: the error then says to open the link in Hermes' Chrome.
 
 ### Call mode
 
-`server.hermes.app.call.enable`. Hermes answers the call, not a separate
-voice model: the owner's speech is transcribed with Hermes' STT
-(`server.hermes.app.call.stt`: faster-whisper on this Mac by default, or
-OpenAI, Groq...), becomes a main-chat turn starting with 🎙 (the prompt makes
-those answers short and speakable), and Hermes' reply is spoken with its TTS
-(`call.tts`: Microsoft's free Edge voices by default, OpenAI, ElevenLabs...)
-sentence by sentence, as its drafts stream. Both stay in the chat as text.
-The app asks for a call in the App topic and gets a single-use token valid
-five minutes and the addresses: `ws://<host>.local:8787/call` on the local
-network, and `server.hermes.app.call.publicUrl` from anywhere, when the
-owner points a tunnel with TLS at that port (none is set up here).
+Nothing on the server: the app hears and speaks on the device
+(LFM3-Omni-2B) and the call is messages of the chat. What the owner says is
+sent as a message starting with 🎙, in the main chat or the sub-chat the call
+is in; Hermes answers as usual, as drafts that stream, and the app reads them
+aloud. For those turns the plugin adds the spoken style to the owner's
+message (`pre_llm_call`: the system prompt, and its cache, stay as they are),
+and the prompt says the same: one short sentence first, then short spoken
+sentences, no markdown, links, code or emoji, and a sentence before a long
+step. The transcript stays in the chat. While the app says a call is on (`call.state`), every
+turn of the owner's gets that style, a follow-up typed without 🎙 too.
 
-Rejected: an omni speech model (LFM3-Omni-2B through llama.cpp's
-`/v1/realtime`, OpenAI's realtime API), which would answer fast but would not
-be Hermes: no memory, no tools. The latency is Hermes' own first sentence,
-plus a second or so of transcription.
+An earlier design had the server transcribe and speak over a WebSocket of its
+own; it was dropped so that everything goes through Telegram and nothing on
+this Mac is reachable from outside.
 
 ### Pushes
 

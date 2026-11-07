@@ -1,12 +1,11 @@
 # Hermes' side of the owner's iOS app (../plugins/app_topic, docs/app.md):
 # the plugin, its settings, and the Hermes settings it rests on (image
-# generation for pets, STT and TTS for call mode). Listed in plugins.enabled
+# generation for pets). Listed in plugins.enabled
 # by memory.nix, which holds that list.
-{ lib, pkgs, server, hostName, ... }:
+{ lib, pkgs, server, ... }:
 let
   cfg = server.hermes.app;
   images = cfg.images;
-  call = cfg.call;
   # Hermes' image plugins (plugins/image_gen): "custom" is its OpenAI one
   # pointed elsewhere (image_gen.openai.base_url / key_env, website/docs/
   # user-guide/features/image-generation.md, "OpenAI-compatible endpoints").
@@ -42,13 +41,6 @@ lib.mkIf cfg.enable {
       delivery_cli = "hermes-app";
       pets.enable = images.provider != null;
       big_files.swisstransfer_token_env = cfg.swisstransferTokenEnv;
-      call = {
-        inherit (call) enable port;
-        bind = "0.0.0.0";
-        public_url = call.publicUrl;
-        lan_host = "${hostName}.local";
-        ffmpeg = lib.getExe pkgs.ffmpeg-headless;
-      };
       apns = {
         inherit (cfg.apns) enable;
         key_id = cfg.apns.keyId;
@@ -58,19 +50,6 @@ lib.mkIf cfg.enable {
       };
     };
 
-    settings = {
-      # A call turns what the owner says into a main-chat turn (PluginContext.inject_message).
-      plugins.entries.app_topic.allow_gateway_injection = true;
-    }
-    // lib.optionalAttrs (images.provider != null) { image_gen = imageSettings; }
-    // lib.optionalAttrs call.enable {
-      # Hermes' default hint is "en" (tts.md, "stt"): the owner may speak any language.
-      stt = { provider = call.stt; language = ""; }
-        // lib.optionalAttrs (call.sttModel != null) { ${call.stt}.model = call.sttModel; };
-      tts = { provider = call.tts; }
-        // lib.optionalAttrs (call.voice != null) {
-          ${call.tts}.${if call.tts == "elevenlabs" then "voice_id" else "voice"} = call.voice;
-        };
-    };
+    settings = lib.optionalAttrs (images.provider != null) { image_gen = imageSettings; };
   };
 }

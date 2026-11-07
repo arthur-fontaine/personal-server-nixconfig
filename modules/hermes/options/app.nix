@@ -1,5 +1,5 @@
 # Hermes' side of the owner's iOS app (docs/app.md): the App topic, pets,
-# big files, call mode, pushes. Building and installing the app itself is
+# big files, pushes. Building and installing the app itself is
 # server.hermes.app.delivery (modules/hermes/app-delivery), apart.
 { lib, ... }:
 let
@@ -43,49 +43,6 @@ in
           The variable of the secrets file holding the custom API's key
           (OpenRouter and OpenAI use OPENROUTER_API_KEY and OPENAI_API_KEY).
         '';
-      };
-    };
-
-    call = {
-      enable = mkEnableOption "call mode: a WebSocket where the owner talks to Hermes from the app";
-      port = mkOption {
-        type = types.port;
-        default = 8787;
-        description = "Its port, on every interface (the LAN; a tunnel may point at it).";
-      };
-      publicUrl = mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        example = "wss://hermes-call.example.com/call";
-        description = ''
-          Its address from anywhere (wss://, a tunnel to this port with TLS),
-          given to the app before the LAN one. null: the LAN only.
-        '';
-      };
-      stt = mkOption {
-        type = types.enum [ "local" "openai" "groq" "mistral" "elevenlabs" ];
-        default = "local";
-        description = ''
-          Who transcribes what the owner says (Hermes' `stt.provider`, which
-          also transcribes Telegram voice messages). local: faster-whisper on
-          this Mac.
-        '';
-      };
-      sttModel = mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        description = "Its model (local: tiny, base, small, medium, large-v3, turbo); null: Hermes' default.";
-      };
-      tts = mkOption {
-        type = types.enum [ "edge" "openai" "elevenlabs" "minimax" "mistral" "gemini" "xai" ];
-        default = "edge";
-        description = "Who speaks Hermes' answers (Hermes' `tts.provider`). edge: Microsoft's free voices.";
-      };
-      voice = mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        example = "fr-FR-HenriNeural";
-        description = "The TTS voice; null: the provider's default.";
       };
     };
 

@@ -43,7 +43,7 @@ modules/
     plugins/tinyfish/     web_search, web_fetch and view_image through TinyFish, with the tinyfish integration (Python)
     plugins/sideload/     Hermes' access to the sideload service: list, install, remove (Python)
     plugins/front_desk/   caps a turn of the main chat: past it, only handing the work to a background subagent (Python)
-    plugins/app_topic/    the iOS app's side: its hidden Telegram topic, stats, pets, big files, call mode (Python; docs/app.md)
+    plugins/app_topic/    the iOS app's side: its hidden Telegram topic, stats, pets, big files, call turns (Python; docs/app.md)
     coding-agent/         Pi sessions in a microVM, their branch reviewed (docs/sandbox.md)
       default.nix         server.hermes.sandbox, and its wiring into Hermes (imported by options/ and agent/)
       hermes-plugin/      the plugin "sandbox": sandbox_run…, the broker's actions (Python)

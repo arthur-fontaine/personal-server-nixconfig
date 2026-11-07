@@ -113,7 +113,7 @@ def spoken(text: str) -> str:
 
 
 def spoken_full(text: str) -> str:
-    """The whole text made speakable (the call mode reads all of it)."""
+    """The whole text made speakable, before it is cut to two sentences."""
     text = _MEDIA.sub("", text or "")
     text = _FILE_MARK.sub(lambda m: f" a file from {_domain(m.group(1)) or 'a link'} ", text)
     text = _CODE_BLOCK.sub(" a code block. ", text)

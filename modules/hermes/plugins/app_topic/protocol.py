@@ -7,7 +7,7 @@ import json
 import re
 from datetime import datetime, timezone
 
-VERSION = 1
+VERSION = 2
 # Telegram's cap, in UTF-16 code units once entities are parsed.
 MAX_UNITS = 4096
 _FENCE = re.compile(r"^\s*```(?:json)?\s*\n?(.*?)\n?\s*```\s*$", re.S)

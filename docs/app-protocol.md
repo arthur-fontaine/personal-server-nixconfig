@@ -1,4 +1,4 @@
-# Hermes app ⇄ Hermes protocol, version 1
+# Hermes app ⇄ Hermes protocol, version 2
 
 Owner: `app-backend` (plugin `app_topic`, `modules/hermes/plugins/app_topic`).
 `ios-app` builds against it and asks `app-backend` (hc send) for changes
@@ -29,7 +29,7 @@ and the Bot API (https://core.telegram.org/bots/api).
     entity, not characters). Always `disable_notification=true`.
   - App → bot: the JSON as the message's plain text. A surrounding
     ```` ```json … ``` ```` fence (as characters) is tolerated and stripped.
-  - Required keys: `"v": 1`, `"type": <string>`. Unknown `type`: the bot
+  - Required keys: `"v": 2`, `"type": <string>`. Unknown `type`: the bot
     replies `error` `unknown_type`; the app ignores unknown types.
 - **Size.** Telegram caps a message at 4096 UTF-16 code units once entities
   are parsed. The bot keeps each message under that: long strings are cut
@@ -74,7 +74,7 @@ be deleted.
 
 ```json
 {
-  "v": 1, "type": "state", "updated_at": "2026-11-07T21:40:03Z",
+  "v": 2, "type": "state", "updated_at": "2026-11-07T21:40:03Z",
   "slots": {"stats": 812, "devices": 813, "sprite": 790},
   "agent": {
     "status": "working", "chat": 0, "task": "Running: nix build …",
@@ -158,7 +158,7 @@ be deleted.
 
 ```json
 {
-  "v": 1, "type": "stats", "updated_at": "2026-11-07T21:40:00Z",
+  "v": 2, "type": "stats", "updated_at": "2026-11-07T21:40:00Z",
   "machine": {
     "cpu_pct": 12.5, "load": [1.2, 1.4, 1.6], "cores": 10,
     "ram_used": 17179869184, "ram_total": 34359738368,
@@ -199,7 +199,7 @@ be deleted.
 `app-delivery`'s `~/.hermes/app/delivery.json`, as is, under `delivery`:
 
 ```json
-{"v": 1, "type": "devices", "updated_at": "…", "delivery": {
+{"v": 2, "type": "devices", "updated_at": "…", "delivery": {
   "v": 1, "updated": "…", "team": {"id": "ABCDE12345", "paid": false},
   "running": null, "next_refresh": "…",
   "devices": [{"id": "<udid>", "name": "iPhone", "model": "iPhone17,1", "os": "26.1",
@@ -217,7 +217,7 @@ the App topic once the message has settled (no edit for 2.5 s; at once for a
 stream's final edit, and for a question):
 
 ```json
-{"v": 1, "type": "notify", "chat": 0, "message_id": 1187,
+{"v": 2, "type": "notify", "chat": 0, "message_id": 1187,
  "kind": "message", "interruption": "active",
  "title": "Hermes", "body": "The build passed. 3 warnings in the …",
  "spoken": "The build passed, with three warnings."}
@@ -245,20 +245,20 @@ A request is a JSON message in the App topic; `re` in the reply is the
 request's message id. The bot deletes the request when it has answered.
 
 ```json
-{"v": 1, "type": "pet.feed"}
-{"v": 1, "type": "reply", "re": 1302, "ok": true, "data": {"hunger": 5}}
-{"v": 1, "type": "reply", "re": 1303, "ok": false,
+{"v": 2, "type": "pet.feed"}
+{"v": 2, "type": "reply", "re": 1302, "ok": true, "data": {"hunger": 5}}
+{"v": 2, "type": "reply", "re": 1303, "ok": false,
  "error": {"code": "busy", "message": "A pet is already being generated"}}
 ```
 
 | `type` | Fields | Reply `data` |
 | --- | --- | --- |
-| `hello` | `app_version`, `build`, `device` (name), `device_id` (UDID if known), `pet_version` (bundled) | `{"server_version", "protocol": 1}`; the bot also re-posts any missing slot |
+| `hello` | `app_version`, `build`, `device` (name), `device_id` (UDID if known), `pet_version` (bundled) | `{"server_version", "protocol": 2}`; the bot also re-posts any missing slot |
 | `stats.refresh` | — | `{}` (the `stats` slot is edited) |
 | `pet.feed` / `pet.play` / `pet.sleep` / `pet.wake` | — | the pet's new needs (`hunger`, `energy`, `happiness`, `xp`, `level`, `asleep`) |
 | `pet.generate` | `prompt` (what it should look like), `name` (optional) | `{"started": true}` at once; the `state.pet` changes when done (minutes), and a `notify` says so |
 | `app.reinstall` | `devices` (UDIDs, optional: all reachable) | the JSON printed by `hermes-app install` (`{"started": true}`) |
-| `call.start` | — | `{"url", "lan_url", "token", "expires"}` (§6) |
+| `call.state` | `active` (bool): a call starts or ends (§6) | `{"active": <bool>}` |
 | `push.register` | `token_hex`, `kind` (`alert` \| `liveactivity` \| `pushtostart`), `sandbox`, `bundle_id`, `activity_id` (liveactivity) | `{"stored": true, "apns": <bool: the server can send>}` |
 | `push.unregister` | `token_hex` | `{}` |
 | `ack` | `ids` (message ids of `notify`/`reply`) | none: the bot deletes them |
@@ -310,39 +310,45 @@ a key, tokens are stored and `apns: false`.
 
 ## 6. Call mode
 
-`call.start` → reply data:
+Everything goes through Telegram; nothing on the server is reachable from
+outside. The app hears and speaks on the device (LFM3-Omni-2B: speech
+recognition and synthesis), and the call is ordinary messages of the chat:
 
-```json
-{"url": "wss://hermes.example.com/call", "lan_url": "ws://personal-server.local:8787/call",
- "token": "q3…", "expires": "2026-11-07T21:45:00Z"}
-```
-
-- `url` is the public address (`server.hermes.app.call.publicUrl`, behind a
-  tunnel with TLS) or `null`; `lan_url` works on the same network (iOS:
-  `NSAllowsLocalNetworking`). Try `url` first when set.
-- The token is single-use, valid 5 minutes to connect; send it as
-  `Authorization: Bearer <token>` (or `?token=` when a header is impossible).
-  One call at a time: a second connection gets `{"type":"end","reason":"busy"}`.
-- **Client → server**: binary frames of PCM16LE mono 24 kHz audio (~40 ms
-  each); text frames `{"type":"input.end"}` (end of the owner's utterance;
-  the server also ends one after 700 ms of silence), `{"type":"interrupt"}`
-  (barge-in: stop speaking), `{"type":"hangup"}`.
-- **Server → client**: binary frames of PCM16LE mono 24 kHz audio; text
-  frames `{"type":"state","state":"listening"|"thinking"|"speaking"}`,
-  `{"type":"transcript","role":"user"|"assistant","text","final":bool}`,
-  `{"type":"clear"}` (drop queued audio), `{"type":"end","reason":"hangup"|
-  "timeout"|"busy"|"error"|"server_stopping"}`, `{"type":"error","message"}`.
-- **What answers**: Hermes itself, in the main chat: the owner's utterance is
-  transcribed and becomes a main-chat turn (prefixed `🎙`, so Hermes answers
-  short and speakable), and Hermes' reply is spoken sentence by sentence as
-  it streams. The turn and its reply stay in the chat as text.
+- **A call turn** is a text message the app sends as the owner, in the chat
+  the call is in (the main chat, or a sub-chat's topic), whose text starts
+  with **`🎙 `** (U+1F399 then a space) followed by what the owner said, as
+  transcribed: `🎙 what's on my calendar tomorrow`. Plain text, no entities,
+  one message per utterance. It stays in the chat as the transcript.
+- **The answer** is Hermes' normal reply: native drafts in the main chat,
+  edits in a topic, then the final message. The app reads it aloud as it
+  streams (it may start at the first complete sentence) and stops when the
+  final message arrives. For such a turn, the plugin adds to the owner's
+  message (`pre_llm_call`, not the system prompt, so the prompt cache holds)
+  and the prompt says: open with one short sentence that answers or says
+  what Hermes will do, then short spoken sentences, no markdown, lists,
+  links, code or emoji, numbers and symbols in words, and a sentence before
+  a long step. A long task still goes to a background subagent (its result
+  is a later message, which the app may read too).
+- **`call.state`** (optional): the app posts `{"v": 2, "type": "call.state",
+  "active": true}` when a call starts and `false` when it ends. While a call
+  is on, every turn of the owner's in Telegram gets the spoken style, even a
+  follow-up typed without 🎙. A call left on (the app killed mid-call) ends by
+  itself after 2 hours.
+- **Barge-in** is local: the app stops speaking. What the owner says next is
+  another call turn; one sent while Hermes is still working reaches the
+  running turn at its next step (Hermes' steer mode), so it can redirect it.
+- Interim messages Hermes posts between its tool calls ("I'm checking…")
+  are messages like the others: the app may read them aloud.
+- No `call.start` request, no token, no audio leaves Telegram.
 
 ## 7. Big files
 
 - Telegram caps what the app (TDLib, user) uploads at 2 GB (4 GB Premium),
   the bot at 50 MB up / 20 MB down. Beyond, the file goes to **gofile.io**
   (guest upload, links `https://gofile.io/d/<code>`), or **SwissTransfer**
-  (`https://www.swisstransfer.com/d/<uuid>`) when an Infomaniak token is set,
+  (`https://swisstransfer.infomaniak.com/dl/<uuid>`, v2; the older
+  `https://www.swisstransfer.com/d/<uuid>` is read too) when an Infomaniak
+  token is set,
   and the message ends with one line per file: `[fichier: <url>]`.
 - Hermes reads such links with `bigfile_fetch` (into `~/.hermes/files/`) and
   sends a file the bot cannot with `bigfile_send`, which uploads to gofile.io
@@ -351,6 +357,10 @@ a key, tokens are stored and `apns: false`.
 
 ## Changelog
 
+- v2 (2026-11-07, Arthur's change): call mode goes through Telegram only.
+  Removed: `call.start`, its URL, token and the server's WebSocket and
+  STT/TTS. Added: the call turn, a message starting with `🎙 `, and the
+  optional `call.state` request (§6). `v` is 2 in every message.
 - v1 (2026-11-07): first precise version. Changes from the v0 draft: the
   state is three edited slot messages (`state`, `stats`, `devices`) instead
   of one pinned message (4096-character cap; a pin shows on top of the DM);

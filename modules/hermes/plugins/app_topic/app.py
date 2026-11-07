@@ -37,6 +37,7 @@ STATS_REFRESH_GAP = 10.0
 EPHEMERAL_FOR = 3600.0
 SLOT_MAX_AGE = 47 * 3600.0
 SETTLE = 2.5
+CALL_MAX = 2 * 3600.0
 
 
 def owner_id() -> int | None:
@@ -75,8 +76,8 @@ class App:
         self.extra_handlers: dict[str, Any] = {}  # request type → coroutine fn(req, msg_id) -> data
         self.pet_busy = False
         self.delivery_mtime = 0.0
-        self.notify_listeners: list = []  # fn(chat, message_id, text, final) — the call mode
         self.started = False
+        self.call_until = 0.0
 
     # ── persistence ──────────────────────────────────────────────────────
 
@@ -191,21 +192,6 @@ class App:
             return msg
 
         adapter.send, adapter.edit_message, adapter._send_control_message = wrapped_send, wrapped_edit, wrapped_control
-        draft = getattr(adapter, "send_draft", None)
-        if draft is not None:
-            async def wrapped_draft(chat_id, draft_id, content, metadata=None, *args, **kwargs):
-                result = await draft(chat_id, draft_id, content, metadata, *args, **kwargs)
-                try:
-                    thread = (metadata or {}).get("thread_id") if isinstance(metadata, dict) else None
-                    topic = plugin.topic_of(chat_id, thread)
-                    if topic is not None and content:
-                        for listener in list(plugin.notify_listeners):
-                            listener(topic, -int(draft_id or 0), content, False)
-                except Exception:
-                    logger.debug("app_topic: draft listener failed", exc_info=True)
-                return result
-
-            adapter.send_draft = wrapped_draft
         adapter._app_topic_wrapped = True
 
     # ── chats ────────────────────────────────────────────────────────────
@@ -576,11 +562,6 @@ class App:
         topic = self.topic_of(chat_id, thread)
         if topic is None or self.is_app_topic(chat_id, thread):
             return
-        for listener in list(self.notify_listeners):
-            try:
-                listener(topic, int(message_id), content, final or not edited)
-            except Exception:
-                logger.debug("app_topic: listener failed", exc_info=True)
         key = (topic, int(message_id))
         with self.lock:
             entry = self.pending_notify.get(key)
@@ -736,6 +717,10 @@ class App:
                 raise RequestError("bad_request", "prompt is required")
             started = self.start_pet_generation(prompt, request.get("name"))
             return {"started": started}
+        if kind == "call.state":
+            # A call left on (the app killed mid-call) ends by itself after CALL_MAX.
+            self.call_until = time.time() + CALL_MAX if request.get("active") else 0.0
+            return {"active": self.call_active()}
         if kind == "app.reinstall":
             return await asyncio.to_thread(self.reinstall, request.get("devices") or [])
         if kind == "ack":
@@ -751,9 +736,12 @@ class App:
         handler = self.extra_handlers.get(kind)
         if handler is not None:
             return await handler(request, message_id)
-        if kind in ("call.start", "push.register", "push.unregister"):
+        if kind in ("push.register", "push.unregister"):
             raise RequestError("unavailable", f"{kind} is off on this server")
         raise RequestError("unknown_type", f"unknown request type {kind!r}")
+
+    def call_active(self) -> bool:
+        return time.time() < self.call_until
 
     def reinstall(self, devices: list) -> dict:
         cli = self.config.get("delivery_cli") or "hermes-app"
