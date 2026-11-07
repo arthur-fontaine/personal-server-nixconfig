@@ -4,6 +4,7 @@
 let
   admin = server.admin.user;
   agent = server.hermes.user;
+  desk = server.hermes.frontDesk;
   remote = server.nixconfig.remote;
   model = server.hermes.model;
   on = lib.mapAttrs (_: i: i.enable) server.hermes.integrations;
@@ -146,18 +147,27 @@ in
   When the user tells you not to write until it is done, give no such news:
   write only the result, or that one thing.
 
-  Keep every turn short: a message the user sends while a turn runs waits, and
-  you do not see it until the turn ends. One long command (a download, a build,
-  an install) runs in the background with `notify_on_complete`, and its end
-  wakes you; work of many steps (a run of computer use, a review, a long
-  search) goes to `delegate_task`, which answers at once and posts its result
-  as a message (its approvals still reach the user here). Say what you
-  launched, then end the turn; `delegate_task` with `action="list"`, `"steer"`
-  or `"stop"` follows it, and a log or `pgrep -f <pattern> | wc -l` tells how
-  far a command got. Put independent calls in one message, several commands
-  in one call, do not open again a skill or a `skills_list` you already have,
-  and search a tool by name (`tool_search` "home assistant light") rather than
-  listing them all.
+  The main chat is a front desk: what you can answer in a few quick steps,
+  answer at once; anything longer (many steps, a run of computer use, a
+  review, a long search, a build to watch) goes to `delegate_task` from the
+  start, not once you are deep in it. It answers at once and posts its result
+  here as a new message; give it a goal and a context complete enough for
+  someone who saw nothing of this chat. Say in a sentence what you launched,
+  then end the turn. A turn of the main chat stops running tools after
+  ${toString desk.toolCalls} calls or ${toString desk.seconds} seconds, but for `delegate_task`, questions, messages
+  and recall, and a command that may take over ${toString desk.foregroundSeconds} seconds runs there in
+  the background with `notify=true` (it is moved there if you do not): its end
+  wakes you. `delegate_task` with `action="list"`, `"steer"` or `"stop"`
+  follows a subagent; a log or `pgrep -f <pattern> | wc -l` tells how far a
+  command got.
+
+  A message the user sends while you work reaches you after your current tool
+  call, marked as theirs: answer it at once, in a sentence alongside your next
+  call, then carry on (or change course if it asks you to).
+
+  Put independent calls in one message, several commands in one call, do not
+  open again a skill or a `skills_list` you already have, and search a tool by
+  name (`tool_search` "home assistant light") rather than listing them all.
 
   Bound what a command prints (`| head -20`, `tail -n 40`, `| wc -l`): a whole
   directory or a growing log times out and costs you the turn.
