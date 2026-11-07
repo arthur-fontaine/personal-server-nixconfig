@@ -30,9 +30,11 @@ class Runtime:
         self.view_bytes = int(config.get("view_bytes", 64_000))
         self.line_bytes = int(config.get("line_bytes", 512))
         self.uzu_model = config.get("uzu_model", "")
-        # A turn waits this long for the last messages' summaries, then goes on
-        # with "(not summarized yet: zoom it)" lines.
-        self.summary_wait = float(config.get("summary_wait_seconds", 20))
+        # A turn waits at most this long for the newest messages' summaries,
+        # then goes on with "(not summarized yet: zoom it)" lines. Short: the
+        # wait is on the user's time, and a summary that is late now is in the
+        # next step's view.
+        self.summary_wait = float(config.get("summary_wait_seconds", 3))
         self.workers = int(config.get("compaction_workers", 4))
         self.keys: dict[str, bytes] = {}
         self.sessions: dict[str, Chat] = {}
@@ -64,6 +66,10 @@ class Runtime:
             self._volumes[name] = volume
             self._compactors[name] = Compactor(volume, self.complete, self.line_bytes, self.workers)
             return volume
+
+    def compactor(self, name: str) -> Compactor | None:
+        with self._lock:
+            return self._compactors.get(name)
 
     def is_locked(self, name: str, policy: Policy | None = None) -> bool:
         return self.encrypted(name, policy) and name not in self.keys

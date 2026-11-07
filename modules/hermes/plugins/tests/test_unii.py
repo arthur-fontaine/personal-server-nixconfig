@@ -10,6 +10,7 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
 import time
 import unittest
 
@@ -164,6 +165,54 @@ class EngineTest(Temp):
         self.assertIn("<chat>\n0+1|user: remember 7", selected[1]["content"])
         self.assertTrue(selected[1]["content"].endswith("what number?"))
         self.assertIn("remember 7", json.loads(main.handle_tool_call("zoom", {"id": 0, "n": 1}))["result"])
+
+    def test_a_step_never_waits_for_a_summary_that_failed(self):
+        # The compaction provider out of funds: every build fails at once.
+        def broke(messages):
+            raise RuntimeError("Error code: 402 - Insufficient account funds")
+
+        rt = Runtime(self.root, {**CONFIG, "summary_wait_seconds": 20}, broke)
+        main = self.engine(rt, MAIN_KEY)
+        history = [{"role": "system", "content": "SYS"}] + turn("x" * 300, "y" * 300)
+        main.on_turn_complete(history)
+        request = history + [{"role": "user", "content": "next"}]
+        with self.assertLogs("unii.engine", "WARNING") as logs:
+            for _ in range(3):
+                started = time.monotonic()
+                selected = main.select_context(request)
+                self.assertLess(time.monotonic() - started, 5)
+        self.assertIn("(not summarized yet: zoom it)", selected[1]["content"])
+        self.assertEqual(len([r for r in logs.output if "unsummarized" in r]), 1)
+
+    def test_only_a_turns_first_step_waits_and_not_past_the_cap(self):
+        release = threading.Event()
+
+        def slow(messages):
+            release.wait(30)
+            return "late summary"
+
+        rt = Runtime(self.root, {**CONFIG, "summary_wait_seconds": 1}, slow)
+        main = self.engine(rt, MAIN_KEY)
+        history = [{"role": "system", "content": "SYS"}] + turn("x" * 300, "ok")
+        main.on_turn_complete(history)
+        request = history + [{"role": "user", "content": "next"}]
+        try:
+            started = time.monotonic()
+            main.select_context(request)
+            first = time.monotonic() - started
+            self.assertGreaterEqual(first, 0.9)
+            self.assertLess(first, 5)
+            started = time.monotonic()
+            main.select_context(request + [{"role": "assistant", "content": "a step"}])
+            self.assertLess(time.monotonic() - started, 0.5)
+        finally:
+            release.set()
+        volume = rt.volume("main")
+        deadline = time.monotonic() + 20
+        while volume.unbuilt(volume.count) and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertEqual(volume.unbuilt(volume.count), [])
+        self.assertIn("late summary", main.select_context(request)[1]["content"])
 
     def test_tool_entries_are_one_line_and_old_results_are_slimmed(self):
         rt = self.runtime()

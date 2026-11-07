@@ -148,6 +148,10 @@ class UniiEngine(ContextEngine):
         self.chat: Chat | None = None
         self.passive = False
         self._logged: set[str] = set()
+        # Per volume: the message count this session last waited for, and the
+        # unsummarized messages it already warned about.
+        self._waited: dict[str, int] = {}
+        self._reported: dict[str, set[int]] = {}
 
     @property
     def name(self) -> str:
@@ -189,11 +193,31 @@ class UniiEngine(ContextEngine):
         blocks = []
         for name in names:
             volume = self.runtime.volume(name, policy if name != MAIN else None)
-            if not volume.wait_built(volume.count, self.runtime.summary_wait):
-                logger.warning("unii: %s still has unsummarized messages", name)
+            self._wait_summaries(name, volume)
             tag = tags.get(name, "chat")
             blocks.append(f"<{tag}>\n{volume.render()}\n</{tag}>")
         return "\n".join(blocks)
+
+    def _wait_summaries(self, name: str, volume) -> None:
+        """Wait, a short while, for the lines of the messages this session has not
+        waited for yet: a turn's first step waits for the last turn's, the steps
+        after it for nothing new. Never for a line whose last build failed."""
+        count = volume.count
+        compactor = self.runtime.compactor(name)
+        hopeless = compactor.failed if compactor is not None else (lambda i: True)
+        volume.wait_built(count, self.runtime.summary_wait, since=self._waited.get(name, 0), hopeless=hopeless)
+        self._waited[name] = count
+        missing = volume.unbuilt(count)
+        reported = self._reported.setdefault(name, set())
+        new = [i for i in missing if i not in reported]
+        if new:
+            failed = sum(1 for i in missing if hopeless(i))
+            logger.warning(
+                "unii: %s has %d unsummarized message(s), %d of them failed to build: going on without them",
+                name, len(missing), failed,
+            )
+        reported.intersection_update(missing)
+        reported.update(new)
 
     def _state(self) -> str:
         now = datetime.now(timezone.utc).astimezone().isoformat(timespec="minutes")

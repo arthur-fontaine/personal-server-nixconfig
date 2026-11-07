@@ -290,17 +290,27 @@ class Volume:
             level += 1
         return missing
 
-    def wait_built(self, upto: int, timeout: float) -> bool:
-        """Wait until messages before `upto` all have their line."""
+    def unbuilt(self, upto: int, since: int = 0) -> list[int]:
+        """The messages from `since` to before `upto` without their line."""
+        return [i for i in range(since, upto) if (0, i) not in self.nodes]
+
+    def wait_built(self, upto: int, timeout: float, since: int = 0, hopeless=lambda i: False) -> bool:
+        """Wait until messages from `since` to before `upto` have their line, but
+        for those `hopeless` says will not get one soon."""
         deadline = time.monotonic() + timeout
         with self._built:
             while True:
-                if all((0, i) in self.nodes for i in range(upto)):
+                if all(hopeless(i) for i in self.unbuilt(upto, since)):
                     return True
                 left = deadline - time.monotonic()
                 if left <= 0:
                     return False
                 self._built.wait(left)
+
+    def wake(self) -> None:
+        """Wake the waiters: what they wait for changed without a new line (a build failed)."""
+        with self._built:
+            self._built.notify_all()
 
     # ── the view ─────────────────────────────────────────────────────────
 

@@ -29,6 +29,11 @@ Where it departs from the design:
 - Logs are one file per volume rather than one per day.
 - The view is one user message (view, then the turn's state, then the message)
   instead of separate blocks.
+- A turn does not wait until the newest lines are built: its first step waits
+  a few seconds (`summary_wait_seconds`) for the lines of the messages logged
+  since the session's last wait, never for a line whose last build failed, and
+  the steps after it not at all. A missing line reads "(not summarized yet:
+  zoom it)" until it is built.
 
 Hermes freezes a session's system prompt and tool list at its first turn, and
 the single chat is one session that never ends: a new SOUL.md, AGENTS.md or

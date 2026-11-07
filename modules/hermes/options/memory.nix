@@ -17,8 +17,14 @@ in
     };
     summaryWait = mkOption {
       type = types.ints.positive;
-      default = 20;
-      description = "Seconds a turn waits for the newest messages' summaries before it goes on without them.";
+      # 20 s cost every step of the chat 20 s on Nov 6, 2026, when the summaries
+      # failed; a late one is in the next step's view anyway.
+      default = 3;
+      description = ''
+        Seconds a turn's first step waits for the last turn's summaries before
+        it goes on without them. The steps after it, and summaries whose last
+        build failed, are never waited for.
+      '';
     };
     compactionWorkers = mkOption {
       type = types.ints.positive;

@@ -36,6 +36,9 @@ class Compactor:
         self.line_bytes = line_bytes
         self._queue: queue.Queue[tuple[int, int] | None] = queue.Queue()
         self._queued: set[tuple[int, int]] = set()
+        # Nodes whose last build failed: a turn does not wait for them, whether
+        # or not a retry is running (a provider out of funds fails every time).
+        self._failed: set[tuple[int, int]] = set()
         self._lock = threading.Lock()
         self._threads = [
             threading.Thread(target=self._work, name=f"unii-{volume.name}-{k}", daemon=True) for k in range(workers)
@@ -80,13 +83,25 @@ class Compactor:
             level, index = item
             try:
                 self.volume.set_node(level, index, self.build(level, index))
+                with self._lock:
+                    self._failed.discard((level, index))
                 self._built(level, index)
             except Exception:
-                # Tried again at the next message.
-                logger.warning("unii: could not build %s in %s", node_name(level, index), self.volume.name, exc_info=True)
+                # Tried again after the next turn.
+                with self._lock:
+                    first = not self._failed
+                    self._failed.add((level, index))
+                # The traceback once a run of failures, not once a node.
+                logger.warning("unii: could not build %s in %s", node_name(level, index), self.volume.name, exc_info=first)
+                self.volume.wake()
             finally:
                 with self._lock:
                     self._queued.discard((level, index))
+
+    def failed(self, index: int) -> bool:
+        """Whether message `index`'s line failed its last build."""
+        with self._lock:
+            return (0, index) in self._failed
 
     def retry_failed(self) -> None:
         for level, index in self.volume.missing_nodes():
