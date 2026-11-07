@@ -6,12 +6,14 @@ struct PetScreen: View {
     @Environment(HermesStore.self) private var store
     @Environment(AppModel.self) private var model
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var busy: PetAction?
     @State private var showGenerate = false
 
     var body: some View {
         ScrollView {
-            let layout = sizeClass == .regular ? AnyLayout(HStackLayout(alignment: .top, spacing: 32)) : AnyLayout(VStackLayout(spacing: 24))
+            let wide = sizeClass == .regular || verticalSizeClass == .compact
+            let layout = wide ? AnyLayout(HStackLayout(alignment: .top, spacing: 32)) : AnyLayout(VStackLayout(spacing: 24))
             layout {
                 stage
                 VStack(spacing: 20) {
@@ -19,7 +21,7 @@ struct PetScreen: View {
                     actions
                     level
                 }
-                .frame(maxWidth: 480)
+                .frame(minWidth: wide ? 320 : nil, maxWidth: 480)
             }
             .padding(24)
             .frame(maxWidth: 1000)
@@ -41,8 +43,8 @@ struct PetScreen: View {
             ZStack {
                 Circle()
                     .fill(RadialGradient(colors: [store.petMood.tint.opacity(0.35), .clear], center: .center, startRadius: 10, endRadius: 170))
-                    .frame(width: 320, height: 320)
-                PetSpriteView(animation: nil, size: 230)
+                    .frame(width: stageSize + 90, height: stageSize + 90)
+                PetSpriteView(animation: nil, size: stageSize)
                     .onTapGesture {
                         store.petReaction = .waving
                         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
@@ -55,6 +57,8 @@ struct PetScreen: View {
         }
         .frame(maxWidth: .infinity)
     }
+
+    private var stageSize: CGFloat { verticalSizeClass == .compact ? 150 : 230 }
 
     private var needs: some View {
         VStack(spacing: 14) {

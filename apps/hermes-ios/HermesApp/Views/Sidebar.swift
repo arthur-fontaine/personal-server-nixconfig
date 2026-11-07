@@ -9,10 +9,13 @@ struct Sidebar: View {
     var body: some View {
         List(selection: selectionBinding) {
             Section {
-                PetCard()
-                    .listRowInsets(EdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4))
-                    .listRowBackground(Color.clear)
-                    .tag(SidebarItem.section(.pet))
+                // A button, not a selectable row: the card is its own highlight.
+                Button { model.section = .pet } label: {
+                    PetCard(selected: model.section == .pet)
+                }
+                .buttonStyle(.plain)
+                .listRowInsets(EdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4))
+                .listRowBackground(Color.clear)
             }
             Section("Chats") {
                 ThreadRow(thread: store.mainThread)
@@ -61,6 +64,7 @@ struct Sidebar: View {
 /// The pet at a glance: mood and needs; a tap opens the Pet section.
 struct PetCard: View {
     @Environment(HermesStore.self) private var store
+    var selected = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -83,8 +87,9 @@ struct PetCard: View {
             Spacer(minLength: 0)
         }
         .padding(10)
-        .background(.fill.quinary, in: .rect(cornerRadius: 18))
+        .background(selected ? AnyShapeStyle(Color.accentColor.opacity(0.18)) : AnyShapeStyle(.fill.quinary), in: .rect(cornerRadius: 18))
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 }
 

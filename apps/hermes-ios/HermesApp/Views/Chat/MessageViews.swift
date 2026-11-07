@@ -46,7 +46,10 @@ struct MessageRow: View {
                     .background(Color.accentColor.opacity(0.16), in: .rect(cornerRadius: 20))
                     .opacity(message.sendState == .pending ? 0.6 : 1)
             }
-            .containerRelativeFrame(.horizontal, alignment: .trailing) { w, _ in w * 0.8 }
+            // At most ~80 % of the column: the leading inset, not containerRelativeFrame, which
+            // measures the whole scroll view, under the floating sidebar too.
+            .padding(.leading, 56)
+            .frame(maxWidth: .infinity, alignment: .trailing)
             .accessibilityLabel("You: \(text)")
         }
     }
@@ -115,7 +118,9 @@ struct CodeBlock: View {
                     .fixedSize(horizontal: true, vertical: false)
                     .padding(.horizontal, 12).padding(.bottom, 12)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(.fill.tertiary, in: .rect(cornerRadius: 14))
     }
 }
@@ -178,8 +183,7 @@ struct InlineKeyboard: View {
 
     var body: some View {
         let rows = Dictionary(grouping: message.buttons, by: \.row).sorted { $0.key < $1.key }
-        GlassEffectContainer(spacing: 8) {
-            VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
                 ForEach(rows, id: \.key) { _, buttons in
                     HStack(spacing: 8) {
                         ForEach(buttons) { button in
@@ -197,9 +201,8 @@ struct InlineKeyboard: View {
                         }
                     }
                 }
-            }
         }
-        .frame(maxWidth: 520)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func press(_ button: InlineButton) {

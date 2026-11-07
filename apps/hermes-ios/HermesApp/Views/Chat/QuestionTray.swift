@@ -33,13 +33,14 @@ struct QuestionTray: View {
 struct QuestionCard: View {
     @Environment(HermesStore.self) private var store
     @Environment(AppModel.self) private var model
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     let question: PendingQuestion
     var more = 0
     @State private var showCommand = false
     @State private var pressing: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: verticalSizeClass == .compact ? 8 : 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: icon).foregroundStyle(.tint)
                 Text(heading).font(.caption.weight(.semibold)).foregroundStyle(.secondary).textCase(.uppercase)
@@ -48,8 +49,10 @@ struct QuestionCard: View {
             }
             Text(question.summary ?? question.text)
                 .font(.body.weight(.medium))
+                .lineLimit(verticalSizeClass == .compact ? 2 : nil)
                 .fixedSize(horizontal: false, vertical: true)
-            if let command = question.command {
+            // Landscape iPhone: summary and buttons only, the conversation keeps some room.
+            if let command = question.command, verticalSizeClass != .compact {
                 DisclosureGroup(isExpanded: $showCommand) {
                     ScrollView(.horizontal, showsIndicators: false) {
                         Text(command)
@@ -65,7 +68,7 @@ struct QuestionCard: View {
             }
             options
         }
-        .padding(16)
+        .padding(verticalSizeClass == .compact ? 12 : 16)
         .glassEffect(in: .rect(cornerRadius: 24))
         .accessibilityElement(children: .contain)
     }

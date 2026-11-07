@@ -21,7 +21,7 @@ struct DashboardView: View {
                     }
                     UsageSummary(models: stats.models, window: window)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
-                        ForEach(stats.models.sorted { ($0.rank, -$0.figures(window).calls) < ($1.rank, -$1.figures(window).calls) }) { m in
+                        ForEach(stats.models.sorted { (Self.roleOrder($0.role), -$0.figures(window).calls) < (Self.roleOrder($1.role), -$1.figures(window).calls) }) { m in
                             ModelCard(model: m, window: window)
                         }
                     }
@@ -39,7 +39,7 @@ struct DashboardView: View {
                         }
                     }
                     if let at = stats.updatedAt {
-                        Text("Updated \(at, style: .relative) ago").font(.caption).foregroundStyle(.secondary)
+                        Text("Updated \(at.formatted(.relative(presentation: .named)))").font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 .padding(20)
@@ -57,6 +57,18 @@ struct DashboardView: View {
         .onAppear { store.refreshStats() }
     }
 
+    /// The chain first (main, then fallbacks), then the helpers.
+    static func roleOrder(_ r: ModelUsage.Role) -> Int {
+        switch r {
+        case .main: 0
+        case .fallback: 1
+        case .local: 2
+        case .background: 3
+        case .decision: 4
+        case .other: 5
+        }
+    }
+
     private func section<T: View>(_ title: String, @ViewBuilder trailing: () -> T) -> some View {
         HStack {
             Text(title).font(.title2.weight(.semibold))
@@ -69,6 +81,10 @@ struct DashboardView: View {
         guard let used, let total else { return "–" }
         return "\(ByteCountFormatter.string(fromByteCount: used, countStyle: .memory)) of \(ByteCountFormatter.string(fromByteCount: total, countStyle: .memory))"
     }
+}
+
+extension DashboardView {
+    static func dollars(_ v: Double) -> String { "$" + v.formatted(.number.precision(.fractionLength(2))) }
 }
 
 struct UsageSummary: View {
@@ -84,7 +100,7 @@ struct UsageSummary: View {
         HStack(spacing: 12) {
             stat("Calls", calls.formatted(.number.notation(.compactName)))
             stat("Tokens", tokens.formatted(.number.notation(.compactName)))
-            stat("Cost", cost.formatted(.currency(code: "USD").precision(.fractionLength(2))))
+            stat("Cost", DashboardView.dollars(cost))
             stat("Errors", "\(errors)", alert: errors > 0)
         }
     }
@@ -127,12 +143,12 @@ struct ModelCard: View {
                 }
                 GridRow {
                     figure("Cached", f.cacheRatio.formatted(.percent.precision(.fractionLength(0))))
-                    figure("Cost", f.costUSD > 0 ? f.costUSD.formatted(.currency(code: "USD").precision(.fractionLength(2))) : "—")
+                    figure("Cost", f.costUSD > 0 ? DashboardView.dollars(f.costUSD) : "—")
                     figure("Errors", "\(f.errors)", alert: f.errors > 0)
                 }
             }
             if let last = model.lastUsed {
-                Text("Last used \(last, style: .relative) ago").font(.caption).foregroundStyle(.secondary)
+                Text("Last used \(last.formatted(.relative(presentation: .named, unitsStyle: .abbreviated)))").font(.caption).foregroundStyle(.secondary)
             }
         }
         .padding(16)

@@ -98,6 +98,10 @@ struct SettingsView: View {
                 LabeledContent("Apple team", value: store.config.paidTeam ? "Paid" : "Free personal")
             }
         }
+        // A readable column in a wide window, as Settings does on iPad.
+        .frame(maxWidth: 720)
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemGroupedBackground))
         .navigationTitle("Settings")
         .task { await refresh() }
         .confirmationDialog("Log out of Telegram on this device?", isPresented: $confirmLogout, titleVisibility: .visible) {

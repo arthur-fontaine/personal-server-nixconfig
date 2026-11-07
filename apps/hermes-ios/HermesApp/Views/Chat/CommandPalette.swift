@@ -26,7 +26,8 @@ struct CommandPalette: View {
             List {
                 if query.isEmpty { current }
                 Section(query.isEmpty ? "Commands" : "Results") {
-                    ForEach(filtered) { cmd in row(cmd) }
+                    // Model and permission mode already sit in "In this chat" with their values.
+                    ForEach(filtered.filter { !query.isEmpty || !shownAbove.contains($0.id) }) { cmd in row(cmd) }
                 }
             }
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search commands")
@@ -54,7 +55,17 @@ struct CommandPalette: View {
                 if let (_, text) = confirming { send(text) }
             }
         }
-        .presentationDetents([.medium, .large])
+        // A half sheet on iPhone; a form-sized sheet on iPad, where a half height shows three rows.
+        // (The idiom, not the size class: inside a form sheet the size class is always compact.)
+        .presentationDetents(UIDevice.current.userInterfaceIdiom == .pad ? [.large] : [.medium, .large])
+        .presentationSizing(.form)
+    }
+
+    private var shownAbove: Set<String> {
+        var ids: Set<String> = []
+        if store.controls.model?.selected(in: topic) != nil { ids.insert("model") }
+        if store.controls.permissionMode?.value != nil { ids.insert("permissions") }
+        return ids
     }
 
     private var commands: [CommandSpec] { store.controls.commands(for: store.commandContext(topic)) }
@@ -74,11 +85,13 @@ struct CommandPalette: View {
                     Button { path.append(.model) } label: {
                         CurrentRow(symbol: "cpu", title: "Model", value: selected.model)
                     }
+                    .buttonStyle(.plain)
                 }
                 if let p = c.permissionMode, let v = p.value, p.set != nil {
                     Button { path.append(.permissions) } label: {
                         CurrentRow(symbol: "checkmark.shield", title: "Permission mode", value: p.options.first { $0.id == v }?.label ?? v)
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -139,7 +152,7 @@ struct CurrentRow: View {
 
     var body: some View {
         HStack {
-            Label(title, systemImage: symbol).foregroundStyle(.primary)
+            Label { Text(title).foregroundStyle(.primary) } icon: { Image(systemName: symbol).foregroundStyle(.tint) }
             Spacer()
             Text(value).foregroundStyle(.secondary).lineLimit(1)
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
