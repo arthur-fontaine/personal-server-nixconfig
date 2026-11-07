@@ -30,7 +30,8 @@ PET_SCHEMA = {
         "Hatch a new pet for the owner's app: an animated mascot (Codex pet format) drawn by the image "
         "provider from a description, which becomes the current pet and the app's icon. Takes several "
         "minutes and costs about ten image generations: in the main chat, hand it to a background "
-        "subagent. Afterwards, decide whether to reinstall the app (app_install) so the icon follows."
+        "subagent. Afterwards, decide whether to reinstall the app (sideload_install with app \"hermes\") so the icon "
+        "follows."
     ),
     "parameters": {
         "type": "object",
@@ -80,7 +81,7 @@ def approval_summary(command: str, summary: str) -> None:
 
 
 def pre_approval_request(command: str = "", description: str = "", **_) -> None:
-    """guard (app-delivery's change) writes a plain-language summary above a
+    """guard (its bash titles, guard/titles.py) writes a plain-language summary above a
     command it escalates; Hermes' own pattern cards have none (their
     description is the pattern's name), and stay without."""
     guard = sys.modules.get("guard")
@@ -146,7 +147,7 @@ def _pet_generate(args: dict, **_) -> str:
         app.pet_busy = False
     return json.dumps({"ok": True, "pet": manifest, "files": str(app.dir / "pet"),
                        "note": "The app shows it at once; its icon changes only when the app is rebuilt "
-                               "(app_install), which you may decide to do now or later."})
+                               "(sideload_install with app \"hermes\"), which you may decide to do now or later."})
 
 
 def _bigfile_fetch(args: dict, **_) -> str:

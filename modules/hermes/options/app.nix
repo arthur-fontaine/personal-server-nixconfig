@@ -1,6 +1,6 @@
 # Hermes' side of the owner's iOS app (docs/app.md): the App topic, pets,
 # big files, pushes. Building and installing the app itself is
-# server.hermes.app.delivery (modules/hermes/app-delivery), apart.
+# server.hermes.app.delivery (modules/hermes/system/sideload.nix), apart.
 { lib, ... }:
 let
   inherit (lib) mkOption mkEnableOption types;
