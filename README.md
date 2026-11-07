@@ -28,6 +28,9 @@ The layout follows [arthur-fontaine/nixconfig](https://github.com/arthur-fontain
   [iMCP](https://github.com/mattt/iMCP)).
 - **Integrations, each optional**: WhatsApp, Instagram, Discord, Home
   Assistant, HomeKit, 1Password, RunPod, GitHub notifications.
+- **The Hermes app** on your iPhone and iPad, if you want it: built here,
+  signed with your Apple Account (a free one: re-signed every few days by
+  itself) and installed over Wi-Fi ([`docs/app.md`](./docs/app.md)).
 - **Tools**: computer use (Accessibility + Screen Recording), its own always-open
   Chrome, fsearch (files by name), DigUp (files by content), and any software
   through Nix.
@@ -80,6 +83,7 @@ integrations, ...) go under
 
 - [`docs/hermes.md`](./docs/hermes.md): the single chat, sub-chats, what Hermes may touch
 - [`docs/events.md`](./docs/events.md): Hermes writing first, when a message may call for you
+- [`docs/app.md`](./docs/app.md): the Hermes iOS app, and how this Mac builds, signs and installs it
 - [`docs/sandbox.md`](./docs/sandbox.md): coding tasks handed to Pi in a microVM, reviewed before anything runs
 - [`docs/repository-layout.md`](./docs/repository-layout.md): where things are, and the checks
 - [`docs/uninstall.md`](./docs/uninstall.md): disabling Hermes, removing it, or uninstalling everything (`scripts/uninstall-macos.sh`)

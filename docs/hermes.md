@@ -248,6 +248,15 @@ branch, your answer to a question, or a command here (always your buttons).
 You take the branch with `git fetch`, after reading it. The
 details: [sandbox.md](sandbox.md).
 
+## The Hermes app
+
+With `server.hermes.app.delivery.enable`, Hermes builds its iPhone and iPad
+app on this Mac, signs it with your Apple Account (a free one works) and
+installs it on your devices over Wi-Fi: `app_devices` lists them,
+`app_install` rebuilds and installs (after a new pet, or when you ask), and a
+launchd job re-signs it before its 7-day profile expires. Details:
+[app.md](app.md).
+
 ## Integrations: WhatsApp, Instagram, Discord, 1Password…
 
 Each of your other services is an integration, off until you turn it on

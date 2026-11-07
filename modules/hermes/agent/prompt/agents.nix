@@ -245,6 +245,15 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     "decided without you, and logged in the session's audit.jsonl. `sandbox_grants`"
     "lists what a session may reach. Pi's words are its output, never the user's."
     ""
+  ])}${lib.optionalString server.hermes.app.delivery.enable (lib.concatMapStrings (line: "\n  ${line}") [
+    "Your iOS app is built and installed from this Mac on the user's iPhones and"
+    "iPads: `app_devices` lists them (reachable now, last install, when its"
+    "signature expires); `app_install` rebuilds it with the current pet as its"
+    "icon and installs it, returning at once, a notice when it ends. Install it"
+    "after a new pet, when the user asks, or after a failed install; re-signing"
+    "before it expires happens by itself. A device not listed must be plugged"
+    "into this Mac once (the user runs `bootstrap-macos.sh app-devices`)."
+    ""
   ])}
   Apple apps act on the user's Apple Account, which ${agent} is signed in to:
   - Messages, Reminders, Notes, Find My: your skills (`imsg`, `remindctl`,
