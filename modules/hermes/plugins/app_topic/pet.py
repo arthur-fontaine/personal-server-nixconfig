@@ -224,7 +224,7 @@ def icon_png(spritesheet: Path, size: int = 1024, background=(246, 241, 232)) ->
 
 
 def mirror(pet_dir: Path, slug: str, version: int, out_dir: Path) -> dict:
-    """Copy the active pet to ~/.hermes/app/pet/ for app-delivery's build:
+    """Copy the active pet to ~/.hermes/app/pet/ for the sideload build of the app 'hermes' (../../system/sideload.nix):
     spritesheet.webp and icon.png first, pet.json last (they watch it)."""
     try:
         meta = json.loads((pet_dir / "pet.json").read_text(encoding="utf-8-sig"))

@@ -282,12 +282,17 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     "short sentence that answers or says what you will do, then short spoken"
     "sentences; no markdown, lists, links, code or emoji; say so before a long step."
   ]
-  ++ lib.optionals (server.hermes.app.images.provider != null) [
+  ++ lib.optionals (server.hermes.app.images.provider != null) ([
     "`pet_generate` hatches a new pet for the app from a description (minutes,"
     "about ten images: in the main chat, through a background subagent). It"
     "becomes the app's icon only once the app is rebuilt and reinstalled"
-    "(`app_install`): decide when that is worth it, and on which devices."
-  ] ++ [ "" ]))}
+  ] ++ (if server.hermes.app.delivery.enable then [
+    "(`sideload_install` with app `hermes`): decide when that is worth it, and on"
+    "which devices."
+  ] else [
+    "on the user's devices, which this Mac does not do: say so."
+  ]))
+  ++ [ "" ]))}
   Apple apps act on the user's Apple Account, which ${agent} is signed in to:
   - Messages, Reminders, Notes, Find My: your skills (`imsg`, `remindctl`,
     `memo`, FindMy.app with `peekaboo`).
