@@ -25,6 +25,20 @@ in
       default = cfg.model.name;
     };
 
+    # Describing a screenshot (vision_analyze, computer use) when the model
+    # cannot take the pixels in a tool result, as on OpenCode Go, whose relay
+    # rejects them (plugins/model-providers/opencode-zen/__init__.py,
+    # supports_vision_tool_messages=False): the describer is the main model, and
+    # with its thinking on a description took ~50 s, 89% of it reasoning (Nov 6,
+    # 2026). No describer of its own, which would also take the pixels away
+    # from a main model that can read them (agent/image_routing.py,
+    # _explicit_aux_vision_override). No token cap either: the pin has no key
+    # for one, and extra_body reaches every wire as it is.
+    auxiliary.vision = {
+      reasoning_effort = "none";
+      timeout = 45;
+    };
+
     fallback_providers = cfg.fallbacks
       ++ lib.optional (cfg.localFallback && server.uzu.enable) { provider = "uzu"; model = server.uzu.model; };
 

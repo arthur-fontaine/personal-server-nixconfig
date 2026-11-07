@@ -307,12 +307,16 @@ guard's approval card is the question, with or without a decision model
 ## Speed: the prompt is what a step costs
 
 A turn is one call to the model per tool call, and every call re-sends the
-conversation. On this machine a fresh session answers in 3 to 6 s a step; the
-same model took 24 to 31 s on a conversation a week old, whose prompt had
-reached ~62k tokens. Those tokens were cached, so they cost almost nothing,
-but they are not free to prefill: the delay was the prompt, not the thinking.
-Tool output is what fills it (a `cua` script result, a terminal dump, a whole
-skill re-read).
+conversation. DeepSeek V4.1 Flash on OpenCode Go answers a ~70k-token prompt in
+4 to 6 s (80 to 100% of it cached). Steps of 24 to 31 s on Nov 6, 2026 were
+not the prompt: 20 s of each was unii waiting for summaries that kept failing
+(their provider was out of funds; a step now waits 3 s at most, only at a
+turn's start, never for a failed one), and a screenshot read cost ~50 s of
+thinking (`auxiliary.vision.reasoning_effort = "none"` now, in
+`modules/hermes/agent/model.nix`). Turns of 5 to 95 minutes were the local
+model answering for the chat after every remote model had failed ("Models").
+Tool output is still what fills the prompt (a `cua` script result, a terminal
+dump, a whole skill re-read).
 
 `modules/hermes/agent/context.nix` keeps it down with Hermes' deterministic
 prune: past 24k tokens of re-sent history, oversized tool results outside the
