@@ -143,6 +143,8 @@ class ChatRecord:
     overrides: dict = field(default_factory=dict)
     last_active: float = 0.0
     session_ids: list = field(default_factory=list)
+    # The topic's name, as /sub new created it (the app lists the sub-chats by it).
+    name: str = ""
 
 
 class Policies:
@@ -201,6 +203,11 @@ class Policies:
             record.preset, record.overrides = name, {}
             self._save()
         return self.policy(chat)
+
+    def set_name(self, chat: Chat, name: str) -> None:
+        with self._lock:
+            self._record(chat).name = name
+            self._save()
 
     def set(self, chat: Chat, key: str, value) -> Policy:
         with self._lock:
