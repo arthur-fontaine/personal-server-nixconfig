@@ -5,3 +5,4 @@ author: "personal-server-nixconfig"
 provides_hooks:
   - pre_llm_call
   - pre_tool_call
+  - pre_api_request

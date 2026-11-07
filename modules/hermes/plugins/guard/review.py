@@ -106,6 +106,7 @@ class Session:
     turn_from_user: bool = False
     hermes_last_message: str = ""
     subagent: bool = False
+    steers_read: int = 0  # the steer rows of the current turn already read
 
 
 @dataclass(frozen=True)

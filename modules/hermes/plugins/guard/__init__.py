@@ -84,6 +84,22 @@ def _text(content) -> str:
     return ""
 
 
+def steered_text(content: str) -> str:
+    """The user's words in a steer row: inside Hermes' marker, after the
+    gateway's origin preamble (gateway/run_busy.py, _steer_text_with_origin)."""
+    try:
+        from agent.prompt_builder import STEER_MARKER_CLOSE, STEER_MARKER_OPEN
+    except ImportError:
+        return ""
+    start, end = content.find(STEER_MARKER_OPEN), content.rfind(STEER_MARKER_CLOSE)
+    if start < 0 or end < start:
+        return ""
+    text = content[start + len(STEER_MARKER_OPEN):end].strip()
+    if text.startswith("Gateway message origin") and "\n\n" in text:
+        text = text.split("\n\n", 1)[1].strip()
+    return text
+
+
 def _last_reply(history) -> str:
     for message in reversed(history or []):
         if isinstance(message, dict) and message.get("role") == "assistant" and (text := _text(message.get("content")).strip()):
@@ -158,11 +174,34 @@ class Guard:
             session.turn_from_user = parent.turn_from_user
             session.hermes_last_message = parent.hermes_last_message
             return
+        session.steers_read = 0
         session.turn_from_user = platform in self.trusted_platforms and not internal(user_message)
         if session.turn_from_user and user_message:
             session.messages.append(_text(user_message)[:2000])
             # What a short answer ("oui") answers.
             session.hermes_last_message = _last_reply(conversation_history)
+
+    def pre_api_request(self, session_id: str = "", platform: str = "", conversation_history=None, **_):
+        """A message the user sends mid-turn (busy_input_mode steer, agent/telegram.nix)
+        joins the turn as a user row only Hermes writes (agent/prompt_builder.py,
+        steer_user_row: display_kind "steer"): theirs, like the turn's first one.
+        Only the rows after the turn's own message: earlier ones belong to
+        turns already read."""
+        if platform not in self.trusted_platforms:
+            return
+        history = [m for m in conversation_history or [] if isinstance(m, dict)]
+        opening = max((i for i, m in enumerate(history) if m.get("role") == "user"
+                       and m.get("display_kind") != "steer"), default=-1)
+        steers = [i for i, m in enumerate(history) if i > opening and m.get("role") == "user"
+                  and m.get("display_kind") == "steer"]
+        session = self._session(session_id)
+        for index in steers[session.steers_read:]:
+            text = steered_text(_text(history[index].get("content")))
+            if text:
+                session.turn_from_user = True
+                session.messages.append(text[:2000])
+                session.hermes_last_message = _last_reply(history[:index])
+        session.steers_read = max(session.steers_read, len(steers))
 
     def pre_tool_call(self, tool_name: str, args: dict, task_id: str = "", session_id: str = "", **_):
         from .review import read_only, review
@@ -290,3 +329,4 @@ def register(ctx) -> None:
     sys.modules.setdefault("guard", sys.modules[__name__])
     ctx.register_hook("pre_llm_call", guard.pre_llm_call)
     ctx.register_hook("pre_tool_call", guard.pre_tool_call)
+    ctx.register_hook("pre_api_request", guard.pre_api_request)

@@ -188,7 +188,8 @@ so one action asks at most once.
 As in Claude Code's auto mode, the reviewer sees your messages and Hermes'
 actions, never what the tools returned: a WhatsApp message, an email or a web
 page telling Hermes to act cannot argue with it. Only Telegram turns count as
-yours (Telegram answers its owner only); a turn the events daemon starts, about
+yours (Telegram answers its owner only), and so does a message you send in the
+middle of one (it reaches the turn as a row only Hermes writes); a turn the events daemon starts, about
 an incoming message, authorizes nothing, and neither does a notice the gateway
 posts in your chat itself (a background process or a subagent finishing, a
 watch pattern matching). Hermes' own checks stay underneath:
