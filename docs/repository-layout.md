@@ -58,6 +58,7 @@ nix build .#checks.aarch64-darwin.coding-agent    # the coding agent's plugin, a
 nix build .#checks.aarch64-darwin.sandbox         # the coding agent's sidecar tests, in its build
 nix build .#checks.aarch64-darwin.events          # the events daemon's tests
 nix build .#checks.aarch64-darwin.freeze          # what hermes-freeze picks
+nix build .#checks.aarch64-darwin.instagram       # the Instagram skill's direct.js, against stand-ins for the page
 nix build .#darwinConfigurations.Personal-Server.system   # the whole system, without switching
 nix run .#hermes-turns                            # two real Hermes turns through the memory, on a scripted model
 ```
