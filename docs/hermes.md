@@ -154,9 +154,10 @@ the Mac.
 Two things here: the gateway's allowlist (`gateway.media_delivery_allow_dirs`,
 `modules/hermes/agent/browser.nix`) opens the harness' screenshot folder,
 `~/.config/browser-harness/tmp`, and only it; and the `outbox` plugin
-(`modules/hermes/plugins/outbox`) rewrites any refused attachment into a
-sentence saying it was not sent, before the reply reaches the user and the
-transcript. It reports rather than moves the file: the directories it names are
+(`modules/hermes/plugins/outbox`) rewrites an attachment the gateway would
+drop (a refused place, a missing file; not a remote image, nor an example in
+code or a quote) into a sentence saying it was not sent, before the reply
+reaches the user and the transcript. It reports rather than moves the file: the directories it names are
 refused because credentials live there.
 
 ## Auto-review of Hermes' actions

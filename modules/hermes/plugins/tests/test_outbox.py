@@ -86,6 +86,46 @@ def main() -> None:
     check("gateway says no", outbox.rescue(f"MEDIA:{plain}", validate=always_no),
           outbox._note("attachment", str(plain)))
 
+    # A remote image is the gateway's to fetch, and a relative link is no
+    # attachment at all: neither is judged.
+    check("kept: remote markdown image",
+          outbox.rescue("Voici : ![chat](https://upload.wikimedia.org/a/cat.png)"), None)
+    check("kept: relative markdown image", outbox.rescue("![a](relative.png)"), None)
+    check("kept: a plain link", outbox.rescue(f"[doc]({shot})"), None)
+
+    # Code and quotes are examples to the gateway (_mask_protected_spans).
+    check("kept: tag in inline code", outbox.rescue("Write it like `MEDIA:/path/to/file.png`."), None)
+    check("kept: tag in a fenced block", outbox.rescue(f"```\nMEDIA:/etc/hosts\n![x]({shot})\n```"), None)
+    check("kept: tag in a quote", outbox.rescue(f"> MEDIA:{shot}"), None)
+    check("rewritten: outside the code, not inside",
+          outbox.rescue(f"`MEDIA:/etc/hosts` then MEDIA:{shot}"),
+          f"`MEDIA:/etc/hosts` then {outbox._note('attachment', str(shot))}")
+
+    # A file that is not there, or a path that is not one, says so: copying
+    # it elsewhere would not help.
+    missing = scratch / "nope.png"
+    check("rewritten: missing file", outbox.rescue(f"MEDIA:{missing}"),
+          f"[attachment not sent: {missing} — no such file]")
+    check("rewritten: missing markdown image", outbox.rescue(f"![x]({missing})"),
+          f"[image not sent: {missing} — no such file]")
+    check("rewritten: relative tag", outbox.rescue("MEDIA:chart.png"),
+          "[attachment not sent: chart.png — not an absolute path]")
+    check("verdict: missing", outbox.verdict(str(missing)), "missing")
+    check("verdict: refused", outbox.verdict(str(shot)), "refused")
+    check("verdict: deliverable", outbox.verdict(str(plain)), None)
+
+    # A quoted path may hold spaces, as the gateway reads it.
+    spaced = write(scratch / "Capture d'écran.png")
+    check("kept: quoted path with spaces", outbox.rescue(f'MEDIA:"{spaced}"'), None)
+    check("kept: backticked path", outbox.rescue(f"MEDIA: `{spaced}`"), None)
+
+    # The operator allowlist (browser.nix) opens the harness' folder alone.
+    os.environ["HERMES_MEDIA_ALLOW_DIRS"] = str(shot.parent.parent)
+    check("allowed: the harness' screenshots", outbox.deliverable(str(shot)), True)
+    check("still denied: the rest of ~/.config",
+          outbox.deliverable(str(write(home / ".config" / "gh" / "hosts.yml"))), False)
+    del os.environ["HERMES_MEDIA_ALLOW_DIRS"]
+
     print("outbox: all checks passed")
 
 
