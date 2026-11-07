@@ -1,0 +1,7 @@
+name: app_delivery
+version: 1.0.0
+description: "Builds the Hermes iOS app on this Mac, signs it and installs it on the owner's paired devices over the network (hermes-app); the install's end comes back to the chat."
+author: "personal-server-nixconfig"
+provides_tools:
+  - app_devices
+  - app_install

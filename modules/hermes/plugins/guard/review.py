@@ -37,6 +37,8 @@ READ_ONLY = frozenset({
     "propose",
     # The sandbox's: what a session may reach, listed.
     "sandbox_grants",
+    # The app's: the devices it can be installed on, listed.
+    "app_devices",
 })
 # computer_use's actions that only look (tools/computer_use/tool.py, _ACTIONS:
 # the ones not marked destructive).

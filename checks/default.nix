@@ -42,6 +42,17 @@ in
     touch $out
   '';
 
+  # hermes-app (build, sign, install, refresh) and its plugin against fake
+  # xcrun, xcodebuild, xcodegen and security, in Hermes' interpreter.
+  app-delivery = pkgs.runCommand "app-delivery-tests" { } ''
+    cp -R ${../modules/hermes/app-delivery} app-delivery
+    chmod -R u+w app-delivery
+    cd app-delivery
+    export HOME=$TMPDIR
+    ${hermes.hermesVenv}/bin/python3 -I tests/test_app_delivery.py
+    touch $out
+  '';
+
   # The events daemon's tests: fake uzu and Hermes servers on loopback, and
   # Hermes' own signature check.
   events = pkgs.runCommand "hermes-events-tests" { __darwinAllowLocalNetworking = true; } ''
