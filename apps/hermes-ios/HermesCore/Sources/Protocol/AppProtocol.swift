@@ -3,7 +3,7 @@ import Foundation
 /// The machine-readable traffic in the hidden "App" topic (hermes-app-work/app-protocol.md).
 /// Each message is one JSON object in a ```json block, with `v` and `type`.
 public enum AppProtocol {
-    public static let version = 1
+    public static let version = 2
     public static let topicName = "App"
 
     /// Pulls the JSON object out of a message: the content of the first ```json fence, else the
@@ -16,7 +16,7 @@ public enum AppProtocol {
                 if lang.isEmpty || lang.lowercased() == "json" { rest = rest[rest.index(after: newline)...] }
             }
             guard let close = rest.range(of: "```") else { return nil }
-            return Data(rest[..<close.lowerBound].utf8)
+            return Data(rest[..<close.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines).utf8)
         }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.hasPrefix("{"), trimmed.hasSuffix("}") else { return nil }
@@ -32,6 +32,7 @@ public enum AppProtocol {
         case "state": return .state(AppState(fields: fields))
         case "stats": return fields.decode(StatsState.self).map(AppMessage.stats)
         case "devices": return .devices(DeliveryState(fields: fields))
+        case "controls": return .controls(ControlsState(fields: fields))
         case "notify": return fields.decode(NotifyPayload.self).map(AppMessage.notify)
         case "reply": return .reply(ReplyPayload(fields: fields))
         default: return .other(type: type, fields: fields)
@@ -54,6 +55,7 @@ public enum AppMessage: Sendable {
     case state(AppState)
     case stats(StatsState)
     case devices(DeliveryState)
+    case controls(ControlsState)
     case notify(NotifyPayload)
     case reply(ReplyPayload)
     case other(type: String, fields: [String: JSONValue])
@@ -76,7 +78,10 @@ public struct AppRequest: Sendable, Equatable {
     public static let petSleep = AppRequest(type: "pet.sleep")
     public static let petWake = AppRequest(type: "pet.wake")
     public static let appReinstall = AppRequest(type: "app.reinstall")
-    public static let callStart = AppRequest(type: "call.start")
+    /// While on, Hermes answers every owner turn in its spoken style (protocol §6).
+    public static func callState(active: Bool) -> AppRequest {
+        AppRequest(type: "call.state", payload: ["active": .bool(active)])
+    }
     public static func petGenerate(prompt: String) -> AppRequest {
         AppRequest(type: "pet.generate", payload: ["prompt": .string(prompt)])
     }
@@ -559,35 +564,14 @@ public struct ReplyPayload: Sendable, Equatable {
 
 // MARK: - Call mode
 
-public struct CallTicket: Sendable, Codable, Equatable {
-    public var url: URL?
-    public var lanURL: URL?
-    public var token: String
-    public var expires: Date?
+/// A call turn is a plain text message starting with this marker (protocol §6): Hermes answers
+/// it in its spoken style.
+public enum CallTurn {
+    public static let marker = "🎙 "
 
-    public init(url: URL?, lanURL: URL? = nil, token: String, expires: Date? = nil) {
-        self.url = url
-        self.lanURL = lanURL
-        self.token = token
-        self.expires = expires
+    public static func message(for transcript: String) -> String {
+        marker + transcript.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Public address first, then the LAN one (protocol §6).
-    public var candidates: [URL] { [url, lanURL].compactMap { $0 } }
-
-    /// From a `reply` to `call.start`: the fields are under `data`.
-    public init?(reply: ReplyPayload) {
-        let fields: [String: JSONValue]
-        if case .object(let data)? = reply["data"] { fields = data } else { fields = reply.fields }
-        guard case .string(let token)? = fields["token"] else { return nil }
-        url = fields["url"]?.stringValue.flatMap(URL.init(string:))
-        lanURL = fields["lan_url"]?.stringValue.flatMap(URL.init(string:))
-        guard url != nil || lanURL != nil else { return nil }
-        self.token = token
-        switch fields["expires"] {
-        case .number(let n)?: expires = Date(timeIntervalSince1970: n)
-        case .string(let s)?: expires = ISO8601DateFormatter().date(from: s)
-        default: expires = nil
-        }
-    }
+    public static func isCallTurn(_ text: String) -> Bool { text.hasPrefix(marker) }
 }

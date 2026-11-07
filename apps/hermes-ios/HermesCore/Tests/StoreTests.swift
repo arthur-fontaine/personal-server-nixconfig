@@ -91,11 +91,12 @@ struct StoreTests {
         try await waitUntil { (store.pet?.hunger ?? 1) < hunger }
     }
 
-    @Test func callStartReturnsATicket() async throws {
-        let (store, _) = try await makeStore()
-        let ticket = try await store.requestCall()
-        #expect(ticket.token == "demo")
-        #expect(ticket.candidates.first?.scheme == "ws")
+    @Test func callTurnsAreMarkedMainChatMessages() async throws {
+        let (store, client) = try await makeStore()
+        await store.setCallActive(true)
+        try await store.sendCallTurn("what's the weather in Lisbon")
+        #expect(client.sent.contains("🎙 what's the weather in Lisbon"))
+        try await waitUntil { client.sent.contains { $0.contains("call.state") } }
     }
 
     @Test func createAndUnlockSubchatsSendCommands() async throws {
@@ -105,6 +106,21 @@ struct StoreTests {
         try await store.unlockSubchat(31, passphrase: "pw")
         #expect(client.sent.contains("/sub unlock pw"))
         #expect(!store.messages(in: 31).contains { $0.text.text.hasPrefix("/sub unlock") })
+    }
+
+    @Test func controlsSetValuesBySendingCommandsInTheirChat() async throws {
+        let (store, client) = try await makeStore()
+        try await waitUntil { store.controls.permissionMode != nil }
+        #expect(store.controls.permissionMode?.value == "auto")
+        try await store.setPermissionMode("ask")
+        #expect(client.sent.contains("/mode ask"))
+        try await waitUntil { store.controls.permissionMode?.value == "ask" }
+        let luna = try #require(store.controls.model?.chain.first { $0.role == "fallback" })
+        try await store.setModel(luna, in: .main)
+        #expect(client.sent.contains("/model gpt-5.5 --provider openai-codex"))
+        try await waitUntil { store.controls.model?.selected(in: .main)?.model == "gpt-5.5" }
+        try await store.setModel(luna, in: 12)
+        #expect(client.sent.contains("/sub set model openai-codex:gpt-5.5"))
     }
 
     @Test func bigFilesGoThroughTheUploader() async throws {

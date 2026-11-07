@@ -164,8 +164,42 @@ public enum Fixtures {
                  "profile_expires":"2026-11-13T09:05:00Z","last_install":{"at":"2026-11-06T09:05:00Z","ok":true,"error":null,"version":"1.0","build":"42","pet_version":3}}]}}
     """
 
+    public static func controlsJSON(mode: String, model: String, reasoning: String) -> String {
+        """
+        {"v":2,"type":"controls","updated_at":"2026-11-07T21:40:00Z",
+         "permission_mode":{"value":"\(mode)","set":"/mode {value}","options":[
+           {"id":"auto","label":"Auto","description":"Safe actions run; a reviewer judges the rest and blocks risky ones."},
+           {"id":"ask","label":"Ask","description":"Every action but reads waits for your yes."}]},
+         "model":{"chain":[{"provider":"opencode-go","model":"deepseek-v4.1-flash","role":"main"},
+                           {"provider":"openai-codex","model":"gpt-5.5","role":"fallback"},
+                           {"provider":"uzu","model":"qwen3.5-9b","role":"local"}],
+                  "default":{"provider":"opencode-go","model":"deepseek-v4.1-flash","role":"main"},
+                  "current":{"0":{"provider":"\(model == "gpt-5.5" ? "openai-codex" : "opencode-go")","model":"\(model)"}},
+                  "last":{"0":{"provider":"opencode-go","model":"deepseek-v4.1-flash","at":"2026-11-07T21:39:58Z"}},
+                  "set_main":"/model {model} --provider {provider}","set_subchat":"/sub set model {provider}:{model}"},
+         "presets":[{"name":"aside","default":true,"memoryRead":true,"memoryWrite":false,"ttl":"session","encrypted":false,"model":null},
+                    {"name":"project","memoryRead":true,"memoryWrite":false,"ttl":null,"encrypted":false,"model":null},
+                    {"name":"secret","memoryRead":false,"memoryWrite":false,"ttl":null,"encrypted":true,"model":"uzu:local"},
+                    {"name":"temp","memoryRead":false,"memoryWrite":false,"ttl":"1h","encrypted":false,"model":"uzu:local"}],
+         "commands":[{"id":"stop","send":"/stop","where":"any"},{"id":"retry","send":"/retry","where":"any"},
+           {"id":"undo","send":"/undo","where":"any","confirm":"Undo Hermes' last turn?"},{"id":"btw","insert":"/btw ","where":"any"},
+           {"id":"bg","insert":"/bg ","where":"any"},{"id":"goal","insert":"/goal ","where":"any"},
+           {"id":"agents","send":"/agents","where":"any"},{"id":"status","send":"/status","where":"any"},
+           {"id":"usage","send":"/usage","where":"any"},
+           {"id":"reasoning","control":"picker","send":"/reasoning {value}","options":["low","medium","high"],"where":"any","value":"\(reasoning)"},
+           {"id":"model","control":"model","where":"any"},{"id":"permissions","control":"permission_mode","where":"any"},
+           {"id":"sub.new","control":"subchat_form","where":"main"},{"id":"sub.show","send":"/sub","where":"subchat"},
+           {"id":"sub.set","insert":"/sub set ","where":"subchat"},{"id":"sub.lock","send":"/sub lock","where":"encrypted"},
+           {"id":"sub.end","send":"/sub end","where":"subchat","confirm":"End this sub-chat? Its topic and memory are deleted."},
+           {"id":"pause","send":"/pause","where":"any","confirm":"Stop all new work until you resume?"},
+           {"id":"resume","send":"/pause off","where":"any"}]}
+        """
+    }
+
     static func answer(to text: String) -> String {
         let l = text.lowercased()
+        if l.hasPrefix("/mode ") { return "Permission mode: **\(text.dropFirst(6))**." }
+        if l.hasPrefix("/model ") { return "This chat now answers with **\(text.split(separator: " ")[1])**." }
         if l.hasPrefix("/sub new") {
             return "Opened a new sub-chat. You'll find it in the sidebar."
         }
