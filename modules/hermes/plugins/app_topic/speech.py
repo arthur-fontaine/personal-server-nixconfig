@@ -23,7 +23,7 @@ _HTML_TAG = re.compile(r"</?[a-zA-Z][^>]*>")
 _HEADING = re.compile(r"^\s{0,3}#{1,6}\s*", re.M)
 _QUOTE = re.compile(r"^\s{0,3}>\s?", re.M)
 _BULLET = re.compile(r"^\s*(?:[-*+•]|\d+[.)])\s+", re.M)
-_EMPHASIS = re.compile(r"(\*\*|__|\*|_|~~)(?=\S)(.+?)(?<=\S)\1")
+_EMPHASIS = re.compile(r"(?<!\w)(\*\*|__|\*|_|~~)(?=\S)(.+?)(?<=\S)\1(?!\w)")
 _TABLE_RULE = re.compile(r"^\s*\|?\s*:?-{3,}.*$", re.M)
 _MEDIA = re.compile(r"^\s*MEDIA:\S+\s*$", re.M)
 _FILE_MARK = re.compile(r"\[fichier:\s*(\S+?)\s*\]")
@@ -128,7 +128,7 @@ def spoken_full(text: str) -> str:
     # Each line is its own thought: a bullet list reads as sentences.
     lines = [line.strip() for line in text.split("\n") if line.strip()]
     text = " ".join(line if line[-1] in ".!?…:" else line + "." for line in lines)
-    text = re.sub(r"[*_#`>|\[\]{}]", "", text)
+    text = re.sub(r"[*#`>|\[\]{}]|(?<!\w)_|_(?!\w)", "", text)
     return _SPACES.sub(" ", text).strip()
 
 
