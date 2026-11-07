@@ -109,13 +109,18 @@ in
           model = mkOption { type = types.str; };
         };
       });
-      default = if config.server.hermes.fallbacks == [ ] then null else lib.head config.server.hermes.fallbacks;
-      defaultText = lib.literalExpression "the first of fallbacks, or null";
+      # Not the first fallback: a fallback is the provider used least, so its
+      # failures go unseen. On Nov 6, 2026 the first fallback (OpenCode Zen) ran
+      # out of funds, every summary failed, and each step of the chat waited
+      # for them.
+      default = null;
+      example = { provider = "opencode-go"; model = "deepseek-v4.1-flash"; };
       description = ''
         The model of the work nobody reads: unii's summaries (unless
         memory.compactionModel names another) and Hermes' review after a turn,
-        which writes skills. By default the first fallback, so a subscription
-        chat model's quota goes to the chat; null: the main model.
+        which writes skills. null: the main model. Name another to keep a
+        subscription's quota for the chat, but only one you watch: when it
+        fails, the memory stops summarizing.
       '';
     };
     providers = mkOption {

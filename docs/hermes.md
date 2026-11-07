@@ -26,8 +26,9 @@ Hermes' are summarized, each with the 8 KB of chat before it; within a turn,
 only the last three tool results keep their screenshots and full text in what
 the model is sent (the transcript keeps everything). The summaries and Hermes'
 own review after a turn, which writes skills, run on
-`server.hermes.backgroundModel`: by default the first fallback, so a
-subscription's quota (ChatGPT's) goes to the chat itself.
+`server.hermes.backgroundModel`: by default the main model. Another one keeps a
+subscription's quota (ChatGPT's) for the chat, but pick one you watch: when it
+fails (no funds left), the memory stops summarizing.
 
 ## Sub-chats
 
