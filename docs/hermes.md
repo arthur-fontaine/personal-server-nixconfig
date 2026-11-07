@@ -292,3 +292,25 @@ guard's approval card is the question, with or without a decision model
   registry otherwise serves a new revision at any start, and the one of Oct 30,
   2026 made uzu panic on M1 to M4 GPUs (its speculator needs an M5's MXU). A new
   model, or a new uzu, comes with a new entry there, tried on an M1 to M4 first.
+
+## Speed: the prompt is what a step costs
+
+A turn is one call to the model per tool call, and every call re-sends the
+conversation. On this machine a fresh session answers in 3 to 6 s a step; the
+same model took 24 to 31 s on a conversation a week old, whose prompt had
+reached ~62k tokens. Those tokens were cached, so they cost almost nothing,
+but they are not free to prefill: the delay was the prompt, not the thinking.
+Tool output is what fills it (a `cua` script result, a terminal dump, a whole
+skill re-read).
+
+`modules/hermes/agent/context.nix` keeps it down with Hermes' deterministic
+prune: past 24k tokens of re-sent history, oversized tool results outside the
+newest ten messages become a summary, with no model call and no deletion —
+the transcript keeps everything, and `session_search` reaches it. It commits
+only when it reclaims 4k tokens, so the prompt cache is not broken every turn.
+
+What the model can do from its side is in the prompt: several commands in one
+call, independent calls in one message, no second `skills_list`, and long
+work — many steps rather than one command — handed to `delegate_task`, which
+answers at once and posts its result as a message. A turn held open is a turn
+in which what the user sends goes unanswered.

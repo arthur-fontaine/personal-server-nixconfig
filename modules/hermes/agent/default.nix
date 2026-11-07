@@ -10,6 +10,7 @@ in
 {
   imports = [
     ./model.nix
+    ./context.nix
     ./memory.nix
     ./telegram.nix
     ./mcp.nix
