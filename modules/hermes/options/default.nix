@@ -13,5 +13,6 @@
     ./homeassistant.nix
     ./decision.nix
     (import ../coding-agent).options
+    (import ../app-delivery).options
   ];
 }
