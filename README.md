@@ -27,7 +27,8 @@ The layout follows [arthur-fontaine/nixconfig](https://github.com/arthur-fontain
   Mail, Maps, Music, Shortcuts… on your Apple Account (the Apple skills and
   [iMCP](https://github.com/mattt/iMCP)).
 - **Integrations, each optional**: WhatsApp, Instagram, Discord, Home
-  Assistant, HomeKit, 1Password, RunPod, GitHub notifications.
+  Assistant, HomeKit, 1Password, RunPod, GitHub notifications, TinyFish web
+  search.
 - **The Hermes app** on your iPhone and iPad, if you want it: built here,
   signed with your Apple Account (a free one: re-signed every few days by
   itself) and installed over Wi-Fi ([`docs/app.md`](./docs/app.md)).

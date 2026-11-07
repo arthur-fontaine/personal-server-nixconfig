@@ -38,6 +38,7 @@ modules/
     plugins/owner_approval/  asks you with Telegram buttons from outside a turn, for other plugins (Python)
     plugins/outbox/       says so when the gateway will not send an attachment of a reply (Python)
     plugins/lost_turns/   settles your Telegram turn cut off by a gateway crash, so the chat never waits for /discard (Python)
+    plugins/tinyfish/     TinyFish Search as web_search's backend, with the tinyfish integration (Python)
     plugins/front_desk/   caps a turn of the main chat: past it, only handing the work to a background subagent (Python)
     coding-agent/         Pi sessions in a microVM, their branch reviewed (docs/sandbox.md)
       default.nix         server.hermes.sandbox, and its wiring into Hermes (imported by options/ and agent/)
@@ -56,7 +57,7 @@ modules/
 
 ```sh
 nix flake check                                   # everything below
-nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval, outbox, lost_turns, front_desk)
+nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval, outbox, lost_turns, front_desk, tinyfish)
 nix build .#checks.aarch64-darwin.coding-agent    # the coding agent's plugin, against a fake sidecar
 nix build .#checks.aarch64-darwin.sandbox         # the coding agent's sidecar tests, in its build
 nix build .#checks.aarch64-darwin.app-delivery    # hermes-app and its plugin, against fake Apple tools
