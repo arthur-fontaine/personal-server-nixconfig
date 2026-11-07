@@ -127,6 +127,7 @@ class SubCommand:
                     "Bot Settings → Threads Settings, turn Threaded Mode on.")
         sub = Chat(chat.platform, "dm", chat.chat_id, thread)
         policy = self.runtime.policies.set_preset(sub, preset)
+        self.runtime.policies.set_name(sub, name)
         try:
             bot.send(chat.chat_id, thread,
                      f"Sub-chat ({preset}): {describe(policy)}\n/sub shows or changes it."
