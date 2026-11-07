@@ -1,0 +1,9 @@
+name: sideload
+version: 1.0.0
+description: "Hermes' access to the sideload service: list the owner's devices and apps (with the free team's limits), install an .ipa or Xcode project, reinstall, remove; an install's end comes back to the chat."
+author: "personal-server-nixconfig"
+provides_tools:
+  - sideload_devices
+  - sideload_apps
+  - sideload_install
+  - sideload_remove

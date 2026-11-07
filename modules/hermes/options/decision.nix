@@ -43,6 +43,42 @@ let
   };
 in
 {
+  # Hermes' permission system (plugins/guard): Claude Code's auto mode,
+  # ported from Arthur's Pi extension auto-mode.
+  options.server.hermes.permissions = {
+    defaultMode = mkOption {
+      type = types.enum [ "auto" "ask" ];
+      default = "auto";
+      description = ''
+        The mode at first start (`/mode auto|ask` changes it at runtime, kept
+        in ~/.hermes/guard/mode.json):
+        - auto: Claude Code's auto mode. Plainly safe calls run (reads, edits
+          inside Hermes' workspace, read-only commands); every other call is
+          judged by the review model (decision.approval) on the conversation
+          and the call, with Claude Code's rules; a risky call is blocked and
+          Hermes told why; after 3 blocks in a row or 20 in a session you are
+          asked instead. Without a review model, those calls ask you.
+        - ask: every call but reads asks you; no model is called.
+      '';
+    };
+    autoMode = mkOption {
+      type = types.submodule {
+        options = lib.genAttrs [ "allow" "soft_deny" "hard_deny" "environment" ] (name: mkOption {
+          type = types.listOf types.str;
+          default = [ ];
+          description = ''
+            Claude Code's `autoMode.${name}`: replaces the classifier's default
+            ${name} rules; the entry "$defaults" keeps them in place. Empty keeps
+            the defaults.
+          '';
+        });
+      };
+      default = { };
+      example = { environment = [ "$defaults" "Trusted repo: github.com/arthur-fontaine/*" ]; };
+      description = "The owner's rules for auto mode's classifier, as Claude Code's `autoMode` setting.";
+    };
+  };
+
   options.server.hermes.decision = {
     computerUse = mkOption {
       type = model { model = "decision-models/baseten-elephant-9b-latest"; };

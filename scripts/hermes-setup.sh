@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The setup at Hermes' login: the bootstrap's steps that need its desktop on
 # the Mac's screen (permissions, Apple apps, WhatsApp, Instagram, Discord,
-# HomeKit), run as Hermes in its own session, so they need neither SSH nor a
+# HomeKit, the Hermes app's devices), run as Hermes in its own session, so they need neither SSH nor a
 # run of the whole bootstrap. launchd starts it at each login
 # (modules/hermes/agent/session/setup.nix); it checks every step without
 # asking or doing anything, and only when one is not done opens Terminal with
@@ -89,7 +89,7 @@ else
     "$("$GUM" style --faint 'What needs this screen. Unanswered, it ends after 24 hours.')"
 fi
 
-for section in permissions apple accounts; do
+for section in permissions apple sideload-account accounts sideload-devices; do
   source "$REPO_DIR/scripts/bootstrap/$section.sh"
 done
 

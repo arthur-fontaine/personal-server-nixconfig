@@ -54,12 +54,24 @@ in
 {
   services.hermes-agent.extraPackages = tools;
 
-  # Web search stays OpenAI's own, server-side on the Codex model (Hermes picks
-  # it from the openai-codex login), but that backend cannot read a page, so
-  # web_extract failed ("search-only backend"). Firecrawl without a key reads
-  # through Hermes' keyless free tiers
+  # Without TinyFish, web search stays OpenAI's own, server-side on the Codex
+  # model (Hermes picks it from the openai-codex login), but that backend
+  # cannot read a page, so web_extract failed ("search-only backend").
+  # Firecrawl without a key reads through Hermes' keyless free tiers
   # (website/docs/user-guide/features/web-search.md, plugins/web/firecrawl).
   services.hermes-agent.settings.web.extract_backend = "firecrawl";
+
+  # With TinyFish, ../plugins/tinyfish (the Pi extension web, ported) answers
+  # web_search with TinySearch's filters, and adds web_fetch (pages as
+  # Markdown) and view_image. Its web_search replaces Hermes' own, whose
+  # backends take only a query: a plugin may replace a built-in tool only
+  # with this grant (hermes_cli/plugins.py, _tool_override_allowed). Listed in
+  # plugins.enabled by memory.nix.
+  services.hermes-agent.extraPlugins = lib.optional server.hermes.integrations.tinyfish.enable
+    (pkgs.runCommand "hermes-plugin-tinyfish" { } "cp -R ${../plugins/tinyfish} $out");
+  services.hermes-agent.settings.plugins.entries = lib.optionalAttrs server.hermes.integrations.tinyfish.enable {
+    tinyfish.allow_tool_override = true;
+  };
 
   # The gateway's PATH, which every terminal command inherits: the tools above,
   # then what the agent installed into its profile, then the system's.

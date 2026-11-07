@@ -28,16 +28,20 @@ modules/
       user.nix            its own account, with home-manager
       access/             read.nix, freeze.nix (+ freeze.py), rebuild.nix, secrets.nix
       applications.nix    the apps it uses, copied into /Applications
+      sideload.nix        the Hermes app as a sideload app, hermes-app, Hermes' sideload plugin
     agent/                its home-manager configuration
       default.nix         the upstream module, from scratch, managed mode
       model.nix memory.nix telegram.nix mcp.nix tools.nix computer-use.nix
       prompt/             SOUL.md (UniiChat's prompt), AGENTS.md (this server's rules)
       session/            its GUI session: launchd agents, display, fsearch, defaults, the setup at login
     plugins/unii/         the single-chat memory and sub-chats (Python)
-    plugins/guard/        the auto-review of Hermes' actions by a decision model (Python)
+    plugins/guard/        the permission system: Claude Code's auto mode (fast paths, a decision-model classifier, /mode) and command titles on approval cards (Python)
     plugins/owner_approval/  asks you with Telegram buttons from outside a turn, for other plugins (Python)
     plugins/outbox/       says so when the gateway will not send an attachment of a reply (Python)
     plugins/lost_turns/   settles your Telegram turn cut off by a gateway crash, so the chat never waits for /discard (Python)
+    plugins/cache_warm/   keeps an idle chat's prompt cache warm (the Pi extension cache-warmer), /warm (Python)
+    plugins/tinyfish/     web_search, web_fetch and view_image through TinyFish, with the tinyfish integration (Python)
+    plugins/sideload/     Hermes' access to the sideload service: list, install, remove (Python)
     plugins/front_desk/   caps a turn of the main chat: past it, only handing the work to a background subagent (Python)
     coding-agent/         Pi sessions in a microVM, their branch reviewed (docs/sandbox.md)
       default.nix         server.hermes.sandbox, and its wiring into Hermes (imported by options/ and agent/)
@@ -48,6 +52,7 @@ modules/
     events/               hermes_events: screens incoming messages, posts proposals (Python)
     fast-act/             fast_act: browser_fast_act, a decision model driving Chrome through Cua (Python)
   uzu/                    local models: options, the mirai server
+  sideload/               iOS apps (Xcode projects, .ipa) installed on the owner's devices and kept signed: the `sideload` CLI and launchd job (docs/sideload.md)
   home/                   the administrator's home-manager configuration
 ```
 
@@ -55,9 +60,10 @@ modules/
 
 ```sh
 nix flake check                                   # everything below
-nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval, outbox, lost_turns, front_desk)
+nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval, outbox, lost_turns, front_desk, tinyfish, cache_warm)
 nix build .#checks.aarch64-darwin.coding-agent    # the coding agent's plugin, against a fake sidecar
 nix build .#checks.aarch64-darwin.sandbox         # the coding agent's sidecar tests, in its build
+nix build .#checks.aarch64-darwin.sideload        # sideload and Hermes' plugin, against fake Apple tools
 nix build .#checks.aarch64-darwin.events          # the events daemon's tests
 nix build .#checks.aarch64-darwin.freeze          # what hermes-freeze picks
 nix build .#checks.aarch64-darwin.instagram       # the Instagram skill's direct.js, against stand-ins for the page

@@ -386,3 +386,22 @@ else
     decision_off approval
   fi
 fi
+
+# What runs without asking (server.hermes.permissions.defaultMode): only with
+# a review model, since without one auto mode asks for the same calls anyway.
+# /mode auto|ask changes it later from the chat.
+if decision_ready approval; then
+  if grep -q 'defaultMode' "$local_nix" 2>/dev/null \
+    && keep "Permission mode: $(setting server.hermes.permissions.defaultMode)"; then
+    :
+  else
+    note "auto: safe calls run, the review model judges the rest and blocks risky ones (Claude Code's auto mode)."
+    note "ask: every action but reads asks you. /mode auto|ask switches later from the chat."
+    mode="$(gum choose --header "What may Hermes do without asking you?" --selected "$(setting server.hermes.permissions.defaultMode)" \
+      auto ask)" || mode=""
+    if [ -n "$mode" ]; then
+      set_host "$("$JQ" -cn --arg m "$mode" '{server: {hermes: {permissions: {defaultMode: $m}}}}')"
+      ok "Permission mode: $mode"
+    fi
+  fi
+fi

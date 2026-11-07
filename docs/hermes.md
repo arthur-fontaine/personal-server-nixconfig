@@ -126,9 +126,19 @@ Hermes' own `computer_use` tool is off, since its clicks no longer reach that
 driver, and Hermes drives the driver's own MCP tools (`mcp__cua__*`) instead;
 the guard lets the ones that only look run without review.
 
-Web search is OpenAI's own, run server-side by the Codex model; reading a page
-(`web_extract`) goes through Firecrawl's keyless tier (`modules/hermes/agent/tools.nix`),
-since that search cannot extract.
+The web is TinyFish with the `tinyfish` integration (free up to 12,000
+searches a day with an API key; `modules/hermes/plugins/tinyfish`, Arthur's Pi
+extension web ported): `web_search` (ranked results, with domain filters, a
+freshness window, news or papers, a language and a page; it replaces Hermes'
+own, whose backends take only a query), `web_fetch` (up to 10 pages as
+Markdown, cut at 40,000 characters with a note saying so, each page's image
+URLs and links on request) and `view_image` (an image from a URL handed to the
+model as an image; over 3.5 MB shrunk by `sips` to a JPEG at most 1568 px
+wide; on a route that takes no images in a tool result, saved for
+`vision_analyze`). Without it, web search is OpenAI's own, run server-side by
+the Codex model, or Hermes' keyless providers on other models. Hermes'
+`web_extract` reads pages through Firecrawl's keyless tier either way
+(`modules/hermes/agent/tools.nix`).
 
 Web pages go faster through `browser_fast_act` (`modules/hermes/fast-act`), once
 the bootstrap's Models section has its key: Cua Driver snapshots the page in
@@ -166,38 +176,58 @@ code or a quote) into a sentence saying it was not sent, before the reply
 reaches the user and the transcript. It reports rather than moves the file: the directories it names are
 refused because credentials live there.
 
-## Auto-review of Hermes' actions
+## Permissions: auto mode
 
-The `guard` plugin (`modules/hermes/plugins/guard`), always installed,
-reviews every action Hermes is about to take, but reads (files, searches, tool
-searches, the read-only MCP servers, screenshots; opening a web page is reviewed,
-its address can carry data out). It fails closed: without a decision model
-(`server.hermes.decision.approval` off), every such action waits for your yes
-in Telegram, on an approval card whose reason reads `no decision model
-configured: ` and the action. With it on (the bootstrap's Models section;
-Baseten's mammoth-1 by default), a decision model rates two
-things at once, as Codex's automatic approval review does: how clearly your own
-messages authorize the action, and how risky it is. Low risk (a click that
-navigates, a draft) runs at once, bounded risk when you asked for it, and high
-risk (a send, a post) only when you asked for that exact action; anything else,
-and anything critical, waits for your yes in Telegram, through Hermes' own approval
-gate (a no, or no answer, refuses it): a card with Once, Session, Always and Deny
-buttons, whose reason line shows the action (the command, or the tool's
-arguments, cut to fit the card and with credentials masked). So does any error of the model: nothing
-is refused outright, nothing unclear runs. A short answer ("oui") is read with
-Hermes' question it answers. The review replaces computer_use's own question
-for each click or key (the `cua` server's clicks are reviewed like any tool),
-so one action asks at most once.
+The `guard` plugin (`modules/hermes/plugins/guard`), always installed, is
+Hermes' permission system: Claude Code's auto mode
+(`permissions.defaultMode: "auto"`), ported from Arthur's Pi extension
+auto-mode with its rules, prompts, thresholds and tests. Two modes,
+`server.hermes.permissions.defaultMode` at first start and `/mode auto|ask`
+in the chat afterwards (kept in `~/.hermes/guard/mode.json`; the app's picker
+sends the same command):
 
-As in Claude Code's auto mode, the reviewer sees your messages and Hermes'
-actions, never what the tools returned: a WhatsApp message, an email or a web
-page telling Hermes to act cannot argue with it. Only Telegram turns count as
-yours (Telegram answers its owner only), and so does a message you send in the
-middle of one (it reaches the turn as a row only Hermes writes); a turn the events daemon starts, about
-an incoming message, authorizes nothing, and neither does a notice the gateway
-posts in your chat itself (a background process or a subagent finishing, a
-watch pattern matching). Hermes' own checks stay underneath:
-its pattern-matched dangerous commands, and its hardline blocklist.
+- **auto** (default). Plainly safe calls run directly: tools that only look
+  (files, searches, screenshots, the read-only MCP servers), `clarify`, edits
+  inside Hermes' workspace (not `.git`, dotfiles and the like), and the shell
+  commands Claude Code itself runs without asking (its read-only command
+  tables: `ls`, `cat`, `git status`, `rg`…, paths inside the workspace; and
+  `mkdir touch rm mv cp sed -i` there). Every other call goes to a
+  classifier that reads the conversation (your messages and Hermes' calls,
+  never what tools returned) and the call, with Claude Code's own rules
+  (`guard/prompts/`, verbatim) and `server.hermes.permissions.autoMode`
+  (`allow`, `soft_deny`, `hard_deny`, `environment`, with `"$defaults"`, as
+  Claude Code's `autoMode`). A risky call is blocked and Hermes is told why
+  (`[Data Exfiltration]`, `[Git Destructive]`…) and to find a safer way or
+  stop and ask you. After 3 blocks in a row, or 20 in a session, you are
+  asked instead, on Hermes' approval card (Once, Session, Always, Deny).
+  A classifier that cannot be reached or gives no usable answer blocks the
+  call (fail closed).
+- **ask**: every call but those that only look asks you; no model call.
+
+The classifier is the review decision model (`server.hermes.decision.approval`,
+Baseten's mammoth-1 by default; Hermes is not on the Claude subscription the
+Pi extension uses): two stages of one System One request each, a `verdict`
+(allow/block) and the matched rule. Its probability of block stands for
+Claude Code's severity: stage 1 clears at 25 % or less, stage 2 blocks above
+35 %. Without a review model, auto mode asks you for every call it cannot
+clear itself. Hermes' `AGENTS.md` is read as Claude Code reads `CLAUDE.md`:
+an explicit authorization there may clear a soft block.
+
+Only Telegram turns (and cron jobs) are yours; a message you send mid-turn
+too. A turn the events daemon or a webhook starts, and a notice the gateway
+posts in your chat itself (a background process, a subagent finishing), reach
+the classifier as notifications, which carry no intent. A subagent's calls
+are judged on its parent's conversation. Hermes' own checks stay underneath:
+its pattern-matched dangerous commands and its hardline blocklist.
+
+On a card, a long or tangled shell command comes with a plain-language title
+above it ("Builds and installs the project"), as Arthur's Pi extension
+bash-titles names commands: same heuristic, prompt and clean-up, Hermes'
+auxiliary model (task `approval`), titles kept by command in
+`~/.hermes/guard/titles.json`; 8 s at most, the card goes out without one
+otherwise. The app shows it apart (`question.summary`, read with guard's
+`card_summary`). computer_use's own per-click question is replaced by this
+one: one action, one question at most.
 
 The same review answers what a sandboxed Pi session asks Hermes for (a host
 its grants do not cover, a folder of this Mac, a push, a command here;
@@ -248,13 +278,23 @@ branch, your answer to a question, or a command here (always your buttons).
 You take the branch with `git fetch`, after reading it. The
 details: [sandbox.md](sandbox.md).
 
+## iOS apps on your devices, and the Hermes app
+
+With the sideload service (`server.sideload.enable`, [sideload.md](sideload.md)),
+Hermes installs any iOS app you ask for on your iPhones and iPads (an `.ipa`
+you send or link, an Xcode project by path or git URL) and the service keeps
+it signed: `sideload_devices`, `sideload_apps` (with a free team's limits: 3
+apps per device, 10 new App IDs a week), `sideload_install`,
+`sideload_remove`. The Hermes app (`server.hermes.app.delivery.enable`) is
+one such app, rebuilt with the current pet: [app.md](app.md).
+
 ## Integrations: WhatsApp, Instagram, Discord, 1Password…
 
 Each of your other services is an integration, off until you turn it on
 (`server.hermes.integrations.<name>.enable`, which the bootstrap asks for):
 `whatsapp`, `instagram`, `discord`, `homeassistant` (Hermes' official plugin:
 the `ha_*` tools), `homekit` (HomeClaw), `onepassword`,
-`runpod`, `github` (notifications). Its skill, MCP server and events come with
+`runpod`, `github` (notifications), `tinyfish` (web search). Its skill, MCP server and events come with
 it, and Hermes' instructions mention only those that are on. Apple's apps are
 not integrations: they come with the Mac.
 
@@ -336,6 +376,29 @@ prune: past 24k tokens of re-sent history, oversized tool results outside the
 newest ten messages become a summary, with no model call and no deletion —
 the transcript keeps everything, and `session_search` reaches it. It commits
 only when it reclaims 4k tokens, so the prompt cache is not broken every turn.
+
+The first step of a turn is fast only when the provider still has the
+prompt's prefix cached, and the owner often answers after the cache is gone.
+On Claude routes Hermes asks for its 1-hour cache tier for the chats a person
+types into, 5 minutes for subagents and cron (`prompt_caching.cache_ttl:
+auto`, `modules/hermes/agent/cache-warm.nix`). Then the `cache_warm` plugin,
+Arthur's Pi extension cache-warmer ported (`server.hermes.cacheWarming`),
+keeps it warm while you are idle: after a Telegram turn whose prompt is 32k
+tokens or more, it replays that turn's last request with one output token
+before the route's cache lifetime ends (every 50 minutes on Claude's 1-hour
+tier, every 250 s on a 5-minute OpenAI-style cache; `ttlMinutes` for other
+lifetimes), for up to 10 idle hours. It never re-warms a cache that already
+lapsed (a late timer), stops when a ping comes back under 50 % cached,
+retries a failed ping twice 5 minutes apart, and stops for the day once 2M
+full-price token equivalents are spent across every chat. Your next message
+cancels the pending ping, and so does a compaction. Where the Pi extension
+compacts the session at the window's end, Hermes leaves the cache to cool:
+the main chat is compacted by unii, not by Hermes. Not for DeepSeek's own API
+(disk cache, hours), the local model, Codex (its own retention), Claude's
+budget thinking (a one-token replay would be a new request), subagents, cron
+or events. `/warm` shows its state and takes `off`, `on`, `off all`, `on
+all` and `now`, as in Pi; each ping and its cached tokens go to
+`~/.hermes/logs/cache-warm.jsonl`.
 
 What the model can do from its side is in the prompt: several commands in one
 call, independent calls in one message, no second `skills_list`.

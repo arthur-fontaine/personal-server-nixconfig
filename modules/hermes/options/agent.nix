@@ -162,6 +162,57 @@ in
       '';
     };
 
+    # Between the owner's turns, the provider's prompt cache kept warm
+    # (../plugins/cache_warm; docs/hermes.md, "Speed").
+    cacheWarming = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          Arthur's Pi extension cache-warmer, on Hermes (plugins/cache_warm):
+          after a Telegram turn whose prompt is at least `minPingK` thousand
+          tokens, replay its last request with one output token before the
+          route's cache lifetime ends (every five sixths of it: 50 min on
+          Claude's 1-hour tier, 250 s on a 5-minute OpenAI-style cache), for up
+          to `warmHours` of idleness; never re-warm a lapsed cache, stop when a
+          ping comes back under 50 % cached, retry a failed ping twice, stop
+          for the day once `dailyBudgetK` full-price token equivalents are
+          spent. `/warm` shows and steers it; pings are logged in
+          ~/.hermes/logs/cache-warm.jsonl.
+        '';
+      };
+      warmHours = mkOption {
+        type = types.ints.positive;
+        default = 10;
+        description = "Idle hours after a turn during which the chat is kept warm.";
+      };
+      minPingK = mkOption {
+        type = types.ints.positive;
+        # The Pi extension's 100k never triggers here: unii keeps the main
+        # chat's prompt near 70k tokens (docs/hermes.md, "Speed").
+        default = 32;
+        description = "Smallest prompt, in thousands of tokens, worth keeping warm.";
+      };
+      dailyBudgetK = mkOption {
+        type = types.ints.positive;
+        default = 2000;
+        description = "Keep-alive spend per day, every chat together, in thousands of full-price token equivalents (cache read 0.1, write 1.25, output 5).";
+      };
+      ttlMinutes = mkOption {
+        type = types.attrsOf types.ints.positive;
+        default = { };
+        example = { openrouter = 5; };
+        description = "Cache lifetime of an OpenAI-style provider (Hermes' id), when not 5 minutes. Claude routes: 60 (Hermes' 1-hour tier).";
+      };
+      skipProviders = mkOption {
+        type = types.listOf types.str;
+        # DeepSeek's own API caches on disk for hours; uzu is this Mac.
+        default = [ "deepseek" "uzu" ];
+        description = "Providers (Hermes' ids) whose cache needs no warming.";
+      };
+    };
+
+
     # The main chat answers and dispatches (../plugins/front_desk): a turn
     # there holds every message the user sends behind it.
     frontDesk = {

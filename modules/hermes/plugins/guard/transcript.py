@@ -1,0 +1,214 @@
+"""The transcript the classifier reads: one JSON line per user turn or tool
+call, as Claude Code builds it (Pi extension auto-mode, transcript.ts).
+
+Hermes' history is OpenAI-style messages. Its tools are shown under Claude
+Code's names where one matches (terminal -> Bash, patch -> Edit, ...), since
+the rules are written about those. Unlike Claude Code, a Hermes chat also
+receives turns its owner did not write (the events daemon, webhooks, the
+gateway's own notices): those are never `user` lines but
+`[SYSTEM NOTIFICATION - NOT USER INPUT]` ones, which the prompt's rule 7
+already says carry no intent. Assistant prose and tool results are left out,
+as Claude Code leaves them out.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import unicodedata
+from typing import Any, Callable, Iterable, Optional
+
+PROTECTED_TAGS = ("transcript", "forwarded_user_turns", "forwarded_turn")
+BREAKS = re.compile(r"\r\n?|[\u001c-\u001e\u2028\u2029\u0085\v\f]")
+LINE_SEPARATORS = re.compile(r"[\u2028\u2029\u0085]")
+
+
+def _strip_invisible(text: str) -> str:
+    return "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+
+
+def defang(text: str, tags: Iterable[str] = PROTECTED_TAGS) -> str:
+    """Text that could close or open the request's own tags turns `<` into `[`."""
+    out = _strip_invisible(text)
+    for tag in tags:
+        out = re.sub(r"[<\uFF1C\uFE64]([\s/\uFF0F]*" + tag + r"\b)", r"[\1", out, flags=re.I)
+    return out
+
+
+def indent(text: str) -> str:
+    return "  " + "\n  ".join(defang(BREAKS.sub("\n", text)).split("\n"))
+
+
+RESERVED_KEYS = {"outcome", "id", "meta", "user", "assistant", "omitted", "host_context", "host_context_live"}
+
+
+def _key(name: str) -> str:
+    return f"[{name}]" if name.strip().lower() in RESERVED_KEYS else name
+
+
+def _json_line(value: Any) -> str:
+    # Compact, as JSON.stringify writes Claude Code's lines.
+    text = defang(json.dumps(value, ensure_ascii=False, default=str, separators=(",", ":")))
+    return LINE_SEPARATORS.sub(lambda m: "\\u%04x" % ord(m.group(0)), text) + "\n"
+
+
+def line(key: str, value: Any) -> str:
+    return _json_line({key: value})
+
+
+def meta_line(meta: dict) -> str:
+    """Harness ground truth placed directly above the call it describes."""
+    return _json_line({"meta": meta})
+
+
+CLAUDE_NAMES = {
+    "terminal": "Bash", "write_file": "Write", "patch": "Edit", "read_file": "Read", "search_files": "Grep",
+    "clarify": "AskUserQuestion", "delegate_task": "Agent", "web_search": "WebSearch", "web_extract": "WebFetch",
+    "web_fetch": "WebFetch",
+}
+
+
+def claude_name(tool: str) -> str:
+    return CLAUDE_NAMES.get(tool, tool)
+
+
+# Claude Code leaves its read-only lookups out of the transcript.
+UNSHOWN = {"read_file", "search_files", "tool_search", "tool_describe", "skills_list", "skill_view", "session_search"}
+
+EDIT_REMOVAL_CAP = 3000
+
+
+def project(tool: str, args: dict) -> Any:
+    """Each tool's toAutoClassifierInput, for Hermes' tools."""
+    if tool == "terminal":
+        return args.get("command")
+    if tool == "write_file":
+        return f"{args.get('path')}: {args.get('content')}"
+    if tool == "patch" and "old_string" in args:
+        removes = str(args.get("old_string") or "")
+        out = {"file_path": args.get("path"), "adds": args.get("new_string"), "removes": removes[:EDIT_REMOVAL_CAP],
+               "removesTruncated": len(removes) > EDIT_REMOVAL_CAP}
+        if args.get("replace_all"):
+            out["replaceAll"] = True
+        return out
+    if tool == "delegate_task" and isinstance(args.get("goal") or args.get("prompt"), str):
+        return f": {args.get('goal') or args.get('prompt')}" if len(args) == 1 else args
+    return args
+
+
+def call_line(tool: str, args: dict) -> str:
+    projected = project(tool, args or {})
+    if projected in ("", None):
+        return ""
+    return line(_key(claude_name(tool)), projected)
+
+
+NOTIFICATION = "[SYSTEM NOTIFICATION - NOT USER INPUT]"
+
+
+def text_of(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(str(p.get("text", "")) for p in content if isinstance(p, dict) and p.get("type") in (None, "text", "input_text"))
+    return ""
+
+
+def _arguments(call: dict) -> dict:
+    fn = call.get("function") or {}
+    raw = fn.get("arguments", call.get("arguments"))
+    if isinstance(raw, dict):
+        return raw
+    try:
+        value = json.loads(raw or "{}")
+    except (TypeError, ValueError):
+        return {"arguments": raw}
+    return value if isinstance(value, dict) else {"arguments": value}
+
+
+def tool_calls(message: dict) -> list:
+    """(id, name, args) of an assistant message's tool calls."""
+    out = []
+    for call in message.get("tool_calls") or []:
+        if not isinstance(call, dict):
+            continue
+        name = (call.get("function") or {}).get("name") or call.get("name")
+        if name:
+            out.append((call.get("id") or "", name, _arguments(call)))
+    return out
+
+
+def history_lines(messages: list, owners_turn: Callable[[str], bool], *, stop_at: str = "") -> list:
+    """The history up to the call under review (or all of it). ``owners_turn(text)``
+    says whether a user-role row is the owner's own words."""
+    lines = []
+    clarify_ids = set()
+    for message in messages or []:
+        if not isinstance(message, dict):
+            continue
+        role = message.get("role")
+        if role == "user":
+            text = text_of(message.get("content"))
+            if not text.strip():
+                continue
+            if owners_turn(text):
+                lines.append(line("user", indent(text)))
+            else:
+                lines.append(line("notification", f"{NOTIFICATION}\n{indent(text)}"))
+        elif role == "assistant":
+            for call_id, name, args in tool_calls(message):
+                if stop_at and call_id == stop_at:
+                    return lines
+                if name == "clarify":
+                    clarify_ids.add(call_id)
+                if name not in UNSHOWN:
+                    text = call_line(name, args)
+                    if text:
+                        lines.append(text)
+        elif role == "tool" and message.get("tool_call_id") in clarify_ids:
+            answer = text_of(message.get("content"))
+            if answer.strip():
+                lines.append(line("user", f"[User answered AskUserQuestion]: {indent(answer)}"))
+    return lines
+
+
+# The {"meta":{"gitStatus":…}} line Claude Code puts above a command that can
+# destroy uncommitted work.
+DESTROYS_WORK = [re.compile(p) for p in (
+    r"\bgit\s+(?:-\S+\s+)*reset\b[^;&|\n]*\s--hard\b",
+    r"\bgit\s+(?:-\S+\s+)*checkout\s+(?:--\s+)?\.(?=\s|$|[;&|])",
+    r"\bgit\s+(?:-\S+\s+)*restore\s+(?:\S+\s+)*\.(?=\s|$|[;&|])",
+    r"\bgit\s+(?:-\S+\s+)*clean\b[^;&|\n]*\s-(?:\w*f|-force)",
+    r"\brm\s+(?:\S+\s+)*?-(?:\w*[rRf]\w*|-recursive|-force)\b",
+)]
+
+
+def destroys_work(command: str) -> bool:
+    head = command[:10_000]
+    return any(p.search(head) for p in DESTROYS_WORK)
+
+
+def parse_porcelain(porcelain: str) -> dict:
+    staged = modified = untracked = 0
+    for row in porcelain.split("\n"):
+        if len(row) < 2:
+            continue
+        x, y = row[0], row[1]
+        if x == "?" and y == "?":
+            untracked += 1
+            continue
+        if x not in (" ", "?"):
+            staged += 1
+        if y != " ":
+            modified += 1
+    return {"clean": True} if staged + modified + untracked == 0 else {"staged": staged, "modified": modified, "untracked": untracked}
+
+
+def short(tool: str, args: dict, limit: int = 600) -> str:
+    projected = project(tool, args or {})
+    text = projected if isinstance(projected, str) else json.dumps(projected, ensure_ascii=False, default=str)
+    return text if len(text) <= limit else text[:limit] + "…"
+
+
+def optional(value: Optional[str]) -> str:
+    return value or ""

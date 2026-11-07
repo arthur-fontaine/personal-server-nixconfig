@@ -11,6 +11,7 @@ in
   imports = [
     ./model.nix
     ./context.nix
+    ./cache-warm.nix
     ./memory.nix
     ./telegram.nix
     ./mcp.nix

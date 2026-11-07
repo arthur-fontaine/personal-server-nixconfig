@@ -14,6 +14,7 @@ integration_choices=(
   "onepassword|1Password: logins Hermes fills in without seeing them"
   "runpod|RunPod: GPU pods and pods left running"
   "github|GitHub notifications as events"
+  "tinyfish|TinyFish: web search (free up to 12000 searches a day)"
 )
 integrations_now() {
   local line names=()
@@ -42,6 +43,6 @@ else
   ok "Integrations: $(integrations_now)"
 fi
 
-for integration in runpod homeassistant onepassword github; do
+for integration in runpod homeassistant onepassword github tinyfish; do
   source "$REPO_DIR/scripts/bootstrap/integrations/$integration.sh"
 done

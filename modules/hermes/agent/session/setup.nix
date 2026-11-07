@@ -12,6 +12,9 @@ let
     "server.energy.displayBrightness" = toString server.energy.displayBrightness;
     "server.hermes.events.port" = toString server.hermes.events.port;
     "server.hermes.browserPort" = toString server.hermes.browserPort;
+    "server.hermes.app.delivery.enable" = toString server.hermes.app.delivery.enable;
+    "server.sideload.enable" = toString server.sideload.enable;
+    "server.sideload.user" = server.sideload.user;
     "home-manager.users.${server.hermes.user}.launchd.agents.hermes-agent.config.EnvironmentVariables.PATH" =
       config.launchd.agents.hermes-agent.config.EnvironmentVariables.PATH;
     "home-manager.users.${server.hermes.user}.services.hermes-agent.environment.HERMES_CUA_DRIVER_CMD" =
