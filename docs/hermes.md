@@ -380,16 +380,24 @@ The first step of a turn is fast only when the provider still has the
 prompt's prefix cached, and the owner often answers after the cache is gone.
 On Claude routes Hermes asks for its 1-hour cache tier for the chats a person
 types into, 5 minutes for subagents and cron (`prompt_caching.cache_ttl:
-auto`, `modules/hermes/agent/cache-warm.nix`). OpenAI-style caches keep a
-prefix 5 to 10 minutes: there, after a turn of a Telegram chat, the
-`cache_warm` plugin re-sends that turn's last request with `max_tokens=1`
-every 4 minutes for 15 minutes, and stops as soon as the chat's next request
-goes out (`server.hermes.cacheWarming`). A ping reads the prefix from the
-cache, a tenth or less of a cold prefill, and keeps warm what the next turn
-shares with it: everything up to the memory's view of the last turn. Not for
-DeepSeek's own API, which caches on disk for hours, the local model, Codex
-(its own retention), subagents, cron or events. Each ping and its cached
-tokens go to `~/.hermes/logs/cache-warm.jsonl`, to check it pays off.
+auto`, `modules/hermes/agent/cache-warm.nix`). Then the `cache_warm` plugin,
+Arthur's Pi extension cache-warmer ported (`server.hermes.cacheWarming`),
+keeps it warm while you are idle: after a Telegram turn whose prompt is 32k
+tokens or more, it replays that turn's last request with one output token
+before the route's cache lifetime ends (every 50 minutes on Claude's 1-hour
+tier, every 250 s on a 5-minute OpenAI-style cache; `ttlMinutes` for other
+lifetimes), for up to 10 idle hours. It never re-warms a cache that already
+lapsed (a late timer), stops when a ping comes back under 50 % cached,
+retries a failed ping twice 5 minutes apart, and stops for the day once 2M
+full-price token equivalents are spent across every chat. Your next message
+cancels the pending ping, and so does a compaction. Where the Pi extension
+compacts the session at the window's end, Hermes leaves the cache to cool:
+the main chat is compacted by unii, not by Hermes. Not for DeepSeek's own API
+(disk cache, hours), the local model, Codex (its own retention), Claude's
+budget thinking (a one-token replay would be a new request), subagents, cron
+or events. `/warm` shows its state and takes `off`, `on`, `off all`, `on
+all` and `now`, as in Pi; each ping and its cached tokens go to
+`~/.hermes/logs/cache-warm.jsonl`.
 
 What the model can do from its side is in the prompt: several commands in one
 call, independent calls in one message, no second `skills_list`.
