@@ -350,6 +350,21 @@ newest ten messages become a summary, with no model call and no deletion —
 the transcript keeps everything, and `session_search` reaches it. It commits
 only when it reclaims 4k tokens, so the prompt cache is not broken every turn.
 
+The first step of a turn is fast only when the provider still has the
+prompt's prefix cached, and the owner often answers after the cache is gone.
+On Claude routes Hermes asks for its 1-hour cache tier for the chats a person
+types into, 5 minutes for subagents and cron (`prompt_caching.cache_ttl:
+auto`, `modules/hermes/agent/cache-warm.nix`). OpenAI-style caches keep a
+prefix 5 to 10 minutes: there, after a turn of a Telegram chat, the
+`cache_warm` plugin re-sends that turn's last request with `max_tokens=1`
+every 4 minutes for 15 minutes, and stops as soon as the chat's next request
+goes out (`server.hermes.cacheWarming`). A ping reads the prefix from the
+cache, a tenth or less of a cold prefill, and keeps warm what the next turn
+shares with it: everything up to the memory's view of the last turn. Not for
+DeepSeek's own API, which caches on disk for hours, the local model, Codex
+(its own retention), subagents, cron or events. Each ping and its cached
+tokens go to `~/.hermes/logs/cache-warm.jsonl`, to check it pays off.
+
 What the model can do from its side is in the prompt: several commands in one
 call, independent calls in one message, no second `skills_list`.
 
