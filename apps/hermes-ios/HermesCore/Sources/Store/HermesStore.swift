@@ -35,6 +35,7 @@ public final class HermesStore {
     public private(set) var state = AppState()
     public private(set) var stats: StatsState?
     public private(set) var delivery = DeliveryState()
+    public private(set) var controls = ControlsState()
     public private(set) var spriteURL: URL?
     private var slotIDs: [String: MessageID] = [:]
     private var pendingReplies: [MessageID: CheckedContinuation<ReplyPayload, Error>] = [:]
@@ -299,6 +300,29 @@ public final class HermesStore {
         Task { await client.setTyping(chat: bot.chatID, topic: topic) }
     }
 
+    // MARK: - Commands (protocol §2.4)
+
+    public func commandContext(_ topic: TopicID) -> CommandContext {
+        let sub = subchat(topic)
+        return CommandContext(topic: topic, isEncrypted: sub?.encrypted ?? false, isUnlocked: sub?.unlocked ?? false)
+    }
+
+    /// Sends a command as the owner, in the chat it applies to; Hermes answers there and the
+    /// `controls` slot then shows the new value.
+    public func run(command text: String, in topic: TopicID) async throws {
+        try await send(text, in: topic)
+    }
+
+    public func setPermissionMode(_ id: String) async throws {
+        guard let text = controls.permissionMode?.command(for: id) else { return }
+        try await run(command: text, in: .main)
+    }
+
+    public func setModel(_ model: ModelRef, in topic: TopicID) async throws {
+        guard let text = controls.model?.command(for: model, in: topic) else { return }
+        try await run(command: text, in: topic)
+    }
+
     // MARK: - Sub-chats
 
     /// The bot creates topics (users can't, in a bot DM): ask it in the main chat.
@@ -383,6 +407,10 @@ public final class HermesStore {
             guard m.id >= (slotIDs["devices"] ?? 0) else { return }
             slotIDs["devices"] = m.id
             delivery = d
+        case .controls(let c):
+            guard m.id >= (slotIDs["controls"] ?? 0) else { return }
+            slotIDs["controls"] = m.id
+            controls = c
         case .notify(let n):
             // History replays old notifications: only live ones become banners.
             guard !replay else { return }
@@ -430,20 +458,13 @@ public final class HermesStore {
         // A local message's id changes once Telegram accepts it: wait for the server id.
         let serverID = try await serverMessageID(for: sent.id, pending: sent.sendState == .pending)
         if let early = earlyReplies.removeValue(forKey: serverID) { return early }
-        return try await withThrowingTaskGroup(of: ReplyPayload.self) { group in
-            group.addTask { @MainActor in
-                try await withCheckedThrowingContinuation { c in self.pendingReplies[serverID] = c }
-            }
-            group.addTask {
-                try await Task.sleep(for: timeout)
-                throw TelegramError.server(code: 408, message: "Hermes didn't answer in time.")
-            }
-            defer {
-                group.cancelAll()
-                if let c = pendingReplies.removeValue(forKey: serverID) { c.resume(throwing: CancellationError()) }
-            }
-            return try await group.next()!
+        let timer = Task { [weak self] in
+            try await Task.sleep(for: timeout)
+            self?.pendingReplies.removeValue(forKey: serverID)?
+                .resume(throwing: TelegramError.server(code: 408, message: "Hermes didn't answer in time."))
         }
+        defer { timer.cancel() }
+        return try await withCheckedThrowingContinuation { c in pendingReplies[serverID] = c }
     }
 
     private var sentWaiters: [MessageID: CheckedContinuation<MessageID, Never>] = [:]
@@ -484,12 +505,14 @@ public final class HermesStore {
         Task { _ = try? await sendRequest(.statsRefresh, awaitReply: false) }
     }
 
-    public func requestCall() async throws -> CallTicket {
-        guard let reply = try await sendRequest(.callStart, timeout: .seconds(15)) else { throw TelegramError.notReady }
-        guard reply.ok, let ticket = CallTicket(reply: reply) else {
-            throw TelegramError.server(code: 503, message: reply.errorMessage ?? "Call mode isn't set up on the server.")
-        }
-        return ticket
+    /// Tells Hermes a call is on (spoken style for every turn) or over.
+    public func setCallActive(_ active: Bool) async {
+        _ = try? await sendRequest(.callState(active: active), awaitReply: false)
+    }
+
+    /// One utterance of a call, as a main-chat message Hermes answers like any other.
+    public func sendCallTurn(_ transcript: String, in topic: TopicID = .main) async throws {
+        try await send(CallTurn.message(for: transcript), in: topic)
     }
 
     public func logOut() async {

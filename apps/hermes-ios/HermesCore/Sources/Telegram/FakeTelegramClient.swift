@@ -17,6 +17,8 @@ public final class FakeTelegramClient: TelegramClient {
     private var store: [TopicID: [ChatMessage]]
     private var appState: AppState
     private var phone = ""
+    private var mode = "auto"
+    private var model = "deepseek-v4.1-flash"
     private var sentLog: [String] = []
 
     public init(startsLoggedIn: Bool = true, now: Date = .now) {
@@ -87,6 +89,7 @@ public final class FakeTelegramClient: TelegramClient {
             Fixtures.appMessage(id: 801, json: Fixtures.devicesJSON),
             Fixtures.appMessage(id: 802, json: Fixtures.statsJSON),
             Fixtures.appMessage(id: 803, json: encodeState()),
+            Fixtures.appMessage(id: 804, json: Fixtures.controlsJSON(mode: mode, model: model, reasoning: "medium")),
         ]
     }
 
@@ -95,12 +98,16 @@ public final class FakeTelegramClient: TelegramClient {
     public func send(text: String, chat: ChatID, topic: TopicID, replyTo: MessageID?) async throws -> ChatMessage {
         sentLog.append(text)
         nextID += 1
-        let local = ChatMessage(id: nextID, topic: topic, date: .now, isOutgoing: true, text: FormattedText(text))
+        var local = ChatMessage(id: nextID, topic: topic, date: .now, isOutgoing: true, text: FormattedText(text))
         if topic == Self.appTopic {
+            // As TDLib: a sent message is pending until the server gives it its real id.
+            local.sendState = .pending
             Task { await handleRequest(text, id: local.id) }
             return local
         }
         store[topic, default: []].append(local)
+        if text.hasPrefix("/mode ") { mode = String(text.dropFirst(6)); pushControls() }
+        if text.hasPrefix("/model ") { model = String(text.split(separator: " ")[1]); pushControls() }
         if !text.hasPrefix("/sub unlock") { Task { await reply(to: text, in: topic) } }
         return local
     }
@@ -187,6 +194,10 @@ public final class FakeTelegramClient: TelegramClient {
         pushState()
     }
 
+    private func pushControls() {
+        emit(.messageChanged(Self.botChat.chatID, Fixtures.appMessage(id: 804, json: Fixtures.controlsJSON(mode: mode, model: model, reasoning: "medium"))))
+    }
+
     private func pushState() {
         emit(.messageChanged(Self.botChat.chatID, Fixtures.appMessage(id: 803, json: encodeState())))
     }
@@ -210,13 +221,13 @@ public final class FakeTelegramClient: TelegramClient {
                 appState.pet = pet
                 pushState()
             }
-        case "call.start":
-            replyData = #"{"url":null,"lan_url":"ws://127.0.0.1:8787/call","token":"demo","expires":"2030-01-01T00:00:00Z"}"#
+        case "call.state":
+            replyData = #"{"active":true}"#
         case "ack", "hello", "stats.refresh": if type != "stats.refresh" { return }
         default: break
         }
         nextID += 1
-        emit(.newMessage(Self.botChat.chatID, Fixtures.appMessage(id: nextID, json: #"{"v":1,"type":"reply","re":\#(serverID),"ok":true,"data":\#(replyData)}"#)))
+        emit(.newMessage(Self.botChat.chatID, Fixtures.appMessage(id: nextID, json: #"{"v":2,"type":"reply","re":\#(serverID),"ok":true,"data":\#(replyData)}"#)))
     }
 
     /// Scripted: a question arrives (Live Activity and banner demos).

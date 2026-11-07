@@ -60,7 +60,7 @@ struct EnvelopeTests {
         #expect(text.hasPrefix("```json\n") && text.hasSuffix("\n```"))
         let obj = try JSONSerialization.jsonObject(with: try #require(AppProtocol.extractJSON(from: text))) as? [String: Any]
         #expect(obj?["type"] as? String == "pet.feed")
-        #expect(obj?["v"] as? Int == 1)
+        #expect(obj?["v"] as? Int == 2)
     }
 
     @Test func encodesAckAndPushRegister() throws {
@@ -221,16 +221,65 @@ struct OtherSlotsTests {
         #expect(q.interruption == .timeSensitive && q.chat == 455 && q.speechText == "Allow?")
     }
 
-    @Test func decodesRepliesAndCallTickets() throws {
-        guard case .reply(let ok)? = AppProtocol.decode(#"{"v":1,"type":"reply","re":1302,"ok":true,"data":{"url":null,"lan_url":"ws://h.local:8787/call","token":"t","expires":"2026-11-07T21:45:00Z"}}"#) else {
+    @Test func decodesRepliesAndCallState() throws {
+        guard case .reply(let ok)? = AppProtocol.decode(#"{"v":2,"type":"reply","re":1302,"ok":true,"data":{"active":true}}"#) else {
             Issue.record("no reply"); return
         }
         #expect(ok.re == 1302 && ok.ok)
-        let ticket = try #require(CallTicket(reply: ok))
-        #expect(ticket.candidates == [URL(string: "ws://h.local:8787/call")!])
-        #expect(ticket.expires != nil)
+        let req = AppProtocol.encode(.callState(active: true))
+        #expect(req.contains("\"type\":\"call.state\"") && req.contains("\"active\":true"))
+        #expect(CallTurn.message(for: " what's next? ") == "🎙 what's next?")
+        #expect(CallTurn.isCallTurn("🎙 hi") && !CallTurn.isCallTurn("hi 🎙"))
         guard case .reply(let bad)? = AppProtocol.decode(#"{"v":1,"type":"reply","re":1303,"ok":false,"error":{"code":"busy","message":"A pet is already being generated"}}"#) else { return }
         #expect(!bad.ok && bad.errorCode == "busy")
-        #expect(CallTicket(reply: bad) == nil)
+    }
+}
+
+@Suite("controls slot")
+struct ControlsTests {
+    func decode() throws -> ControlsState {
+        guard case .controls(let c)? = AppProtocol.decode(Fixtures.controlsJSON(mode: "auto", model: "deepseek-v4.1-flash", reasoning: "medium")) else {
+            throw CancellationError()
+        }
+        return c
+    }
+
+    @Test func decodesTheSlot() throws {
+        let c = try decode()
+        #expect(c.permissionMode?.options.map(\.id) == ["auto", "ask"])
+        #expect(c.permissionMode?.command(for: "ask") == "/mode ask")
+        #expect(c.model?.chain.count == 3)
+        #expect(c.model?.selected(in: .main)?.model == "deepseek-v4.1-flash")
+        #expect(c.model?.selected(in: 12)?.model == "deepseek-v4.1-flash")
+        #expect(c.model?.last[.main]?.at != nil)
+        #expect(c.orderedPresets.first?.name == "aside")
+        #expect(c.presets.first { $0.name == "secret" }?.summary == "Encrypted, no main memory, model uzu:local")
+        #expect(c.commands.count == 19)
+        #expect(c.commands.first { $0.id == "reasoning" }?.options == ["low", "medium", "high"])
+    }
+
+    @Test func filtersCommandsByChat() throws {
+        let c = try decode()
+        let main = c.commands(for: CommandContext(topic: .main)).map(\.id)
+        #expect(main.contains("sub.new") && !main.contains("sub.end") && !main.contains("sub.lock"))
+        #expect(main.first == "model")
+        let sub = c.commands(for: CommandContext(topic: 12)).map(\.id)
+        #expect(!sub.contains("sub.new") && sub.contains("sub.end") && !sub.contains("sub.lock"))
+        let secret = c.commands(for: CommandContext(topic: 31, isEncrypted: true, isUnlocked: true)).map(\.id)
+        #expect(secret.contains("sub.lock"))
+    }
+
+    @Test func fillsTemplates() throws {
+        let c = try decode()
+        let r = try #require(c.commands.first { $0.id == "reasoning" })
+        #expect(r.text(["value": "high"]) == "/reasoning high")
+        #expect(c.commands.first { $0.id == "btw" }?.insert == "/btw ")
+        #expect(CommandCatalog.entry("sub.end").label == "End sub-chat")
+        #expect(CommandCatalog.entry("unknown").label == "unknown")
+    }
+
+    @Test func permissionsHiddenWhenNotReported() {
+        let c = ControlsState(permissionMode: nil, commands: [CommandSpec(id: "permissions", control: "permission_mode"), CommandSpec(id: "stop", send: "/stop")])
+        #expect(c.commands(for: CommandContext(topic: .main)).map(\.id) == ["stop"])
     }
 }

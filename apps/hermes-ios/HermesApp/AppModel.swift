@@ -1,0 +1,159 @@
+import HermesCore
+import SwiftUI
+import UserNotifications
+import WidgetKit
+
+enum AppSection: String, CaseIterable, Hashable, Identifiable {
+    case chat, pet, dashboard, settings
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .chat: "Chat"
+        case .pet: "Pet"
+        case .dashboard: "Dashboard"
+        case .settings: "Settings"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .chat: "bubble.left.and.text.bubble.right"
+        case .pet: "pawprint"
+        case .dashboard: "gauge.with.dots.needle.33percent"
+        case .settings: "gearshape"
+        }
+    }
+}
+
+/// App-wide UI state and the glue between the store and the system (notifications, Live
+/// Activities, widgets). One per process: App Intents reach it from the Live Activity.
+@MainActor
+@Observable
+final class AppModel {
+    static let shared = AppModel()
+
+    let config: AppConfig
+    let store: HermesStore
+    var section: AppSection = .chat
+    var selectedTopic: TopicID? = .main
+    var showNewSubchat = false
+    var callPresented = false
+    /// Private sub-chats opened with Face ID this session; cleared when the app goes to the background.
+    var unlockedTopics: Set<TopicID> = []
+    var toast: String?
+
+    private init() {
+        let arguments = ProcessInfo.processInfo.arguments
+        config = AppConfig.fromBundle(deviceName: UIDevice.current.name)
+        let client: any TelegramClient
+        if config.demo {
+            client = FakeTelegramClient(startsLoggedIn: !arguments.contains("-demoLogin"))
+        } else {
+            client = TDLibTelegramClient(config: config)
+        }
+        store = HermesStore(client: client, config: config)
+        store.hooks.notify = { NotificationService.shared.post($0) }
+        store.hooks.stateChanged = { [weak self] state in self?.stateChanged(state) }
+        store.hooks.spriteAvailable = { [weak self] pet, url in self?.spriteChanged(pet: pet, url: url) }
+        store.start()
+        applyLaunchArguments(arguments)
+        IntentBridge.shared.answer = { [weak self] questionID, optionID in
+            try await self?.answerFromIntent(questionID: questionID, optionID: optionID)
+        }
+        IntentBridge.shared.petAction = { [weak self] action in
+            try await self?.store.perform(action)
+        }
+    }
+
+    // MARK: Navigation
+
+    func select(_ section: AppSection) { self.section = section }
+
+    func open(topic: TopicID) {
+        section = .chat
+        selectedTopic = topic
+    }
+
+    /// `hermes://chat/<topic>`, `hermes://pet`, `hermes://call` (widgets and notifications).
+    func open(_ url: URL) {
+        guard url.scheme == "hermes" else { return }
+        switch url.host() {
+        case "chat": open(topic: TopicID(url.lastPathComponent) ?? .main)
+        case "pet": section = .pet
+        case "dashboard": section = .dashboard
+        case "call": startCall()
+        default: break
+        }
+    }
+
+    func startCall() { callPresented = true }
+
+    func showToast(_ text: String) {
+        toast = text
+        Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            if toast == text { toast = nil }
+        }
+    }
+
+    // MARK: System glue
+
+    private var lastSnapshot: SharedSnapshot?
+
+    private func stateChanged(_ state: AppState) {
+        LiveActivityController.shared.update(state: state, store: store)
+        writeWidgetSnapshot()
+    }
+
+    private func spriteChanged(pet: PetState, url: URL) {
+        writeWidgetSnapshot()
+    }
+
+    func writeWidgetSnapshot() {
+        let pet = store.pet
+        var spriteFile: String?
+        if let url = store.spriteURL ?? BundledPet.load()?.spritesheet {
+            spriteFile = SharedContainer.storeSpritesheet(url, petID: pet?.id ?? "pip", version: pet?.version ?? 0, group: config.appGroup)
+        }
+        let snap = SharedSnapshot(
+            petName: pet?.name ?? "Pip", petLevel: pet?.level ?? 1, levelProgress: pet?.levelProgress ?? 0,
+            hunger: pet?.hunger ?? 0.3, energy: pet?.energy ?? 0.8, happiness: pet?.happiness ?? 0.7, asleep: pet?.asleep ?? false,
+            mood: store.petMood, agentStatus: store.agent.status, agentTask: store.agent.task,
+            questionText: store.questions.first.map { $0.summary ?? $0.text }, spritesheetFile: spriteFile)
+        var comparable = snap
+        comparable.updatedAt = lastSnapshot?.updatedAt ?? snap.updatedAt
+        guard comparable != lastSnapshot else { return }
+        lastSnapshot = snap
+        SharedContainer.write(snap, group: config.appGroup)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    private func answerFromIntent(questionID: String, optionID: String) async throws {
+        guard let q = store.questions.first(where: { $0.id == questionID }),
+              let option = q.options.first(where: { $0.id == optionID }) else { return }
+        _ = try await store.answer(q, with: option)
+    }
+
+    func didRegisterForPush(token: Data) {
+        #if HERMES_PAID
+        Task {
+            _ = try? await store.sendRequest(.pushRegister(token: token, kind: "alert", sandbox: true,
+                                                           bundleID: Bundle.main.bundleIdentifier ?? ""), awaitReply: false)
+        }
+        #endif
+    }
+
+    /// Screenshot and demo hooks: `-section pet`, `-topic 12`, `-approval`, `-call`.
+    private func applyLaunchArguments(_ args: [String]) {
+        func value(_ flag: String) -> String? {
+            guard let i = args.firstIndex(of: flag), i + 1 < args.count else { return nil }
+            return args[i + 1]
+        }
+        if let s = value("-section").flatMap(AppSection.init(rawValue:)) { section = s }
+        if let t = value("-topic").flatMap(TopicID.init) { selectedTopic = t }
+        if args.contains("-unlocked"), let t = selectedTopic { unlockedTopics.insert(t) }
+        if args.contains("-newSubchat") { showNewSubchat = true }
+        if args.contains("-call") { callPresented = true }
+    }
+}
