@@ -17,11 +17,12 @@
 
       # bootout returns before the service is gone, and a bootstrap right
       # after fails (5: Input/output error), leaving the agent unloaded until
-      # the next login: wait for it to go, and try again.
+      # the next login: wait for it to go, and try again. The gateway may take
+      # its whole ExitTimeOut (60 s, restart.nix) settling the turn in flight.
       restart() {
         local name="$1" target="$2" try
         run /bin/launchctl bootout "$domain/$name" 2>/dev/null || true
-        for try in $(seq 20); do
+        for try in $(seq 140); do
           /bin/launchctl print "$domain/$name" >/dev/null 2>&1 || break
           sleep 0.5
         done

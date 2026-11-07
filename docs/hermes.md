@@ -314,3 +314,22 @@ call, independent calls in one message, no second `skills_list`, and long
 work — many steps rather than one command — handed to `delegate_task`, which
 answers at once and posts its result as a message. A turn held open is a turn
 in which what the user sends goes unanswered.
+
+## A rebuild in the middle of a turn
+
+`server-rebuild` restarts the gateway whenever its configuration changes
+(`modules/hermes/agent/session/restart.nix`). On SIGTERM it stops the turn in
+flight, gives it up to 45 s to settle as *interrupted*, and starts again; the
+messages queued behind it then run in order, and the stopped one is not re-run
+(send it again if it still matters). launchd allows the gateway 60 s for that
+(`ExitTimeOut`; its default of 20 s killed it first), and the rebuild waits for
+the old gateway to be gone before it starts the new one.
+
+A turn that was killed rather than stopped (a crash, a power loss, a stop that
+overran the 60 s) is one Hermes cannot tell finished or not: it marks it
+`unknown` and pauses the chat, answering "⏸️ This conversation is paused…" and
+nothing else, until you say what to do. Send `/discard` in Telegram to drop the
+lost turn (it is not re-run, it stays in the transcript) and let the waiting
+messages run, or `/reset` for a fresh conversation. From a shell on the server,
+as Hermes and while the gateway runs (with none running, the command starts
+one of its own), `hermes sessions discard <session> --yes` does the same.
