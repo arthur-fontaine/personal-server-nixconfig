@@ -205,6 +205,48 @@ def test_call_turn() -> None:
     plugin_pkg.STATE["app"] = None
 
 
+def test_subchats() -> None:
+    from unii.policy import Chat, Policies
+
+    root = Path(tempfile.mkdtemp(dir=TMP))
+    policies = Policies({"presets": {"aside": {"ttl": "session"}, "secret": {"encrypted": True, "ttl": "7d"}},
+                         "default_preset": "aside"}, str(root))
+    secret = Chat("telegram", "dm", str(OWNER), "455")
+    policies.set_preset(secret, "secret")
+    policies.set_name(secret, "Taxes")
+    policies.touch(secret, "s1")
+    policies.set_preset(Chat("telegram", "dm", str(OWNER), "456"), "aside")
+    policies.set_preset(Chat("telegram", "group", "-100", ""), "aside")  # a group: not a topic of the DM
+
+    class Runtime:
+        def __init__(self):
+            self.policies, self.keys = policies, {}
+
+        def chat_volumes(self, chat):
+            return policies.policy(chat), f"own-{chat.thread}", []
+
+        def encrypted(self, name, policy=None):
+            return bool(policy and policy.encrypted)
+
+        def is_locked(self, name, policy=None):
+            return self.encrypted(name, policy) and name not in self.keys
+
+    runtime = Runtime()
+    sys.__dict__["_hermes_unii_state"] = {"runtime": runtime}
+    try:
+        plugin = types.SimpleNamespace(saved={"thread": 77})
+        subs = app_mod.App.subchats(plugin)
+        assert [s["topic_id"] for s in subs] == [455, 456], subs
+        taxes = subs[0]
+        assert taxes["name"] == "Taxes" and taxes["preset"] == "secret" and taxes["encrypted"] and not taxes["unlocked"]
+        assert taxes["ttl"] == "7d" and taxes["expires_at"] is not None
+        assert subs[1]["name"] is None and not subs[1]["encrypted"] and subs[1]["expires_at"] is None
+        runtime.keys["own-455"] = b"k"
+        assert app_mod.App.subchats(plugin)[0]["unlocked"]
+    finally:
+        sys.__dict__.pop("_hermes_unii_state", None)
+
+
 def test_gofile_token() -> None:
     a = bigfiles.Gofile.website_token("tok", now=0)
     assert a == bigfiles.Gofile.website_token("tok", now=14399) != bigfiles.Gofile.website_token("tok", now=14400)

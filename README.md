@@ -26,6 +26,9 @@ The layout follows [arthur-fontaine/nixconfig](https://github.com/arthur-fontain
 - **Apple's apps**: iMessage, Notes, Reminders, Find My, Calendar, Contacts,
   Mail, Maps, Music, Shortcuts… on your Apple Account (the Apple skills and
   [iMCP](https://github.com/mattt/iMCP)).
+- **An iPhone and iPad app**, optional: a Telegram client of that DM, fed by a
+  hidden topic (what Hermes is doing, its questions, stats, a pet), with spoken
+  notifications and calls ([`docs/app.md`](./docs/app.md)).
 - **Integrations, each optional**: WhatsApp, Instagram, Discord, Home
   Assistant, HomeKit, 1Password, RunPod, GitHub notifications, TinyFish web
   search.
