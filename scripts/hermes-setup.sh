@@ -89,7 +89,7 @@ else
     "$("$GUM" style --faint 'What needs this screen. Unanswered, it ends after 24 hours.')"
 fi
 
-for section in permissions apple accounts app-devices; do
+for section in permissions apple sideload-account accounts sideload-devices; do
   source "$REPO_DIR/scripts/bootstrap/$section.sh"
 done
 

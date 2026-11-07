@@ -42,14 +42,17 @@ in
     touch $out
   '';
 
-  # hermes-app (build, sign, install, refresh) and its plugin against fake
-  # xcrun, xcodebuild, xcodegen and security, in Hermes' interpreter.
-  app-delivery = pkgs.runCommand "app-delivery-tests" { } ''
-    cp -R ${../modules/hermes/app-delivery} app-delivery
-    chmod -R u+w app-delivery
-    cd app-delivery
+  # sideload (Xcode builds, .ipa re-signing, limits, refresh, removal) and
+  # Hermes' sideload plugin against fake xcrun, xcodebuild, xcodegen,
+  # codesign, ditto and security, in Hermes' interpreter.
+  sideload = pkgs.runCommand "sideload-tests" { } ''
+    mkdir -p modules/hermes
+    cp -R ${../modules/sideload} modules/sideload
+    cp -R ${../modules/hermes/plugins} modules/hermes/plugins
+    chmod -R u+w modules
+    cd modules/sideload
     export HOME=$TMPDIR
-    ${hermes.hermesVenv}/bin/python3 -I tests/test_app_delivery.py
+    ${hermes.hermesVenv}/bin/python3 -I tests/test_sideload.py
     touch $out
   '';
 

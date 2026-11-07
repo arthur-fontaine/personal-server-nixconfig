@@ -24,7 +24,7 @@ ALLOWLIST = frozenset({
     # unii's own tools: they open its memory's view.
     "zoom", "date",
     # The sandbox's grants, the app's devices and installed apps, listed.
-    "sandbox_grants", "app_devices", "sideload_devices", "sideload_apps",
+    "sandbox_grants", "sideload_devices", "sideload_apps",
 })
 # Tools that put their own question to the owner, as AskUserQuestion does.
 INTERACTIVE = frozenset({"clarify", "propose"})

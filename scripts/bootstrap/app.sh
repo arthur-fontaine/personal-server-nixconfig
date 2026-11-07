@@ -1,9 +1,9 @@
 # ── The Hermes app: built here, installed on your iPhone and iPad ───────────
 # Whether this Mac builds the Hermes iOS app and installs it on your devices
-# (server.hermes.app.delivery, docs/app.md), and the Telegram API id the app
-# logs in to Telegram with. Before xcode.sh and system.sh: it writes
-# hosts/local.nix. Signing in Hermes' Xcode is in apple.sh, your devices in
-# app-devices.sh, both once Hermes' session is there.
+# (server.hermes.app.delivery, through the sideload service: docs/sideload.md),
+# and the Telegram API id the app logs in to Telegram with. Before xcode.sh and
+# system.sh: it writes hosts/local.nix. Signing in Xcode is sideload-account.sh,
+# your devices sideload-devices.sh, both once Hermes' session is there.
 step "The Hermes app"
 
 if grep -q 'delivery' "$local_nix" 2>/dev/null \

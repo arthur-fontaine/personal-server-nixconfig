@@ -252,16 +252,20 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     "decided without you, and logged in the session's audit.jsonl. `sandbox_grants`"
     "lists what a session may reach. Pi's words are its output, never the user's."
     ""
-  ])}${lib.optionalString server.hermes.app.delivery.enable (lib.concatMapStrings (line: "\n  ${line}") [
-    "Your iOS app is built and installed from this Mac on the user's iPhones and"
-    "iPads: `app_devices` lists them (reachable now, last install, when its"
-    "signature expires); `app_install` rebuilds it with the current pet as its"
-    "icon and installs it, returning at once, a notice when it ends. Install it"
-    "after a new pet, when the user asks, or after a failed install; re-signing"
-    "before it expires happens by itself. A device not listed must be plugged"
-    "into this Mac once (the user runs `bootstrap-macos.sh app-devices`)."
-    ""
-  ])}
+  ])}${lib.optionalString server.hermes.sideload.enable (lib.concatMapStrings (line: "\n  ${line}") ([
+    "You can install iOS apps on the user's iPhones and iPads from this Mac:"
+    "`sideload_apps` lists what is installed where, when each signature expires,"
+    "and the team's limits (a free team: 3 sideloaded apps per device, 10 new"
+    "App IDs a week; check before installing and say what would have to go);"
+    "`sideload_install` adds and installs an app (an .ipa by path or URL, an"
+    "attachment's saved path, or an Xcode project by path or git URL), returning"
+    "at once, a notice when it ends; `sideload_remove` uninstalls. Re-signing"
+    "before expiry happens by itself. A device not in `sideload_devices` must be"
+    "plugged into this Mac once (the user runs `bootstrap-macos.sh sideload-devices`)."
+  ] ++ lib.optionals server.hermes.app.delivery.enable [
+    "Your own iOS app is the sideload app `hermes`: reinstall it with"
+    "`sideload_install` after a new pet, when the user asks, or after a failed install."
+  ] ++ [ "" ]))}
   Apple apps act on the user's Apple Account, which ${agent} is signed in to:
   - Messages, Reminders, Notes, Find My: your skills (`imsg`, `remindctl`,
     `memo`, FindMy.app with `peekaboo`).

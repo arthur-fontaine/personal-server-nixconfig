@@ -5,5 +5,6 @@
     ./user.nix
     ./access
     ./applications.nix
+    ./sideload.nix
   ];
 }
