@@ -27,6 +27,7 @@ struct RootView: View {
         .animation(.smooth, value: store.auth)
         .animation(.smooth, value: store.bot)
         .fullScreenCover(isPresented: $model.callPresented) { CallView() }
+        .sheet(isPresented: $model.askNotifications) { NotificationsPrompt() }
         .overlay(alignment: .top) {
             if let toast = model.toast {
                 Text(toast)
@@ -43,6 +44,32 @@ struct RootView: View {
             if phase == .background { model.unlockedTopics.removeAll() }
             if phase == .active { model.writeWidgetSnapshot() }
         }
+    }
+}
+
+struct NotificationsPrompt: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 22) {
+            PetSpriteView(animation: .waiting, size: 110)
+            Text("Don't miss Hermes' questions").font(.title2.weight(.bold)).multilineTextAlignment(.center)
+            Text("Hermes asks before anything risky, and tells you when long work is done. With AirPods, Siri can read it out.")
+                .multilineTextAlignment(.center).foregroundStyle(.secondary)
+            Button {
+                Task {
+                    await NotificationService.shared.requestAuthorization()
+                    model.askNotifications = false
+                    dismiss()
+                }
+            } label: { Text("Turn On Notifications").font(.headline).frame(maxWidth: .infinity, minHeight: 34) }
+            .buttonStyle(.glassProminent)
+            .controlSize(.large)
+            Button("Not Now") { model.askNotifications = false; dismiss() }
+        }
+        .padding(28)
+        .presentationDetents([.medium])
     }
 }
 

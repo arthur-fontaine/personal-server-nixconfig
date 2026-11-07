@@ -1,3 +1,4 @@
+import ActivityKit
 import HermesCore
 import SwiftUI
 import UserNotifications
@@ -65,6 +66,15 @@ final class AppModel {
         IntentBridge.shared.petAction = { [weak self] action in
             try await self?.store.perform(action)
         }
+        #if HERMES_PAID
+        // Lets Hermes start the Live Activity itself when a turn starts while the app is closed.
+        Task { [store] in
+            for await token in Activity<HermesActivityAttributes>.pushToStartTokenUpdates {
+                _ = try? await store.sendRequest(.pushRegister(token: token, kind: "pushtostart", sandbox: true,
+                                                               bundleID: Bundle.main.bundleIdentifier ?? ""), awaitReply: false)
+            }
+        }
+        #endif
     }
 
     // MARK: Navigation
@@ -130,10 +140,24 @@ final class AppModel {
         WidgetCenter.shared.reloadAllTimelines()
     }
 
+    /// A Live Activity button may launch the app in the background: wait for Telegram and the
+    /// state slot (a few seconds from TDLib's local database) before pressing the button.
     private func answerFromIntent(questionID: String, optionID: String) async throws {
+        let deadline = Date.now.addingTimeInterval(20)
+        while Date.now < deadline, !(store.isReady && store.questions.contains { $0.id == questionID }) {
+            try await Task.sleep(for: .milliseconds(200))
+        }
         guard let q = store.questions.first(where: { $0.id == questionID }),
-              let option = q.options.first(where: { $0.id == optionID }) else { return }
+              let option = q.options.first(where: { $0.id == optionID }) else {
+            throw TelegramError.server(code: 410, message: "This question was already answered.")
+        }
         _ = try await store.answer(q, with: option)
+    }
+
+    /// Asked once, after login, with a word on why (design.md, "Install → first message").
+    var askNotifications: Bool {
+        get { store.isReady && !UserDefaults.standard.bool(forKey: "notificationsAsked") && !config.demo }
+        set { if !newValue { UserDefaults.standard.set(true, forKey: "notificationsAsked") } }
     }
 
     func didRegisterForPush(token: Data) {
