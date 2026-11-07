@@ -59,7 +59,18 @@ in
   # web_extract failed ("search-only backend"). Firecrawl without a key reads
   # through Hermes' keyless free tiers
   # (website/docs/user-guide/features/web-search.md, plugins/web/firecrawl).
-  services.hermes-agent.settings.web.extract_backend = "firecrawl";
+  services.hermes-agent.settings.web = {
+    extract_backend = "firecrawl";
+  } // lib.optionalAttrs server.hermes.integrations.tinyfish.enable {
+    search_backend = "tinyfish";
+  };
+
+  # With TinyFish, its Search answers web_search (../plugins/tinyfish: Hermes'
+  # pinned revision has no such backend); a failed call is retried once on
+  # Hermes' keyless ring (web.keyless_rescue, on by default). Listed in
+  # plugins.enabled by memory.nix.
+  services.hermes-agent.extraPlugins = lib.optional server.hermes.integrations.tinyfish.enable
+    (pkgs.runCommand "hermes-plugin-tinyfish" { } "cp -R ${../plugins/tinyfish} $out");
 
   # The gateway's PATH, which every terminal command inherits: the tools above,
   # then what the agent installed into its profile, then the system's.

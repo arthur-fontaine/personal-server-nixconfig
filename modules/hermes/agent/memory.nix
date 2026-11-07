@@ -41,6 +41,7 @@ in
         # not add. The Home Assistant one: homeassistant.nix.
         enabled = [ "unii" "owner_approval" "guard" "outbox" "lost_turns" "front_desk" ] # owner-approval.nix, guard.nix, outbox.nix, lost-turns.nix, front-desk.nix
           ++ lib.optional cfg.integrations.homeassistant.enable "homeassistant"
+          ++ lib.optional cfg.integrations.tinyfish.enable "tinyfish" # tools.nix
           ++ lib.optional cfg.sandbox.enable "sandbox" # ../coding-agent
           ++ lib.optional cfg.app.delivery.enable "app_delivery"; # ../app-delivery
         # The compactions may run on another model than the chat.

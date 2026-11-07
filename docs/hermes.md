@@ -126,9 +126,13 @@ Hermes' own `computer_use` tool is off, since its clicks no longer reach that
 driver, and Hermes drives the driver's own MCP tools (`mcp__cua__*`) instead;
 the guard lets the ones that only look run without review.
 
-Web search is OpenAI's own, run server-side by the Codex model; reading a page
-(`web_extract`) goes through Firecrawl's keyless tier (`modules/hermes/agent/tools.nix`),
-since that search cannot extract.
+Web search is TinyFish Search with the `tinyfish` integration (free up to
+12,000 searches a day with an API key; `modules/hermes/plugins/tinyfish`, since
+Hermes' pinned revision has no such backend), a failed search retried once on
+Hermes' keyless providers; without it, OpenAI's own, run server-side by the
+Codex model, or Hermes' keyless providers on other models. Reading a page
+(`web_extract`) goes through Firecrawl's keyless tier either way
+(`modules/hermes/agent/tools.nix`).
 
 Web pages go faster through `browser_fast_act` (`modules/hermes/fast-act`), once
 the bootstrap's Models section has its key: Cua Driver snapshots the page in
@@ -263,7 +267,7 @@ Each of your other services is an integration, off until you turn it on
 (`server.hermes.integrations.<name>.enable`, which the bootstrap asks for):
 `whatsapp`, `instagram`, `discord`, `homeassistant` (Hermes' official plugin:
 the `ha_*` tools), `homekit` (HomeClaw), `onepassword`,
-`runpod`, `github` (notifications). Its skill, MCP server and events come with
+`runpod`, `github` (notifications), `tinyfish` (web search). Its skill, MCP server and events come with
 it, and Hermes' instructions mention only those that are on. Apple's apps are
 not integrations: they come with the Mac.
 
