@@ -22,7 +22,10 @@
       # hermes.integrations.whatsapp.enable = true;
       # hermes.integrations.homeassistant.enable = true;
       # hermes.homeassistant.url = "http://192.168.1.10:8123";
-      # uzu.model = "alibaba:qwen3.5:0.8b:mirai:mirai-m:4";
+      # The local model: one of pkgs/uzu-models.nix, or none (the bootstrap asks).
+      # uzu.model = "alibaba:qwen3.5:9b:mirai:mirai-m:4";
+      # uzu.enable = false;
+      # hermes.localFallback = true; # it answers the main chat when every remote model fails
       # energy.lowPowerMode = false;
     };
   };

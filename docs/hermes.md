@@ -307,8 +307,10 @@ guard's approval card is the question, with or without a decision model
 - OpenCode Zen: `deepseek-v4.1-flash`, paid as you go. OpenCode's free models
   (`*-free`) answer only its own app: through the API they return HTTP 429
   "Free usage limit reached" from the first request.
-- Local: uzu serves Qwen 3.5 9B on the GPU at `127.0.0.1:8000`
-  (`server.uzu`), for the sub-chats that pin `uzu:local`. Compactions can use it
+- Local, a choice of the bootstrap (`server.uzu.enable`, `server.uzu.model`):
+  uzu serves one of the models of `pkgs/uzu-models.nix` that fits the Mac (Qwen
+  3.5 9B on 16 GB) on the GPU at `127.0.0.1:8000`, for the events' screening
+  and the sub-chats that pin `uzu:local`; none at all is fine. Compactions can use it
   too: `server.hermes.memory.compactionModel = "uzu:local"`. Its files are pinned
   by revision in `pkgs/uzu-models.nix`, without the speculator: Trymirai's
   registry otherwise serves a new revision at any start, and the one of Oct 30,

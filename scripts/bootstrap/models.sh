@@ -1,6 +1,6 @@
 # ── Models: the main one, then its fallbacks ────────────────────────────────
 # Hermes tries them in order when one fails (a limit reached, an outage), for
-# that turn; the local model (uzu) always comes last. Written to
+# that turn. Then the local model, if any (below). Written to
 # hosts/local.nix (server.hermes.model, .fallbacks, and .providers for other
 # OpenAI-compatible APIs); each key goes to the secrets file as soon as its
 # provider is chosen. The providers and models are Hermes' own lists. A
@@ -115,11 +115,11 @@ model_chain() {
     | "$JQ" -r 'map("\(.name) (\(.provider))") | join(" → ")'
 }
 
-if grep -q 'fallbacks' "$local_nix" 2>/dev/null && keep "Models: $(model_chain) → the local model"; then
+if grep -q 'fallbacks' "$local_nix" 2>/dev/null && keep "Models: $(model_chain)"; then
   :
 else
-  note "The main model, then the ones Hermes falls back to, in order, when one fails;"
-  note "the local model (uzu) always comes last. A ChatGPT subscription logs in once the chain is chosen."
+  note "The main model, then the ones Hermes falls back to, in order, when one fails: only ones"
+  note "with funds or quota left. A ChatGPT subscription logs in once the chain is chosen."
   new_providers="$(nix eval --json "$flake.config.server.hermes.providers")"
   until choose_entry "Main model · its provider (type to search)" && [ -n "$pick_provider" ]; do :; done
   main="$("$JQ" -cn --arg p "$pick_provider" --arg n "$pick_model" '{provider: $p, name: $n}')"
@@ -128,7 +128,7 @@ else
   fallbacks="[]" n=1
   while :; do
     echo
-    choose_entry "Fallback $n, after $chain · its provider" "No other: then the local model" || continue
+    choose_entry "Fallback $n, after $chain · its provider" "No other fallback" || continue
     [ -n "$pick_provider" ] || break
     fallbacks="$("$JQ" -c --arg p "$pick_provider" --arg n "$pick_model" '. + [{provider: $p, model: $n}]' <<< "$fallbacks")"
     chain="$chain → $pick_model ($pick_label)"
@@ -137,7 +137,7 @@ else
   done
   set_host "$("$JQ" -cn --argjson m "$main" --argjson f "$fallbacks" --argjson p "$new_providers" \
     '{server: {hermes: {model: $m, fallbacks: $f, providers: $p}}}')"
-  ok "Models: $(model_chain) → the local model"
+  ok "Models: $(model_chain)"
 fi
 
 # Every provider of the chain has its key: asked above when the chain is
@@ -192,6 +192,70 @@ if nix eval --json "$flake.config.server.hermes" \
   else
     warn "Not logged in: Hermes falls back to the next model. Run this script again to retry."
   fi
+fi
+
+# ── The local model ─────────────────────────────────────────────────────────
+# One of the models pinned in pkgs/uzu-models.nix, served by uzu on this Mac's
+# GPU, or none (server.uzu). It screens the events and answers the sub-chats
+# that pin uzu:local; without it, nothing is screened and those run on the
+# main model. It may also be the last fallback (server.hermes.localFallback),
+# but the main chat's prompt takes it minutes a step. uzu runs on Apple
+# silicon only, and only the models that leave this Mac's memory room to work
+# are offered.
+
+mac_memory_gb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 ))
+apple_silicon="$(sysctl -n hw.optional.arm64 2>/dev/null || true)"
+local_summary() {
+  if [ "$(setting server.uzu.enable)" != 1 ]; then
+    echo "none"
+    return 0
+  fi
+  printf '%s' "$(setting server.uzu.model)"
+  if [ "$(setting server.hermes.localFallback)" = 1 ]; then printf ', also the last fallback'; fi
+  echo
+}
+
+echo
+if grep -q '^ *uzu = ' "$local_nix" 2>/dev/null && keep "Local model: $(local_summary)"; then
+  :
+else
+  none="None: no model on this Mac"
+  local_rows=""
+  if [ "$apple_silicon" = 1 ]; then
+    # label · weights · id, for what fits.
+    local_rows="$(nix eval --json "$flake.pkgs.uzu-models" --apply 'm: builtins.attrValues (builtins.mapAttrs
+      (id: v: { inherit id; inherit (v) label memoryGB minMemoryGB; }) (removeAttrs m [ "override" "overrideDerivation" ]))' \
+      | "$JQ" -r --argjson ram "$mac_memory_gb" \
+        'sort_by(-.memoryGB)[] | select(.minMemoryGB <= $ram) | "\(.label) · \(.memoryGB) GB on the GPU · \(.id)"' || true)"
+  fi
+  if [ -z "$local_rows" ]; then
+    warn "No local model fits this Mac (Apple silicon: ${apple_silicon:-no}, ${mac_memory_gb} GB of memory)."
+    choice="$none"
+  else
+    note "A model on this Mac's GPU (uzu) screens incoming messages before Hermes sees them, and"
+    note "answers the private sub-chats: free and private, but small and slow. Without one, nothing"
+    note "is screened (groups and bulk mail are dropped) and those sub-chats use the main model."
+    choice="$( { echo "$local_rows"; echo "$none"; } \
+      | gum choose --header "Local model (this Mac: ${mac_memory_gb} GB of memory)" || true)"
+    [ -n "$choice" ] || choice="$none"
+  fi
+  if [ "$choice" = "$none" ]; then
+    set_host '{"server":{"uzu":{"enable":false},"hermes":{"localFallback":false}}}'
+    case "$(setting server.hermes.memory.compactionModel)" in
+      uzu:*)
+        set_host '{"server":{"hermes":{"memory":{"compactionModel":null}}}}'
+        note "The summaries ran on the local model: they use the background model now."
+        ;;
+    esac
+  else
+    local_fallback=false
+    if ask --default=false "Also answer the main chat with it when every remote model fails? It takes minutes a step there."; then
+      local_fallback=true
+    fi
+    set_host "$("$JQ" -cn --arg m "${choice##* · }" --argjson f "$local_fallback" \
+      '{server: {uzu: {enable: true, model: $m}, hermes: {localFallback: $f}}}')"
+  fi
+  ok "Local model: $(local_summary)"
 fi
 
 

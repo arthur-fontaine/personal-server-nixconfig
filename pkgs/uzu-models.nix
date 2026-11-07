@@ -14,13 +14,13 @@
 # token anyway ("spec 1.00 tok/pass").
 { lib, fetchurl, runCommand }:
 let
-  model = { name, toolchain, repository, revision, files, encodings }:
+  model = { name, label, memoryGB, minMemoryGB, toolchain, repository, revision, files, encodings }:
     let
       base = "https://assets.trymirai.com/models/${toolchain}/${repository}/${revision}";
       fetched = lib.mapAttrs (file: sha256: fetchurl { url = "${base}/${file}"; inherit sha256; }) files;
     in
     # Links, not copies: the weights stay one store path of their own.
-    runCommand name { passthru = { inherit toolchain repository revision; }; } ''
+    runCommand name { passthru = { inherit label memoryGB minMemoryGB toolchain repository revision; }; } ''
       mkdir -p $out
       ${lib.concatStrings (lib.mapAttrsToList (file: src: "ln -s ${src} $out/${file}\n") fetched)}
       # The chat template the registry names (its model's "encodings"), which
@@ -31,6 +31,10 @@ in
 {
   "alibaba:qwen3.5:9b:mirai:mirai-m:4" = model {
     name = "uzu-qwen3.5-9b-mirai-m-4";
+    label = "Qwen 3.5 9B, 4-bit";
+    # The largest that leaves an M1 Pro with 16 GB room to work.
+    memoryGB = 5;
+    minMemoryGB = 16;
     toolchain = "0.17.0";
     repository = "trymirai-Qwen3.5-9B-M";
     revision = "b1b94b8c-5fc3-45cc-a68d-8fe302ffaf29";
