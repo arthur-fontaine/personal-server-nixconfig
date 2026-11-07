@@ -113,10 +113,13 @@ def _bot():
 
 
 def _gateway_loop() -> Optional[asyncio.AbstractEventLoop]:
+    # Never an import: outside the gateway it would load the whole gateway, and
+    # in it, before startup ends, gateway.run may still be importing on a thread
+    # that waits for us (lost_turns' docstring). Hermes reads it the same way
+    # (tools/cronjob_tools.py).
+    ref = getattr(sys.modules.get("gateway.run"), "_gateway_runner_ref", None)
     try:
-        from gateway.run import _gateway_runner_ref
-
-        runner = _gateway_runner_ref()
+        runner = ref() if callable(ref) else None
     except Exception:
         runner = None
     loop = getattr(runner, "_gateway_loop", None) or STATE.loop
