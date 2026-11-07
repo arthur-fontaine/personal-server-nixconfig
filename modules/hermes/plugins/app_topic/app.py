@@ -78,6 +78,7 @@ class App:
         self.delivery_mtime = 0.0
         self.started = False
         self.call_until = 0.0
+        self.last_models: dict[str, dict] = {}
 
     # ── persistence ──────────────────────────────────────────────────────
 
@@ -410,6 +411,65 @@ class App:
             logger.debug("app_topic: sub-chats unreadable", exc_info=True)
         return sorted(out, key=lambda s: s["topic_id"])
 
+    def build_controls(self) -> dict:
+        """Current values of what the app sets natively, and how to set them."""
+        owner = owner_id()
+        chain = list(self.config.get("chain") or [])
+        models = [{**c, "role": "main" if i == 0 else "fallback"} for i, c in enumerate(chain)]
+        if self.config.get("local_model"):
+            models.append({"provider": "uzu", "model": "local", "role": "local"})
+        current = {}
+        overrides = {}
+        ref = getattr(sys.modules.get("gateway.run"), "_gateway_runner_ref", None)
+        try:
+            runner = ref() if callable(ref) else None
+            overrides = dict(getattr(runner, "_session_model_overrides", None) or {})
+        except Exception:
+            overrides = {}
+        for key, value in overrides.items():
+            parts = str(key).split(":")
+            if len(parts) >= 5 and parts[2] == "telegram":
+                chat = self.topic_of(parts[4], parts[5] if len(parts) > 5 else "")
+                if chat is not None and isinstance(value, dict):
+                    current[str(chat)] = {"provider": value.get("provider"), "model": value.get("model")}
+        with self.lock:
+            last = dict(self.last_models)
+        mode = self.permission_mode()
+        return protocol.message(
+            "controls", updated_at=protocol.now_iso(),
+            permission_mode=mode,
+            model={"chain": models, "default": models[0] if models else None, "current": current, "last": last,
+                   "set_main": "/model {model} --provider {provider}",
+                   "set_subchat": "/sub set model {provider}:{model}"},
+            presets=self.config.get("presets") or [],
+            commands=[c for c in COMMANDS if c["id"] != "permissions" or mode is not None],
+            owner=owner)
+
+    def permission_mode(self) -> dict | None:
+        """guard's permission mode (hermes-tweaks' auto mode): its current
+        value, persisted by guard in ~/.hermes/guard/mode.json, set with
+        `/mode <value>`. None without it."""
+        guard = sys.modules.get("guard")
+        info = getattr(guard, "permission_mode_info", None)
+        if callable(info):
+            try:
+                out = info()
+                if isinstance(out, dict):
+                    return out
+            except Exception:
+                pass
+        read = getattr(guard, "permission_mode", None)
+        if not callable(read):
+            return None
+        try:
+            value = read()
+        except Exception:
+            return None
+        modes = list(getattr(guard, "PERMISSION_MODES", ("auto", "ask")))
+        return {"value": value, "set": "/mode {value}",
+                "options": [{"id": m, **PERMISSION_LABELS.get(m, {"label": m.capitalize(), "description": ""})}
+                            for m in modes]}
+
     def build_stats(self) -> dict:
         obj = protocol.message("stats", updated_at=protocol.now_iso(), machine=self.machine.snapshot(),
                                models=self.ledger.summary())
@@ -446,9 +506,10 @@ class App:
         mtime = path.stat().st_mtime if path.exists() else 0.0
         if "devices" not in self.desired or mtime != self.delivery_mtime:
             self.desired["devices"] = self.build_devices()
+        self.desired["controls"] = await asyncio.to_thread(self.build_controls)
         await self.sync_sprite()
         # state last: it names the other slots' ids.
-        for name in ("stats", "devices"):
+        for name in ("stats", "devices", "controls"):
             await self.put_slot(name, self.desired[name])
         self.desired["state"] = await asyncio.to_thread(self.build_state)
         if not await self.put_slot("state", self.desired["state"]):
@@ -652,6 +713,11 @@ class App:
         platform = getattr(getattr(source, "platform", None), "value", getattr(source, "platform", None))
         if platform != "telegram" or not self.is_app_topic(getattr(source, "chat_id", None),
                                                           getattr(source, "thread_id", None)):
+            if (getattr(event, "text", None) or "").startswith("/"):
+                # A command may change what `controls` shows (/mode, /model, /sub…): look again once handled.
+                timer = threading.Timer(3.0, self.dirty.set)
+                timer.daemon = True
+                timer.start()
             return None
         if str(getattr(source, "user_id", "")) != str(owner_id()):
             return {"action": "skip", "reason": "app-topic: not the owner"}
@@ -765,6 +831,9 @@ class App:
                          response_model=None, **kwargs) -> None:
         cost = estimate_cost(model, provider, base_url, usage)
         self.ledger.record(provider, model, usage=usage, cost=cost)
+        chat = self.status.chat_for(kwargs.get("session_id", ""))
+        with self.lock:
+            self.last_models[str(chat)] = {"provider": provider, "model": model, "at": protocol.now_iso()}
 
     def api_request_error(self, provider: str = "", model: str = "", **kwargs) -> None:
         self.ledger.record(provider, model, error=True)
@@ -841,6 +910,48 @@ class App:
 
         threading.Thread(target=run, daemon=True, name="app_topic-pet").start()
         return True
+
+
+# The commands the app offers natively (docs/app-protocol.md §2.4), chosen
+# among Hermes' ~70 and the plugins' for a single never-ending chat on a
+# server: no /new, /resume, /sessions (one chat), no /compress (unii), no
+# /yolo or /approvals (the permission mode replaces them), no /update or
+# /restart (Nix and server-rebuild own those).
+# insert: put the text in the composer for the owner to finish; send: send as is.
+# Labels and icons are the app's (the protocol's table), to keep the slot small.
+COMMANDS = [
+    {"id": "stop", "send": "/stop", "where": "any"},
+    {"id": "retry", "send": "/retry", "where": "any"},
+    {"id": "undo", "send": "/undo", "where": "any"},
+    {"id": "btw", "insert": "/btw ", "where": "any"},
+    {"id": "bg", "insert": "/bg ", "where": "any"},
+    {"id": "goal", "insert": "/goal ", "where": "any"},
+    {"id": "agents", "send": "/agents", "where": "any"},
+    {"id": "status", "send": "/status", "where": "any"},
+    {"id": "usage", "send": "/usage", "where": "any"},
+    {"id": "reasoning", "control": "picker", "send": "/reasoning {value}",
+     "options": ["low", "medium", "high"], "where": "any"},
+    {"id": "model", "control": "model", "where": "any"},
+    {"id": "permissions", "control": "permission_mode", "where": "any",
+     "icon": "lock.shield"},
+    {"id": "sub.new", "control": "subchat_form", "send": "/sub new {preset} {name}",
+     "where": "main"},
+    {"id": "sub.show", "send": "/sub", "where": "subchat"},
+    {"id": "sub.set", "insert": "/sub set ", "where": "subchat"},
+    {"id": "sub.lock", "send": "/sub lock", "where": "encrypted"},
+    {"id": "sub.end", "send": "/sub end", "where": "subchat",
+     "confirm": "The sub-chat and its memory are deleted."},
+    {"id": "pause", "send": "/pause", "where": "main",
+     "confirm": "Hermes stops starting new work until /pause off."},
+    {"id": "resume", "send": "/pause off", "where": "main"},
+]
+
+
+PERMISSION_LABELS = {
+    "auto": {"label": "Auto", "description": "Safe actions run; a reviewer judges the rest and blocks risky ones. "
+                                             "You are asked after repeated blocks."},
+    "ask": {"label": "Ask", "description": "Every action but reading asks you first."},
+}
 
 
 class RequestError(Exception):

@@ -39,6 +39,13 @@ lib.mkIf cfg.enable {
       chain = [ { inherit (server.hermes.model) provider; model = server.hermes.model.name; } ]
         ++ map (f: { inherit (f) provider model; }) server.hermes.fallbacks;
       delivery_cli = "hermes-app";
+      # For the app's model menu and sub-chat form.
+      local_model = server.uzu.enable;
+      presets = lib.mapAttrsToList (name: p: {
+        inherit name;
+        default = name == server.hermes.subchats.default;
+        inherit (p) memoryRead memoryWrite volume ttl encrypted model tools;
+      }) server.hermes.subchats.presets;
       pets.enable = images.provider != null;
       big_files.swisstransfer_token_env = cfg.swisstransferTokenEnv;
       apns = {

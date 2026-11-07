@@ -51,7 +51,7 @@ and the Bot API (https://core.telegram.org/bots/api).
 - **Identity.** Only the owner's messages count (the first id of
   `TELEGRAM_ALLOWED_USERS`; the DM has no one else).
 
-## 2. State: three slot messages, edited in place
+## 2. State: four slot messages, edited in place
 
 The bot keeps one message per slot in the App topic and edits it:
 
@@ -60,6 +60,7 @@ The bot keeps one message per slot in the App topic and edits it:
 | `state` | `agent`, `questions`, `pet`, `subchats`, `slots` | any of them changes (≤ 1 edit / 3 s) |
 | `stats` | machine and model usage | every 60 s, or on `stats.refresh` |
 | `devices` | where the app can be installed | `~/.hermes/app/delivery.json` changes |
+| `controls` | the native commands and the current values they set (§2.4) | a value changes |
 
 **Finding them.** No pin: in a private chat a pinned message shows on top of
 the whole DM in every Telegram client, so the bot does not pin. The app reads
@@ -210,6 +211,90 @@ be deleted.
 
 `delivery` is `null` when app delivery is not set up.
 
+### 2.4 `controls`: native commands
+
+```json
+{"v": 2, "type": "controls", "updated_at": "…",
+ "permission_mode": {"value": "auto", "set": "/mode {value}",
+                     "options": [{"id": "auto", "label": "Auto", "description": "…"},
+                                 {"id": "ask", "label": "Ask", "description": "…"}]},
+ "model": {
+   "chain": [{"provider": "opencode-go", "model": "deepseek-v4.1-flash", "role": "main"},
+             {"provider": "openai-codex", "model": "gpt-6-luna", "role": "fallback"},
+             {"provider": "uzu", "model": "local", "role": "local"}],
+   "default": {"provider": "opencode-go", "model": "deepseek-v4.1-flash", "role": "main"},
+   "current": {"0": {"provider": "openai-codex", "model": "gpt-6-luna"}},
+   "last": {"0": {"provider": "opencode-go", "model": "deepseek-v4.1-flash", "at": "…"}},
+   "set_main": "/model {model} --provider {provider}",
+   "set_subchat": "/sub set model {provider}:{model}"},
+ "presets": [{"name": "aside", "default": true, "memoryRead": true, "memoryWrite": false,
+              "volume": null, "tools": null, "ttl": "session", "encrypted": false, "model": null}, "…"],
+ "commands": [{"id": "stop", "send": "/stop", "where": "any"},
+              {"id": "btw", "insert": "/btw ", "where": "any"},
+              {"id": "reasoning", "control": "picker", "send": "/reasoning {value}",
+               "options": ["low", "medium", "high"], "where": "any"}, "…"]}
+```
+
+**How the app sets anything: it sends the slash command, as the owner, in the
+chat it applies to** (the main chat, or the sub-chat's topic). Hermes handles
+it as if typed and answers in that chat; the slot then shows the new value.
+No App-topic request: one path, the one Telegram already has.
+
+- `send`: send that text as is (fill `{value}`, `{model}`, `{provider}`,
+  `{preset}`, `{name}`); `insert`: put it in the composer for the owner to
+  finish. `confirm`: ask before sending, with that sentence.
+- `where`: `any`, `main` (the main chat only), `subchat` (a sub-chat topic),
+  `encrypted` (an encrypted sub-chat that is unlocked).
+- `control`: the native UI: `picker` (its `options`), `model` (the model
+  menu below), `permission_mode`, `subchat_form` (below).
+- **Model menu**: `chain` lists the models this server has (main, fallbacks,
+  the local one when there is one). `current[chat]` is a `/model` switch in
+  force for that chat (absent: `default`); `last[chat]` is what actually
+  answered last (a fallback shows here). In the main chat, set it with
+  `set_main` (for that chat's session, until changed again); in a sub-chat,
+  `set_subchat` pins it in the sub-chat's rules (`/sub set model`), and
+  `subchats[].` in `state` does not show it, `/sub` does.
+- **Permission mode** (the auto-review, `guard`): `auto` (Claude Code's auto
+  mode: safe actions run, a reviewer judges the rest and blocks risky ones;
+  the owner is asked after 3 blocks in a row or 20 in a session) or `ask`
+  (every action but reads asks the owner). Set with `/mode auto|ask`, at
+  once, kept across restarts (`server.hermes.permissions.defaultMode` is only
+  the first value). `null` when guard does not report it; `set: null` would
+  mean read-only.
+- **Sub-chat form** (`sub.new`, main chat only): a name and a preset from
+  `presets` (the `default` one first), then `/sub new <preset> <name>`. The
+  bot answers in the main chat and opens the topic; it appears in
+  `state.subchats`. Changing a rule later: `/sub set <key> <value>`
+  (keys as in `presets`), in the topic.
+
+The commands, with the app's labels (chosen among Hermes' ~70 and the
+plugins' for one never-ending chat on a server: no `/new`, `/resume`,
+`/sessions` — there is one chat; no `/compress` — unii's memory replaces it;
+no `/yolo`, `/approvals` — the permission mode replaces them; no `/update`,
+`/restart` — Nix and `server-rebuild` own those):
+
+| id | Label | Does |
+| --- | --- | --- |
+| `stop` | Stop background work | kills the background processes |
+| `retry` | Retry | re-sends the last message |
+| `undo` | Undo last turn | backs up one turn |
+| `btw` | Side question | asks about the conversation without interrupting the turn |
+| `bg` | Run in background | a prompt in a separate background session |
+| `goal` | Standing goal | Hermes works on it across turns until reached |
+| `agents` | Running tasks | the agents and tasks running |
+| `status` | Session status | model, tokens, context |
+| `usage` | Usage and limits | token usage and rate limits |
+| `reasoning` | Reasoning effort | low / medium / high |
+| `model` | Model | the model menu |
+| `permissions` | Permission mode | the permission picker (only when reported) |
+| `sub.new` | New sub-chat | the sub-chat form |
+| `sub.show` | Sub-chat rules | `/sub` in the topic |
+| `sub.set` | Change a rule | `/sub set …` in the topic |
+| `sub.lock` | Lock | forgets the sub-chat's key until `/sub unlock` |
+| `sub.end` | End sub-chat | deletes the topic and its memory (confirm) |
+| `pause` | Emergency stop | no new work until resumed (confirm) |
+| `resume` | Resume work | `/pause off` |
+
 ## 3. Notifications: `notify`
 
 For every bot message that may notify the owner, the bot posts a `notify` in
@@ -357,6 +442,8 @@ recognition and synthesis), and the call is ordinary messages of the chat:
 
 ## Changelog
 
+- v2, additive (2026-11-07, Arthur's addition): the `controls` slot (§2.4),
+  native commands and the values they set; `state.slots.controls`.
 - v2 (2026-11-07, Arthur's change): call mode goes through Telegram only.
   Removed: `call.start`, its URL, token and the server's WebSocket and
   STT/TTS. Added: the call turn, a message starting with `🎙 `, and the
