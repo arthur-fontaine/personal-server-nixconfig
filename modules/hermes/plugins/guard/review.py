@@ -118,11 +118,24 @@ class Verdict:
     risk: str = "unknown"
 
 
-def allowed(authorization: str, risk: str) -> bool:
+# The approval modes (server.hermes.approvalMode), as Claude Code's: "auto"
+# runs what the review clears and asks for the rest; "cautious" runs only what
+# cannot hurt; "ask" asks for every action but the read-only ones, without
+# calling the model.
+MODES = ("auto", "cautious", "ask")
+ASK_MODE = "ask mode: every action asks"
+
+
+def allowed(authorization: str, risk: str, mode: str = "auto") -> bool:
     """As Codex's policy.md: high risk needs the user's explicit ask, critical
     always asks. Anything low risk runs, since what cannot hurt needs no
     consent (a tool search, a click that navigates); bounded risk, asked for
-    in substance; high risk (a send), only the exact action the user asked."""
+    in substance; high risk (a send), only the exact action the user asked.
+    In cautious mode, only low risk runs."""
+    if mode == "ask":
+        return False
+    if mode == "cautious":
+        return risk == "low"
     if risk == "low":
         return True
     if risk == "medium":
@@ -132,7 +145,10 @@ def allowed(authorization: str, risk: str) -> bool:
     return False
 
 
-def review(config: systemone.Config | None, session: Session, tool: str, args: Mapping[str, Any]) -> Verdict:
+def review(config: systemone.Config | None, session: Session, tool: str, args: Mapping[str, Any],
+           mode: str = "auto") -> Verdict:
+    if mode == "ask":
+        return Verdict(False, ASK_MODE, "unknown")
     if config is None:
         return Verdict(False, NO_MODEL, "unknown")
     state = {
@@ -150,5 +166,5 @@ def review(config: systemone.Config | None, session: Session, tool: str, args: M
     except systemone.DecisionError as error:
         return Verdict(False, f"the auto-review could not decide ({error})", "unknown")
     authorization, risk = answers["authorization"].selected_id, answers["risk"].selected_id
-    reason = f"{risk} risk, {authorization} authorization"
-    return Verdict(allowed(authorization, risk), reason, risk)
+    reason = f"{risk} risk, {authorization} authorization" + (", cautious mode" if mode == "cautious" else "")
+    return Verdict(allowed(authorization, risk, mode), reason, risk)

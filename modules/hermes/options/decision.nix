@@ -43,6 +43,24 @@ let
   };
 in
 {
+  # Claude Code's permission modes, on guard's review (plugins/guard).
+  options.server.hermes.approvalMode = mkOption {
+    type = types.enum [ "auto" "cautious" "ask" ];
+    default = "auto";
+    description = ''
+      What Hermes does without asking you, beyond reading (files, searches,
+      screenshots), which never asks:
+      - auto: what the review model clears runs (low risk always, bounded
+        risk you asked for in substance, high risk only the exact action you
+        asked for); the rest asks you. As Claude Code's auto mode.
+      - cautious: only what the model rates low risk runs; anything with a
+        side effect asks you.
+      - ask: every action asks you, and no model is called.
+      Without a decision model (decision.approval off), auto and cautious ask
+      for everything too: the review fails closed.
+    '';
+  };
+
   options.server.hermes.decision = {
     computerUse = mkOption {
       type = model { model = "decision-models/baseten-elephant-9b-latest"; };

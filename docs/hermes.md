@@ -193,6 +193,13 @@ Hermes' question it answers. The review replaces computer_use's own question
 for each click or key (the `cua` server's clicks are reviewed like any tool),
 so one action asks at most once.
 
+How much runs without you is `server.hermes.approvalMode`, Claude Code's
+permission modes mapped onto this review (the bootstrap's Models section asks,
+once a review model is set): `auto`, the default, is the above; `cautious`
+runs only what the model rates low risk (a search, a click that navigates)
+and asks for anything with a side effect; `ask` asks for every action but the
+reads, without calling the model. Without a review model, every mode asks.
+
 As in Claude Code's auto mode, the reviewer sees your messages and Hermes'
 actions, never what the tools returned: a WhatsApp message, an email or a web
 page telling Hermes to act cannot argue with it. Only Telegram turns count as
