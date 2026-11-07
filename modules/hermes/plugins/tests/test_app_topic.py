@@ -364,13 +364,33 @@ def test_plugin() -> None:
     threading.Thread(target=loop.run_forever, daemon=True).start()
     bot = Bot()
     adapter = Adapter(bot)
-    plugin = app_mod.App(home, {"chain": [{"provider": "p", "model": "m"}], "delivery_cli": "/nonexistent/hermes-app"})
+    plugin = app_mod.App(home, {"chain": [{"provider": "p", "model": "m"}, {"provider": "q", "model": "n"}],
+                                "local_model": True, "delivery_cli": "/nonexistent/hermes-app",
+                                "presets": [{"name": "aside", "default": True, "ttl": "session"},
+                                            {"name": "secret", "default": False, "encrypted": True}]})
     plugin.loop = loop
     asyncio.run_coroutine_threadsafe(asyncio.sleep(0), loop).result()
     loop.call_soon_threadsafe(plugin.attach, PTBApp(bot), adapter)
 
     # The topic, its three slots, and the sprite.
-    wait_for(lambda: bot.in_topic("state") and bot.in_topic("stats") and bot.in_topic("devices"), "the slots")
+    wait_for(lambda: bot.in_topic("state") and bot.in_topic("stats") and bot.in_topic("devices")
+             and bot.in_topic("controls"), "the slots")
+    controls = bot.in_topic("controls")[-1][1]
+    assert protocol.fits(controls)
+    assert [m["role"] for m in controls["model"]["chain"]] == ["main", "fallback", "local"]
+    assert controls["model"]["default"] == {"provider": "p", "model": "m", "role": "main"}
+    assert controls["permission_mode"] is None and "permissions" not in [c["id"] for c in controls["commands"]]
+    assert next(c for c in controls["commands"] if c["id"] == "sub.new")["where"] == "main"
+    assert [p["name"] for p in controls["presets"]] == ["aside", "secret"]
+    # The permission mode, once its plugin reports it.
+    sys.modules["guard"] = types.SimpleNamespace(permission_mode=lambda: "auto", PERMISSION_MODES=("auto", "ask"))
+    plugin.changed()
+    wait_for(lambda: (bot.in_topic("controls")[-1][1]["permission_mode"] or {}).get("value") == "auto", "the mode")
+    assert "permissions" in [c["id"] for c in bot.in_topic("controls")[-1][1]["commands"]]
+    mode = bot.in_topic("controls")[-1][1]["permission_mode"]
+    assert mode["set"] == "/mode {value}" and [o["id"] for o in mode["options"]] == ["auto", "ask"]
+    assert mode["options"][1]["label"] == "Ask"
+    del sys.modules["guard"]
     assert bot.topics == 1 and plugin.saved["thread"] == 77
     assert all(kw.get("disable_notification") for name, kw in bot.calls if name == "send_message"
                and kw.get("message_thread_id") == 77)
@@ -455,10 +475,13 @@ def test_plugin() -> None:
     wait_for(lambda: not bot.in_topic("state")[-1][1]["questions"], "the question answered")
 
     # Usage hooks feed the stats slot.
-    plugin.post_api_request(provider="p", model="m", usage={"input_tokens": 10, "output_tokens": 2})
+    plugin.post_api_request(provider="q", model="n", usage={"input_tokens": 10, "output_tokens": 2}, session_id="s9")
+    plugin.changed()
+    wait_for(lambda: bot.in_topic("controls")[-1][1]["model"]["last"].get("0", {}).get("model") == "n",
+             "the last model of the main chat")
     plugin.dispatch(event('{"v":1,"type":"stats.refresh"}', mid="559"))
     wait_for(lambda: bot.in_topic("stats")[-1][1]["models"], "the usage in the stats")
-    assert bot.in_topic("stats")[-1][1]["models"][0]["role"] == "main"
+    assert bot.in_topic("stats")[-1][1]["models"][0]["role"] == "fallback"
 
     # A deleted slot message is posted again (the newest wins).
     state_id = plugin.saved["slots"]["state"]["id"]

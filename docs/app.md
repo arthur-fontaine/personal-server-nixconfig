@@ -18,7 +18,7 @@ It needs BotFather's Threaded Mode, as the sub-chats do.
 | Part | What it does | Where |
 | --- | --- | --- |
 | App topic | a topic named "App" of the DM, hidden by the app, carries JSON both ways; nothing posted there reaches the model | `app.py` |
-| State | three messages the bot edits: `state` (what Hermes is doing, the questions waiting for the owner, the pet, the sub-chats), `stats`, `devices` | `app.py`, `status.py`, `questions.py` |
+| State | four messages the bot edits: `state` (what Hermes is doing, the questions waiting for the owner, the pet, the sub-chats), `stats`, `devices`, `controls` (native commands and their current values) | `app.py`, `status.py`, `questions.py` |
 | Notifications | for each message that may notify, a `notify` with a short spoken version for Siri | `speech.py` |
 | Stats | model usage per provider and model, fallbacks apart, over 24 h / 7 d / 30 d; CPU, memory, storage, power, battery, uptime | `usage.py`, `machine.py` |
 | Pets | the pet's needs and level, `pet_generate`, its files for the app's build | `pet.py` |
@@ -36,6 +36,20 @@ The questions come from the cards themselves: every Hermes card with buttons
 `_send_control_message`, which the plugin wraps, and `owner_approval`
 reports its own. The app answers a question by pressing the card's button
 through Telegram, exactly as a tap would, so Hermes sees no difference.
+
+### Native commands
+
+The app offers a few of Hermes' commands natively, listed with their current
+values in the `controls` message: the permission mode (guard's `auto` or
+`ask`, `/mode`), the model (the chain this server has, the `/model` switch in
+force per chat, and what answered last), the reasoning effort, a form for a
+new sub-chat (a name and one of the presets), and buttons for `/stop`,
+`/retry`, `/undo`, `/btw`, `/bg`, `/goal`, `/agents`, `/status`, `/usage`,
+`/sub …` and `/pause`. The app sets a value by sending the command itself in
+the chat it applies to, so Hermes handles it as typed; the plugin looks again
+a few seconds after any command. Left out on purpose: one chat means no
+`/new`, `/resume` or `/sessions`; unii replaces `/compress`; the permission
+mode replaces `/yolo` and `/approvals`; Nix owns `/update` and `/restart`.
 
 ### Notifications read aloud
 
