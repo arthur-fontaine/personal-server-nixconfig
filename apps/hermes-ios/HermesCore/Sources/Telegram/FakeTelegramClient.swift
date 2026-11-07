@@ -21,11 +21,21 @@ public final class FakeTelegramClient: TelegramClient {
     private var model = "deepseek-v4.1-flash"
     private var sentLog: [String] = []
 
-    public init(startsLoggedIn: Bool = true, now: Date = .now) {
+    public init(startsLoggedIn: Bool = true, withQuestion: Bool = true, now: Date = .now) {
         (events, continuation) = AsyncStream.makeStream(bufferingPolicy: .unbounded)
         self.startsLoggedIn = startsLoggedIn
         store = Fixtures.messages(now: now)
         appState = Fixtures.state(now: now)
+        if !withQuestion {
+            appState.questions = []
+            appState.agent = AgentState(status: .idle)
+            var main = store[.main] ?? []
+            if let i = main.firstIndex(where: { $0.id == 1005 }) {
+                main[i].buttons = []
+                main[i].text = FormattedText(main[i].text.text + "\n\n✅ Allowed once")
+            }
+            store[.main] = main
+        }
     }
 
     /// What the app sent, for tests.

@@ -6,7 +6,6 @@ struct ChatView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.horizontalSizeClass) private var sizeClass
     let topic: TopicID
-    @State private var position = ScrollPosition(edge: .bottom)
     @State private var atBottom = true
     @State private var showInspector = false
     @FocusState private var composerFocused: Bool
@@ -42,7 +41,8 @@ struct ChatView: View {
 
     private var conversation: some View {
         let messages = store.messages(in: topic)
-        return ScrollView {
+        return ScrollViewReader { proxy in
+        ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
                 if !store.reachedStart.contains(topic), !messages.isEmpty {
                     ProgressView()
@@ -61,36 +61,37 @@ struct ChatView: View {
                 } else if store.typing.contains(topic) {
                     TypingDots().padding(.vertical, 6).id("typing")
                 }
+                Color.clear.frame(height: 1).id(Self.bottomID)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-            // A readable column on wide iPads instead of 1300 pt lines.
+            // A readable column on wide iPads instead of 1300 pt lines. (Not containerRelativeFrame:
+            // it ignores the safe area of iOS 26's floating sidebar.)
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
             .scrollTargetLayout()
         }
-        .scrollPosition($position)
         .defaultScrollAnchor(.bottom)
         .scrollDismissesKeyboard(.interactively)
         .onScrollGeometryChange(for: Bool.self) { geo in
-            geo.contentOffset.y + geo.containerSize.height >= geo.contentSize.height - 80
+            geo.visibleRect.maxY >= geo.contentSize.height - 80
         } action: { _, isAtBottom in
             atBottom = isAtBottom
         }
         .onChange(of: messages.last?.id) { old, _ in
             // Follow new messages only when already at the bottom, or when the owner just sent one.
             if atBottom || messages.last?.isOutgoing == true {
-                withAnimation(.smooth) { position.scrollTo(edge: .bottom) }
+                withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }
         }
         .onChange(of: store.drafts[topic]?.text.text) {
-            if atBottom { position.scrollTo(edge: .bottom) }
+            if atBottom { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 10) {
                 if !atBottom {
                     Button {
-                        withAnimation(.smooth) { position.scrollTo(edge: .bottom) }
+                        withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
                     } label: {
                         Label("Latest", systemImage: "arrow.down")
                             .font(.subheadline.weight(.semibold))
@@ -106,7 +107,10 @@ struct ChatView: View {
             .padding(.bottom, 8)
             .animation(.snappy, value: atBottom)
         }
+        }
     }
+
+    static let bottomID = "bottom"
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .principal) {

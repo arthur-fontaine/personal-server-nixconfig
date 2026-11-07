@@ -38,6 +38,7 @@ final class AppModel {
     var section: AppSection = .chat
     var selectedTopic: TopicID? = .main
     var showNewSubchat = false
+    var showCommands = false
     var callPresented = false
     /// Private sub-chats opened with Face ID this session; cleared when the app goes to the background.
     var unlockedTopics: Set<TopicID> = []
@@ -48,7 +49,7 @@ final class AppModel {
         config = AppConfig.fromBundle(deviceName: UIDevice.current.name)
         let client: any TelegramClient
         if config.demo {
-            client = FakeTelegramClient(startsLoggedIn: !arguments.contains("-demoLogin"))
+            client = FakeTelegramClient(startsLoggedIn: !arguments.contains("-demoLogin"), withQuestion: !arguments.contains("-noQuestion"))
         } else {
             client = TDLibTelegramClient(config: config)
         }
@@ -154,6 +155,7 @@ final class AppModel {
         if let t = value("-topic").flatMap(TopicID.init) { selectedTopic = t }
         if args.contains("-unlocked"), let t = selectedTopic { unlockedTopics.insert(t) }
         if args.contains("-newSubchat") { showNewSubchat = true }
+        if args.contains("-commands") { showCommands = true }
         if args.contains("-call") { callPresented = true }
     }
 }

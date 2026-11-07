@@ -15,7 +15,6 @@ struct Composer: View {
     @State private var photos: [PhotosPickerItem] = []
     @State private var sending = false
     @State private var lastTyping = Date.distantPast
-    @State private var showCommands = false
 
     var body: some View {
         GlassEffectContainer(spacing: 10) {
@@ -32,7 +31,7 @@ struct Composer: View {
                 }
                 HStack(alignment: .bottom, spacing: 10) {
                     Menu {
-                        Button { showCommands = true } label: { Label("Commands", systemImage: "command") }
+                        Button { model.showCommands = true } label: { Label("Commands", systemImage: "command") }
                         Divider()
                         Button { importing = true } label: { Label("File", systemImage: "doc") }
                         PhotosPicker(selection: $photos, maxSelectionCount: 10, matching: .any(of: [.images, .videos])) {
@@ -52,7 +51,7 @@ struct Composer: View {
                             .padding(.leading, 16)
                             .onChange(of: text) { old, new in
                                 // "/" on an empty composer opens the palette instead of Telegram's raw commands.
-                                if old.isEmpty, new == "/" { text = ""; showCommands = true }
+                                if old.isEmpty, new == "/" { text = ""; model.showCommands = true }
                                 typingPing()
                             }
                         Button(action: send) {
@@ -72,7 +71,7 @@ struct Composer: View {
                 }
             }
         }
-        .sheet(isPresented: $showCommands) {
+        .sheet(isPresented: Bindable(model).showCommands) {
             CommandPalette(topic: topic) { inserted in
                 text = inserted
                 focused.wrappedValue = true

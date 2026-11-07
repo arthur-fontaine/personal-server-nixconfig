@@ -68,6 +68,7 @@ targets:
         NSSupportsLiveActivitiesFrequentUpdates: true
         NSFaceIDUsageDescription: Hermes uses Face ID to open your private sub-chats.
         NSMicrophoneUsageDescription: Hermes uses the microphone in call mode, to talk with your agent.
+        NSSpeechRecognitionUsageDescription: Without the voice model, calls use Apple's speech recognition, on this device when it can, to turn what you say into messages for Hermes.
         NSPhotoLibraryUsageDescription: Hermes lets you send photos and videos to your agent.
         NSCameraUsageDescription: Hermes lets you send photos you take to your agent.
         NSUserActivityTypes: [INSendMessageIntent, INStartCallIntent]
@@ -141,6 +142,19 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).core.tests
         GENERATE_INFOPLIST_FILE: YES
+  HermesUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: HermesUITests
+    dependencies:
+      - target: HermesApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: HermesApp
+        SWIFT_VERSION: "5.0"
 schemes:
   HermesApp:
     build:
@@ -151,6 +165,6 @@ schemes:
       config: Debug
     test:
       config: Debug
-      targets: [HermesCoreTests]
+      targets: [HermesCoreTests, HermesUITests]
     archive:
       config: Release
