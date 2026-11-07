@@ -1,0 +1,4 @@
+name: cache_warm
+version: 1.0.0
+description: "Keeps the provider's prompt cache warm between the owner's turns: re-sends a chat's last request with max_tokens=1 while an answer is likely, on routes whose cache lasts minutes."
+author: "personal-server-nixconfig"

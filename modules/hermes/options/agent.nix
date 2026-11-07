@@ -162,6 +162,41 @@ in
       '';
     };
 
+    # Between the owner's turns, the provider's prompt cache kept warm
+    # (../plugins/cache_warm; docs/hermes.md, "Speed").
+    cacheWarming = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          After a turn of a Telegram chat on an OpenAI-style route, re-send its
+          last request with max_tokens=1 every `interval` seconds for `window`
+          seconds, until the chat's next request: its first step then starts
+          from a warm cache. Each ping costs the cached prefix (a tenth or less
+          of a cold one); logged with its usage in ~/.hermes/logs/cache-warm.jsonl.
+        '';
+      };
+      interval = mkOption {
+        type = types.ints.positive;
+        # Under the 5 minutes OpenAI-style caches keep a prefix at least.
+        default = 240;
+        description = "Seconds between two pings: under the provider's cache lifetime.";
+      };
+      window = mkOption {
+        type = types.ints.positive;
+        # Three pings: a reply within a quarter of an hour, when the owner is
+        # still on the conversation, is the one worth its first step warm.
+        default = 900;
+        description = "Seconds after a chat's last request during which it is kept warm.";
+      };
+      skipProviders = mkOption {
+        type = types.listOf types.str;
+        # DeepSeek's own API caches on disk for hours; uzu is this Mac.
+        default = [ "deepseek" "uzu" ];
+        description = "Providers (Hermes' ids) whose cache needs no warming.";
+      };
+    };
+
     # The main chat answers and dispatches (../plugins/front_desk): a turn
     # there holds every message the user sends behind it.
     frontDesk = {
