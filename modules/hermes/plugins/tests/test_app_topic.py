@@ -66,6 +66,7 @@ def test_speech() -> None:
     assert "a code block" in speech.spoken("Here:\n```\nls -la\n```")
     assert speech.spoken("[fichier: https://gofile.io/d/abc]").startswith("a file from gofile.io")
     assert len(speech.body("word " * 200)) <= speech.BODY_MAX
+    assert speech.spoken("Use file_a and file_b, *really*.") == "Use file_a and file_b, really."
     q = speech.question_spoken("clarify", "Which day?", None, ["Monday", "Tuesday", "Other"])
     assert q == "Hermes asks: Which day? Options: Monday, Tuesday."
 
@@ -250,6 +251,10 @@ class Adapter:
     def __init__(self, bot):
         self._bot = bot
 
+    @staticmethod
+    def _notification_kwargs(metadata):
+        return {"disable_notification": True} if (metadata or {}).get("silent") else {}
+
     async def send(self, chat_id, content, reply_to=None, metadata=None):
         msg = await self._bot.send_message(chat_id=chat_id, text=content)
         return types.SimpleNamespace(success=True, message_id=str(msg.message_id))
@@ -357,6 +362,7 @@ def test_plugin() -> None:
     assert notify["spoken"] == "Done. The build passed to a link to ci.example.com."
     asyncio.run_coroutine_threadsafe(
         adapter.edit_message(str(OWNER), str(notify["message_id"]), "edited"), loop).result()
+    asyncio.run_coroutine_threadsafe(adapter.send(str(OWNER), "A quiet notice", metadata={"silent": True}), loop).result()
     time.sleep(0.5)
     assert len(bot.in_topic("notify")) == 1
 

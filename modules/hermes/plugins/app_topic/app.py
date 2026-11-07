@@ -154,11 +154,19 @@ class App:
             return
         plugin = self
 
+        def silent(metadata) -> bool:
+            # Hermes' own rule ("important" mode: only what it flags notifies), so
+            # the app announces what Telegram itself would ring for.
+            try:
+                return bool(adapter._notification_kwargs(metadata if isinstance(metadata, dict) else None))
+            except Exception:
+                return False
+
         async def wrapped_send(chat_id, content, reply_to=None, metadata=None, *args, **kwargs):
             result = await send(chat_id, content, reply_to, metadata, *args, **kwargs)
             try:
                 plugin.on_sent(chat_id, metadata, getattr(result, "message_id", None), content,
-                               final=False, ok=getattr(result, "success", False))
+                               final=False, ok=getattr(result, "success", False), silent=silent(metadata))
             except Exception:
                 logger.debug("app_topic: on_sent failed", exc_info=True)
             return result
@@ -168,7 +176,7 @@ class App:
             try:
                 target = getattr(result, "message_id", None) or message_id
                 plugin.on_sent(chat_id, metadata, target, content, final=finalize, ok=getattr(result, "success", False),
-                               edited=True)
+                               edited=True, silent=not finalize or silent(metadata))
             except Exception:
                 logger.debug("app_topic: on_edit failed", exc_info=True)
             return result
@@ -560,7 +568,8 @@ class App:
 
     # ── notifications ────────────────────────────────────────────────────
 
-    def on_sent(self, chat_id, metadata, message_id, content, *, final: bool, ok: bool, edited: bool = False) -> None:
+    def on_sent(self, chat_id, metadata, message_id, content, *, final: bool, ok: bool, edited: bool = False,
+                silent: bool = False) -> None:
         if not ok or not message_id or not content:
             return
         thread = (metadata or {}).get("thread_id") if isinstance(metadata, dict) else None
@@ -577,7 +586,7 @@ class App:
             entry = self.pending_notify.get(key)
             if entry is None:
                 # Telegram notified once, at the first send: a later edit is not a new notification.
-                if int(message_id) in self.saved.get("notified", []):
+                if silent or int(message_id) in self.saved.get("notified", []):
                     return
                 entry = {"chat": topic, "message_id": int(message_id)}
                 self.pending_notify[key] = entry
