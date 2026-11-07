@@ -326,6 +326,18 @@ messages queued behind it then run in order, and the stopped one is not re-run
 (`ExitTimeOut`; its default of 20 s killed it first), and the rebuild waits for
 the old gateway to be gone before it starts the new one.
 
+A rebuild is not what paused the chat on 2026-11-06, though. A heavy build
+Hermes ran from the chat (a Metal shader compile) saturated the machine. The
+gateway was a `Background` launchd process, as upstream ships it, so it was
+limited to the efficiency cores at priority 4, and so was every command it
+ran. Its event loop starved, Telegram timed out, and its loop watchdog killed
+it some 25 minutes later. The next start, starved the same way, took 15 minutes.
+Now the gateway runs `Interactive`, as an app does, and every command Hermes
+runs (`bash -c`, and `$SHELL -lic` for a background process) starts under
+`taskpolicy -c utility` (`modules/hermes/agent/tools.nix`). The children
+inherit that, so on a busy machine the gateway is served first, while an idle
+one still runs commands at full speed.
+
 A turn that was killed rather than stopped (a crash, a power loss, a stop that
 overran the 60 s) is one Hermes cannot tell finished or not: it marks it
 `unknown`. Upstream then pauses the chat behind it until you send `/discard`

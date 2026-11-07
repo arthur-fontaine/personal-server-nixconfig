@@ -28,6 +28,28 @@ let
     gnugrep
     findutils
   ];
+
+  # Every command Hermes runs starts through one of these: the terminal
+  # tool's `bash -c` (the first bash on PATH: tools/environments/local.py,
+  # _find_bash) and a background process's `$SHELL -lic` (_find_shell). The
+  # utility QoS clamp, inherited by all its children (taskpolicy(8)), ranks
+  # them below the gateway (priority 20 against 31) without leaving the
+  # performance cores: an idle machine runs them at full speed, a busy one
+  # serves the gateway first. A Metal or Xcode build talks to its compiler
+  # services over XPC, which carries the clamp along where nice would not.
+  clamped = name: shell: pkgs.writeTextFile {
+    name = "hermes-${name}-utility";
+    destination = "/bin/${name}";
+    executable = true;
+    text = ''
+      #!/bin/sh
+      exec /usr/sbin/taskpolicy -c utility ${shell} "$@"
+    '';
+  };
+  commandBash = clamped "bash" "${pkgs.bash}/bin/bash";
+  # The account's login shell (../system/user.nix), which launchd gives
+  # its jobs as SHELL.
+  loginShell = clamped "zsh" "${pkgs.zsh}/bin/zsh";
 in
 {
   services.hermes-agent.extraPackages = tools;
@@ -42,13 +64,22 @@ in
   # The gateway's PATH, which every terminal command inherits: the tools above,
   # then what the agent installed into its profile, then the system's.
   launchd.agents.hermes-agent.config.EnvironmentVariables.PATH = lib.mkForce (lib.concatStringsSep ":" [
-    (lib.makeBinPath ([ config.services.hermes-agent.package pkgs.bash ] ++ tools))
+    (lib.makeBinPath ([ commandBash config.services.hermes-agent.package pkgs.bash ] ++ tools))
     "${home}/.nix-profile/bin"
     "/etc/profiles/per-user/${server.hermes.user}/bin"
     "/run/current-system/sw/bin"
     "/nix/var/nix/profiles/default/bin"
     "/usr/bin:/bin:/usr/sbin:/sbin"
   ]);
+  launchd.agents.hermes-agent.config.EnvironmentVariables.SHELL = "${loginShell}/bin/zsh";
+
+  # Upstream's agent is a Background process (nix/homeManagerModules.nix):
+  # throttled to the efficiency cores at priority 4, as was everything it
+  # ran. On 2026-11-06 a shader build from the chat saturated them, the
+  # gateway's loop starved until its watchdog killed it, and the next start
+  # took 15 minutes (3.6 s of CPU in 300 s). The gateway answers the user: it
+  # runs as an app does, and its commands get the clamp above.
+  launchd.agents.hermes-agent.config.ProcessType = lib.mkForce "Interactive";
 
   programs.git = {
     enable = true;
