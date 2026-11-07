@@ -11,18 +11,40 @@ stuck chat: the turn settles ``interrupted`` like /discard (never replayed),
 with a notice in the transcript so Hermes knows it was cut off, and what was
 queued behind it runs.
 
-Two places, so the pause is never seen:
+Plugins load long before there is anything to settle. ``hermes gateway``
+starts plugin discovery on a background thread first thing
+(hermes_cli/main.py, start_background_plugin_discovery), while the main thread
+imports gateway.run; that import's config bridge waits for the discovery to
+finish when config.yaml has an ``auxiliary`` section (gateway/run.py,
+_bridge_auxiliary_config_to_env). So register() must not import gateway.run
+(its module lock is held by a thread that waits for us: the load times out,
+plugins.load_timeout_seconds, and Hermes drops every hook we registered), and
+there is no runner yet anyway. register() returns at once and leaves the
+boot to a thread that reads the runner from sys.modules, as Hermes' own tools
+do (tools/cronjob_tools.py).
 
-- At load, in ``GatewayRunner.start()``: the authority has already recovered
-  the lost turns, but Telegram is not connected and no native session is live
-  or drained yet (gateway/run_runtime.py, recover_gateway_native_sessions
-  runs later). The turn settles in the store, the way Hermes settles an
-  automation turn at boot (settle_recovered_unattended), and the startup
-  recovery then drains what was queued.
-- Before each of the owner's messages (``pre_gateway_dispatch``, awaited on
-  the gateway's loop before admission): a turn lost while the gateway stayed
-  up (a lost worker) settles through the owner's own resolution
-  (SessionAuthority.resolve_unknown_as_owner, the call /discard makes).
+Then, at the pinned revision: GatewayRunner() publishes _gateway_runner_ref;
+initialize_session_authority fences the lost turns ``unknown`` and publishes
+runner.session_authority; start() sets runner._gateway_loop, connects
+Telegram, and only then recover_gateway_native_sessions mounts and drains the
+sessions with queued input (gateway/run_bootstrap.py, run_startup.py,
+run_runtime.py). Two places settle the owner's turn:
+
+- At boot, on the gateway's loop as soon as it has one: the turn settles in
+  the store, the way Hermes settles an automation turn
+  (settle_recovered_unattended), and the startup recovery drains what was
+  queued. If the recovery mounted the session first (it leaves it paused on
+  the unknown head, silently), the turn settles through the owner's own
+  resolution (SessionAuthority.resolve_unknown_as_owner, the call /discard
+  makes), which drains the queue.
+- Before each of the owner's messages (``pre_gateway_dispatch``, awaited
+  without a timeout on the gateway's loop, before admission:
+  gateway/run_inbound.py): a turn lost while the gateway stayed up (a lost
+  worker), or one the boot has not reached yet, settles the same way.
+
+The pause notice is only ever the reply to a new message admitted onto the
+unknown head (gateway/session_ingress.py, admit_message): with the hook in
+front of every admission, the owner never gets it, however late the boot.
 
 The messages the user steered into the lost turn (busy_input_mode steer,
 agent/telegram.nix) are not queued: the recovery settles them with it,
@@ -43,6 +65,9 @@ import asyncio
 import json
 import logging
 import os
+import sys
+import threading
+import time
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -59,7 +84,8 @@ CONTINUE = (
 )
 STEERED = "While it ran, you also sent these messages, which that turn may not have seen:"
 QUOTE = 1000  # characters of each steered message the notice keeps
-READY_WAIT = 900.0  # seconds a boot waits for the gateway before giving up the continuation
+READY_WAIT = 900.0  # seconds a boot waits for the gateway before giving up
+POLL = 0.05  # the boot's settlement window is seconds wide (Telegram connects in it)
 
 
 def owner_id() -> Optional[str]:
@@ -141,7 +167,7 @@ def _settle_in_store(db, epoch: int, row: dict, text: str = NOTICE) -> None:
 
 
 async def settle(authority, owner: Optional[str] = None) -> list[str]:
-    """Settle the owner's lost turns; returns the sessions that have nothing left to run."""
+    """Settle the owner's lost turns; returns the sessions settled."""
     from gateway.session_contract import SessionRef
     from hermes_state_runtime import RuntimeStoreError
     owner = owner if owner is not None else owner_id()
@@ -162,17 +188,16 @@ async def settle(authority, owner: Optional[str] = None) -> list[str]:
         logger.info("lost_turns: the owner's turn %s on %s settled interrupted (not replayed)",
                     row["admission_id"], session_id)
         settled.append(session_id)
-    idle = []
-    for session_id in dict.fromkeys(settled):
-        if not await asyncio.to_thread(has_queued, authority.db, session_id):
-            idle.append(session_id)
-    return idle
+    return list(dict.fromkeys(settled))
 
 
 def _runner():
+    """The live GatewayRunner, never importing gateway.run: in the gateway it is
+    still being imported while plugins load (see the module docstring); in any
+    other process there is none."""
+    ref = getattr(sys.modules.get("gateway.run"), "_gateway_runner_ref", None)
     try:
-        from gateway.run import _gateway_runner_ref
-        return _gateway_runner_ref() if _gateway_runner_ref else None
+        return ref() if callable(ref) else None
     except Exception:
         return None
 
@@ -186,19 +211,30 @@ async def _poll(predicate, timeout: float, step: float = 1.0) -> bool:
     return True
 
 
+def _ready(runner) -> bool:
+    return (getattr(runner, "session_runtime_descriptor", None) or {}).get("state") == "ready"
+
+
 async def at_boot(ctx, runner, ready_wait: float = READY_WAIT) -> None:
-    if not await _poll(lambda: getattr(runner, "session_authority", None) is not None, ready_wait):
+    # Once per gateway: a plugin reload registers again.
+    if getattr(runner, "_lost_turns_booted", False):
         return
+    runner._lost_turns_booted = True
     authority = runner.session_authority
-    idle = await settle(authority)
-    if not idle:
+    settled = await settle(authority)
+    if not settled:
         return
-    # The continuation is a message in the owner's chat: only once Telegram
-    # is connected and the startup recovery ran.
-    descriptor = lambda: getattr(runner, "session_runtime_descriptor", None) or {}
-    if not await _poll(lambda: descriptor().get("state") == "ready", ready_wait):
+    idle = [sid for sid in settled if not await asyncio.to_thread(has_queued, authority.db, sid)]
+    # Ready comes after the startup recovery, and after Telegram connected.
+    if not await _poll(lambda: _ready(runner), ready_wait):
         logger.warning("lost_turns: the gateway never got ready; no continuation")
         return
+    # The recovery may have read the head as unknown before the settlement
+    # committed and mounted the session paused: wake it (a no-op while its
+    # drain runs, or for a session not live).
+    for session_id in settled:
+        authority.wake_after_worker(session_id)
+    # The continuation is a message in the owner's chat.
     owner = owner_id()
     for session_id in idle:
         # The user wrote in the meantime: their message runs, after the notice.
@@ -231,22 +267,31 @@ async def before_dispatch(event=None, gateway=None, **_) -> None:
     return None
 
 
-_TASKS: set = set()
+def _boot_ready(runner) -> Optional[asyncio.AbstractEventLoop]:
+    loop = getattr(runner, "_gateway_loop", None)
+    if getattr(runner, "session_authority", None) is None or loop is None or loop.is_closed():
+        return None
+    return loop
+
+
+def watch_boot(ctx, wait: float = READY_WAIT, step: float = POLL) -> bool:
+    """Wait for the runner, its fenced authority and its loop, then settle there.
+    False when none came (the CLI, cron or a tool's process: no chat to settle)."""
+    deadline = time.monotonic() + wait
+    while time.monotonic() < deadline:
+        runner = _runner()
+        loop = _boot_ready(runner) if runner is not None else None
+        if loop is not None:
+            future = asyncio.run_coroutine_threadsafe(at_boot(ctx, runner), loop)
+            future.add_done_callback(lambda f: f.cancelled() or not f.exception() or logger.warning(
+                "lost_turns: boot settlement failed: %r", f.exception()))
+            return True
+        time.sleep(step)
+    return False
 
 
 def register(ctx) -> None:
+    # Returns at once: Hermes runs register() under a deadline, beside a main
+    # thread that is still importing gateway.run.
     ctx.register_hook("pre_gateway_dispatch", before_dispatch)
-    runner = _runner()
-    if runner is None:
-        return  # the CLI, cron or a tool's process: no chat to settle
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = getattr(runner, "_gateway_loop", None)
-    if loop is None or loop.is_closed():
-        return
-    future = asyncio.run_coroutine_threadsafe(at_boot(ctx, runner), loop)
-    _TASKS.add(future)
-    future.add_done_callback(_TASKS.discard)
-    future.add_done_callback(lambda f: f.cancelled() or not f.exception() or logger.warning(
-        "lost_turns: boot settlement failed: %r", f.exception()))
+    threading.Thread(target=watch_boot, args=(ctx,), name="lost_turns-boot", daemon=True).start()
