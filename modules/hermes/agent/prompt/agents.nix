@@ -193,7 +193,7 @@ in
 
   Set up here: this Telegram chat and its sub-chats, the terminal and files of
   this Mac, fsearch and DigUp, the MCP servers ${lib.concatMapStringsSep ", " (n: "`${n}`") mcpServers},
-  computer use (once its macOS permissions are granted), the local model (uzu),
+  computer use (once its macOS permissions are granted),${lib.optionalString server.uzu.enable " the local model (uzu),"}
   cron jobs that report here, and the skills you write yourself. Skills for
   services with no account here are turned off; any other service is not set
   up until you have checked.
@@ -221,7 +221,8 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
   ])}${lib.optionalString server.hermes.events.enable (lib.concatMapStrings (line: "\n  ${line}") [
     "The user's incoming messages and notifications (WhatsApp, iMessage,"
     "Instagram, Discord, mail, calendar, calls, their home) are watched for you:"
-    "the events daemon screens each with the local model, and only what may need"
+    (if server.uzu.enable then "the events daemon screens each with the local model, and only what may need"
+    else "the events daemon drops groups' messages and bulk mail (no local model screens the rest), and what may need")
     "the user reaches this chat, as a proposal. Everything it saw, proposed or"
     "not, from the last two days, is in"
     "`${server.hermes.home}/.local/state/hermes-events/recent.jsonl` (one JSON a"
@@ -294,7 +295,7 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
      the message holding the passphrase is deleted, and the plain transcript is
      dropped after each turn. Telegram itself still holds its copy of the chat
      (bots never get end-to-end encryption), and the model provider sees each
-     turn unless the sub-chat runs on `uzu:local`, the model on this Mac.
+     turn${if server.uzu.enable then " unless the sub-chat runs on `uzu:local`, the model on this Mac" else " (this Mac has no local model)"}.
 
   ## Roleplay and fiction
 
@@ -315,9 +316,7 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
 
   ## Models
 
-  You run on ${model.name} (${model.provider})${lib.optionalString (fallbacks != [ ]) ". When it fails, a turn goes on with ${lib.concatMapStringsSep ", then " (f: "${f.model} (${f.provider})") fallbacks}"}. The sub-chats that pin `uzu:local`
-  answer with a model running on this Mac's GPU (uzu, OpenAI-compatible at
-  http://127.0.0.1:${toString server.uzu.port}/v1): private and free, but small and slow.
+  You run on ${model.name} (${model.provider})${lib.optionalString (fallbacks != [ ]) ". When it fails, a turn goes on with ${lib.concatMapStringsSep ", then " (f: "${f.model} (${f.provider})") fallbacks}"}.${lib.optionalString server.uzu.enable " The sub-chats that pin `uzu:local`\n  answer with a model running on this Mac's GPU (uzu, OpenAI-compatible at\n  http://127.0.0.1:${toString server.uzu.port}/v1): private and free, but small and slow."}
   The chain is `server.hermes.model` and `server.hermes.fallbacks` in the
   repository; an OpenAI-compatible API Hermes has no provider for is
   `server.hermes.providers.<name> = { url; keyEnv; }`, its key in the secrets

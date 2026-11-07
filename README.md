@@ -17,7 +17,7 @@ The layout follows [arthur-fontaine/nixconfig](https://github.com/arthur-fontain
   with the bot, each with its own rules for memory access, shared memory
   volumes, tools, expiry, encryption and model.
 - **Hermes writes first**: a message, a notification or a change at home that
-  may call for you is screened by the local model, looked into (your calendar,
+  may call for you is screened by the local model if any, looked into (your calendar,
   the place), and turned into a proposal in the main chat
   ([`docs/events.md`](./docs/events.md)).
 - **Access rules enforced by macOS**: it reads anything, writes only what it
@@ -31,8 +31,9 @@ The layout follows [arthur-fontaine/nixconfig](https://github.com/arthur-fontain
 - **Tools**: computer use (Accessibility + Screen Recording), its own always-open
   Chrome, fsearch (files by name), DigUp (files by content), and any software
   through Nix.
-- **uzu**: Qwen 3.5 9B on the GPU: the last fallback, the events' screening,
-  and private or temporary sub-chats.
+- **uzu**, if you want a local model: Qwen 3.5 9B on the GPU, for the events'
+  screening and private or temporary sub-chats (and the last fallback, if you
+  ask for it).
 - **A server Mac**: SSH with keys only, never sleeps, restarts itself, the
   display awake but unlit, Spotlight, Bluetooth and Siri off, Low Power Mode,
   the local network reachable without macOS' permission dialogs.

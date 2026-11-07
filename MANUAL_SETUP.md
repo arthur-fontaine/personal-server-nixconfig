@@ -48,7 +48,7 @@ reach over SSH) does not get in the way.
 | Discord (at Hermes' login) *(integration)* | points you to the Discord tab Hermes' events keep open in its Chrome, until that tab is on discord.com/channels (Chrome's DevTools list) | log in (the phone app's QR code is easiest), allow notifications |
 | HomeKit (at Hermes' login) *(integration)* | installs HomeClaw from the App Store with `mas` (or opens its page), starts it, turns on its HTTP MCP endpoint and checks it answers, then points its webhook at Hermes' events daemon | allow it your home data; in its Settings → Webhook, choose the accessories it reports |
 | Start | restarts Hermes, or the first time reboots, so macOS logs Hermes in and starts it | |
-| Check (a run once Hermes is logged in) | asks uzu a question and the events' screening question on a test invitation (waiting for it to load), then offers to send a fake WhatsApp message through the events chain ([docs/events.md](docs/events.md)) | see the proposal arrive in Telegram |
+| Check (a run once Hermes is logged in) | if there is a local model, asks uzu a question and the events' screening question on a test invitation (waiting for it to load); then offers to send a fake WhatsApp message through the events chain ([docs/events.md](docs/events.md)) | see the proposal arrive in Telegram |
 
 macOS reserves those clicks for a person: no script can grant them.
 

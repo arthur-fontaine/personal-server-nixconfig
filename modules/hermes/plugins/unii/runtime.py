@@ -115,6 +115,9 @@ class Runtime:
         if not policy.model:
             return None
         provider, _, model = policy.model.partition(":")
+        if provider == "uzu" and not self.uzu_model:
+            # Pinned before the local model was turned off: the main model.
+            return None
         if provider == "uzu" and model in ("", "local"):
             model = self.uzu_model
         return {"provider": provider, "model": model}

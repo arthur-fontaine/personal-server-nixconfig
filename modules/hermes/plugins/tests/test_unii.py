@@ -321,6 +321,17 @@ class HooksTest(Temp):
 
         self.assertIn("main chat", SubCommand(rt).run("", P.Chat("whatsapp", "dm", "336")))
 
+    def test_without_a_local_model_uzu_is_refused_and_an_old_pin_is_the_main_model(self):
+        rt = Runtime(self.root, {**CONFIG, "uzu_model": ""}, fake_complete)
+        rt.session_store = FakeStore([GROUP_KEY])
+        chat = P.Chat("whatsapp", "group", "g3@g.us")
+        UniiEngine(rt).on_session_start("g", platform="whatsapp", conversation_id=GROUP_KEY)
+        self.assertIn("no local model", SubCommand(rt).run("set model uzu:local", chat))
+        self.assertIsNone(rt.policies.policy(chat).model)
+        # A preset (or a policy saved earlier) that still pins it runs on the main model.
+        SubCommand(rt).run("preset temp", chat)
+        self.assertIsNone(rt.session_store.overrides.get(GROUP_KEY))
+
 
 class TelegramTopicTest(Temp):
     def test_a_dm_topic_is_a_sub_chat_with_its_own_model(self):

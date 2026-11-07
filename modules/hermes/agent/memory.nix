@@ -24,7 +24,8 @@ in
       summary_wait_seconds = cfg.memory.summaryWait;
       compaction_workers = cfg.memory.compactionWorkers;
       compaction_model = compactionModel;
-      uzu_model = server.uzu.model;
+      # Empty without a local model: unii then refuses `/sub set model uzu:local`.
+      uzu_model = lib.optionalString server.uzu.enable server.uzu.model;
       volumes = cfg.memory.volumes;
       presets = cfg.subchats.presets;
       default_preset = cfg.subchats.default;

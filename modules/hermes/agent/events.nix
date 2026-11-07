@@ -1,7 +1,8 @@
 # Hermes writes first, when something happens (docs/events.md). The daemon
-# (../events, hermes_events) screens incoming messages with the local model
-# and posts what may call for the user to Hermes' webhook route below, whose
-# run looks things up and proposes actions in the main chat. That run reads
+# (../events, hermes_events) screens incoming messages with the local model,
+# when there is one, and posts what may call for the user to Hermes' webhook
+# route below, whose run looks things up and proposes actions in the main
+# chat. That run reads
 # other people's words, so it gets read-only tools only: it proposes, and the
 # user's answer in the main chat, which has every tool, acts.
 { config, lib, pkgs, server, ... }:
@@ -27,7 +28,9 @@ let
     state_dir = "${server.hermes.home}/.local/state/hermes-events";
     hermes_url = "http://127.0.0.1:${toString cfg.webhookPort}/webhooks";
     listen = { host = "127.0.0.1"; port = cfg.port; };
-    triage = {
+    # Without a local model, nothing is screened: other people's messages are
+    # not sent to a remote model just to be sorted (triage.py, NoTriage).
+    triage = if !server.uzu.enable then null else {
       url = "http://127.0.0.1:${toString server.uzu.port}/v1/chat/completions";
       model = server.uzu.model;
       # ~6 s for a message alone on the server; its conversation adds a few
@@ -81,6 +84,7 @@ let
         every = minutes 5;
         services = {
           "Hermes" = "http://127.0.0.1:${toString cfg.webhookPort}/health";
+        } // lib.optionalAttrs server.uzu.enable {
           "uzu, the local model" = "http://127.0.0.1:${toString server.uzu.port}/v1/models";
         };
       };
@@ -97,11 +101,6 @@ let
   ];
 in
 lib.mkIf cfg.enable {
-  assertions = [{
-    assertion = server.uzu.enable;
-    message = "server.hermes.events screens with the local model: it needs server.uzu.enable.";
-  }];
-
   # Under the launcher: imsg reads Messages' database (Full Disk Access).
   launchd.agents.hermes-events = {
     enable = true;

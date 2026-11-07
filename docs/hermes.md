@@ -63,6 +63,10 @@ once with `/sub preset <name>`:
 | `secret` | secrets: no main memory either way, the encrypted `vault` volume, the local model, file and terminal tools only |
 | `temp` | a throwaway chat on the local model, no tools, gone an hour after its last message |
 
+Without a local model (`server.uzu.enable = false`), `secret` and `temp` run on
+the main model, whose provider then reads them, and `/sub set model uzu:local`
+is refused; a preset or `compactionModel` that names `uzu:` fails the build.
+
 Volumes are declared in `server.hermes.memory.volumes`; `encrypted = true`
 there makes every sub-chat using the volume encrypted.
 

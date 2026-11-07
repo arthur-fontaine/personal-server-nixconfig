@@ -18,7 +18,7 @@ from .browser import Instagram, instagram_watch
 from .history import History
 from .homeassistant import homeassistant_watch
 from .sources import imessage_watch, whatsapp_app
-from .triage import UzuTriage
+from .triage import NoTriage, UzuTriage
 
 
 def read_env_file(path: str) -> dict[str, str]:
@@ -43,7 +43,7 @@ async def main(config: dict) -> None:
     instagram = Instagram(tails_path=os.path.join(config["state_dir"], "instagram-tails.json")) if on("instagram") else None
     history = config.get("history", {})
     pipeline = Pipeline(
-        triage=UzuTriage(config["triage"]["url"], config["triage"]["model"], config["triage"]["timeout"]),
+        triage=UzuTriage(triage["url"], triage["model"], triage["timeout"]) if (triage := config.get("triage")) else NoTriage(),
         sink=HermesSink(config["hermes_url"], secret, owner),
         seen=Seen(os.path.join(config["state_dir"], "seen.json")),
         batch_seconds=config["batch_seconds"],

@@ -32,7 +32,10 @@ if gui_session && [ "$(setting server.uzu.enable)" = 1 ]; then
   else
     warn "uzu does not answer at $uzu_url: see $agent_home/Library/Logs/uzu.log"
   fi
+fi
 
+# Without a local model too: the daemon then passes a direct message unscreened.
+if gui_session; then
   events_port="$(setting server.hermes.events.port)"
   webhook_health="http://127.0.0.1:$(setting server.hermes.events.webhookPort)/health"
   # The gateway was just restarted (Start, above): give it a minute.

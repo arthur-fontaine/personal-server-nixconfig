@@ -1,7 +1,8 @@
 # The main model, its fallbacks in order (Hermes' fallback_providers:
 # https://hermes-agent.nousresearch.com/docs/user-guide/features/fallback-providers),
-# and the on-device uzu server: the last fallback, and the provider of the
-# sub-chats that pin it (`model = "uzu:local"`).
+# and the on-device uzu server when this Mac has one (server.uzu.enable): the
+# provider of the sub-chats that pin it (`model = "uzu:local"`), and the last
+# fallback if localFallback says so.
 { lib, server, ... }:
 let
   cfg = server.hermes;
@@ -12,12 +13,24 @@ let
     api = p.url;
     transport = "chat_completions";
   } // lib.optionalAttrs (p.keyEnv != null) { key_env = p.keyEnv; };
+  isUzu = m: m != null && lib.hasPrefix "uzu:" m;
+  # What would run on the local model: a sub-chat preset, the compactions.
+  pinsUzu =
+    lib.mapAttrsToList (name: _: "server.hermes.subchats.presets.${name}.model")
+      (lib.filterAttrs (_: p: isUzu p.model) cfg.subchats.presets)
+    ++ lib.optional (isUzu cfg.memory.compactionModel) "server.hermes.memory.compactionModel";
 in
 {
-  assertions = [{
-    assertion = !(cfg.providers ? uzu);
-    message = "server.hermes.providers.uzu: that name is the local model's.";
-  }];
+  assertions = [
+    {
+      assertion = !(cfg.providers ? uzu);
+      message = "server.hermes.providers.uzu: that name is the local model's.";
+    }
+    {
+      assertion = server.uzu.enable || pinsUzu == [ ];
+      message = "${lib.concatStringsSep ", " pinsUzu} pin the local model, and there is none (server.uzu.enable is false).";
+    }
+  ];
 
   services.hermes-agent.settings = {
     model = {
@@ -42,7 +55,7 @@ in
     fallback_providers = cfg.fallbacks
       ++ lib.optional (cfg.localFallback && server.uzu.enable) { provider = "uzu"; model = server.uzu.model; };
 
-    providers = lib.mapAttrs (_: named) cfg.providers // {
+    providers = lib.mapAttrs (_: named) cfg.providers // lib.optionalAttrs server.uzu.enable {
       uzu = {
         name = "uzu (on this Mac)";
         api = "http://127.0.0.1:${toString server.uzu.port}/v1";

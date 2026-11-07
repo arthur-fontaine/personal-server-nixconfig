@@ -45,6 +45,11 @@ pollers (calendar, mail, …) ┤
 
 The screening runs on this Mac (uzu, the model it already serves, with its
 answer held to a JSON schema), so the main model only runs for what may matter.
+Without a local model (`server.uzu.enable = false`) nothing is screened, rather
+than sending other people's messages to a remote model to be sorted: what a
+failed screening would pass (a direct message, a notice, a personal mail) goes
+to Hermes, marked urgency "unknown", and what it would drop (a group's
+messages, bulk mail) is dropped (`NoTriage` in `hermes_events/triage.py`).
 [Jev](https://openrouter.ai/docs/guides/community/jev) (OpenRouter's typed
 decisions API) could replace it: `hermes_events/triage.py` is the one class to
 swap.
@@ -173,7 +178,7 @@ Mac's are always on.
 
 ## Checking it
 
-The bootstrap asks uzu a question, then the screening question on a test
+The bootstrap asks uzu (if any) a question, then the screening question on a test
 invitation, then offers to send a fake WhatsApp message through the whole
 chain: a proposal should reach Telegram. Logs: `~/Library/Logs/hermes-events.log`
 on the Hermes account; `nix build .#checks.aarch64-darwin.events` runs the

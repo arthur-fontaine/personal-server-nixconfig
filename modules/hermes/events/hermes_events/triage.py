@@ -176,3 +176,13 @@ class UzuTriage:
         except Exception as err:
             log.warning("triage failed for %s (%s): %s", event.get("key"), "passing" if fail_open else "dropping", err)
             return {"urgency": "unknown"} if fail_open else None
+
+
+class NoTriage:
+    """No local model to screen with: every event takes the path of a failed
+    triage, so what the caller passes on a miss (a direct chat, a notice, a
+    personal mail) goes to Hermes, and what it drops (a group, a bulk mail) is
+    dropped. Nothing goes to a remote model just to be sorted."""
+
+    async def decide(self, event: dict, *, fail_open: bool) -> dict | None:
+        return {"urgency": "unknown"} if fail_open else None

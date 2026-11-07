@@ -22,7 +22,7 @@ from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 from hermes_events.core import Chat, Journal, Message, Pipeline, Seen  # noqa: E402
 from hermes_events.hermes import HermesSink  # noqa: E402
 from hermes_events.sources import imessage_message, whatsapp_app, whatsapp_message  # noqa: E402
-from hermes_events.triage import UzuTriage  # noqa: E402
+from hermes_events.triage import NoTriage, UzuTriage  # noqa: E402
 from hermes_events.browser import (  # noqa: E402
     Instagram, keep_discord, Thread, instagram_message, notification_message, resolve_instagram,
     thread_from_inbox, thread_id_of)
@@ -171,6 +171,20 @@ class PipelineTest(unittest.IsolatedAsyncioTestCase):
         p.own_message(chat)  # the user answered within the window
         await asyncio.sleep(0.15)
         self.assertEqual(sink.events, [])
+
+    async def test_without_a_local_model_nothing_is_screened(self):
+        sink = FakeSink()
+        p = pipeline(self.tmp, triage=NoTriage(), sink=sink)
+        direct, message, _ = whatsapp_message(wa(id="N1"))
+        p.message(direct, message)
+        group, message, _ = whatsapp_message(wa(chat="1203@g.us", ChatName="Foot", id="N2"))
+        p.message(group, message)
+        p.notice("mail", "bulk", "Newsletter", "From: news@x", id="bulk", triage="mail", fail_open=False)
+        p.notice("mail", "own", "A mail", "From: lea@x", id="own", triage="mail")
+        await eventually(lambda: len(sink.events) >= 2)
+        await asyncio.sleep(0.15)
+        self.assertEqual(sorted(e["key"] for e in sink.events), ["mail:own", "whatsapp:33611111111@s.whatsapp.net"])
+        self.assertEqual({e["urgency"] for e in sink.events}, {"unknown"})
 
     async def test_triage_drops(self):
         sink = FakeSink()

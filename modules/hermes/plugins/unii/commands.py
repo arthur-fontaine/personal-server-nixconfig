@@ -79,6 +79,8 @@ class SubCommand:
             elif command == "set" and len(rest) >= 2:
                 key = rest[0]
                 value = parse_setting(key, " ".join(rest[1:]))
+                if key == "model" and value and value.partition(":")[0] == "uzu" and not self.runtime.uzu_model:
+                    raise ValueError("this Mac has no local model (server.uzu)")
                 policy = policies.set(chat, key, value)
             elif command == "lock":
                 _, own, _ = self.runtime.chat_volumes(chat)

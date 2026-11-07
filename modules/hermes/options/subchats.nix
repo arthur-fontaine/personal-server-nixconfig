@@ -1,9 +1,11 @@
 # Sub-chats: every topic of your Telegram DM but the Main one, and every group
 # with the bot (and each topic of a group), kept out of the main chat according
 # to its policy.
-{ lib, ... }:
+{ config, lib, ... }:
 let
   inherit (lib) mkOption types;
+  # The presets that keep a chat on this Mac, when it has a local model.
+  local = lib.optionalAttrs config.server.uzu.enable { model = "uzu:local"; };
 
   policy = types.submodule {
     options = {
@@ -57,7 +59,7 @@ let
       model = mkOption {
         type = types.nullOr types.str;
         default = null;
-        description = ''"<provider>:<model>", e.g. "uzu:local" for the on-device model. null: the main model.'';
+        description = ''"<provider>:<model>", e.g. "uzu:local" for the on-device model (server.uzu). null: the main model.'';
       };
     };
   };
@@ -77,19 +79,19 @@ in
           memoryRead = true;
           volume = "projects";
         };
-        # Secrets: no main memory either way, an encrypted volume, local model.
+        # Secrets: no main memory either way, an encrypted volume, the local
+        # model (without one, the main model: its provider reads them).
         secret = {
           volume = "vault";
           encrypted = true;
-          model = "uzu:local";
           tools = [ "file" "terminal" ];
-        };
-        # Throwaway chat on the local model, gone an hour after its last message.
+        } // local;
+        # Throwaway chat on the local model (or the main one), gone an hour
+        # after its last message.
         temp = {
           ttl = "1h";
-          model = "uzu:local";
           tools = [ ];
-        };
+        } // local;
       };
       description = "Named sub-chat policies, applied in a group with `/sub preset <name>`.";
     };
