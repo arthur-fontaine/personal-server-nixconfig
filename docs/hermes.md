@@ -187,7 +187,12 @@ risk (a send, a post) only when you asked for that exact action; anything else,
 and anything critical, waits for your yes in Telegram, through Hermes' own approval
 gate (a no, or no answer, refuses it): a card with Once, Session, Always and Deny
 buttons, whose reason line shows the action (the command, or the tool's
-arguments, cut to fit the card and with credentials masked). So does any error of the model: nothing
+arguments, cut to fit the card and with credentials masked). A shell command
+comes with one plain-language sentence above it ("Deletes the build folder of
+your project."), written by Hermes' auxiliary model (task `approval`, as its
+own smart approvals; 8 s at most, the card goes out without it otherwise), in
+the language of your last message; the app shows it apart (`summary` in the
+App topic's question, read with guard's `card_summary`). So does any error of the model: nothing
 is refused outright, nothing unclear runs. A short answer ("oui") is read with
 Hermes' question it answers. The review replaces computer_use's own question
 for each click or key (the `cua` server's clicks are reviewed like any tool),

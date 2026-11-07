@@ -237,6 +237,7 @@ def main() -> None:
     assert len(REQUESTS) == sent, "no request without a model"
 
     modes(port)
+    command_summaries(port)
     subagent_after_its_parent(port)
     steered_mid_turn(port)
     httpd.shutdown()
@@ -288,6 +289,55 @@ def modes(port: int) -> None:
         for written, read in (("cautious", "cautious"), ("yolo", "ask")):
             (Path(home) / "guard" / "config.json").write_text(json.dumps({"mode": written}))
             assert plugin._load(home)[2] == read, (written, read)
+
+
+def command_summaries(port: int) -> None:
+    """A command going to the owner comes with one plain sentence above it,
+    from Hermes' auxiliary model; the App topic reads it apart."""
+    from types import SimpleNamespace
+
+    import agent.auxiliary_client as aux
+    import guard as plugin
+
+    asked = []
+
+    def fake(**kwargs):
+        asked.append(kwargs)
+        if fake.fail:
+            raise TimeoutError("slow provider")
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=fake.text))])
+
+    fake.fail, fake.text = False, "Supprime le dossier `build` de ton projet."
+    real = aux.call_llm
+    aux.call_llm = fake
+    try:
+        g = Guard(None, frozenset({"telegram"}), "auto")
+        g.pre_llm_call(session_id="x", user_message="Nettoie le projet", platform="telegram")
+        directive = g.pre_tool_call("terminal", {"command": "rm -rf ./build"}, session_id="x")
+        message = directive["message"]
+        assert message == ("Supprime le dossier build de ton projet.\n\n"
+                           "no decision model configured: terminal: rm -rf ./build"), message
+        assert plugin.card_summary(message) == "Supprime le dossier build de ton projet."
+        assert plugin.card_summary("terminal: ls") is None
+        call = asked[-1]
+        assert call["task"] == "approval" and call["timeout"] <= 10
+        user = call["messages"][1]["content"]
+        assert "<command>\nrm -rf ./build\n</command>" in user and "Nettoie le projet" in user, user
+
+        # Not for other tools; nothing when the model fails.
+        count = len(asked)
+        other = g.pre_tool_call("write_file", {"path": "/tmp/a", "content": "x"}, session_id="x")
+        assert len(asked) == count and plugin.card_summary(other["message"]) is None
+        fake.fail = True
+        plain = g.pre_tool_call("terminal", {"command": "make install"}, session_id="x")["message"]
+        assert plain == "no decision model configured: terminal: make install", plain
+
+        # Long ones still fit the card's 500 characters.
+        fake.fail, fake.text = False, "word " * 80
+        long = g.pre_tool_call("terminal", {"command": "echo " + "y" * 2000}, session_id="x")["message"]
+        assert len(long) < 500 and plugin.card_summary(long).endswith("…"), len(long)
+    finally:
+        aux.call_llm = real
 
 
 def steered_mid_turn(port: int) -> None:
