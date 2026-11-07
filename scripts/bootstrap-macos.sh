@@ -88,7 +88,7 @@ fi
 # Each section, in order, from the clone (scripts/bootstrap/). Integrations
 # come in two groups: what is set up before the configuration is applied
 # (it may change it), and what needs Hermes' account, after.
-sections=(host telegram models coding-agent integrations xcode system permissions apple accounts start check)
+sections=(host telegram models coding-agent integrations app xcode system permissions apple accounts app-devices start check)
 if [ "$#" -gt 0 ]; then
   for section in "$@"; do
     case "$section" in host | lib) false ;; esac && [ -e "$REPO_DIR/scripts/bootstrap/$section.sh" ] \
