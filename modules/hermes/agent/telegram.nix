@@ -44,11 +44,20 @@
     # (gateway/display_config.py, _TIER_HIGH).
     display.platforms.telegram.interim_assistant_messages = true;
 
-    # A message sent while a turn runs waits for that turn and runs as the
-    # next one (website/docs/user-guide/messaging/index.md, "busy input").
-    # Hermes' default redirects the running turn instead, which derails a long
-    # task — the user asking where a build stood was told the agent would be
-    # redirected, and the task went on from wherever the message landed.
-    display.busy_input_mode = "queue";
+    # A message sent while a turn runs reaches it at its next tool boundary,
+    # as a message of the user's within the turn (website/docs/user-guide/
+    # messaging/index.md, "Queue vs interrupt vs steer"); the prompt asks
+    # Hermes to answer it at once and carry on (prompt/agents.nix). The main
+    # chat's turns are short (../plugins/front_desk), so the wait is one step.
+    # "queue" made it wait for the whole turn: hours, behind a build. Hermes'
+    # default (interrupt) redirects the turn instead, which derailed long tasks.
+    # Where steer cannot land, nothing is lost (gateway/run_busy.py,
+    # _resolve_busy_steer_or_redirect): with no turn running, or for a photo or
+    # a file, the message is queued as its own turn; one that arrives after the
+    # turn's last tool call becomes the next turn (agent/turn_finalizer.py,
+    # pending_steer). A turn lost in a crash takes the messages steered into it
+    # (hermes_state_runtime.py, recover_session_inputs: never replayed);
+    # lost_turns quotes them in the notice that closes it.
+    display.busy_input_mode = "steer";
   };
 }

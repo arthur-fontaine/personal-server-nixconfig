@@ -5,10 +5,11 @@
 Your Telegram DM with the bot is the main chat, for daily use, forever.
 Answers appear as they are written (Telegram's drafts; edited messages in the
 sub-chats' topics), and messages sent while Hermes was down are answered when
-it is back. A message sent while it
-is working waits for the current turn and then gets its own turn, in order
-(`display.busy_input_mode: queue`): Hermes' default redirects the running turn
-instead, which knocks a long task off its course. There
+it is back. A message sent while it is working reaches the turn at its next
+step (`display.busy_input_mode: steer`), and Hermes answers it there and then
+carries on; the main chat's turns are short (see "The main chat is a front
+desk"), so that is seconds. A photo or a file, or a message sent once the turn
+has made its last call, gets its own turn after it. There
 is no session to reset and nothing to compact by hand: the unii plugin
 (`modules/hermes/plugins/unii`) logs every message and keeps a view of the whole
 chat, recent messages word for word and older ones as merged summaries, so each
