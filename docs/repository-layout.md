@@ -39,7 +39,7 @@ modules/
     plugins/outbox/       says so when the gateway will not send an attachment of a reply (Python)
     plugins/lost_turns/   settles your Telegram turn cut off by a gateway crash, so the chat never waits for /discard (Python)
     plugins/front_desk/   caps a turn of the main chat: past it, only handing the work to a background subagent (Python)
-    plugins/app_topic/    the iOS app's side: its hidden Telegram topic, stats, pets, big files, call mode (Python; docs/app.md)
+    plugins/app_topic/    the iOS app's side: its hidden Telegram topic, stats, pets, big files, call turns (Python; docs/app.md)
     coding-agent/         Pi sessions in a microVM, their branch reviewed (docs/sandbox.md)
       default.nix         server.hermes.sandbox, and its wiring into Hermes (imported by options/ and agent/)
       hermes-plugin/      the plugin "sandbox": sandbox_run…, the broker's actions (Python)

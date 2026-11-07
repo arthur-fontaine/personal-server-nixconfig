@@ -1,24 +1,21 @@
 # ── The app: Hermes' side ───────────────────────────────────────────────────
 # What Hermes serves the owner's iOS app (server.hermes.app, docs/app.md):
 # the hidden App topic, the pets' image provider (OpenRouter, OpenAI, or any
-# OpenAI-compatible API by its address, checked as the models' are), call
-# mode's speech providers, and APNs for a paid team. Writes hosts/local.nix
+# OpenAI-compatible API by its address, checked as the models' are), and APNs
+# for a paid team. Call mode needs nothing here: the app hears and speaks on
+# the device, and its words reach Hermes as Telegram messages. Writes hosts/local.nix
 # and the keys to the secrets file, before system.sh applies them.
 
 step "App · Hermes' side"
 
 app_summary() {
-  local images call
+  local images
   if [ "$(setting server.hermes.app.enable)" != 1 ]; then
     echo "off"
     return 0
   fi
   images="$(setting server.hermes.app.images.provider)"
-  call="off"
-  if [ "$(setting server.hermes.app.call.enable)" = 1 ]; then
-    call="$(setting server.hermes.app.call.stt) → Hermes → $(setting server.hermes.app.call.tts)"
-  fi
-  echo "on; pets drawn by ${images:-nobody}; calls: $call"
+  echo "on; pets drawn by ${images:-nobody}"
 }
 
 # Pets: who draws them. Sets the images part of the patch.
@@ -63,40 +60,6 @@ app_images() {
   esac
 }
 
-# Call mode: who hears and who speaks; Hermes answers in between.
-app_call() {
-  local stt tts voice url
-  local stt_local="On this Mac (Whisper: free, private)" stt_openai="OpenAI" stt_groq="Groq (fast, cheap)"
-  local tts_edge="Microsoft's voices (free)" tts_openai="OpenAI" tts_eleven="ElevenLabs (the most natural)"
-  note "Call mode: talk to Hermes from the app as on a phone call. What you say is transcribed,"
-  note "Hermes answers in the main chat, and its answer is read aloud as it is written."
-  if ! ask "Allow call mode?"; then
-    app_patch="$("$JQ" -c '.call = {enable: false}' <<< "$app_patch")"
-    return 0
-  fi
-  stt="$(gum choose --header "Call · who transcribes you" "$stt_local" "$stt_openai" "$stt_groq")" || stt="$stt_local"
-  case "$stt" in
-    "$stt_openai") stt=openai; ask_key openai OpenAI OPENAI_API_KEY "calls cannot hear you." ;;
-    "$stt_groq") stt=groq; ask_key groq Groq GROQ_API_KEY "calls cannot hear you." ;;
-    *) stt=local ;;
-  esac
-  tts="$(gum choose --header "Call · who speaks Hermes' answers" "$tts_edge" "$tts_openai" "$tts_eleven")" || tts="$tts_edge"
-  case "$tts" in
-    "$tts_openai") tts=openai; ask_key openai OpenAI OPENAI_API_KEY "calls stay silent." ;;
-    "$tts_eleven") tts=elevenlabs; ask_key elevenlabs ElevenLabs ELEVENLABS_API_KEY "calls stay silent." ;;
-    *) tts=edge ;;
-  esac
-  voice="$(gum input --header "Its voice (empty: the provider's default)" \
-    --placeholder "$( [ "$tts" = edge ] && echo fr-FR-HenriNeural || echo "a voice id" )")"
-  note "On your network the app reaches this Mac directly. From anywhere, it needs a tunnel with"
-  note "TLS to port $(setting server.hermes.app.call.port) (a Cloudflare tunnel, Tailscale Funnel...)."
-  url="$(gum input --value "$(setting server.hermes.app.call.publicUrl)" \
-    --header "Its public address (empty: your network only)" --placeholder "wss://call.example.com/call")"
-  app_patch="$("$JQ" -c --arg s "$stt" --arg t "$tts" --arg v "$voice" --arg u "$url" \
-    '.call = {enable: true, stt: $s, tts: $t, voice: (if $v == "" then null else $v end),
-              publicUrl: (if $u == "" then null else $u end)}' <<< "$app_patch")"
-}
-
 # APNs: pushes while the app is closed, for a paid Apple Developer team only.
 app_apns() {
   local key_id team bundle p8
@@ -128,14 +91,12 @@ app_apns() {
 
 if [ "$(setting server.hermes.app.enable)" = 1 ] && keep "App: $(app_summary)"; then
   :
-elif ! ask "Serve Hermes' iOS app (its hidden topic, pets, calls)?"; then
+elif ! ask "Serve Hermes' iOS app (its hidden topic, pets)?"; then
   [ "$(setting server.hermes.app.enable)" != 1 ] || set_host '{"server":{"hermes":{"app":{"enable":false}}}}'
   ok "App: off"
 else
   app_patch='{"enable": true}'
   app_images
-  echo
-  app_call
   echo
   app_apns
   set_host "$("$JQ" -cn --argjson a "$app_patch" '{server: {hermes: {app: $a}}}')"

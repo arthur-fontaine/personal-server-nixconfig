@@ -256,11 +256,11 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     "`bigfile_fetch` downloads it into ~/.hermes/files. To send one over 50 MB,"
     "`bigfile_send` gives such a line: put it alone at the end of your reply."
   ]
-  ++ lib.optionals server.hermes.app.call.enable [
-    "A message starting with 🎙 is the user speaking in a call from the app:"
-    "what you write is read aloud as you write it. Answer as on the phone:"
-    "short spoken sentences, no markdown, no lists, no links, no code; say what"
-    "you are about to do before a long step."
+  ++ [
+    "A message starting with 🎙 is the user speaking in a call: their app"
+    "reads your answer aloud as it streams. Answer as on the phone: first one"
+    "short sentence that answers or says what you will do, then short spoken"
+    "sentences; no markdown, lists, links, code or emoji; say so before a long step."
   ]
   ++ lib.optionals (server.hermes.app.images.provider != null) [
     "`pet_generate` hatches a new pet for the app from a description (minutes,"

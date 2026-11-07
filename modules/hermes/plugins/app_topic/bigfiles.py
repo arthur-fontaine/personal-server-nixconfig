@@ -149,6 +149,7 @@ class Gofile:
 def swisstransfer_fetch(url: str, directory: Path, token: str | None) -> list[Path]:
     """A SwissTransfer link: its container through the web app's API, then
     each file. Without a token, the public link API the website uses."""
+    # www.swisstransfer.com/d/<uuid>, and v2's swisstransfer.infomaniak.com/dl/<uuid>.
     link = urlparse(url).path.rstrip("/").split("/")[-1]
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     with _client() as client:
@@ -171,7 +172,7 @@ def fetch(url: str, directory: Path, gofile: Gofile, swisstransfer_token: str | 
     host = (urlparse(url).hostname or "").lower()
     if host.endswith("gofile.io") and "/d/" in url:
         return gofile.fetch(url, directory)
-    if host.endswith("swisstransfer.com"):
+    if host.endswith("swisstransfer.com") or host == "swisstransfer.infomaniak.com":
         return swisstransfer_fetch(url, directory, swisstransfer_token)
     if urlparse(url).scheme not in ("http", "https"):
         raise BigFileError("only http(s) links")

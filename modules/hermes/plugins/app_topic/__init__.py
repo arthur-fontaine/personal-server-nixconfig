@@ -4,8 +4,8 @@ The app is a Telegram client of the owner's DM with the bot. Machine traffic
 goes through a hidden forum topic "App" of that DM: the state the app shows
 (agent status, open questions, the pet, sub-chats, machine and model stats,
 devices), the notifications' spoken text, and the app's requests. This
-plugin keeps that topic, counts model usage, keeps the pet's needs, serves
-the call mode's WebSocket, and gives Hermes the tools for pets and big files.
+plugin keeps that topic, counts model usage, keeps the pet's needs, makes
+call turns speakable, and gives Hermes the tools for pets and big files.
 
 Other plugins may report an approval's plain-language summary before the card
 is sent (sys.modules["app_topic"].approval_summary(command, summary)), and
@@ -93,6 +93,26 @@ def pre_approval_request(command: str = "", description: str = "", **_) -> None:
         return
     if summary:
         approval_summary(command, summary)
+
+
+CALL_MARK = "\U0001f399"
+CALL_CONTEXT = (
+    "[This message was spoken in a call from the user's app, and your answer is read aloud as it streams. "
+    "Answer as on the phone: open with one short sentence that answers or says what you will do, then short "
+    "spoken sentences; no markdown, lists, tables, links, code or emoji; numbers and symbols as words. "
+    "Before a long step, say so in a sentence first.]"
+)
+
+
+def call_turn(user_message=None, platform="", **_):
+    """pre_llm_call: a call turn (docs/app-protocol.md §6) gets the spoken style
+    with its message, not in the system prompt, so the prompt cache holds.
+    While the app says a call is on (call.state), every Telegram turn does."""
+    text = user_message if isinstance(user_message, str) else ""
+    app = STATE["app"]
+    if text.lstrip().startswith(CALL_MARK) or (app is not None and app.call_active() and platform == "telegram"):
+        return {"context": CALL_CONTEXT}
+    return None
 
 
 def question_card(chat_id, thread, message_id, text_html, markup, command=None, summary=None) -> None:
@@ -192,6 +212,7 @@ def register(ctx) -> None:
     ctx.register_hook("on_human_input_resolved", resolved)
     ctx.register_hook("on_session_end", status.end)
     ctx.register_hook("pre_approval_request", pre_approval_request)
+    ctx.register_hook("pre_llm_call", call_turn)
     ctx.register_hook("post_api_request", app.post_api_request)
     ctx.register_hook("api_request_error", app.api_request_error)
     ctx.register_hook("post_auxiliary_call", app.post_auxiliary_call)
@@ -210,29 +231,6 @@ def register(ctx) -> None:
     if push.enabled:
         app.extra_handlers["_push_notify"] = push.notify
         app.extra_handlers["_push_activity"] = push.activity
-
-    call = (app.config.get("call") or {})
-    if call.get("enable") and not getattr(app, "call_server", None):
-        from .call import CallServer
-
-        server = CallServer(call, app)
-        owner = os.environ.get("TELEGRAM_ALLOWED_USERS", "").split(",")[0].strip()
-
-        def inject(text: str) -> bool:
-            origin = {"platform": "telegram", "chat_id": owner, "chat_type": "dm", "user_id": owner}
-            future = app.submit(_inject(text, origin))
-            try:
-                return bool(future.result(10)) if future is not None else False
-            except Exception:
-                return False
-
-        async def _inject(text, origin):
-            return STATE["ctx"].inject_message(text, origin=origin)
-
-        server.inject_fn = inject
-        app.extra_handlers["call.start"] = server.start_request
-        app.call_server = server
-        server.start()
 
     try:
         app.sync_pet()

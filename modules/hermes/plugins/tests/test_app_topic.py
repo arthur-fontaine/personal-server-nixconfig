@@ -22,7 +22,7 @@ os.environ["TELEGRAM_ALLOWED_USERS"] = "4242"
 os.makedirs(os.environ["HERMES_HOME"], exist_ok=True)
 
 from app_topic import app as app_mod  # noqa: E402
-from app_topic import bigfiles, call, machine, protocol, questions, speech, usage  # noqa: E402
+from app_topic import bigfiles, machine, protocol, questions, speech, usage  # noqa: E402
 from app_topic.pet import Needs, level_for, xp_for_level  # noqa: E402
 from app_topic.status import Status, tool_label  # noqa: E402
 
@@ -190,16 +190,19 @@ def test_status() -> None:
     assert s.snapshot(False)["status"] == "idle" and len(s.take_finished()) == 2
 
 
-def test_call_pieces() -> None:
-    chunks, offset = call.split_ready("Hello there, Arthur. I am check", 0, False)
-    assert chunks == ["Hello there, Arthur."] and offset == len("Hello there, Arthur.")
-    chunks, offset = call.split_ready("Hello there, Arthur. I am checking.", offset, True)
-    assert chunks == ["I am checking."]
-    tokens = call.Tokens()
-    token, _ = tokens.issue()
-    assert tokens.take(token) and not tokens.take(token) and not tokens.take("nope")
-    silence, loud = b"\x00\x00" * 960, struct.pack("<960h", *([8000, -8000] * 480))
-    assert call.rms(silence) == 0 and call.rms(loud) > 7000
+def test_call_turn() -> None:
+    import app_topic as plugin_pkg
+
+    assert plugin_pkg.call_turn(user_message="\U0001f399 what time is it")["context"].startswith("[This message was spoken")
+    assert plugin_pkg.call_turn(user_message="  \U0001f399 hi") is not None
+    assert plugin_pkg.call_turn(user_message="what time is it") is None
+    assert plugin_pkg.call_turn(user_message=[{"type": "text", "text": "x"}]) is None
+    fake = types.SimpleNamespace(call_until=time.time() + 60)
+    fake.call_active = lambda: time.time() < fake.call_until
+    plugin_pkg.STATE["app"] = fake
+    assert plugin_pkg.call_turn(user_message="and tomorrow?", platform="telegram") is not None
+    assert plugin_pkg.call_turn(user_message="and tomorrow?", platform="webhook") is None
+    plugin_pkg.STATE["app"] = None
 
 
 def test_gofile_token() -> None:
@@ -355,15 +358,21 @@ def test_plugin() -> None:
     reply = bot.in_topic("reply")[-1][1]
     assert reply["re"] == 555 and reply["ok"] and reply["data"]["happiness"] == 100
     assert ("delete_message", {"chat_id": OWNER, "message_id": 555}) in bot.calls
+    plugin.dispatch(event('{"v":2,"type":"call.state","active":true}', mid="560"))
+    wait_for(lambda: any(r[1]["re"] == 560 for r in bot.in_topic("reply")), "call.state's reply")
+    assert plugin.call_active()
+    plugin.dispatch(event('{"v":2,"type":"call.state","active":false}', mid="561"))
+    wait_for(lambda: any(r[1]["re"] == 561 for r in bot.in_topic("reply")), "call.state off")
+    assert not plugin.call_active()
     plugin.dispatch(event('{"v":1,"type":"nope"}', mid="556"))
-    wait_for(lambda: len(bot.in_topic("reply")) == 2, "an error reply")
+    wait_for(lambda: any(r[1]["re"] == 556 for r in bot.in_topic("reply")), "an error reply")
     assert bot.in_topic("reply")[-1][1]["error"]["code"] == "unknown_type"
     plugin.dispatch(event('{"v":1,"type":"app.reinstall"}', mid="557"))
-    wait_for(lambda: len(bot.in_topic("reply")) == 3, "reinstall's reply")
+    wait_for(lambda: any(r[1]["re"] == 557 for r in bot.in_topic("reply")), "reinstall's reply")
     assert bot.in_topic("reply")[-1][1]["error"]["code"] == "unavailable"
     plugin.dispatch(event('{"v":1,"type":"call.start"}', mid="558"))
-    wait_for(lambda: len(bot.in_topic("reply")) == 4, "call.start's reply")
-    assert bot.in_topic("reply")[-1][1]["error"]["code"] == "unavailable"
+    wait_for(lambda: any(r[1]["re"] == 558 for r in bot.in_topic("reply")), "call.start's reply")
+    assert bot.in_topic("reply")[-1][1]["error"]["code"] == "unknown_type"  # protocol v2: no call.start
 
     # Status: a tool call shows in the state.
     plugin.status.pre_tool_call(tool_name="terminal", args={"command": "make"}, session_id="s1")
