@@ -133,9 +133,10 @@ be deleted.
     exactly what a tap in Telegram does, so Hermes resolves it the same way
     and edits the card. The app may also read the keyboard from the message
     itself (same buttons).
-  - `summary`: a plain-language summary of a command (filled by
-    `app-delivery`'s approval change; `null` until then or when not a
-    command). `command`: the raw command (or the tool and its arguments),
+  - `summary`: the one-sentence plain-language summary the auto-review
+    (`guard`) writes above a command it sends to the owner; `null` for
+    Hermes' own pattern cards (their reason is a pattern name, in `text`)
+    and for a clarify. `command`: the raw command (or the tool and its arguments),
     `null` for a clarify. `text`: the card's text without markup.
   - A clarify's `options` end with `{"id": "other", …}`: pressing it makes
     Hermes take the next text message in that chat as the answer.
