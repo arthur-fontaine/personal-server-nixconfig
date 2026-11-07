@@ -170,50 +170,58 @@ code or a quote) into a sentence saying it was not sent, before the reply
 reaches the user and the transcript. It reports rather than moves the file: the directories it names are
 refused because credentials live there.
 
-## Auto-review of Hermes' actions
+## Permissions: auto mode
 
-The `guard` plugin (`modules/hermes/plugins/guard`), always installed,
-reviews every action Hermes is about to take, but reads (files, searches, tool
-searches, the read-only MCP servers, screenshots; opening a web page is reviewed,
-its address can carry data out). It fails closed: without a decision model
-(`server.hermes.decision.approval` off), every such action waits for your yes
-in Telegram, on an approval card whose reason reads `no decision model
-configured: ` and the action. With it on (the bootstrap's Models section;
-Baseten's mammoth-1 by default), a decision model rates two
-things at once, as Codex's automatic approval review does: how clearly your own
-messages authorize the action, and how risky it is. Low risk (a click that
-navigates, a draft) runs at once, bounded risk when you asked for it, and high
-risk (a send, a post) only when you asked for that exact action; anything else,
-and anything critical, waits for your yes in Telegram, through Hermes' own approval
-gate (a no, or no answer, refuses it): a card with Once, Session, Always and Deny
-buttons, whose reason line shows the action (the command, or the tool's
-arguments, cut to fit the card and with credentials masked). A shell command
-comes with one plain-language sentence above it ("Deletes the build folder of
-your project."), written by Hermes' auxiliary model (task `approval`, as its
-own smart approvals; 8 s at most, the card goes out without it otherwise), in
-the language of your last message; the app shows it apart (`summary` in the
-App topic's question, read with guard's `card_summary`). So does any error of the model: nothing
-is refused outright, nothing unclear runs. A short answer ("oui") is read with
-Hermes' question it answers. The review replaces computer_use's own question
-for each click or key (the `cua` server's clicks are reviewed like any tool),
-so one action asks at most once.
+The `guard` plugin (`modules/hermes/plugins/guard`), always installed, is
+Hermes' permission system: Claude Code's auto mode
+(`permissions.defaultMode: "auto"`), ported from Arthur's Pi extension
+auto-mode with its rules, prompts, thresholds and tests. Two modes,
+`server.hermes.permissions.defaultMode` at first start and `/mode auto|ask`
+in the chat afterwards (kept in `~/.hermes/guard/mode.json`; the app's picker
+sends the same command):
 
-How much runs without you is `server.hermes.approvalMode`, Claude Code's
-permission modes mapped onto this review (the bootstrap's Models section asks,
-once a review model is set): `auto`, the default, is the above; `cautious`
-runs only what the model rates low risk (a search, a click that navigates)
-and asks for anything with a side effect; `ask` asks for every action but the
-reads, without calling the model. Without a review model, every mode asks.
+- **auto** (default). Plainly safe calls run directly: tools that only look
+  (files, searches, screenshots, the read-only MCP servers), `clarify`, edits
+  inside Hermes' workspace (not `.git`, dotfiles and the like), and the shell
+  commands Claude Code itself runs without asking (its read-only command
+  tables: `ls`, `cat`, `git status`, `rg`…, paths inside the workspace; and
+  `mkdir touch rm mv cp sed -i` there). Every other call goes to a
+  classifier that reads the conversation (your messages and Hermes' calls,
+  never what tools returned) and the call, with Claude Code's own rules
+  (`guard/prompts/`, verbatim) and `server.hermes.permissions.autoMode`
+  (`allow`, `soft_deny`, `hard_deny`, `environment`, with `"$defaults"`, as
+  Claude Code's `autoMode`). A risky call is blocked and Hermes is told why
+  (`[Data Exfiltration]`, `[Git Destructive]`…) and to find a safer way or
+  stop and ask you. After 3 blocks in a row, or 20 in a session, you are
+  asked instead, on Hermes' approval card (Once, Session, Always, Deny).
+  A classifier that cannot be reached or gives no usable answer blocks the
+  call (fail closed).
+- **ask**: every call but those that only look asks you; no model call.
 
-As in Claude Code's auto mode, the reviewer sees your messages and Hermes'
-actions, never what the tools returned: a WhatsApp message, an email or a web
-page telling Hermes to act cannot argue with it. Only Telegram turns count as
-yours (Telegram answers its owner only), and so does a message you send in the
-middle of one (it reaches the turn as a row only Hermes writes); a turn the events daemon starts, about
-an incoming message, authorizes nothing, and neither does a notice the gateway
-posts in your chat itself (a background process or a subagent finishing, a
-watch pattern matching). Hermes' own checks stay underneath:
-its pattern-matched dangerous commands, and its hardline blocklist.
+The classifier is the review decision model (`server.hermes.decision.approval`,
+Baseten's mammoth-1 by default; Hermes is not on the Claude subscription the
+Pi extension uses): two stages of one System One request each, a `verdict`
+(allow/block) and the matched rule. Its probability of block stands for
+Claude Code's severity: stage 1 clears at 25 % or less, stage 2 blocks above
+35 %. Without a review model, auto mode asks you for every call it cannot
+clear itself. Hermes' `AGENTS.md` is read as Claude Code reads `CLAUDE.md`:
+an explicit authorization there may clear a soft block.
+
+Only Telegram turns (and cron jobs) are yours; a message you send mid-turn
+too. A turn the events daemon or a webhook starts, and a notice the gateway
+posts in your chat itself (a background process, a subagent finishing), reach
+the classifier as notifications, which carry no intent. A subagent's calls
+are judged on its parent's conversation. Hermes' own checks stay underneath:
+its pattern-matched dangerous commands and its hardline blocklist.
+
+On a card, a long or tangled shell command comes with a plain-language title
+above it ("Builds and installs the project"), as Arthur's Pi extension
+bash-titles names commands: same heuristic, prompt and clean-up, Hermes'
+auxiliary model (task `approval`), titles kept by command in
+`~/.hermes/guard/titles.json`; 8 s at most, the card goes out without one
+otherwise. The app shows it apart (`question.summary`, read with guard's
+`card_summary`). computer_use's own per-click question is replaced by this
+one: one action, one question at most.
 
 The same review answers what a sandboxed Pi session asks Hermes for (a host
 its grants do not cover, a folder of this Mac, a push, a command here;
