@@ -369,16 +369,23 @@ class Instagram:
     async def _read(self) -> list[dict]:
         try:
             async with self._tab() as session:
-                for _ in range(40):  # the app has to load and ask for its inbox
+                # The app has to load and ask for its inbox, and it asks in
+                # pieces: the first GraphQL answer can hold a few threads of
+                # many. A count that held for one more poll is the inbox.
+                last: list[dict] = []
+                for _ in range(40):
                     await asyncio.sleep(0.5)
                     body = await self._evaluate(session, INBOX_JS)
                     try:
                         rows = json.loads(body).get("threads") or []
                     except (ValueError, AttributeError):
                         continue
-                    if rows:
+                    if rows and len(rows) == len(last):
                         log.debug("instagram: %d threads in the inbox", len(rows))
                         return rows
+                    last = rows
+                if last:
+                    return last
         except Exception as err:
             log.warning("instagram: could not read the inbox: %s", err)
             return []
@@ -501,6 +508,21 @@ class Instagram:
                                                           "returnByValue": True}, session)
         return answer.get("result", {}).get("result", {}).get("value") or ""
 
+    PUSH_POLL_SECONDS = 0.5
+
+    async def _push_state(self, session: str, done, tries: int = 20) -> dict:
+        """PUSH_JS's answer once `done(state)` holds, or the last one."""
+        state: dict = {}
+        for _ in range(tries):
+            await asyncio.sleep(self.PUSH_POLL_SECONDS)
+            try:
+                state = json.loads(await self._evaluate(session, PUSH_JS) or "{}")
+            except ValueError:
+                continue
+            if done(state):
+                break
+        return state
+
     async def prepare(self) -> None:
         """Whether Instagram can actually push, and turning it on if it is one
         click away. The watcher grants the permission each session
@@ -509,8 +531,9 @@ class Instagram:
         a fresh setup only needs that control used once."""
         try:
             async with self._tab() as session:
-                await asyncio.sleep(4)
-                state = json.loads(await self._evaluate(session, PUSH_JS) or "{}")
+                # Until the page has its service worker and its control, or
+                # says it is subscribed: polled, a slow load is not "off".
+                state = await self._push_state(session, lambda s: s.get("subscribed") or s.get("control"))
                 if state.get("subscribed"):
                     log.info("instagram: push notifications are on")
                     return
@@ -518,8 +541,7 @@ class Instagram:
                 if control:
                     log.info("instagram: turning notifications on (%s)", control)
                     if await self._evaluate(session, CLICK_JS) == "clicked":
-                        await asyncio.sleep(3)
-                        after = json.loads(await self._evaluate(session, PUSH_JS) or "{}")
+                        after = await self._push_state(session, lambda s: s.get("subscribed"))
                         if after.get("subscribed"):
                             log.info("instagram: push notifications are on")
                             return

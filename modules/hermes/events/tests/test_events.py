@@ -964,14 +964,18 @@ class InstagramThreadTest(unittest.IsolatedAsyncioTestCase):
                     FakeCDP.expression = params["expression"]
                     if "__ig" not in FakeCDP.expression:
                         return {"result": {"result": {"value": ""}}}
-                    return {"result": {"result": {"value": json.dumps({"count": 1, "threads": [INBOX_ROW]})}}}
+                    # The app's first answer holds some threads, the next all.
+                    FakeCDP.reads += 1
+                    rows = [INBOX_ROW] if FakeCDP.reads == 1 else [INBOX_ROW, {**INBOX_ROW, "id": "1000000000000002"}]
+                    return {"result": {"result": {"value": json.dumps({"count": len(rows), "threads": rows})}}}
                 return {"result": {}}
 
+        FakeCDP.reads = 0
         ig = Instagram()
         self.assertEqual(await ig.inbox(), [])  # not connected yet
         ig.cdp = FakeCDP()
         rows = await ig.inbox()
-        self.assertEqual([r["id"] for r in rows], ["1000000000000001"])
+        self.assertEqual([r["id"] for r in rows], ["1000000000000001", "1000000000000002"])
         self.assertIn("__ig.inbox()", FakeCDP.expression)
         self.assertNotIn("seen", FakeCDP.expression)
         # The script goes in before the page runs, and the tab closes.
@@ -983,6 +987,35 @@ class InstagramThreadTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls.count("Target.createTarget"), 1)
         # An id that is not one is refused before anything opens.
         self.assertIsNone(await ig.thread("1; alert(1)"))
+
+    async def test_prepare_waits_for_the_page_and_its_subscription(self):
+        """A slow page is polled, not judged after a fixed sleep: the control
+        shows up late, and the subscription a moment after the click."""
+        answers = iter([{"permission": "granted"}, {"permission": "granted"},
+                        {"permission": "granted", "control": "Turn on notifications"},
+                        {"permission": "granted"}, {"permission": "granted", "subscribed": True}])
+        clicked = []
+
+        class FakeCDP:
+            async def call(self, method, params=None, session=None):
+                if method == "Target.createTarget":
+                    return {"result": {"targetId": "T"}}
+                if method == "Target.attachToTarget":
+                    return {"result": {"sessionId": "S"}}
+                if method == "Runtime.evaluate":
+                    if "control.click()" in params["expression"]:
+                        clicked.append(True)
+                        return {"result": {"result": {"value": "clicked"}}}
+                    return {"result": {"result": {"value": json.dumps(next(answers))}}}
+                return {"result": {}}
+
+        ig = Instagram()
+        ig.PUSH_POLL_SECONDS = 0
+        ig.cdp = FakeCDP()
+        with self.assertLogs("hermes_events", "INFO") as logs:
+            await ig.prepare()
+        self.assertEqual(clicked, [True])
+        self.assertTrue(any("push notifications are on" in line for line in logs.output))
 
 
 class DiscordTest(unittest.IsolatedAsyncioTestCase):

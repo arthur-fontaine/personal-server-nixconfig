@@ -151,6 +151,13 @@ Chrome for Testing gets a push endpoint that Firebase refuses (`410`), so
 sites' pushes never reach it; a Google Chrome's endpoint takes them (`201`).
 Both were tried with a real Web Push before choosing.
 
+The permission alone is not enough: the push subscription is Instagram's to
+create. Each time the daemon connects to Chrome it grants the permission, opens
+Instagram in a background tab and asks whether it is subscribed. When it is
+not and the page shows Instagram's own "Turn on notifications" control, the
+daemon clicks that control once, as you would, and checks again. If that still
+leaves Instagram unsubscribed, it logs a warning. The tab closes either way.
+
 ## Settings
 
 The sources of an integration (WhatsApp, Instagram, Discord, Home Assistant, HomeKit, GitHub,
