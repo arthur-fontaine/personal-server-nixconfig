@@ -251,6 +251,18 @@ globalThis.document.querySelector = () => null;
 check("no composer", await ig.send("hello"), { sent: false, reason: "no message box on this page: open the thread first" });
 globalThis.document.querySelector = keep;
 
+// ── a newer version loaded into a page an older one hooked ──────────────────
+// fetch stays wrapped once; what it catches must still reach the version in
+// place, not the closure of the one that wrapped it.
+const before = ig.responses().length;
+ig.version = -1;
+check("a new version installs over an old one", eval(source), "installed");
+globalThis.fetch("https://www.instagram.com/api/graphql/again");
+await settle();
+await settle();
+check("the old hook feeds the new version", globalThis.__ig.responses().length, before + 1);
+check("and keeps what it had", globalThis.__ig.thread().me, "4242");
+
 if (failures.length) {
   console.error(`\ndirect.js: ${failures.length} check(s) failed`);
   process.exit(1);

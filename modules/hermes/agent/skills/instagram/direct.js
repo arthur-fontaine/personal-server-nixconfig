@@ -21,22 +21,26 @@
   "use strict";
   if (typeof globalThis === "undefined") return "no globalThis";
 
-  const VERSION = 3;
+  const VERSION = 4;
   const ig = (globalThis.__ig = globalThis.__ig || {});
   if (ig.version === VERSION) return "already installed";
   ig.version = VERSION;
+  // What the hooks caught lives on __ig, not in this closure: a newer version
+  // loaded into an already-hooked page finds fetch wrapped and does not wrap
+  // it again, so the wrapper calls whatever `__ig.keep` is now, into the same
+  // store, and the new version reads what the old hooks kept.
+  const store = (ig.store = ig.store || { responses: [], viewer: null });
 
   // ── the page's own DM traffic ─────────────────────────────────────────────
   const INTERESTING = /direct|inbox|thread|graphql/i;
   const MAX_RESPONSES = 40;
-  const responses = [];
+  const responses = store.responses;
 
   // Who the user is, out of whatever the app says about itself: `viewer_id`
   // on an inbox payload, `viewer.pk` on a thread's. Without it an item's
   // sender stays unknown rather than guessed.
-  let viewer = null;
   const noteViewer = (node, depth) => {
-    if (viewer || !node || typeof node !== "object" || depth > 12) return;
+    if (store.viewer || !node || typeof node !== "object" || depth > 12) return;
     if (!Array.isArray(node)) {
       const id = node.viewer_id != null
         ? node.viewer_id
@@ -44,7 +48,7 @@
           ? node.viewer.pk ?? node.viewer.pk_id ?? node.viewer.id
           : null;
       if (id != null) {
-        viewer = String(id);
+        store.viewer = String(id);
         return;
       }
     }
@@ -62,6 +66,7 @@
     if (responses.length > MAX_RESPONSES) responses.shift();
     noteViewer(body, 0);
   };
+  ig.keep = keep;
 
   const hookFetch = () => {
     const original = globalThis.fetch;
@@ -72,7 +77,7 @@
         const url = String((input && input.url) || input);
         if (INTERESTING.test(url)) {
           pending
-            .then((r) => r.clone().json().then((j) => keep(url, j)).catch(() => {}))
+            .then((r) => r.clone().json().then((j) => globalThis.__ig.keep(url, j)).catch(() => {}))
             .catch(() => {});
         }
       } catch (e) {}
@@ -94,7 +99,7 @@
       this.addEventListener("load", () => {
         try {
           const url = this.__igUrl || "";
-          if (INTERESTING.test(url)) keep(url, JSON.parse(this.responseText));
+          if (INTERESTING.test(url)) globalThis.__ig.keep(url, JSON.parse(this.responseText));
         } catch (e) {}
       });
       return send.apply(this, args);
@@ -355,6 +360,7 @@
     const opened = openThread();
     const id = (String(globalThis.location?.href || "").match(/\/direct\/t\/(\d+)/) || [])[1]
       || (opened ? idOf(opened) : null);
+    const viewer = store.viewer;
     const out = { id, me: viewer, messages: null, text: visible().slice(-4000) };
     if (!opened) return out;
     const users = new Map(
