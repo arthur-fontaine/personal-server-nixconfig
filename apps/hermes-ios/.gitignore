@@ -4,3 +4,4 @@ Config/Local.xcconfig
 *.xcresult
 HermesApp/Info.plist
 HermesWidgets/Info.plist
+Vendor/
