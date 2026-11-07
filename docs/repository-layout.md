@@ -23,7 +23,7 @@ modules/
     xcode.nix             the latest Command Line Tools and Xcode (xcodes, server.xcode), at each activation
     nix.nix
   hermes/                 Hermes Agent
-    options/              server.hermes.*: account, model, memory, sub-chats, access (the sandbox's: coding-agent/)
+    options/              server.hermes.*: account, model, memory, sub-chats, access, the app (the sandbox's: coding-agent/)
     system/               what it is to macOS (nix-darwin)
       user.nix            its own account, with home-manager
       access/             read.nix, freeze.nix (+ freeze.py), rebuild.nix, secrets.nix
@@ -39,6 +39,7 @@ modules/
     plugins/outbox/       says so when the gateway will not send an attachment of a reply (Python)
     plugins/lost_turns/   settles your Telegram turn cut off by a gateway crash, so the chat never waits for /discard (Python)
     plugins/front_desk/   caps a turn of the main chat: past it, only handing the work to a background subagent (Python)
+    plugins/app_topic/    the iOS app's side: its hidden Telegram topic, stats, pets, big files, call mode (Python; docs/app.md)
     coding-agent/         Pi sessions in a microVM, their branch reviewed (docs/sandbox.md)
       default.nix         server.hermes.sandbox, and its wiring into Hermes (imported by options/ and agent/)
       hermes-plugin/      the plugin "sandbox": sandbox_run…, the broker's actions (Python)
@@ -55,7 +56,7 @@ modules/
 
 ```sh
 nix flake check                                   # everything below
-nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval, outbox, lost_turns, front_desk)
+nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval, outbox, lost_turns, front_desk, app_topic)
 nix build .#checks.aarch64-darwin.coding-agent    # the coding agent's plugin, against a fake sidecar
 nix build .#checks.aarch64-darwin.sandbox         # the coding agent's sidecar tests, in its build
 nix build .#checks.aarch64-darwin.events          # the events daemon's tests
