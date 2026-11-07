@@ -829,6 +829,12 @@ class InstagramInboxTest(unittest.IsolatedAsyncioTestCase):
         # Read a moment ago: a miss is a miss, not another tab.
         self.assertIsNone(await ig.find("rien de tel"))
         self.assertEqual(ig.reads, 3)
+        # The same text again, a minute later: the cached "ok" is the old one.
+        push = INBOX_ROW["at"] / 1000 + 40 + 600
+        ig.rows = [{**INBOX_ROW, "text": "ok", "at": int(push * 1000)}]
+        ig._read_at -= 30
+        thread = await ig.find("ok", push)
+        self.assertEqual((ig.reads, thread.items[-1].time), (4, push))
 
     def test_a_row_carries_what_the_inbox_showed_before(self):
         """The screening reads the exchange, not one fragment: the earlier
@@ -917,11 +923,11 @@ class InstagramThreadTest(unittest.IsolatedAsyncioTestCase):
             def __init__(self, found):
                 self.found, self.asked = found, []
 
-            async def thread(self, tid, text=None):
+            async def thread(self, tid, text=None, since=None):
                 self.asked.append(("thread", tid))
                 return self.found
 
-            async def find(self, text):
+            async def find(self, text, since=None):
                 self.asked.append(("find", text))
                 return self.found
 

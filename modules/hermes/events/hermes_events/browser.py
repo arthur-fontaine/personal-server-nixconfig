@@ -388,11 +388,20 @@ class Instagram:
     # A read younger than this already holds whatever the push announced.
     FRESH_SECONDS = 5
 
-    async def _lookup(self, pick, text: str | None) -> Thread | None:
+    # How far Instagram's clock and the push may disagree: a preview older
+    # than the push by more than this is an earlier message with the same text.
+    SKEW_SECONDS = 120
+
+    def _has(self, thread: Thread, text: str, since: float | None) -> bool:
+        return any(_same(i.text, text) and (since is None or i.time >= since - self.SKEW_SECONDS)
+                   for i in thread.items)
+
+    async def _lookup(self, pick, text: str | None, since: float | None) -> Thread | None:
         """The thread `pick` chooses among the rows, read again once when the
         cached rows predate `text`: "Bubble tea ?" then "?" twenty seconds
         later found the first one's preview still cached, so "?" matched no
-        thread, went to a chat of its own and was screened as a lone "?"."""
+        thread, went to a chat of its own and was screened as a lone "?".
+        `since` (the push's time) tells a new "?" from an old one."""
         thread = None
         for refresh in (False, True):
             if refresh and time.monotonic() - self._read_at < self.FRESH_SECONDS:
@@ -402,20 +411,20 @@ class Instagram:
                 if candidate is not None:
                     thread = candidate
                     break
-            if thread is not None and (text is None or any(_same(i.text, text) for i in thread.items)):
+            if thread is not None and (text is None or self._has(thread, text, since)):
                 return thread
         return thread
 
-    async def find(self, text: str) -> Thread | None:
-        """The thread whose newest message is `text`."""
+    async def find(self, text: str, since: float | None = None) -> Thread | None:
+        """The thread whose newest message is `text` (sent after `since`)."""
         def pick(row):
             thread = thread_from_inbox(row, self._tail(row))
-            return thread if thread and any(_same(item.text, text) for item in thread.items) else None
-        return await self._lookup(pick, text)
+            return thread if thread and self._has(thread, text, since) else None
+        return await self._lookup(pick, text, since)
 
-    async def thread(self, thread_id: str, text: str | None = None) -> Thread | None:
+    async def thread(self, thread_id: str, text: str | None = None, since: float | None = None) -> Thread | None:
         """The thread `thread_id`; with `text`, read again when the cached row
-        does not have it yet."""
+        does not have it yet (or only an older message reading the same)."""
         if not thread_id.isdigit():
             return None
 
@@ -423,7 +432,7 @@ class Instagram:
             if thread_id in (str(row.get("id")), str(row.get("v2"))):
                 return thread_from_inbox(row, self._tail(row))
             return None
-        return await self._lookup(pick, text)
+        return await self._lookup(pick, text, since)
 
     def _tail(self, row: dict) -> list[dict]:
         return self._tails.get(str(row.get("id") or ""), [])
@@ -527,8 +536,8 @@ async def resolve_instagram(instagram: Instagram, pipeline: Pipeline, payload: d
     and its history; the notification alone when it cannot be found."""
     try:
         tid = thread_id_of(payload)
-        thread = await instagram.thread(tid, message.text) if tid else None
-        thread = thread or await instagram.find(message.text)
+        thread = await instagram.thread(tid, message.text, message.time) if tid else None
+        thread = thread or await instagram.find(message.text, message.time)
     except Exception as err:
         log.warning("instagram: could not find the thread: %s", err)
         thread = None
