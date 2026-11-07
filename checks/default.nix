@@ -5,8 +5,8 @@ let
 in
 {
   # The plugins' tests (unii, guard against a fake System One server on
-  # loopback, owner_approval, lost_turns against Hermes' own session store),
-  # in the interpreter Hermes runs them with.
+  # loopback, owner_approval, lost_turns against Hermes' own session store,
+  # front_desk in Hermes' own agent loop), in the interpreter Hermes runs them with.
   unii = pkgs.runCommand "unii-tests" { __darwinAllowLocalNetworking = true; nativeBuildInputs = [ pkgs.git ]; } ''
     cp -R ${../modules/hermes/plugins} plugins
     chmod -R u+w plugins

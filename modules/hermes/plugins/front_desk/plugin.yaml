@@ -1,0 +1,9 @@
+name: front_desk
+version: 1.0.0
+description: "The owner's main Telegram chat answers and dispatches: past a short budget a turn may only hand its work to a background subagent, and a long foreground command runs in the background."
+author: "personal-server-nixconfig"
+provides_hooks:
+  - pre_llm_call
+  - pre_tool_call
+  - on_human_input_request
+  - on_human_input_resolved

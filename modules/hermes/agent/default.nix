@@ -23,6 +23,7 @@ in
     (import ../coding-agent).agent
     ./owner-approval.nix
     ./lost-turns.nix
+    ./front-desk.nix
     ./apple.nix
     ./whatsapp.nix
     ./browser.nix

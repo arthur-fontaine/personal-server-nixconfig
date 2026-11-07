@@ -318,10 +318,35 @@ the transcript keeps everything, and `session_search` reaches it. It commits
 only when it reclaims 4k tokens, so the prompt cache is not broken every turn.
 
 What the model can do from its side is in the prompt: several commands in one
-call, independent calls in one message, no second `skills_list`, and long
-work — many steps rather than one command — handed to `delegate_task`, which
-answers at once and posts its result as a message. A turn held open is a turn
-in which what the user sends goes unanswered.
+call, independent calls in one message, no second `skills_list`.
+
+## The main chat is a front desk
+
+A chat is one queue: while a turn runs, what you send waits for it. A turn
+that watched a build for hours left every message unanswered for hours, and
+on an ordinary day messages waited 1 to 10 minutes. So the main chat only
+answers and dispatches; anything longer runs in a background subagent
+(`delegate_task`, whose top-level calls answer at once and post their result
+as a new message). The prompt says so, and the `front_desk` plugin
+(`modules/hermes/plugins/front_desk`) enforces it:
+
+- A turn of the main chat may make 8 tool calls or run 2 minutes
+  (`server.hermes.frontDesk`; the time spent waiting on your answer, an
+  approval card or a question, not counted). Past that, its tool calls are
+  refused, and the refusal tells Hermes to hand the rest to `delegate_task`
+  with the whole context, say what it launched, and end the turn. What stays
+  open: `delegate_task`, questions and messages to you, memory and recall,
+  finding a tool, and checking on or stopping a background command.
+- A foreground command that may run more than a minute (a longer timeout, a
+  build, a rebuild, an install, a test run, a long `sleep`) runs in the
+  background instead and notifies when it exits: its result is a new message.
+
+Only the main chat's own turns: a subagent works as long as it needs (it is
+neither capped nor its commands moved, and it waits for its own builds), and
+so do the sub-chats, the events' turns, cron and the CLI. A subagent's actions
+are reviewed by guard as its parent's would be, with the parent's messages,
+and what guard does not clear comes to you as an approval card, as in the
+main chat.
 
 ## A rebuild in the middle of a turn
 

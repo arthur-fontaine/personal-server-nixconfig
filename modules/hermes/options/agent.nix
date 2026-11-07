@@ -150,5 +150,40 @@ in
       default = true;
       description = "After the fallbacks, the local model (uzu): slow and small, but always there.";
     };
+
+    # The main chat answers and dispatches (../plugins/front_desk): a turn
+    # there holds every message the user sends behind it.
+    frontDesk = {
+      seconds = mkOption {
+        type = types.ints.positive;
+        # A step costs 3 to 6 s on a fresh session and up to ~30 s on a long
+        # one (docs/hermes.md, "Speed"): two minutes is a handful of steps,
+        # enough to answer, and the most a message should wait.
+        default = 120;
+        description = ''
+          Seconds a turn of the main chat may run (the time spent waiting on
+          the user's answer not counted) before its tool calls are blocked but
+          delegate_task and the ones that answer or recall.
+        '';
+      };
+      toolCalls = mkOption {
+        type = types.ints.positive;
+        # Several commands in one call and independent calls in one message
+        # are the prompt's rule, so eight calls are a lookup, not a task.
+        default = 8;
+        description = "Tool calls a turn of the main chat may make before the same block.";
+      };
+      foregroundSeconds = mkOption {
+        type = types.ints.positive;
+        # A foreground command blocks even a steered message until it exits
+        # (agent/interrupt_control.py: steer() never yields it).
+        default = 60;
+        description = ''
+          A foreground command of the main chat with a longer timeout (or a
+          build, an install, a test run, a longer sleep) runs in the
+          background instead, and notifies when it exits.
+        '';
+      };
+    };
   };
 }
