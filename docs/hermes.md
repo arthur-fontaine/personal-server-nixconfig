@@ -328,9 +328,20 @@ the old gateway to be gone before it starts the new one.
 
 A turn that was killed rather than stopped (a crash, a power loss, a stop that
 overran the 60 s) is one Hermes cannot tell finished or not: it marks it
-`unknown` and pauses the chat, answering "⏸️ This conversation is paused…" and
-nothing else, until you say what to do. Send `/discard` in Telegram to drop the
-lost turn (it is not re-run, it stays in the transcript) and let the waiting
-messages run, or `/reset` for a fresh conversation. From a shell on the server,
-as Hermes and while the gateway runs (with none running, the command starts
-one of its own), `hermes sessions discard <session> --yes` does the same.
+`unknown`. Upstream then pauses the chat behind it until you send `/discard`
+(it settles on its own only a turn nobody sent: a cron run, an event, a
+webhook). Here the `lost_turns` plugin (`modules/hermes/plugins/lost_turns`)
+settles your own Telegram turn the same way `/discard` would, so you never
+have to: as the gateway starts, before Telegram connects, and again before
+any message of yours if a turn was lost while it kept running. The lost turn
+is not re-run; it ends in the transcript with a notice that it was cut off, so
+Hermes knows it stopped half-way and checks where the work stands before it
+carries on. The messages you sent meanwhile then run in order. When you sent
+nothing meanwhile, Hermes gets one turn of its own to pick the work up or tell
+you where it stopped (a `[SYSTEM: …]` turn, so the auto-review treats its
+actions as not asked by you). If that turn is lost too, Hermes settles it
+itself and does not try again.
+
+Other chats (a group, another platform) still pause as upstream does: send
+`/discard` there, or, from a shell on the server as Hermes while the gateway
+runs, `hermes sessions discard <session> --yes`.

@@ -22,6 +22,7 @@ in
     ./outbox.nix
     (import ../coding-agent).agent
     ./owner-approval.nix
+    ./lost-turns.nix
     ./apple.nix
     ./whatsapp.nix
     ./browser.nix
