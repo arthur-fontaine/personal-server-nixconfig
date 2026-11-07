@@ -1,0 +1,17 @@
+name: app_topic
+version: 1.0.0
+description: "Hermes' side of the owner's iOS app: the hidden App topic of the Telegram DM (state, questions, notifications' spoken text, requests), model and machine stats, the pet, big files and spoken call turns."
+author: "personal-server-nixconfig"
+provides_hooks:
+  - pre_gateway_dispatch
+  - pre_api_request
+  - pre_tool_call
+  - post_tool_call
+  - on_human_input_request
+  - on_human_input_resolved
+  - on_session_end
+  - pre_approval_request
+  - pre_llm_call
+  - post_api_request
+  - api_request_error
+  - post_auxiliary_call

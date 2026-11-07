@@ -151,6 +151,36 @@ ask_key() { # provider label variable [without it]
   fi
 }
 
+# An OpenAI-compatible API's address and key, checked on its /models, which
+# also lists its models: the models' "Another OpenAI-compatible API" and the
+# App's custom image API. Asks until it answers or is skipped (returns 1).
+# Sets api_url, api_key (empty when it takes none) and api_models.
+openai_api() { # name key-variable [address placeholder]
+  local name="$1" var="$2" response status auth
+  api_url="${api_url:-}" api_key="$(secret_value "$var")" api_models=""
+  while :; do
+    api_url="$(gum input --value "$api_url" --header "$name's address, the one /models hangs from" \
+      --placeholder "${3:-https://api.example.com/v1}")"
+    api_url="${api_url%/}"
+    [ -n "$api_url" ] || return 1
+    [ -n "$api_key" ] || api_key="$(gum input --password --header "$name API key ($var; empty if it takes none)" | tr -d '[:space:]')"
+    auth=()
+    [ -n "$api_key" ] && auth=(-H "Authorization: Bearer $api_key")
+    response="$(curl -s -w '\n%{http_code}' --max-time 15 ${auth[@]+"${auth[@]}"} "$api_url/models" || true)"
+    status="${response##*$'\n'}"
+    api_models="$("$JQ" -r '.data[]?.id // empty' <<< "${response%$'\n'*}" 2>/dev/null || true)"
+    case "$status" in
+      2??) [ -n "$api_models" ] && ok "$name answers, with $(wc -l <<< "$api_models" | tr -d ' ') models" && break
+        warn "$name answers, but lists no models: you will type the model's id." && break ;;
+      401 | 403) warn "$name refused that key (status $status)."; api_key="" ;;
+      000) warn "Nothing answers at $api_url from this Mac: a wrong address, another network, or the local network not allowed." ;;
+      *) warn "$api_url/models answers $status: not an OpenAI-compatible address?" ;;
+    esac
+    gum confirm --affirmative "Try again" --negative "Skip" "Retry?" || return 1
+  done
+  [ -z "$api_key" ] || set_secret "$var" "$api_key"
+}
+
 # A part already set up: says so, and offers to change it. True when it stays.
 keep() {
   ok "$1"

@@ -265,6 +265,28 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
   ] ++ lib.optionals server.hermes.app.delivery.enable [
     "Your own iOS app is the sideload app `hermes`: reinstall it with"
     "`sideload_install` after a new pet, when the user asks, or after a failed install."
+  ] ++ [ "" ]))}${lib.optionalString server.hermes.app.enable (lib.concatMapStrings (line: "\n  ${line}") ([
+    "The user also reads this chat in their own iOS app, which hides the topic"
+    "named App (machine messages, kept by a plugin: never write there). Your"
+    "messages may be read aloud by Siri from a notification, from a short spoken"
+    "version made of your text. When yours would sound wrong aloud (a table, a"
+    "list of commands), end it with a line `🔊 ` and one or two plain spoken"
+    "sentences; it is not shown in the notification."
+    "A file too big for Telegram arrives as a line `[fichier: <url>]`:"
+    "`bigfile_fetch` downloads it into ~/.hermes/files. To send one over 50 MB,"
+    "`bigfile_send` gives such a line: put it alone at the end of your reply."
+  ]
+  ++ [
+    "A message starting with 🎙 is the user speaking in a call: their app"
+    "reads your answer aloud as it streams. Answer as on the phone: first one"
+    "short sentence that answers or says what you will do, then short spoken"
+    "sentences; no markdown, lists, links, code or emoji; say so before a long step."
+  ]
+  ++ lib.optionals (server.hermes.app.images.provider != null) [
+    "`pet_generate` hatches a new pet for the app from a description (minutes,"
+    "about ten images: in the main chat, through a background subagent). It"
+    "becomes the app's icon only once the app is rebuilt and reinstalled"
+    "(`app_install`): decide when that is worth it, and on which devices."
   ] ++ [ "" ]))}
   Apple apps act on the user's Apple Account, which ${agent} is signed in to:
   - Messages, Reminders, Notes, Find My: your skills (`imsg`, `remindctl`,
