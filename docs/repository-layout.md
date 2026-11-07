@@ -47,6 +47,7 @@ modules/
       tests/              the plugin's tests, against a fake sidecar
     events/               hermes_events: screens incoming messages, posts proposals (Python)
     fast-act/             fast_act: browser_fast_act, a decision model driving Chrome through Cua (Python)
+    app-delivery/         the iOS app built, signed and installed from here: hermes-app (CLI, launchd job), the plugin app_delivery (docs/app.md)
   uzu/                    local models: options, the mirai server
   home/                   the administrator's home-manager configuration
 ```
@@ -58,6 +59,7 @@ nix flake check                                   # everything below
 nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval, outbox, lost_turns, front_desk)
 nix build .#checks.aarch64-darwin.coding-agent    # the coding agent's plugin, against a fake sidecar
 nix build .#checks.aarch64-darwin.sandbox         # the coding agent's sidecar tests, in its build
+nix build .#checks.aarch64-darwin.app-delivery    # hermes-app and its plugin, against fake Apple tools
 nix build .#checks.aarch64-darwin.events          # the events daemon's tests
 nix build .#checks.aarch64-darwin.freeze          # what hermes-freeze picks
 nix build .#checks.aarch64-darwin.instagram       # the Instagram skill's direct.js, against stand-ins for the page
