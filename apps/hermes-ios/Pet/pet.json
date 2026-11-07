@@ -1,0 +1,8 @@
+{
+  "id": "pip",
+  "displayName": "Pip",
+  "name": "Pip",
+  "description": "A small winged messenger, Hermes' default companion.",
+  "spritesheetPath": "spritesheet.webp",
+  "version": 0
+}
