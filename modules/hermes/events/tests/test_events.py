@@ -756,6 +756,11 @@ class InstagramInboxTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mine.items[0].sender, "me")
         mine_fr = thread_from_inbox({**INBOX_ROW, "text": "Vous : ok"})
         self.assertEqual(mine_fr.items[0].sender, "me")
+        for own in ("You sent a video.", "Vous avez envoyé une pièce jointe.", "You replied to a story"):
+            self.assertEqual(thread_from_inbox({**INBOX_ROW, "text": own}).items[0].sender, "me", own)
+        # A friend's message that merely starts with the word is theirs.
+        for theirs in ("Vous venez ce soir ?", "You up?", "Vous avez faim ?"):
+            self.assertEqual(thread_from_inbox({**INBOX_ROW, "text": theirs}).items[0].sender, "zoe.martin", theirs)
         # A group names the thread, not who in it wrote.
         group = thread_from_inbox({**INBOX_ROW, "group": True, "users": ["a", "b"], "text": "oui"})
         self.assertFalse(group.sender_of("oui"))

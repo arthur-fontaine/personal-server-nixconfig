@@ -38,8 +38,15 @@ log = logging.getLogger("hermes_events")
 # to read the inbox the same way (hermes_events/../agent/skills/instagram).
 DIRECT_JS = (pathlib.Path(__file__).with_name("direct.js")).read_text()
 
-# A thread's newest message, as the app previews it: "You: …" is the user's own.
-_OWN = re.compile(r"^(?:you|vous)\b", re.IGNORECASE)
+# A thread's newest message, as the app previews it: "You: …" is the user's own,
+# and so are the app's own phrasings of what they did ("You sent a video.").
+# The separator is required: a friend's "Vous venez ce soir ?" starts with
+# "Vous" too.
+_OWN = re.compile(
+    r"^(?:(?:you|vous)\s*:"
+    r"|you (?:sent|replied|reacted|liked|shared|unsent|mentioned)\b"
+    r"|vous avez (?:envoyé|répondu|réagi|aimé|partagé|retiré|mentionné)\b)",
+    re.IGNORECASE)
 
 BINDING = "hermesNotify"
 HOOK = """(() => {
