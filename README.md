@@ -9,9 +9,8 @@ The layout follows [arthur-fontaine/nixconfig](https://github.com/arthur-fontain
 ## What it sets up
 
 - **Hermes, configured from scratch** (no `hermes setup`), as its own macOS
-  account, on a chain of models you choose: for example your ChatGPT
-  subscription, then OpenCode Zen's DeepSeek, then the local model, each taking
-  over when the one before fails.
+  account, on a chain of models you choose: for example OpenCode Go's DeepSeek,
+  then your ChatGPT subscription, each taking over when the one before fails.
 - **One chat that never ends**: your Telegram DM with the bot is the main chat,
   with UniiChat-style memory instead of sessions and compaction.
 - **Sub-chats**: topics the bot opens in that DM (`/sub new`), and any group

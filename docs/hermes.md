@@ -277,11 +277,18 @@ guard's approval card is the question, with or without a decision model
 
 - A chain, chosen by the bootstrap (or set in `hosts/local.nix`): the main model
   (`server.hermes.model`), then its fallbacks in order (`server.hermes.fallbacks`),
-  then the local model (`server.hermes.localFallback`). When one fails (a limit
-  reached, an outage, an expired login), Hermes goes on with the next for that
-  turn, and tries the main one again on the next turn ([Hermes' fallback
+  then, only if `server.hermes.localFallback` is on, the local model. When one
+  fails (a limit reached, an outage, an expired login, no funds left), Hermes
+  goes on with the next for that turn, and tries the main one again on the next
+  turn ([Hermes' fallback
   providers](https://hermes-agent.nousresearch.com/docs/user-guide/features/fallback-providers)).
-  For example: your ChatGPT subscription, then OpenCode's DeepSeek, then uzu.
+  For example: OpenCode Go's DeepSeek, then your ChatGPT subscription.
+- A fallback is the model used least, so the one whose failure goes unseen:
+  keep in the chain only what still has funds or quota. On Nov 6, 2026 the
+  ChatGPT plan's limit was reached (Hermes waited ~20 days to retry it) and
+  OpenCode Zen had no funds left, so every turn went to the local model, which
+  took 5 to 95 minutes a turn on the main chat's prompt: `localFallback` is off
+  by default since.
 - Any provider Hermes knows, any of its models: the bootstrap lists them from
   Hermes itself (`scripts/lib/hermes-models.py`, the provider's live list when
   it has one), asks for the provider's key as soon as it is chosen, and takes a

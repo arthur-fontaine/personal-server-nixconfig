@@ -152,8 +152,14 @@ in
     };
     localFallback = mkOption {
       type = types.bool;
-      default = true;
-      description = "After the fallbacks, the local model (uzu): slow and small, but always there.";
+      # Off: the main chat's prompt (50 to 75k tokens) is beyond what a local
+      # model prefills in reasonable time. On Nov 6, 2026, with every remote
+      # model failing, each turn on uzu took 5 to 95 minutes.
+      default = false;
+      description = ''
+        After the fallbacks, the local model (server.uzu), when there is one:
+        always there, but minutes a step on the main chat.
+      '';
     };
 
     # The main chat answers and dispatches (../plugins/front_desk): a turn
