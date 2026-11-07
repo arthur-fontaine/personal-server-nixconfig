@@ -195,9 +195,10 @@ const openPayload = {
       thread_title: "Zoé, Nino et Sam",
       users: [{ pk: "4242", username: "azur.exemple" }, { pk: "7", username: "zoe.martin" }],
       items: [
-        { item_id: "1", user_id: "7", timestamp: 1767225000000000, item_type: "text", text: "Bubble tea ?" },
-        { item_id: "2", user_id: "4242", timestamp: 1767225600000000, item_type: "text", text: "?" },
+        // Newest first, as the app sends them.
         { item_id: "3", user_id: "7", timestamp: 1767225660000000, item_type: "like" },
+        { item_id: "2", user_id: "4242", timestamp: 1767225600000000, item_type: "text", text: "?" },
+        { item_id: "1", user_id: "7", timestamp: 1767225000000000, item_type: "text", text: "Bubble tea ?" },
       ],
     },
   },
@@ -205,6 +206,20 @@ const openPayload = {
 // The response the hook's own fetch returns: swap what it answers with.
 payload = openPayload;
 globalThis.fetch("https://www.instagram.com/api/graphql/thread");
+await settle();
+await settle();
+// Another thread with items, captured after: not the one the URL names.
+payload = {
+  data: {
+    thread: {
+      id: "1000000000000009",
+      thread_id: "340282366841710300949128000000000000009",
+      users: [{ pk: "8", username: "nino.dupont" }],
+      items: [{ item_id: "9", user_id: "8", timestamp: 1767226000000000, item_type: "text", text: "pas ce fil" }],
+    },
+  },
+};
+globalThis.fetch("https://www.instagram.com/api/graphql/prefetch");
 await settle();
 await settle();
 

@@ -349,17 +349,22 @@
     }[kind] || (kind ? `[${kind}]` : "");
   };
 
-  const openThread = () => {
+  // The thread the URL names, never just the last one captured: the inbox and
+  // a prefetched neighbour carry items too.
+  const namesOf = (t) =>
+    [idOf(t), v2Of(t), t.id, t.thread_id, t.thread_v2_id, t.threadId].filter((v) => v != null).map(String);
+  const openThread = (urlId) => {
     const found = [];
     for (const { body } of responses) walk(body, found, 0);
-    const withItems = found.filter((t) => Array.isArray(t.items) && t.items.length);
+    const withItems = found.filter((t) => Array.isArray(t.items) && t.items.length
+      && (!urlId || namesOf(t).includes(urlId)));
     return withItems.length ? withItems[withItems.length - 1] : null;
   };
 
   ig.thread = () => {
-    const opened = openThread();
-    const id = (String(globalThis.location?.href || "").match(/\/direct\/t\/(\d+)/) || [])[1]
-      || (opened ? idOf(opened) : null);
+    const urlId = (String(globalThis.location?.href || "").match(/\/direct\/t\/(\d+)/) || [])[1] || null;
+    const opened = openThread(urlId);
+    const id = urlId || (opened ? idOf(opened) : null);
     const viewer = store.viewer;
     const out = { id, me: viewer, messages: null, text: visible().slice(-4000) };
     if (!opened) return out;
@@ -379,7 +384,9 @@
         text: itemText(item),
         at,
       };
-    }).filter((m) => m.text);
+    }).filter((m) => m.text)
+      // The app sends them newest first; the skill promises oldest first.
+      .sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
     return out;
   };
 
