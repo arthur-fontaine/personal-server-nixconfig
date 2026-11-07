@@ -1,15 +1,15 @@
-# ── The Hermes app's devices ────────────────────────────────────────────────
-# The iPhones and iPads Hermes can install its app on (hermes-app, docs/app.md).
+# ── Sideload: your devices ──────────────────────────────────────────────────
+# The iPhones and iPads the sideload service installs apps on (docs/sideload.md).
 # A device must be plugged into this Mac once, by cable: paired (you tap
 # Trust on it), with Developer Mode on; from then on Xcode reaches it over the
 # local network. Also run at Hermes' login (scripts/hermes-setup.sh): done
 # when a device is paired, or when you said you have none for now. Through
-# the launcher, in Hermes' session, as hermes-app's own job runs.
-[ "$(setting server.hermes.app.delivery.enable)" = 1 ] || return 0
-step "The Hermes app's devices"
+# the launcher, in Hermes' session, as the sideload job runs (as Hermes' account).
+[ "$(setting server.sideload.enable)" = 1 ] || return 0
+step "Sideload: your iPhones and iPads"
 
-app_skipped="$agent_home/.local/state/hermes-setup/app-devices-skipped"
-app_devices() { as_gateway "hermes-app devices" 2>/dev/null || true; }
+app_skipped="$agent_home/.local/state/hermes-setup/sideload-devices-skipped"
+app_devices() { as_gateway "sideload devices" 2>/dev/null || true; }
 # Ready: paired, with Developer Mode on (an install fails without it).
 app_ready='.devices[]? | select(.paired and (.developer_mode == null or .developer_mode == "enabled"))'
 app_paired() { "$JQ" -r "[$app_ready] | length" <<< "$1" 2>/dev/null || echo 0; }
@@ -63,7 +63,7 @@ app_devices_loop() {
       Done) return 0 ;;
       "I have no device for now")
         as_agent mkdir -p "$(dirname "$app_skipped")" && as_agent touch "$app_skipped"
-        note "Not asked again at each login; run bootstrap-macos.sh app-devices to add one."
+        note "Not asked again at each login; run bootstrap-macos.sh sideload-devices to add one."
         return 0
         ;;
     esac
@@ -76,27 +76,27 @@ if ! gui_session; then
 fi
 app_json="$(app_devices)"
 if [ -z "$app_json" ]; then
-  warn "hermes-app does not answer yet (the configuration not applied?): run bootstrap-macos.sh app-devices later."
+  warn "sideload does not answer yet (the configuration not applied?): run bootstrap-macos.sh sideload-devices later."
   return 0
 fi
 app_error="$("$JQ" -r '.error // empty' <<< "$app_json" 2>/dev/null || true)"
 [ -z "$app_error" ] || warn "devicectl: $app_error"
-if [ "$(app_paired "$app_json")" -gt 0 ] && keep "The Hermes app can be installed on: $(app_names "$app_json")"; then
+if [ "$(app_paired "$app_json")" -gt 0 ] && keep "Apps can be sideloaded on: $(app_names "$app_json")"; then
   :
-elif [ "$(app_paired "$app_json")" = 0 ] && as_agent test -e "$app_skipped" && keep "No device for the Hermes app for now"; then
+elif [ "$(app_paired "$app_json")" = 0 ] && as_agent test -e "$app_skipped" && keep "No device to sideload on for now"; then
   :
-elif needs "a device for the Hermes app" && gum confirm "Pair an iPhone or iPad for the Hermes app now?"; then
+elif needs "a device to sideload on" && gum confirm "Pair an iPhone or iPad now?"; then
   as_agent rm -f "$app_skipped"
   hermes_lit 1
   app_devices_loop
   hermes_lit "$(setting server.energy.displayBrightness)"
   app_json="$(app_devices)"
   if [ "$(app_paired "$app_json")" -gt 0 ]; then
-    ok "The Hermes app can be installed on: $(app_names "$app_json")"
-    note "Hermes installs it again when it decides to (a new pet, or when you ask it to)."
-    if ask "Install the app on them now (a few minutes, in the background)?"; then
-      as_gateway "hermes-app install --reason 'first install'" >/dev/null 2>&1 \
-        && ok "Installing: its log is ~$agent/Library/Logs/hermes-app.log" \
+    ok "Apps can be sideloaded on: $(app_names "$app_json")"
+    if [ "$(setting server.hermes.app.delivery.enable)" = 1 ] \
+      && ask "Install the Hermes app on them now (a few minutes, in the background)?"; then
+      as_gateway "sideload install hermes --reason 'first install'" >/dev/null 2>&1 \
+        && ok "Installing: its log is ~$agent/Library/Logs/sideload.log" \
         || warn "Could not start the install: ask Hermes to install the app."
     fi
   fi

@@ -35,6 +35,7 @@
             ./modules/system
             ./modules/hermes
             ./modules/uzu
+            ./modules/sideload
             home-manager.darwinModules.home-manager
             # A host's `server = { ... };` sets the options under server.*.
             { server = hostConfig.server or { }; }

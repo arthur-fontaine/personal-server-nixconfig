@@ -22,7 +22,6 @@ in
     ./guard.nix
     ./outbox.nix
     (import ../coding-agent).agent
-    (import ../app-delivery).agent
     ./owner-approval.nix
     ./lost-turns.nix
     ./front-desk.nix

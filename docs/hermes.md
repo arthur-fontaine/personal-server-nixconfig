@@ -278,14 +278,15 @@ branch, your answer to a question, or a command here (always your buttons).
 You take the branch with `git fetch`, after reading it. The
 details: [sandbox.md](sandbox.md).
 
-## The Hermes app
+## iOS apps on your devices, and the Hermes app
 
-With `server.hermes.app.delivery.enable`, Hermes builds its iPhone and iPad
-app on this Mac, signs it with your Apple Account (a free one works) and
-installs it on your devices over Wi-Fi: `app_devices` lists them,
-`app_install` rebuilds and installs (after a new pet, or when you ask), and a
-launchd job re-signs it before its 7-day profile expires. Details:
-[app.md](app.md).
+With the sideload service (`server.sideload.enable`, [sideload.md](sideload.md)),
+Hermes installs any iOS app you ask for on your iPhones and iPads (an `.ipa`
+you send or link, an Xcode project by path or git URL) and the service keeps
+it signed: `sideload_devices`, `sideload_apps` (with a free team's limits: 3
+apps per device, 10 new App IDs a week), `sideload_install`,
+`sideload_remove`. The Hermes app (`server.hermes.app.delivery.enable`) is
+one such app, rebuilt with the current pet: [app.md](app.md).
 
 ## Integrations: WhatsApp, Instagram, Discord, 1Password…
 
