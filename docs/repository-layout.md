@@ -34,7 +34,7 @@ modules/
       prompt/             SOUL.md (UniiChat's prompt), AGENTS.md (this server's rules)
       session/            its GUI session: launchd agents, display, fsearch, defaults, the setup at login
     plugins/unii/         the single-chat memory and sub-chats (Python)
-    plugins/guard/        the auto-review of Hermes' actions by a decision model (Python)
+    plugins/guard/        the permission system: Claude Code's auto mode (fast paths, a decision-model classifier, /mode) and command titles on approval cards (Python)
     plugins/owner_approval/  asks you with Telegram buttons from outside a turn, for other plugins (Python)
     plugins/outbox/       says so when the gateway will not send an attachment of a reply (Python)
     plugins/lost_turns/   settles your Telegram turn cut off by a gateway crash, so the chat never waits for /discard (Python)
