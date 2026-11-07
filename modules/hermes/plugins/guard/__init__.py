@@ -150,6 +150,7 @@ class Guard:
     ):
         session = self._session(session_id)
         parent = self.sessions.get(parent_session_id) if parent_session_id else None
+        session.subagent = session.subagent or bool(parent_session_id)
         if parent is not None and not session.messages:
             # A subagent (delegate_task) works for its parent's turn: what the
             # user wrote there, and whether that turn was theirs, carry over.
@@ -186,11 +187,58 @@ class Guard:
             message = f"{verdict.reason}: {summary(tool_name, args)}"
         else:
             message = f"{summary(tool_name, args)} (auto-review: {verdict.reason})"
-        return {
-            "action": "approve",
-            "message": message,
-            "rule_key": f"guard:{tool_name}:{grain}",
-        }
+        rule_key = f"guard:{tool_name}:{grain}"
+        if session.subagent and _no_card():
+            return _ask_owner(message, rule_key)
+        return {"action": "approve", "message": message, "rule_key": rule_key}
+
+
+def _no_card() -> bool:
+    """Whether Hermes' approval gate would ask nobody: in the gateway, its
+    card goes through a notifier the running turn registers and removes when
+    it ends (gateway/run_turn_runner.py, _run_conversation_with_approval).
+    A background subagent (delegate_task) still working after its parent's
+    turn ended finds none, and the gate stores a pending approval the user
+    never sees (tools/approval.py, _pending_result): the action is refused
+    without a question."""
+    try:
+        from tools.approval import _gateway_notify_cb
+        from tools.approval_context import _is_gateway_approval_context, get_current_session_key
+
+        return _is_gateway_approval_context() and _gateway_notify_cb(get_current_session_key()) is None
+    except Exception:
+        return False
+
+
+# The owner's buttons for a subagent's action: what the card offers, but
+# Always (a permanent rule is the card's to write).
+SUBAGENT_CHOICES = [("once", "Allow once"), ("session", "Allow for this session"), ("deny", "Deny")]
+
+
+def _ask_owner(message: str, rule_key: str):
+    """Ask with owner_approval's buttons, in the main chat, from the
+    subagent's own thread (it blocks until the tap, as the card would)."""
+    try:
+        from tools.approval import approve_session, is_approved
+        from tools.approval_context import _get_approval_timeout, get_current_session_key
+
+        session_key = get_current_session_key()
+        pattern_key = f"plugin_rule:{rule_key}"  # what the card's Session and Always grant
+        if is_approved(session_key, pattern_key):
+            return None
+        from owner_approval import ask
+
+        choice = ask("A subagent wants to act", message, SUBAGENT_CHOICES, timeout=_get_approval_timeout())
+    except Exception:
+        logger.warning("guard: could not ask the owner for a subagent's action", exc_info=True)
+        choice = "unavailable"
+    if choice == "session":
+        approve_session(session_key, pattern_key)
+    if choice in ("once", "session"):
+        return None
+    reason = {"deny": "the user denied it", "timeout": "the user did not answer in time"}.get(
+        choice, "the user could not be asked")
+    return {"action": "block", "message": f"BLOCKED: {reason}. Do not retry it; say so in your result. ({message})"}
 
 
 # The loaded Guard, for other plugins (the sandbox's network questions):

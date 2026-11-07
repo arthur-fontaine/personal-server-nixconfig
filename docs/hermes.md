@@ -201,6 +201,13 @@ decision model reviews the request against your messages from when Hermes
 started the session, never Pi's, and what it does not clear comes to you as
 buttons. Without a decision model, every such request comes to you.
 
+A subagent (`delegate_task`) is reviewed with its parent's messages. When
+its action needs your yes after its parent's turn ended (a background
+subagent usually does), Hermes' card has no turn to post in, and its gate
+would refuse the action without asking anyone; guard asks you instead, with
+`owner_approval`'s buttons in the main chat: Allow once, Allow for this
+session, Deny.
+
 Every question Hermes asks you has buttons. Its own belong to a turn: its
 approval card and the `clarify` tool's choices are buttons in the chat the
 turn runs in (its instructions say to ask with `clarify`, not in a reply),

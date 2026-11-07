@@ -236,8 +236,71 @@ def main() -> None:
     plugin.GUARD = None
     assert len(REQUESTS) == sent, "no request without a model"
 
+    subagent_after_its_parent(port)
     httpd.shutdown()
     print("guard: ok")
+
+
+def subagent_after_its_parent(port: int) -> None:
+    """A background subagent acting after its parent's turn ended: no turn
+    has the chat's approval card, so it asks with owner_approval's buttons."""
+    import types
+
+    from gateway.session_context import clear_session_vars, set_session_vars
+    from tools.approval import register_gateway_notify, request_tool_approval, unregister_gateway_notify
+    from tools.approval_context import reset_current_session_key, set_current_session_key
+
+    chat = "agent:main:telegram:dm:4242"
+    tokens = set_session_vars(platform="telegram", session_key=chat)
+    key = set_current_session_key(chat)
+    try:
+        # The premise, at the pinned revision: Hermes' own gate asks nobody.
+        result = request_tool_approval("terminal", "x", rule_key="guard:premise")
+        assert not result["approved"] and result.get("status") == "approval_required", result
+
+        asked, answers = [], []
+        owner = types.ModuleType("owner_approval")
+        owner.ask = lambda title, details, choices, timeout=300: asked.append(details) or answers.pop(0)
+        sys.modules["owner_approval"] = owner
+        g = guard(port)
+        g.pre_llm_call(session_id="p", user_message="Range mes téléchargements", platform="telegram")
+        g.pre_llm_call(session_id="kid", user_message="(task)", platform="subagent", parent_session_id="p")
+        ANSWER.clear()
+        ANSWER.update(authorization="low", risk="medium")
+        move = {"command": "mv ~/Downloads/a ~/Documents/"}
+
+        answers.append("once")
+        assert g.pre_tool_call("terminal", move, session_id="kid") is None
+        assert "mv ~/Downloads/a" in asked[-1]
+        answers.append("deny")
+        directive = g.pre_tool_call("terminal", move, session_id="kid")
+        assert directive["action"] == "block" and "denied" in directive["message"], directive
+        answers.append("timeout")
+        assert g.pre_tool_call("terminal", move, session_id="kid")["action"] == "block"
+        # "For this session" is the card's Session: the next one runs unasked.
+        answers.append("session")
+        assert g.pre_tool_call("terminal", move, session_id="kid") is None
+        count = len(asked)
+        assert g.pre_tool_call("terminal", {"command": "mv b c"}, session_id="kid") is None
+        assert len(asked) == count
+
+        ANSWER.update(authorization="low", risk="high")
+        # While a turn of the chat runs, its card asks, as for any action.
+        register_gateway_notify(chat, lambda data: None)
+        try:
+            assert g.pre_tool_call("terminal", move, session_id="kid")["action"] == "approve"
+        finally:
+            unregister_gateway_notify(chat)
+        # The main chat's own turn keeps the card (its notifier is live then).
+        assert g.pre_tool_call("terminal", move, session_id="p")["action"] == "approve"
+        assert len(asked) == count
+        # owner_approval not loaded: refused, never run.
+        del sys.modules["owner_approval"]
+        assert g.pre_tool_call("terminal", move, session_id="kid")["action"] == "block"
+    finally:
+        sys.modules.pop("owner_approval", None)
+        reset_current_session_key(key)
+        clear_session_vars(tokens)
 
 
 if __name__ == "__main__":

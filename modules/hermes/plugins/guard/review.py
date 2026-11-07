@@ -105,6 +105,7 @@ class Session:
     actions: deque = field(default_factory=lambda: deque(maxlen=5))
     turn_from_user: bool = False
     hermes_last_message: str = ""
+    subagent: bool = False
 
 
 @dataclass(frozen=True)
