@@ -272,8 +272,13 @@ def thread_from_inbox(row: dict, tail: list[dict] = ()) -> Thread | None:
         # leaves the row carrying the name of the thread and nothing more.
         if _OWN.match(text):
             sender = "me"
+        elif len(names) == 1 and not group:
+            sender = names[0]
         else:
-            sender = names[0] if len(names) == 1 and not group else ""
+            # A group's preview leads with who wrote ("zoe.martin: on mange
+            # où ?"); a name that is not one of its people is the text's own.
+            lead = text.split(":", 1)[0].strip() if ":" in text else ""
+            sender = lead if lead in names else ""
         items.append(Message("", when, sender, text))
     return Thread(tid, str(row.get("name") or ""), group, users, items)
 

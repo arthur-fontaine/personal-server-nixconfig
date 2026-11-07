@@ -69,7 +69,12 @@ print(js('__ig.inbox()'))   # js() awaits, so send() and clear() come back settl
   from `messages`, never from reading `text` in order**: a transcript shows the
   user's own bubbles the same way as everyone else's, so guessing an author
   there is how you tell them a message of theirs was someone else's. `text` is
-  the visible transcript, for a layout question only.
+  the visible transcript, for a layout question only. `messages: null` means
+  the thread's payload was not captured (load the thread again with the
+  script in place) or was renamed: then take authors from a screenshot, where
+  the user's own bubbles sit on the right and others' on the left. In a group,
+  a line with no name above it is not necessarily the previous speaker's: it
+  is often the user's. When you still cannot tell, say so rather than guess.
 - `__ig.send('text')`: types into the open thread's box, presses the page's
   own Send button the way a mouse does (pointer events at its centre: the app
   ignores a plain `.click()`), waits, and reads the box back. `{sent: true,

@@ -759,6 +759,14 @@ class InstagramInboxTest(unittest.IsolatedAsyncioTestCase):
         # A group names the thread, not who in it wrote.
         group = thread_from_inbox({**INBOX_ROW, "group": True, "users": ["a", "b"], "text": "oui"})
         self.assertFalse(group.sender_of("oui"))
+        # Unless its preview leads with one of its people.
+        named = thread_from_inbox({**INBOX_ROW, "group": True, "users": ["a", "zoe.martin"],
+                                   "text": "zoe.martin: on mange où ?"})
+        self.assertEqual(named.items[-1].sender, "zoe.martin")
+        mine = thread_from_inbox({**INBOX_ROW, "group": True, "users": ["a", "zoe.martin"], "text": "You: j'ai une idée"})
+        self.assertEqual(mine.items[-1].sender, "me")
+        stranger = thread_from_inbox({**INBOX_ROW, "group": True, "users": ["a", "b"], "text": "Note: 20 h"})
+        self.assertEqual(stranger.items[-1].sender, "")
         # No id: no chat to key on.
         self.assertIsNone(thread_from_inbox({"name": "x", "text": "y"}))
         # No preview (a photo, a video): the thread, without an item.
