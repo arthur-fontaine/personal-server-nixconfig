@@ -18,7 +18,7 @@ from .readonly import read_only_refusal, realish
 # page (web_extract) is not here: its URL can carry data out.
 ALLOWLIST = frozenset({
     "read_file", "search_files", "session_search", "skill_view", "skills_list",
-    "web_search", "x_search", "vision_analyze", "video_analyze", "view_image_url",
+    "web_search", "x_search", "vision_analyze", "video_analyze",
     "todo", "todo_list", "read_terminal", "read_window_below", "show_tip",
     "memory", "react_to_message", "tool_search", "tool_describe",
     # unii's own tools: they open its memory's view.
