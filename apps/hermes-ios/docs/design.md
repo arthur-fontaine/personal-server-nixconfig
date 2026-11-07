@@ -124,7 +124,22 @@ Hidden: the "App" topic (machine traffic)
 - **Call**: phone button → full-screen call: the pet large in the centre,
   animated by the call state (listening: `waiting`, thinking: `review`,
   speaking: `running`), a live caption under it, mute / speaker / end in a
-  glass bar. Audio session `.voiceChat` for echo cancellation.
+  glass bar. Audio session `.voiceChat` for echo cancellation. The device is
+  the ears and the voice (LFM3-Omni-2B on device, Apple speech as fallback),
+  Hermes is the brain over Telegram: each utterance becomes a `🎙` message,
+  Hermes' draft is spoken sentence by sentence as it grows, a short filler
+  ("One moment.") covers a silence over 1.6 s, and talking over it stops the
+  speech at once.
+- **Commands**: `/` on an empty composer, or *+ › Commands*, opens the
+  palette instead of Telegram's raw list: a search field, "In this chat" with
+  the values in force (model, permission mode) and the curated commands with
+  an icon and one line each. Some are native: the model is a menu of the
+  server's chain with the current one checked and "the last answer came from
+  a fallback" noted; the permission mode is a picker with each mode
+  explained; a new sub-chat is a form; option commands (reasoning effort) are
+  pickers; commands that need words (side question, standing goal) prefill
+  the composer; destructive ones confirm. Setting anything sends the slash
+  command in that chat, so Telegram and the app stay one path.
 - **Glance**: Home Screen widget (pet + status + needs), Lock Screen widget
   (pet + status), Live Activity while it works.
 
@@ -216,6 +231,25 @@ The pet itself: its first idle frame, centred on a solid colour background,
 1024×1024 (`~/.hermes/app/pet/icon.png`, rendered by the backend), dropped
 into `HermesApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png` by the server's
 build. A single-size icon: iOS 26 derives the dark and tinted variants.
+
+## Checked layouts
+
+`scripts/screenshots.sh` tours every screen (chat with and without a question,
+a sub-chat, a private one, the palette, the new sub-chat form, pet,
+dashboard, settings, login, call) on an iPhone 17 Pro and an iPad Pro 13", in
+portrait and landscape. What it showed and what the layouts do:
+
+- iPhone portrait: tabs; landscape (compact height): the question tray drops
+  the command disclosure and the pet goes two-column, so the conversation
+  keeps room.
+- iPad: split view with the floating iOS 26 sidebar; the conversation's
+  readable column is padded inside the detail's safe area (not measured from
+  the container, which extends under the sidebar); the inspector shows in
+  landscape; the dashboard grid has two columns in portrait, three in
+  landscape; sheets are form-sized (the palette full-height, since a half
+  height shows three rows).
+- Narrow iPad windows (Slide Over, Stage Manager) fall back to the iPhone
+  layout through the size class.
 
 ## Accessibility
 
