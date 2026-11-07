@@ -151,9 +151,9 @@ user never got — a screenshot of the browser lives under `~/.config` by
 default, which is how the user asked four times for an image that never left
 the Mac.
 
-Two things here: `BH_TMP_DIR` (`modules/hermes/agent/browser.nix`) moves the
-harness' screenshots into `~/.hermes/cache/screenshots`, a directory the
-gateway delivers from; and the `outbox` plugin
+Two things here: the gateway's allowlist (`gateway.media_delivery_allow_dirs`,
+`modules/hermes/agent/browser.nix`) opens the harness' screenshot folder,
+`~/.config/browser-harness/tmp`, and only it; and the `outbox` plugin
 (`modules/hermes/plugins/outbox`) rewrites any refused attachment into a
 sentence saying it was not sent, before the reply reaches the user and the
 transcript. It reports rather than moves the file: the directories it names are

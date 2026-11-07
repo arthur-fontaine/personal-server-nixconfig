@@ -36,14 +36,17 @@ in
 
   services.hermes-agent.settings.browser.cdp_url = "http://127.0.0.1:${port}";
 
-  # Where the browser harness writes its screenshots (BH_TMP_DIR,
-  # tools/browser_harness_dirs.py). Its default, ~/.config/browser-harness/tmp,
-  # is one of the directories the gateway refuses to deliver files from
-  # (gateway/platforms/base.py, _MEDIA_DELIVERY_DENIED_HOME_SUBPATHS): asked for
-  # one, Hermes could take the screenshot and never send it. A cache root is
-  # deliverable in every mode, and pruned as the cache it is.
-  services.hermes-agent.environment.BH_TMP_DIR =
-    "${server.hermes.home}/.hermes/cache/screenshots/browser-harness";
+  # The browser harness writes its screenshots to ~/.config/browser-harness/tmp
+  # (browser_harness/paths.py, tmp_dir), under ~/.config, which the gateway
+  # refuses to deliver from (gateway/platforms/base.py,
+  # _MEDIA_DELIVERY_DENIED_HOME_SUBPATHS): Hermes took screenshots it could
+  # never send. The operator allowlist is checked before that denylist, so it
+  # opens this one folder and nothing else of ~/.config. Moving the folder with
+  # BH_TMP_DIR instead would also move the daemons' sockets, under one name for
+  # every browser session (browser_harness/_ipc.py, _runtime_stem).
+  services.hermes-agent.settings.gateway.media_delivery_allow_dirs = [
+    "${server.hermes.home}/.config/browser-harness/tmp"
+  ];
 
   home.activation.browserProfile = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     run mkdir -p ${profile}
