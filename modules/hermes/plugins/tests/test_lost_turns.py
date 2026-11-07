@@ -5,20 +5,41 @@ epochs on one SQLite store, as upstream tests its automation settlement
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import queue
+import shutil
+import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+TESTS = Path(__file__).resolve().parent
+PLUGINS = TESTS.parent
+sys.path.insert(0, str(PLUGINS))
 
 OWNER = "4242"
 os.environ["TELEGRAM_ALLOWED_USERS"] = f"{OWNER},77"
 
 import lost_turns as lt  # noqa: E402
+
+LOAD_DEADLINE = 10  # plugins.load_timeout_seconds in these homes
+
+
+def plugin_home(home, enabled=("lost_turns",)):
+    """A Hermes home with lost_turns installed as a user plugin, as on the server."""
+    if "lost_turns" in enabled and not (home / "plugins" / "lost_turns").exists():
+        shutil.copytree(PLUGINS / "lost_turns", home / "plugins" / "lost_turns",
+                        ignore=shutil.ignore_patterns("__pycache__"))
+    (home / "config.yaml").write_text(json.dumps({
+        "plugins": {"enabled": list(enabled), "load_timeout_seconds": LOAD_DEADLINE,
+                    "entries": {"lost_turns": {"allow_gateway_injection": True}}},
+        # The server has one: it makes gateway.run's import wait for the plugins.
+        "auxiliary": {"title_generation": {"enabled": False}},
+    }))
 
 
 def principal(chat, user, platform="telegram"):
@@ -167,14 +188,89 @@ async def test_messages_steered_into_the_lost_turn_are_quoted(home):
         store.close_all_db_handles()
 
 
-async def test_a_live_session_settles_before_the_owners_message(home):
+async def test_loads_beside_the_gateway_import(home):
+    """Hermes' own loader, under its deadline, while the main thread is still
+    importing gateway.run (lost_turns_startup.py): register() returns at once
+    and its hook stays registered."""
+    state, user = home / "state", home / "user"
+    state.mkdir()
+    user.mkdir()
+    plugin_home(state)
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(user), "HERMES_HOME": str(state),
+           "TELEGRAM_ALLOWED_USERS": OWNER}
+    child = await asyncio.to_thread(
+        subprocess.run, [sys.executable, "-I", str(TESTS / "lost_turns_startup.py")],
+        env=env, capture_output=True, text=True, timeout=120)
+    assert child.returncode == 0, child.stdout + child.stderr
+    result = json.loads(child.stdout.strip().splitlines()[-1])
+    assert result["held"], result
+    assert result["found"] and result["error"] is None and result["enabled"], result
+    assert result["elapsed"] < LOAD_DEADLINE, result
+    assert any(h.endswith("lost_turns.before_dispatch") for h in result["hooks"]), result
+    assert result["boot_thread"], result
+
+
+async def test_the_boot_waits_for_the_runner_and_its_loop(home):
+    store, runner, authority, head, executed, source = await lost_head(home, principal(OWNER, OWNER))
+    published = {}
+    lookup = lt._runner
+    lt._runner = lambda: published.get("runner")
+    try:
+        injected = []
+        ctx = SimpleNamespace(inject_message=lambda text, origin: injected.append(text) or True)
+        found = []
+        watcher = threading.Thread(target=lambda: found.append(lt.watch_boot(ctx, wait=30)), daemon=True)
+        watcher.start()
+        # GatewayRunner() publishes the runner, the authority comes next, the loop in start().
+        runner._gateway_loop = None
+        published["runner"] = runner
+        runner.session_authority = authority
+        runner.session_runtime_descriptor = {"state": "starting"}
+        assert statuses(authority.db)[0] == ("BUILD", "unknown", None)  # nothing to run it on yet
+        runner._gateway_loop = asyncio.get_running_loop()
+        await poll(lambda: statuses(authority.db)[0][1] == "terminal", "the boot settlement")
+        assert statuses(authority.db)[0] == ("BUILD", "terminal", "interrupted")
+        await poll(lambda: found, "the watcher")
+        assert found == [True]
+        await drain(authority, source)
+        assert executed == ["FOLLOWER"], executed
+    finally:
+        lt._runner = lookup
+        store.close_all_db_handles()
+
+
+async def test_the_boot_settles_a_session_the_recovery_already_mounted(home):
     store, runner, authority, head, executed, source = await lost_head(home, principal(OWNER, OWNER))
     try:
+        # The startup recovery won the race: mounted, paused on the unknown head, silently.
+        await drain(authority, source)
+        assert executed == [] and statuses(authority.db)[0][1] == "unknown"
+        runner.session_authority = authority
+        runner.session_runtime_descriptor = {"state": "ready"}
+        ctx = SimpleNamespace(inject_message=lambda *a, **k: True)
+        await lt.at_boot(ctx, runner, ready_wait=5)
+        live = authority.sessions["s"]
+        await poll(lambda: executed == ["FOLLOWER"] and live.task.done(), "the follower")
+        assert statuses(authority.db)[0] == ("BUILD", "terminal", "interrupted")
+        assert not live.pause_notified
+    finally:
+        store.close_all_db_handles()
+
+
+async def test_a_live_session_settles_before_the_owners_message(home):
+    # Loaded by Hermes' own loader, the hook fired by Hermes' own dispatch.
+    plugin_home(home)
+    store, runner, authority, head, executed, source = await lost_head(home, principal(OWNER, OWNER))
+    try:
+        from hermes_cli.plugins import ainvoke_hook, discover_plugins
+        await asyncio.to_thread(discover_plugins)
         # Live and paused, as after a worker lost while the gateway stayed up.
         await drain(authority, source)
         assert executed == [] and statuses(authority.db)[0][1] == "unknown"
         event = SimpleNamespace(source=source)
-        assert await lt.before_dispatch(event=event, gateway=SimpleNamespace(session_authority=authority)) is None
+        assert await ainvoke_hook("pre_gateway_dispatch", event=event,
+                                  gateway=SimpleNamespace(session_authority=authority),
+                                  session_store=store) == []
         live = authority.sessions["s"]
         await poll(lambda: executed == ["FOLLOWER"] and live.task.done(), "the follower")
         assert statuses(authority.db)[0] == ("BUILD", "terminal", "interrupted")
