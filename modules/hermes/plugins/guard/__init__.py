@@ -132,11 +132,16 @@ def _skip_computer_use_question(args: dict) -> None:
 
 def _load(home: str):
     from . import systemone
+    from .review import MODES
 
     config = json.loads((Path(home) / "guard" / "config.json").read_text())
     trusted = frozenset(config.get("trusted_platforms", ["telegram", "cron"]))
+    mode = config.get("mode", "auto")
+    if mode not in MODES:
+        logger.warning("guard: unknown mode %r; asking for every action", mode)
+        mode = "ask"
     if not config.get("model"):
-        return None, trusted
+        return None, trusted, mode
     key = os.environ.get(config["key_env"], "") if config.get("key_env") else ""
     model = systemone.Config.from_env({
         "OPENJEV_BASE_URL": config["url"],
@@ -145,15 +150,16 @@ def _load(home: str):
         "OPENJEV_API_KEY": key,
         "OPENJEV_TIMEOUT_MS": str(config.get("timeout_ms", 10000)),
     })
-    return model, trusted
+    return model, trusted, mode
 
 
 class Guard:
-    def __init__(self, model, trusted_platforms) -> None:
+    def __init__(self, model, trusted_platforms, mode: str = "auto") -> None:
         from .review import Session
 
         self.model = model
         self.trusted_platforms = trusted_platforms
+        self.mode = mode
         self.sessions: dict[str, Session] = {}
         self._new = Session
 
@@ -210,7 +216,7 @@ class Guard:
         if read_only(tool_name, args):
             return None
         session = self._session(session_id or task_id)
-        verdict = review(self.model, session, tool_name, args)
+        verdict = review(self.model, session, tool_name, args, self.mode)
         if tool_name == "computer_use":
             _skip_computer_use_question(args)
         session.actions.append(f"{tool_name}: {'ran' if verdict.run else 'asked the user'} ({verdict.reason})")
@@ -222,7 +228,7 @@ class Guard:
         # always sending to Zoé is not always sending.
         grain = verdict.risk if verdict.risk in {"low", "medium"} else hashlib.sha256(
             json.dumps(args, sort_keys=True, default=str).encode()).hexdigest()[:16]
-        if self.model is None:
+        if self.model is None or self.mode == "ask":
             message = f"{verdict.reason}: {summary(tool_name, args)}"
         else:
             message = f"{summary(tool_name, args)} (auto-review: {verdict.reason})"
@@ -286,9 +292,9 @@ GUARD: Guard | None = None
 
 
 def reviewing() -> bool:
-    """Whether a decision model reviews actions: guard is loaded and has one.
-    Without it, review_action never clears anything."""
-    return GUARD is not None and GUARD.model is not None
+    """Whether a decision model reviews actions: guard is loaded, has one, and
+    is not in ask mode. Without it, review_action never clears anything."""
+    return GUARD is not None and GUARD.model is not None and GUARD.mode != "ask"
 
 
 def launch_context(session_id: str) -> dict | None:
@@ -315,7 +321,7 @@ def review_action(context: dict, tool: str, args: dict, actions=()):
     session.messages.extend((context or {}).get("messages") or [])
     session.turn_from_user = bool((context or {}).get("turn_from_user"))
     session.actions.extend(actions)
-    return review(GUARD.model, session, tool, args)
+    return review(GUARD.model, session, tool, args, GUARD.mode)
 
 
 def register(ctx) -> None:

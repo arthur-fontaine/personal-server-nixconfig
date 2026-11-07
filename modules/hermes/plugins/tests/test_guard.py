@@ -218,8 +218,8 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as home:
         (Path(home) / "guard").mkdir()
         (Path(home) / "guard" / "config.json").write_text(json.dumps({"timeout_ms": 10000, "trusted_platforms": ["telegram", "cron"]}))
-        model, trusted = plugin._load(home)
-    assert model is None and trusted == {"telegram", "cron"}
+        model, trusted, mode = plugin._load(home)
+    assert model is None and trusted == {"telegram", "cron"} and mode == "auto"
     off = Guard(model, trusted)
     sent = len(REQUESTS)
     off.pre_llm_call(session_id="o", user_message="Envoie Salut à Zoé", platform="telegram")
@@ -236,10 +236,58 @@ def main() -> None:
     plugin.GUARD = None
     assert len(REQUESTS) == sent, "no request without a model"
 
+    modes(port)
     subagent_after_its_parent(port)
     steered_mid_turn(port)
     httpd.shutdown()
     print("guard: ok")
+
+
+def modes(port: int) -> None:
+    """server.hermes.approvalMode: auto clears what the review allows, cautious
+    only low risk, ask everything but reads (without calling the model)."""
+    import tempfile
+
+    import guard as plugin
+
+    model = guard(port).model
+    asked_for = "Envoie Salut à Zoé sur WhatsApp"
+
+    auto = Guard(model, frozenset({"telegram"}), "auto")
+    auto.pre_llm_call(session_id="a", user_message=asked_for, platform="telegram")
+    ANSWER.clear()
+    ANSWER.update(authorization="high", risk="high")
+    assert auto.pre_tool_call("terminal", {"command": "wacli send --to Zoé Salut"}, session_id="a") is None, "auto: asked-for send runs"
+    ANSWER.update(authorization="medium", risk="medium")
+    assert auto.pre_tool_call("write_file", {"path": "/tmp/a", "content": "x"}, session_id="a") is None, "auto: bounded risk asked for runs"
+
+    cautious = Guard(model, frozenset({"telegram"}), "cautious")
+    cautious.pre_llm_call(session_id="c", user_message=asked_for, platform="telegram")
+    ANSWER.update(authorization="high", risk="high")
+    asked = cautious.pre_tool_call("terminal", {"command": "wacli send --to Zoé Salut"}, session_id="c")
+    assert asked["action"] == "approve" and "cautious mode" in asked["message"], asked
+    ANSWER.update(authorization="high", risk="medium")
+    assert cautious.pre_tool_call("write_file", {"path": "/tmp/a", "content": "x"}, session_id="c")["action"] == "approve"
+    ANSWER.update(authorization="unknown", risk="low")
+    assert cautious.pre_tool_call("browser_navigate", {"url": "https://example.org"}, session_id="c") is None, "cautious: low risk runs"
+
+    ask = Guard(model, frozenset({"telegram"}), "ask")
+    ask.pre_llm_call(session_id="k", user_message=asked_for, platform="telegram")
+    sent = len(REQUESTS)
+    directive = ask.pre_tool_call("browser_navigate", {"url": "https://example.org"}, session_id="k")
+    assert directive["message"] == "ask mode: every action asks: browser_navigate: url: https://example.org", directive
+    assert ask.pre_tool_call("read_file", {"path": "/tmp/x"}, session_id="k") is None, "ask: reads still run"
+    assert len(REQUESTS) == sent, "ask mode calls no model"
+    plugin.GUARD = ask
+    assert not plugin.reviewing()
+    assert not plugin.review_action({"messages": ["x"], "turn_from_user": True}, "sandbox_network", {}).run
+    plugin.GUARD = None
+
+    with tempfile.TemporaryDirectory() as home:
+        (Path(home) / "guard").mkdir()
+        for written, read in (("cautious", "cautious"), ("yolo", "ask")):
+            (Path(home) / "guard" / "config.json").write_text(json.dumps({"mode": written}))
+            assert plugin._load(home)[2] == read, (written, read)
 
 
 def steered_mid_turn(port: int) -> None:

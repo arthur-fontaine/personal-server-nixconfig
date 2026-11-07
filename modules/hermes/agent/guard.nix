@@ -24,6 +24,7 @@ in
       # the user's, and a cron job's too (its creation was reviewed); the
       # events' webhook turns are not.
       trusted_platforms = [ "telegram" "cron" ];
+      mode = server.hermes.approvalMode;
     } // lib.optionalAttrs cfg.enable {
       inherit (cfg) url model;
       auth_scheme = cfg.authScheme;
