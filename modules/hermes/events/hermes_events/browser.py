@@ -373,21 +373,45 @@ class Instagram:
         log.info("instagram: the inbox came back empty (logged out, or the page did not load)")
         return []
 
+    # A read younger than this already holds whatever the push announced.
+    FRESH_SECONDS = 5
+
+    async def _lookup(self, pick, text: str | None) -> Thread | None:
+        """The thread `pick` chooses among the rows, read again once when the
+        cached rows predate `text`: "Bubble tea ?" then "?" twenty seconds
+        later found the first one's preview still cached, so "?" matched no
+        thread, went to a chat of its own and was screened as a lone "?"."""
+        thread = None
+        for refresh in (False, True):
+            if refresh and time.monotonic() - self._read_at < self.FRESH_SECONDS:
+                break
+            for row in await self.inbox(refresh=refresh):
+                candidate = pick(row)
+                if candidate is not None:
+                    thread = candidate
+                    break
+            if thread is not None and (text is None or any(_same(i.text, text) for i in thread.items)):
+                return thread
+        return thread
+
     async def find(self, text: str) -> Thread | None:
         """The thread whose newest message is `text`."""
-        for row in await self.inbox():
+        def pick(row):
             thread = thread_from_inbox(row, self._tail(row))
-            if thread and any(_same(item.text, text) for item in thread.items):
-                return thread
-        return None
+            return thread if thread and any(_same(item.text, text) for item in thread.items) else None
+        return await self._lookup(pick, text)
 
-    async def thread(self, thread_id: str) -> Thread | None:
+    async def thread(self, thread_id: str, text: str | None = None) -> Thread | None:
+        """The thread `thread_id`; with `text`, read again when the cached row
+        does not have it yet."""
         if not thread_id.isdigit():
             return None
-        for row in await self.inbox():
+
+        def pick(row):
             if thread_id in (str(row.get("id")), str(row.get("v2"))):
                 return thread_from_inbox(row, self._tail(row))
-        return None
+            return None
+        return await self._lookup(pick, text)
 
     def _tail(self, row: dict) -> list[dict]:
         return self._tails.get(str(row.get("id") or ""), [])
@@ -491,7 +515,7 @@ async def resolve_instagram(instagram: Instagram, pipeline: Pipeline, payload: d
     and its history; the notification alone when it cannot be found."""
     try:
         tid = thread_id_of(payload)
-        thread = await instagram.thread(tid) if tid else None
+        thread = await instagram.thread(tid, message.text) if tid else None
         thread = thread or await instagram.find(message.text)
     except Exception as err:
         log.warning("instagram: could not find the thread: %s", err)

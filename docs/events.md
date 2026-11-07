@@ -85,12 +85,18 @@ apart from the new messages (`hermes_events/history.py`):
   keep is the last eight previews the inbox showed for each thread, on disk
   (`instagram-tails.json` in its state folder): a burst that the inbox split
   into "Bubble tea ?" and, later, "?" is then screened as one exchange
-  instead of two fragments nothing can be answered from. So an Instagram
-  event arrives with what the inbox said before it, and the daemon still
-  cannot tell whether you already answered it from your phone.
-- Discord: none yet.
+  instead of two fragments nothing can be answered from. The inbox read is
+  cached two minutes for a burst, but a notification the cached rows do not
+  show yet reads it again, so a "?" twenty seconds after "Bubble tea ?" lands
+  in the same thread, not in a chat of its own. So an Instagram event arrives
+  with what the inbox said before it, and the daemon still cannot tell
+  whether you already answered it from your phone.
+- Discord, and a chat whose source could not be read: the daemon's own
+  journal (`recent.jsonl`), the last eight lines it screened in that chat in
+  the past day, whether they reached you or not. Your own replies are not in
+  it. A notification that names no sender is never given another's lines.
 
-When a source cannot be read, the event goes on without its history.
+When a source cannot be read, the event goes on with what the journal has.
 
 ## Every event source in this setup
 

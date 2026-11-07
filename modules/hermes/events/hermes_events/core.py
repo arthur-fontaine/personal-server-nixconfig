@@ -98,6 +98,7 @@ class Journal:
             "time": datetime.fromtimestamp(now).isoformat(timespec="seconds"),
             "t": now,
             "source": event.get("source"),
+            "key": event.get("key"),
             "chat": event.get("chat"),
             "summary": event.get("summary"),
             "messages": event.get("messages"),
@@ -114,6 +115,21 @@ class Journal:
         with open(tmp, "w") as f:
             f.writelines(kept)
         os.replace(tmp, self.path)
+
+    def earlier(self, key: str, since: float, limit: int) -> list[str]:
+        """The lines this chat's earlier events carried, oldest first: the
+        conversation as the daemon saw it, for a source that keeps none it
+        can read (Discord), or a thread it could not find."""
+        lines: list[str] = []
+        try:
+            with open(self.path) as f:
+                for raw in f:
+                    record = json.loads(raw)
+                    if record.get("key") == key and record.get("t", 0) >= since:
+                        lines.extend(line for line in (record.get("messages") or "").splitlines() if line)
+        except (OSError, ValueError):
+            return []
+        return lines[-limit:]
 
 
 class Pipeline:
@@ -217,7 +233,13 @@ class Pipeline:
                 context = await self.history(batch.chat, batch.messages)
             except Exception as error:
                 log.warning("%s: no history (%s)", batch.chat.key, error)
-        event = self.event(batch, context)
+        seen = []
+        # A chat keyed on its source alone ("instagram:instagram") is whoever
+        # the notification did not name: their lines are not one conversation.
+        named = batch.chat.chat_id != batch.chat.source
+        if (context is None or not context.earlier) and self.journal is not None and named:
+            seen = self.journal.earlier(batch.chat.key, batch.started - self.EARLIER_SECONDS, self.EARLIER_LINES)
+        event = self.event(batch, context, seen)
         if context is not None and context.answered:
             log.info("%s: the user answered, dropped %d message(s)", batch.chat.key, len(batch.messages))
             self._journal(event, "not proposed (the user answered in the chat)")
@@ -234,13 +256,22 @@ class Pipeline:
         text = "\n".join(f"[{stamp(m)}] {m.sender}: {m.text}" for m in messages)
         return "…" + text[-self.max_chars:] if len(text) > self.max_chars else text
 
-    def event(self, batch: Batch, context=None) -> dict:
+    # What the journal gives a chat with no history of its own: the triage
+    # keeps eight lines anyway (triage.recent).
+    EARLIER_LINES = 8
+    EARLIER_SECONDS = 86400
+
+    def event(self, batch: Batch, context=None, seen: list[str] = ()) -> dict:
         chat, messages = batch.chat, batch.messages
         text = self.lines(messages)
         earlier = ""
         if context is not None and context.earlier:
             earlier = ("Earlier in this conversation, oldest first (\"me\" is the user):\n"
                        + self.lines(context.earlier) + "\n\nThe new messages:")
+        elif seen:
+            # Only what others sent: the user's own replies never reach the daemon here.
+            earlier = ("Earlier in this conversation, as it reached the user's assistant, oldest first "
+                       "(the user's own replies are not shown):\n" + "\n".join(seen) + "\n\nThe new messages:")
         where = f"the group {chat.name}" if chat.is_group else chat.name
         count = f"{len(messages)} new messages" if len(messages) > 1 else "A new message"
         return {

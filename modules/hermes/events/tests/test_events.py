@@ -196,6 +196,36 @@ class PipelineTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(p.triage.events[0][0]["triage"], "mail")
         self.assertEqual(sink.events, [])
 
+    async def test_a_chat_without_history_reads_what_came_before(self):
+        """Discord keeps no history the daemon can read: "Bubble tea ?", screened
+        and dropped, is still what the "?" after it answers."""
+        sink, triage = FakeSink(), FakeTriage(None)
+        p = pipeline(self.tmp, triage=triage, sink=sink)
+        p.journal = Journal(os.path.join(self.tmp, "recent.jsonl"))
+
+        async def none(chat, messages):
+            return None
+
+        p.history = none
+        payload = {"title": "Zoé", "body": "Bubble tea ?", "tag": "1", "host": "discord.com"}
+        p.message(*notification_message(payload, time.time()))
+        await eventually(lambda: line_count(p.journal.path) == 1)
+        p.triage = triage = FakeTriage()
+        p.message(*notification_message({**payload, "body": "?", "tag": "2"}, time.time()))
+        await eventually(lambda: sink.events)
+        event = sink.events[0]
+        self.assertIn("Zoé: Bubble tea ?", event["context"])
+        self.assertIn("Zoé: ?", event["messages"])
+        self.assertNotIn("Bubble", event["messages"])
+        self.assertIn("Bubble tea ?", UzuTriage("u", "m").request(triage.events[0][0])["messages"][1]["content"])
+        # Whoever an unnamed notification came from is not one conversation.
+        unnamed = {"title": "Instagram", "body": "on peut regarder ?", "host": "www.instagram.com"}
+        p.message(*notification_message({**unnamed, "tag": "3"}, time.time()))
+        await eventually(lambda: len(sink.events) == 2)
+        p.message(*notification_message({**unnamed, "body": "et demain ?", "tag": "4"}, time.time()))
+        await eventually(lambda: len(sink.events) == 3)
+        self.assertEqual(sink.events[2]["context"], "")
+
 
 class TriageTest(unittest.IsolatedAsyncioTestCase):
     async def serve(self, handler):
@@ -758,6 +788,35 @@ class InstagramInboxTest(unittest.IsolatedAsyncioTestCase):
         await ig.inbox(refresh=True)
         self.assertEqual(ig.reads, 2)
 
+    async def test_a_message_newer_than_the_cached_inbox_reads_it_again(self):
+        """"Bubble tea ?" then "?" twenty seconds later: the cached inbox still
+        previews the first, and "?" must land in the same thread anyway."""
+        class Inbox(Instagram):
+            def __init__(self):
+                super().__init__()
+                self.rows, self.reads = [{**INBOX_ROW, "text": "Bubble tea ?"}], 0
+
+            async def _read(self):
+                self.reads += 1
+                return self.rows
+
+        ig = Inbox()
+        ig.cdp = object()
+        self.assertEqual((await ig.find("Bubble tea ?")).id, INBOX_ROW["id"])
+        ig.rows = [{**INBOX_ROW, "text": "?", "at": INBOX_ROW["at"] + 20000}]
+        ig._read_at -= 30  # cached, but not from this very moment
+        thread = await ig.find("?")
+        self.assertEqual((thread.id, ig.reads), (INBOX_ROW["id"], 2))
+        self.assertEqual([m.text for m in thread.items], ["Bubble tea ?", "?"])
+        # By id too: a cached row that does not have the message yet is read again.
+        ig.rows = [{**INBOX_ROW, "text": "ok", "at": INBOX_ROW["at"] + 40000}]
+        ig._read_at -= 30
+        self.assertEqual((await ig.thread(INBOX_ROW["id"], "ok")).items[-1].text, "ok")
+        self.assertEqual(ig.reads, 3)
+        # Read a moment ago: a miss is a miss, not another tab.
+        self.assertIsNone(await ig.find("rien de tel"))
+        self.assertEqual(ig.reads, 3)
+
     def test_a_row_carries_what_the_inbox_showed_before(self):
         """The screening reads the exchange, not one fragment: the earlier
         previews come back with the newest message."""
@@ -845,7 +904,7 @@ class InstagramThreadTest(unittest.IsolatedAsyncioTestCase):
             def __init__(self, found):
                 self.found, self.asked = found, []
 
-            async def thread(self, tid):
+            async def thread(self, tid, text=None):
                 self.asked.append(("thread", tid))
                 return self.found
 

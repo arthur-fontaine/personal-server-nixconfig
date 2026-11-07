@@ -8,7 +8,8 @@ replies included.
 - iMessage, SMS: `imsg history --chat-id <id> --end <time> --json`, JSON lines
   of imsg's MessagePayload (Sources/imsg/OutputModels.swift).
 - Instagram: the thread, from the logged-in browser (browser.Instagram).
-- Discord and the rest: none.
+- Discord and the rest: none here; the pipeline then gives what its own
+  journal screened in that chat (core.Journal.earlier).
 """
 
 from __future__ import annotations
