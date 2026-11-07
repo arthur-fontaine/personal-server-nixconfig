@@ -785,9 +785,9 @@ class App:
 
             slug = ""
             try:
-                from hermes_cli.config import load_config
+                from hermes_cli.config import load_config_readonly
 
-                slug = ((load_config() or {}).get("display", {}) or {}).get("pet", {}).get("slug", "") or ""
+                slug = ((load_config_readonly() or {}).get("display", {}) or {}).get("pet", {}).get("slug", "") or ""
             except Exception:
                 pass
             pet = store.resolve_active_pet(slug or None) if slug else None
