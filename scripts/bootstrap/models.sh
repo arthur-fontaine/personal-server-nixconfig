@@ -41,40 +41,19 @@ choose_model() { # provider label models
 # and key, checked on its /models, which also lists its models. Sets
 # pick_provider, pick_label and pick_model, and adds it to new_providers.
 custom_api() {
-  local name="${1:-}" slug var url key response status models auth
+  local name="${1:-}" slug var
   [ -n "$name" ] || name="$(gum input --header "Its name (e.g. Mistral)")"
   [ -n "$name" ] || return 1
   slug="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-*//; s/-*$//')"
   # Not a name Hermes gives a provider of its own, nor the local model's.
   while [ "$slug" = uzu ] || grep -qxF "$slug" <<< "$provider_names"; do slug="$slug-custom"; done
   var="$(printf '%s' "$slug" | tr 'a-z-' 'A-Z_')_API_KEY"
-  url="$("$JQ" -r --arg s "$slug" '.[$s].url // empty' <<< "$new_providers")"
-  key="$(secret_value "$var")"
-  while :; do
-    url="$(gum input --value "$url" --header "$name's address, the one /models and /chat/completions hang from" \
-      --placeholder "https://api.example.com/v1")"
-    url="${url%/}"
-    [ -n "$url" ] || return 1
-    [ -n "$key" ] || key="$(gum input --password --header "$name API key ($var; empty if it takes none)" | tr -d '[:space:]')"
-    auth=()
-    [ -n "$key" ] && auth=(-H "Authorization: Bearer $key")
-    response="$(curl -s -w '\n%{http_code}' --max-time 15 ${auth[@]+"${auth[@]}"} "$url/models" || true)"
-    status="${response##*$'\n'}"
-    models="$("$JQ" -r '.data[]?.id // empty' <<< "${response%$'\n'*}" 2>/dev/null || true)"
-    case "$status" in
-      2??) [ -n "$models" ] && ok "$name answers, with $(wc -l <<< "$models" | tr -d ' ') models" && break
-        warn "$name answers, but lists no models: you will type the model's id." && break ;;
-      401 | 403) warn "$name refused that key (status $status)."; key="" ;;
-      000) warn "Nothing answers at $url from this Mac: a wrong address, another network, or the local network not allowed." ;;
-      *) warn "$url/models answers $status: not an OpenAI-compatible address?" ;;
-    esac
-    gum confirm --affirmative "Try again" --negative "Skip" "Retry?" || return 1
-  done
-  [ -n "$key" ] && set_secret "$var" "$key"
-  new_providers="$("$JQ" -c --arg s "$slug" --arg l "$name" --arg u "$url" --arg k "$var" --argjson keyed "$([ -n "$key" ] && echo true || echo false)" \
+  api_url="$("$JQ" -r --arg s "$slug" '.[$s].url // empty' <<< "$new_providers")"
+  openai_api "$name" "$var" || return 1
+  new_providers="$("$JQ" -c --arg s "$slug" --arg l "$name" --arg u "$api_url" --arg k "$var" --argjson keyed "$([ -n "$api_key" ] && echo true || echo false)" \
     '.[$s] = {label: $l, url: $u, keyEnv: (if $keyed then $k else null end)}' <<< "$new_providers")"
   pick_provider="$slug" pick_label="$name"
-  choose_model "$slug" "$name" "$models"
+  choose_model "$slug" "$name" "$api_models"
 }
 
 # One model of the chain: its provider (and key), then the model. Sets
