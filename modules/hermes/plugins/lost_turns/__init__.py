@@ -24,6 +24,12 @@ Two places, so the pause is never seen:
   up (a lost worker) settles through the owner's own resolution
   (SessionAuthority.resolve_unknown_as_owner, the call /discard makes).
 
+The messages the user steered into the lost turn (busy_input_mode steer,
+agent/telegram.nix) are not queued: the recovery settles them with it,
+``interrupted`` and never replayed (hermes_state_runtime.py,
+recover_session_inputs). The notice quotes them, so Hermes answers them after
+all.
+
 When nothing was queued behind the lost turn, Hermes gets one turn of its own
 once the gateway is ready (PluginContext.inject_message, an automation turn:
 if it is lost too, Hermes settles it itself, so a turn that kills the gateway
@@ -51,6 +57,8 @@ CONTINUE = (
     "[SYSTEM: Hermes restarted in the middle of your previous turn, which was cut off and not run "
     "again. Check where that work stands, then carry it on or tell the user where it stopped.]"
 )
+STEERED = "While it ran, you also sent these messages, which that turn may not have seen:"
+QUOTE = 1000  # characters of each steered message the notice keeps
 READY_WAIT = 900.0  # seconds a boot waits for the gateway before giving up the continuation
 
 
@@ -76,10 +84,43 @@ def is_owner_dm(principal: str, owner: Optional[str]) -> bool:
 def lost_owner_turns(db, owner: Optional[str]) -> list[dict]:
     with db._read_ctx() as conn:
         rows = conn.execute(
-            "SELECT admission_id, generation, target_session_id, principal_id FROM session_admissions "
+            "SELECT admission_id, generation, target_session_id, principal_id, owner_epoch FROM session_admissions "
             "WHERE status='unknown' ORDER BY seq").fetchall()
-    return [dict(zip(("admission_id", "generation", "target_session_id", "principal_id"), row))
+    return [dict(zip(("admission_id", "generation", "target_session_id", "principal_id", "owner_epoch"), row))
             for row in rows if is_owner_dm(row[3], owner)]
+
+
+def _text(payload: dict) -> str:
+    # A native message keeps its text in its envelope (gateway/session_authority.py, _pending_receipt).
+    text = payload.get("text")
+    if text is None:
+        text = payload.get("native_text_v1", {}).get("event", {}).get("text", "")
+    return text if isinstance(text, str) else ""
+
+
+def steered_into(db, row: dict) -> list[str]:
+    """What was handed to the lost claim mid-turn: the admissions bound to its
+    (owner_epoch, generation), settled with it (hermes_state_runtime.py, STEERING)."""
+    with db._read_ctx() as conn:
+        rows = conn.execute(
+            "SELECT payload_json FROM session_admissions WHERE target_session_id=? AND owner_epoch=? "
+            "AND generation=? AND admission_id!=? AND status='terminal' AND outcome IN ('steering','interrupted') "
+            "ORDER BY seq", (row["target_session_id"], row["owner_epoch"], row["generation"],
+                             row["admission_id"])).fetchall()
+    texts = []
+    for (payload,) in rows:
+        try:
+            text = _text(json.loads(payload)).strip()
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if text:
+            texts.append(text[:QUOTE] + ("…" if len(text) > QUOTE else ""))
+    return texts
+
+
+def notice(db, row: dict) -> str:
+    texts = steered_into(db, row)
+    return "\n\n".join([NOTICE, STEERED, *(f"« {t} »" for t in texts)]) if texts else NOTICE
 
 
 def has_queued(db, session_id: str) -> bool:
@@ -88,14 +129,14 @@ def has_queued(db, session_id: str) -> bool:
                             "AND status IN ('queued','started','unknown') LIMIT 1", (session_id,)).fetchone() is not None
 
 
-def _settle_in_store(db, epoch: int, row: dict) -> None:
+def _settle_in_store(db, epoch: int, row: dict, text: str = NOTICE) -> None:
     """No live session, so no drain to tell: settle_recovered_unattended's write."""
     from gateway.session_ingress_media import release_admission_media
     from gateway.session_results import close_discarded_turn
     from hermes_state_runtime import resolve_unknown_session_input
     resolve_unknown_session_input(
         db, epoch=epoch, admission_id=row["admission_id"], generation=row["generation"],
-        _terminal_write=lambda conn, lost: close_discarded_turn(db, conn, lost, NOTICE))
+        _terminal_write=lambda conn, lost: close_discarded_turn(db, conn, lost, text))
     release_admission_media(db, row["admission_id"])
 
 
@@ -108,12 +149,13 @@ async def settle(authority, owner: Optional[str] = None) -> list[str]:
     for row in await asyncio.to_thread(lost_owner_turns, authority.db, owner):
         session_id = row["target_session_id"]
         try:
+            text = await asyncio.to_thread(notice, authority.db, row)
             if session_id in authority.sessions:
                 await authority.resolve_unknown_as_owner(
                     SessionRef(authority.profile_id, session_id), row["admission_id"], row["generation"],
-                    notice=NOTICE)
+                    notice=text)
             else:
-                await asyncio.to_thread(_settle_in_store, authority.db, authority.epoch, row)
+                await asyncio.to_thread(_settle_in_store, authority.db, authority.epoch, row, text)
         except RuntimeStoreError as exc:
             logger.warning("lost_turns: %s left unknown: %s", row["admission_id"], exc.reason)
             continue

@@ -41,7 +41,7 @@ async def poll(predicate, what, timeout=30.0):
         await asyncio.sleep(0.02)
 
 
-async def lost_head(home, head_principal, *, follower=True):
+async def lost_head(home, head_principal, *, follower=True, steered=()):
     """Owner 1 admits a head from ``head_principal`` and maybe a follower, claims
     the head and dies; owner 2 starts on the same store (the head is now unknown)."""
     from gateway.config import GatewayConfig, Platform
@@ -69,7 +69,14 @@ async def lost_head(home, head_principal, *, follower=True):
     if follower:
         admit_session_input(db, epoch=first.epoch, principal_id=head_principal, session_id="s",
                             request_id="500", payload={"text": "FOLLOWER"})
-    assert claim_session_input(db, epoch=first.epoch, session_id="s")["admission_id"] == head["admission_id"]
+    claim = claim_session_input(db, epoch=first.epoch, session_id="s")
+    assert claim["admission_id"] == head["admission_id"]
+    for n, text in enumerate(steered):
+        # Sent mid-turn and handed to the running claim (busy_input_mode steer).
+        from hermes_state_runtime import steer_session_input
+        sent = admit_session_input(db, epoch=first.epoch, principal_id=head_principal, session_id="s",
+                                   request_id=f"6{n}", payload={"text": text})
+        steer_session_input(db, epoch=first.epoch, admission_id=sent["admission_id"], generation=claim["generation"])
     db.append_message("s", "user", "BUILD")
     db.append_message("s", "assistant", "", tool_calls=[{"id": "c1", "type": "function",
                                                          "function": {"name": "terminal", "arguments": "{}"}}])
@@ -135,6 +142,27 @@ async def test_nothing_queued_gets_one_continuation(home):
         assert injected == [(lt.CONTINUE, {"platform": "telegram", "chat_id": OWNER,
                                            "chat_type": "dm", "user_id": OWNER})]
         assert lt.CONTINUE.startswith("[SYSTEM")  # guard: not the user's turn
+    finally:
+        store.close_all_db_handles()
+
+
+async def test_messages_steered_into_the_lost_turn_are_quoted(home):
+    store, runner, authority, head, executed, source = await lost_head(
+        home, principal(OWNER, OWNER), follower=False, steered=["et le build ?", "laisse tomber"])
+    try:
+        # The recovery settled them with the lost claim: nothing queued, never replayed.
+        assert [s[1:] for s in statuses(authority.db)[1:]] == [("terminal", "interrupted")] * 2
+        runner.session_authority = authority
+        runner.session_runtime_descriptor = {"state": "ready"}
+        injected = []
+        ctx = SimpleNamespace(inject_message=lambda text, origin: injected.append(text) or True)
+        await lt.at_boot(ctx, runner, ready_wait=5)
+        [notice] = notices(authority.db)
+        assert notice.startswith(lt.NOTICE) and lt.STEERED in notice, notice
+        assert notice.index("et le build ?") < notice.index("laisse tomber"), notice
+        assert injected == [lt.CONTINUE]  # Hermes gets a turn to answer them
+        await drain(authority, source)
+        assert executed == []
     finally:
         store.close_all_db_handles()
 
