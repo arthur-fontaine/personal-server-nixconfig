@@ -39,7 +39,7 @@ paths are signed and renamed between releases, and a hand-built one is an
 unofficial client.
 
 ```python
-SCRIPT = open('/Users/hermes/.hermes/skills/social-media/instagram/direct.js').read()
+SCRIPT = open('@skillDir@/direct.js').read()
 cdp('Page.addScriptToEvaluateOnNewDocument', source=SCRIPT)  # every page load
 # A narrow page only renders its empty state: work wide.
 cdp('Emulation.setDeviceMetricsOverride', width=1280, height=900,
