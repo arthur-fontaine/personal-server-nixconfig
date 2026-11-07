@@ -397,7 +397,8 @@ overran the 60 s) is one Hermes cannot tell finished or not: it marks it
 webhook). Here the `lost_turns` plugin (`modules/hermes/plugins/lost_turns`)
 settles your own Telegram turn the same way `/discard` would, so you never
 have to: as the gateway starts, before Telegram connects, and again before
-any message of yours if a turn was lost while it kept running. The lost turn
+any message of yours, if a turn was lost while it kept running or the start
+has not reached it yet, so you never get the "send /discard" notice. The lost turn
 is not re-run; it ends in the transcript with a notice that it was cut off, so
 Hermes knows it stopped half-way and checks where the work stands before it
 carries on. The messages you sent meanwhile then run in order. When you sent
