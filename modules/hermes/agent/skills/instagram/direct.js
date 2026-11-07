@@ -377,7 +377,28 @@
     return out;
   };
 
-  // Type and click Send. Nothing else clicks anything: the app's own button
+  // A press as a mouse makes it. The app's button handles pointer events and
+  // checks what pressed it: `.click()`, or mouse events named "pointerdown",
+  // left the text in the box (Nov 2026), while PointerEvents with a
+  // pointerType, a primary pointer and the button's own coordinates sent it.
+  // One press only: a second click event would send the text twice.
+  const press = (button) => {
+    const point = pointOf(button) || { x: 0, y: 0 };
+    const base = {
+      bubbles: true, cancelable: true, composed: true, view: globalThis,
+      clientX: point.x, clientY: point.y, screenX: point.x, screenY: point.y, button: 0,
+    };
+    const pointer = { ...base, pointerId: 1, pointerType: "mouse", isPrimary: true, width: 1, height: 1 };
+    const Pointer = globalThis.PointerEvent || MouseEvent;
+    button.dispatchEvent(new Pointer("pointerover", { ...pointer, buttons: 0 }));
+    button.dispatchEvent(new Pointer("pointerdown", { ...pointer, buttons: 1, pressure: 0.5 }));
+    button.dispatchEvent(new MouseEvent("mousedown", { ...base, buttons: 1 }));
+    button.dispatchEvent(new Pointer("pointerup", { ...pointer, buttons: 0, pressure: 0 }));
+    button.dispatchEvent(new MouseEvent("mouseup", { ...base, buttons: 0 }));
+    button.dispatchEvent(new MouseEvent("click", { ...base, buttons: 0, detail: 1 }));
+  };
+
+  // Type and press Send. Nothing else clicks anything: the app's own button
   // sends, with the app's own request.
   ig.send = async (text) => {
     if (!text || !String(text).trim()) return { sent: false, reason: "empty text" };
@@ -391,19 +412,15 @@
     if (!draft(box)) {
       return { sent: false, reason: "the text did not reach the box: open the thread and try again" };
     }
-    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
-      button.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
-    }
-    button.click();
+    press(button);
     await pause(700);
-    // Read back, never assume: the app empties the box when it sends, and
-    // ignores a scripted click on this button (it wants a real pointer).
+    // Read back, never assume: the app empties the box when it sends.
     if (!draft(box)) {
       return { sent: true, how: "the page's Send button", after: visible().slice(-400) };
     }
     return {
       sent: false,
-      reason: "the text is still in the box: the app ignored the scripted click",
+      reason: "the text is still in the box: the app ignored the press",
       needsRealClick: true,
       point: ig.sendPoint(),
     };

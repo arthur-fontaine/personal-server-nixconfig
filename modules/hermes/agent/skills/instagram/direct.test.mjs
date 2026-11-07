@@ -23,15 +23,26 @@ const check = (name, got, want) => {
 };
 
 // ── the page, as the script sees it ────────────────────────────────────────
-const state = { clicks: 0, typed: null, backspace: false, range: false, ignoreClicks: false };
+const state = { clicks: 0, sends: 0, pressedAt: null, typed: null, backspace: false, range: false, ignoreClicks: false };
 const sendIcon = { getAttribute: (k) => (k === "aria-label" ? "Send" : null), closest: () => sendButtonNode };
 const sendButtonNode = {
-  // The app empties the box when it sends, and ignores a scripted click.
-  click: () => {
-    state.clicks++;
-    if (!state.ignoreClicks) box.textContent = "";
+  // Like the app: `.click()` and mouse events do nothing, a primary mouse
+  // pointer pressed and released on the button sends and empties the box.
+  click: () => { state.clicks++; },
+  dispatchEvent: (event) => {
+    if (event.type === "pointerdown" && event.pointerType === "mouse" && event.isPrimary) {
+      state.down = event instanceof globalThis.PointerEvent;
+    }
+    if (event.type === "pointerup" && state.down && event.pointerType === "mouse") {
+      state.down = false;
+      state.pressedAt = { x: event.clientX, y: event.clientY };
+      if (!state.ignoreClicks && box.textContent) {
+        state.sends++;
+        box.textContent = "";
+      }
+    }
+    return true;
   },
-  dispatchEvent: () => true,
   getBoundingClientRect: () => ({ left: 1200, top: 850, width: 30, height: 30 }),
 };
 
@@ -61,6 +72,7 @@ const rowNode = (text) => ({ innerText: text });
 globalThis.getSelection = () => ({ removeAllRanges: () => {}, addRange: () => {} });
 globalThis.location = { href: "https://www.instagram.com/direct/t/1000000000000001/" };
 globalThis.MouseEvent = class { constructor(type, init = {}) { this.type = type; Object.assign(this, init); } };
+globalThis.PointerEvent = class extends globalThis.MouseEvent {};
 globalThis.KeyboardEvent = class { constructor(type, init = {}) { this.type = type; Object.assign(this, init); } };
 globalThis.document = {
   title: "(2) Instagram • Messages",
@@ -210,14 +222,15 @@ check("empty send refused", await ig.send("   "), { sent: false, reason: "empty 
 
 const sent = await ig.send("On se retrouve à 20 h 30 ?");
 check("typed into the box", state.typed, "On se retrouve à 20 h 30 ?");
-check("clicked the page's Send button", state.clicks, 1);
+check("pressed the page's Send button as a mouse", state.sends, 1);
+check("at its centre", state.pressedAt, { x: 1215, y: 865 });
+check("and nothing that could send it twice", state.clicks, 0);
 check("reported how", sent.how, "the page's Send button");
 check("reported sent", sent.sent, true);
 check("where the button is, for a real click", ig.sendPoint(), { found: true, x: 1215, y: 865 });
 
-// The app's handler wants a real pointer: a scripted click leaves the text in
-// the box, and the answer must say so (with the point to click) instead of
-// claiming it went.
+// When the app ignores the press too, the text stays in the box, and the
+// answer must say so (with the point to click) instead of claiming it went.
 state.ignoreClicks = true;
 const refused = await ig.send("On se retrouve à 20 h 30 ?");
 check("a click that was ignored is not a send", refused.sent, false);

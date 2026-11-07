@@ -70,15 +70,19 @@ print(js('__ig.inbox()'))   # js() awaits, so send() and clear() come back settl
   user's own bubbles the same way as everyone else's, so guessing an author
   there is how you tell them a message of theirs was someone else's. `text` is
   the visible transcript, for a layout question only.
-- `__ig.send('text')`: types into the open thread's box, clicks the page's own
-  Send button, waits, and reads the box back. `{sent: true, how, after}` means
-  the app took it, `after` being the tail of the transcript. `{sent: false,
-  needsRealClick: true, point}` means the app **ignored the scripted click**
-  and the text is still in the box: click `point` with a real pointer
+- `__ig.send('text')`: types into the open thread's box, presses the page's
+  own Send button the way a mouse does (pointer events at its centre: the app
+  ignores a plain `.click()`), waits, and reads the box back. `{sent: true,
+  how, after}` means the app took it, `after` being the tail of the
+  transcript; do not press or click anything more. `{sent: false,
+  needsRealClick: true, point}` means the app **ignored the press** and the
+  text is still in the box: click `point` with a real pointer
   (`cdp('Input.dispatchMouseEvent', type='mousePressed', x=point['x'],
   y=point['y'], button='left', clickCount=1)`, then `mouseReleased`), then
-  confirm with `thread()`. Never report a message as sent on the strength of
-  `send()` alone — `sent` or a `You:` line in the thread, nothing else. The
+  confirm with `thread()`. A `cdp` call that times out may still have
+  clicked: read the box and the thread before clicking again, or the message
+  goes twice. Never report a message as sent on the strength of `send()`
+  alone — `sent` or a `You:` line in the thread, nothing else. The
   Send button only exists once the box has text (an empty box shows emoji,
   voice clip, photo and GIF instead), so `sendButton: false` in an empty
   thread is normal. `__ig.sendPoint()` gives the button's `{x, y}` on its own.
