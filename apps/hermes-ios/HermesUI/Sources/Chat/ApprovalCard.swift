@@ -21,8 +21,8 @@ public struct ApprovalCard: View {
     }
 
     public var body: some View {
-        CardSurface(surface: .grouped, inset: .m, innerControlHeight: controlHeight) {
-            VStack(alignment: .leading, spacing: Spacing.s.points) {
+        CardSurface(surface: .grouped, inset: Block.card, innerControlHeight: controlHeight) {
+            VStack(alignment: .leading, spacing: Rhythm.blocks.spacing.points) {
                 Text(verbatim: question)
                     .textRole(.headline)
                     .fixedSize(horizontal: false, vertical: true)

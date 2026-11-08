@@ -138,8 +138,8 @@ public struct ActionRow: View {
         }
     }
 
-    /// "…": in a row, a circle of the row's height (design-rules 10.1) — its width is set equal to
-    /// the measured height, so it is round by construction; stacked, a full-width "More Answers".
+    /// "…": in a row, the system's bordered circle as tall as the row (design-rules 10.1);
+    /// stacked, a full-width "More Answers".
     @ViewBuilder private func moreMenu(lines: Int?) -> some View {
         let menu = Menu {
             ForEach(more) { a in
@@ -149,11 +149,11 @@ public struct ActionRow: View {
             if lines == nil {
                 Text("More Answers").frame(maxWidth: .infinity).foregroundStyle(Color(uiColor: .label))
             } else {
+                // The system's circle around a square label: its fill is Deny's, its size the row's.
+                let label = Metric.squareLargeButtonLabel(rowHeight: reportedHeight)
                 Image(systemName: "ellipsis")
                     .foregroundStyle(Color(uiColor: .label))
-                    .frame(width: reportedHeight, height: reportedHeight)
-                    .background(Surface.fill.style, in: Circle())
-                    .contentShape(Circle())
+                    .frame(width: label.width, height: label.height)
             }
         }
         .accessibilityLabel(Text("More Answers"))
@@ -161,7 +161,7 @@ public struct ActionRow: View {
         if lines == nil {
             menu.menuStyle(.button).buttonStyle(.bordered).tint(.gray).controlSize(.large)
         } else {
-            menu.menuStyle(.button).buttonStyle(PressFade())
+            menu.menuStyle(.button).buttonStyle(.bordered).buttonBorderShape(.circle).tint(.gray).controlSize(.large)
         }
     }
 }

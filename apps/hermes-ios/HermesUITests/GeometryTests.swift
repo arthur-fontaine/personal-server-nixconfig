@@ -86,16 +86,18 @@ final class GeometryTests: XCTestCase {
         XCTAssertGreaterThan(items.count, 4)
         for (a, b) in zip(items, items.dropFirst()) {
             let gap = b.frame.minY - a.frame.maxY
-            let expected: CGFloat = a.speaker == b.speaker ? 12 : 24
+            // 12.3: 24 between turns, 8 between the owner's bubbles, 16 between Hermes' blocks.
+            let expected: CGFloat = a.speaker != b.speaker ? 24 : (a.speaker == "owner" ? 8 : 16)
             XCTAssertEqual(gap, expected, accuracy: tolerance, "\(a.speaker)→\(b.speaker) gap \(gap)")
             XCTAssertTrue(scale.contains { abs($0 - gap) <= tolerance }, "gap \(gap) off the scale")
         }
         // The composer never touches the transcript's last item.
         let card = one(app, "chat.approval").frame, composer = one(app, "composer").frame
-        XCTAssertGreaterThanOrEqual(composer.minY - card.maxY, 8 - tolerance)
+        XCTAssertEqual(composer.minY - card.maxY, 16, accuracy: tolerance, "the last item breathes above the composer")
     }
 
-    /// 5.3, 6.1: the approval's buttons share one height ≥ 44, one row, primary trailing.
+    /// 5.3, 6.1, 10.1: the approval's buttons share one height ≥ 44, one row, primary trailing;
+    /// "…" is a circle of that height.
     func testApprovalButtons() {
         let app = launch()
         let buttons = ["action.more", "action.deny", "action.once"].map { one(app, $0).frame }
@@ -106,6 +108,7 @@ final class GeometryTests: XCTestCase {
         }
         XCTAssertLessThan(buttons[1].minX, buttons[2].minX, "the primary is trailing")
         XCTAssertEqual(buttons[1].width, buttons[2].width, accuracy: tolerance, "text buttons share the width")
+        XCTAssertEqual(buttons[0].width, buttons[0].height, accuracy: 0.5, "“…” is round")
     }
 
     /// 5.1: inner radius = outer radius − inset, measured: the card's declared corner and inset,
@@ -125,8 +128,12 @@ final class GeometryTests: XCTestCase {
            let p = probe(bubble) {
             XCTAssertEqual(bubble.frame.height / 2, p.radius, accuracy: tolerance, "one-line bubble is a capsule")
         }
-        // Code outside a card: the block minimum, inset by its own padding.
-        if let code = probe(one(app, "chat.code")) { XCTAssertEqual(code.radius, 12, accuracy: tolerance) }
+        // Code outside a card: the block minimum, its own 16-pt padding (12.2).
+        if let code = probe(one(app, "chat.code")) {
+            XCTAssertEqual(code.radius, 16, accuracy: tolerance)
+            XCTAssertGreaterThanOrEqual(code.inset, 16)
+        }
+        XCTAssertGreaterThanOrEqual(card.inset, 20, "the approval card breathes (12.2)")
     }
 
     /// 5.4: every control we draw at least 44 × 44. Toolbar items are the system's own: they

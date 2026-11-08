@@ -93,11 +93,20 @@ struct TokenTests {
         #expect(Radius.bubble * 2 == Metric.bodyLine + 2 * Bubble.vertical.points)
     }
 
-    @Test func rhythmSeparatesTurnsMoreThanItemsOfATurn() {
+    /// 2.4, 12.3: 24 between turns, 8 between the owner's bubbles, 16 between a reply's blocks.
+    @Test func rhythm() {
         #expect(TranscriptRow<EmptyView>.gap(.hermes, after: nil) == nil)
-        #expect(TranscriptRow<EmptyView>.gap(.hermes, after: .hermes) == Rhythm.withinTurn.spacing)
-        #expect(TranscriptRow<EmptyView>.gap(.owner, after: .hermes) == Rhythm.turn.spacing)
-        #expect(Rhythm.turn.spacing.points > Rhythm.withinTurn.spacing.points)
-        #expect(Rhythm.withinTurn.spacing.points >= Spacing.xs.points, "items never touch (design-rules 2.4)")
+        #expect(TranscriptRow<EmptyView>.gap(.hermes, after: .hermes)?.points == 16)
+        #expect(TranscriptRow<EmptyView>.gap(.owner, after: .owner)?.points == 8)
+        #expect(TranscriptRow<EmptyView>.gap(.owner, after: .hermes)?.points == 24)
+        #expect(TranscriptRow<EmptyView>.gap(.hermes, after: .owner)?.points == 24)
+    }
+
+    /// 12.1–12.2: surfaces breathe — never below 16 × 10 for the bubble, 16 for code, 20 for the card.
+    @Test func chatSurfacesBreathe() {
+        #expect(Bubble.horizontal.points >= 16 && Bubble.vertical.points >= 10)
+        #expect(Radius.bubble * 2 >= 46 && Radius.bubble * 2 <= 48, "one-line bubble ≈ 46–48 pt")
+        #expect(Block.padding.points >= 16)
+        #expect(Block.card.points >= 20)
     }
 }
