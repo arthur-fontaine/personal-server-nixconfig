@@ -8,7 +8,8 @@ new folder next to them.
 flake.nix                 darwinConfigurations, packages, checks
 hosts/                    machine definitions (shared.nix, git-ignored local.nix)
 pkgs/                     what nixpkgs lacks, as an overlay
-checks/                   `nix flake check`: the plugins', the coding agent's and freeze tests; hermes-turns/, end to end
+apps/hermes-ios/          the Hermes iPhone and iPad app (SwiftUI, XcodeGen; its README), built here by the sideload service
+checks/                   `nix flake check`: the plugins', the coding agent's, sideload's, the events' and freeze tests; hermes-turns/, end to end
 scripts/                  bootstrap-macos.sh (the setup), hermes-setup.sh (its screen steps, at Hermes' login), uninstall-macos.sh (disable, remove), with gum
   bootstrap/              the setup's sections (lib.sh: their helpers), sourced in the order bootstrap-macos.sh lists
     integrations/         one file per integration's setup
@@ -32,6 +33,7 @@ modules/
     agent/                its home-manager configuration
       default.nix         the upstream module, from scratch, managed mode
       model.nix memory.nix telegram.nix mcp.nix tools.nix computer-use.nix
+      app.nix             the app_topic plugin and its settings (server.hermes.app)
       prompt/             SOUL.md (UniiChat's prompt), AGENTS.md (this server's rules)
       session/            its GUI session: launchd agents, display, fsearch, defaults, the setup at login
     plugins/unii/         the single-chat memory and sub-chats (Python)
