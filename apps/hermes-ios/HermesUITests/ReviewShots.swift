@@ -68,20 +68,19 @@ final class ReviewShots: XCTestCase {
         try shot("chatsmenu")
     }
 
-    func testPetSheet() throws {
-        let app = launch(["-scene", "review", "-pet"])
-        let avatar = app.descendants(matching: .any).matching(identifier: "pet.avatar").firstMatch
-        XCTAssertTrue(avatar.waitForExistence(timeout: 10))
-        settle(avatar)
-        try shot("pet")
-        // A caress: hold the pet; the heart rises for a second.
-        avatar.press(forDuration: 0.6)
-        Thread.sleep(forTimeInterval: 0.25)
+    /// The bar's pet: a tap caresses it (the heart for a second), a long press offers New Pet….
+    func testPet() throws {
+        let app = launch(["-scene", "review"])
+        let pet = app.descendants(matching: .any).matching(identifier: "toolbar.pet").firstMatch
+        XCTAssertTrue(pet.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 2)
+        pet.tap()
+        Thread.sleep(forTimeInterval: 0.3)
         try shot("pet-caress")
-        // The large detent.
-        app.swipeUp(velocity: .slow)
-        settle(avatar)
-        try shot("pet-large")
+        Thread.sleep(forTimeInterval: 1.5)
+        pet.press(forDuration: 0.8)
+        Thread.sleep(forTimeInterval: 0.8)
+        try shot("pet-menu")
     }
 
     func testCatalog() throws {

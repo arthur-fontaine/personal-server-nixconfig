@@ -141,8 +141,7 @@ final class GeometryTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(f.width, 44 - tolerance, "\(id) width \(f.width)")
             XCTAssertGreaterThanOrEqual(f.height, 44 - tolerance, "\(id) height \(f.height)")
         }
-        var bar = ["toolbar.call"]
-        if UIDevice.current.userInterfaceIdiom == .phone { bar.append("toolbar.pet") }
+        let bar = ["toolbar.call", "toolbar.pet"]
         for id in bar {
             let f = one(app, id).frame
             XCTAssertGreaterThanOrEqual(min(f.width, f.height), 36 - tolerance, "\(id) is smaller than a system bar item: \(f)")
@@ -173,18 +172,12 @@ final class GeometryTests: XCTestCase {
             var ids = ["composer.attach", "toolbar.call"]
             ids.append(app.descendants(matching: .any)["composer.stop"].exists ? "composer.stop" : "composer.send")
             if !ax { ids.append("action.more") } // stacked at AX5: "More Answers", a full-width button
-            if UIDevice.current.userInterfaceIdiom == .phone { ids.append("toolbar.pet") }
+            ids.append("toolbar.pet")
             for id in ids {
                 let f = one(app, id).frame
                 XCTAssertEqual(f.width, f.height, accuracy: 0.5, "\(id) is an oval: \(f.size)\(ax ? " at AX5" : "")")
             }
             app.terminate()
-            // The pet's avatar in its sheet.
-            let pet = launch(["-pet"] + (ax ? ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] : []))
-            let avatar = pet.descendants(matching: .any).matching(identifier: "pet.avatar").firstMatch
-            XCTAssertTrue(avatar.waitForExistence(timeout: 5))
-            XCTAssertEqual(avatar.frame.width, avatar.frame.height, accuracy: 0.5, "pet avatar is an oval: \(avatar.frame.size)")
-            pet.terminate()
         }
     }
 

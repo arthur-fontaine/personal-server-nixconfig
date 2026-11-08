@@ -23,12 +23,12 @@ run() { # device appearance tag args tests…
     -destination "platform=iOS Simulator,name=$d" -derivedDataPath "$dd" "${only[@]}" 2>&1 | grep -E 'error:|Executed .* tests' | tail -2
 }
 AX="-UIPreferredContentSizeCategoryName UICTContentSizeCategoryAccessibilityXXXL"
-run "$phone" light light "" testChat testChatsMenu testPetSheet testCatalog
-run "$phone" dark dark "" testChat testChatsMenu testPetSheet testCatalog
+run "$phone" light light "" testChat testChatsMenu testPet testCatalog
+run "$phone" dark dark "" testChat testChatsMenu testPet testCatalog
 run "$phone" light ax5 "$AX" testChat testCatalog
-run "$phone" light fr "-AppleLanguages (fr) -AppleLocale fr_FR" testChat testChatsMenu testPetSheet
-run "$phone" light otherpet-light "-petHue 200" testChat testPetSheet
-run "$phone" dark otherpet-dark "-petHue 200" testChat testPetSheet
+run "$phone" light fr "-AppleLanguages (fr) -AppleLocale fr_FR" testChat testChatsMenu testPet
+run "$phone" light otherpet-light "-petHue 200" testChat testPet
+run "$phone" dark otherpet-dark "-petHue 200" testChat testPet
 run "$pad" light light "" testChat
 run "$pad" dark dark "" testChat
 xcrun simctl ui "$phone" appearance light; xcrun simctl ui "$pad" appearance light
