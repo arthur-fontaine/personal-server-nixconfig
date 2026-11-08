@@ -139,7 +139,7 @@ public struct FileCard: View {
     /// Where a file name may break, without hyphens (zero-width spaces): after a separator
     /// (`-`, `_`, `.`, space) and where letters meet digits or a capital follows a lower case —
     /// "Statements-" / "2025.pdf"; inside a segment longer than `longSegment`, anywhere.
-    static func breakableAnywhere(_ s: String) -> String {
+    nonisolated static func breakableAnywhere(_ s: String) -> String {
         let zwsp = "\u{200B}"
         var segments: [String] = [], current = ""
         var previous: Character?
@@ -160,5 +160,5 @@ public struct FileCard: View {
     }
 
     /// A segment this long may not fit a line at accessibility sizes: it breaks anywhere.
-    static let longSegment = 14
+    nonisolated static let longSegment = 14
 }
