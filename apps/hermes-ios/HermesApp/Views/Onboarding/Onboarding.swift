@@ -2,31 +2,28 @@ import HermesCore
 import HermesUI
 import SwiftUI
 
-// Phase 2 of the redesign: these screens still use raw styling (DesignCheck lists the file).
-
+/// Asked once after login, with a word on why (design.md, "Install → first message").
 struct NotificationsPrompt: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 22) {
+        OnboardingPage(title: Text("Don't miss Hermes' questions"),
+                       message: Text("Hermes asks before anything risky, and tells you when long work is done. With AirPods, Siri can read it out.")) {
             PetSpriteView(animation: .waiting, size: .hero)
-            Text("Don't miss Hermes' questions").font(.title2.weight(.bold)).multilineTextAlignment(.center)
-            Text("Hermes asks before anything risky, and tells you when long work is done. With AirPods, Siri can read it out.")
-                .multilineTextAlignment(.center).foregroundStyle(.secondary)
-            Button {
+        } fields: {
+            EmptyView()
+        } actions: {
+            PrimaryButton("Turn On Notifications", fullWidth: true) {
                 Task {
                     await NotificationService.shared.requestAuthorization()
                     model.askNotifications = false
                     dismiss()
                 }
-            } label: { Text("Turn On Notifications").font(.headline).frame(maxWidth: .infinity, minHeight: 34) }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            }
             Button("Not Now") { model.askNotifications = false; dismiss() }
         }
-        .padding(28)
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
     }
 }
 
@@ -37,24 +34,27 @@ struct LaunchView: View {
     }
 }
 
+/// Looking for the bot after login; if it can't be found, why, and Try Again.
 struct FindingBotView: View {
     @Environment(HermesStore.self) private var store
 
     var body: some View {
-        VStack(spacing: 20) {
-            PetSpriteView(animation: store.botError == nil ? .jumping : .failed, size: .stage)
-            if let error = store.botError {
-                Text("Couldn't reach Hermes").font(.title2.weight(.semibold))
-                Text(error).font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                Button("Try Again") { store.retryConnectBot() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-            } else {
-                Text("Finding @\(store.config.botUsername)…").font(.headline).foregroundStyle(.secondary)
+        if let error = store.botError {
+            OnboardingPage(title: Text("Couldn't reach Hermes"), message: Text(error)) {
+                PetSpriteView(animation: .failed, size: .hero)
+            } fields: {
+                EmptyView()
+            } actions: {
+                PrimaryButton("Try Again", fullWidth: true) { store.retryConnectBot() }
+            }
+        } else {
+            OnboardingPage(title: Text("Finding Hermes"), message: Text("@\(store.config.botUsername)")) {
+                PetSpriteView(animation: .jumping, size: .hero)
+            } fields: {
+                ProgressView()
+            } actions: {
+                EmptyView()
             }
         }
-        .padding(32)
-        .frame(maxWidth: 440)
     }
 }
-

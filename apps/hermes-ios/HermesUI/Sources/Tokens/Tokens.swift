@@ -90,6 +90,10 @@ enum Metric {
     static let chartTicks = 3
     /// Past this, usage is shown in red.
     static let criticalUsage = 0.9
+    /// A first-run step's column on wide screens (one field, one button).
+    static let onboardingWidth: CGFloat = 440
+    /// A first-run step's text field: a large control's height.
+    static let fieldHeight: CGFloat = 52
     /// Typing indicator dot.
     static let typingDot: CGFloat = 6
     /// A quote's leading rule (Mail's quote bar).
@@ -132,6 +136,8 @@ enum Radius {
 }
 
 extension Radius {
+    /// A first-run step's field: half its height, as round as the large buttons beside it.
+    static let field: CGFloat = Metric.fieldHeight / 2
     /// The composer's field: a capsule at one line, the same corner as it grows.
     static let composerField: CGFloat = Metric.composerControl / 2
 }
