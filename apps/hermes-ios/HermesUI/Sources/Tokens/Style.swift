@@ -19,7 +19,8 @@ public enum TextRole: CaseIterable, Sendable {
 
 /// Foreground colours: semantic only (design-rules 4.1). `accent` is the pet's tint.
 public enum Tone: CaseIterable, Sendable {
-    case primary, secondary, tertiary, accent, destructive
+    /// `warning`: a status that needs attention soon (system orange, design-rules 4: status colours).
+    case primary, secondary, tertiary, accent, destructive, warning
 
     var style: AnyShapeStyle {
         switch self {
@@ -28,6 +29,7 @@ public enum Tone: CaseIterable, Sendable {
         case .tertiary: AnyShapeStyle(.tertiary)
         case .accent: AnyShapeStyle(.tint)
         case .destructive: AnyShapeStyle(.red)
+        case .warning: AnyShapeStyle(.orange)
         }
     }
 }
@@ -64,6 +66,14 @@ public enum Emphasis: Sendable {
 }
 
 public extension View {
+    /// A system grouped list (Form, inset-grouped List) in a readable column on wide screens, its
+    /// grouped background running edge to edge (as Settings on iPad; design-rules 2.2, 6.3).
+    func readableGroupedList() -> some View {
+        frame(maxWidth: Metric.readableWidth)
+            .frame(maxWidth: .infinity)
+            .background(Color(uiColor: .systemGroupedBackground))
+    }
+
     func textRole(_ role: TextRole) -> some View { font(role.font) }
     func tone(_ tone: Tone) -> some View { foregroundStyle(tone.style) }
 
