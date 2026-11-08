@@ -86,14 +86,14 @@ def pre_approval_request(command: str = "", description: str = "", **_) -> None:
     description is the pattern's name), and stay without."""
     guard = sys.modules.get("guard")
     summarize = getattr(guard, "card_summary", None)
-    if summarize is None or not command:
+    app = STATE["app"]
+    if summarize is None or not command or app is None:
         return
     try:
         summary = summarize(description)
     except Exception:
-        return
-    if summary:
-        approval_summary(command, summary)
+        summary = None
+    app.questions.add_summary(command, summary)
 
 
 CALL_MARK = "\U0001f399"
