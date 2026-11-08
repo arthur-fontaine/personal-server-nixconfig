@@ -1,5 +1,7 @@
 import ActivityKit
+import CoreImage
 import HermesCore
+import HermesUI
 import SwiftUI
 import UserNotifications
 import WidgetKit
@@ -38,6 +40,14 @@ final class AppModel {
     let store: HermesStore
     var section: AppSection = .chat
     var selectedTopic: TopicID? = .main
+    /// The pet's sheet (needs, actions, then Dashboard and Settings), from the pet in the toolbar.
+    var showPet = false
+    /// A section pushed inside the pet sheet on iPhone (`-section dashboard`, `hermes://dashboard`).
+    var petPath: [AppSection] = []
+    /// The app's one colour, read from the pet's sprite (design-rules 4.2).
+    var accent: PetAccent = .fallback
+    /// `-catalog <page>`: HermesUI's component catalogue instead of the app (design reviews).
+    let catalogPage = AppModel.value("-catalog", in: ProcessInfo.processInfo.arguments).flatMap(CatalogPage.init(rawValue:))
     var showNewSubchat = false
     var showCommands = false
     var callPresented = false
@@ -50,7 +60,8 @@ final class AppModel {
         config = AppConfig.fromBundle(deviceName: UIDevice.current.name)
         let client: any TelegramClient
         if config.demo {
-            client = FakeTelegramClient(startsLoggedIn: !arguments.contains("-demoLogin"), withQuestion: !arguments.contains("-noQuestion"))
+            client = FakeTelegramClient(startsLoggedIn: !arguments.contains("-demoLogin"), withQuestion: !arguments.contains("-noQuestion"),
+                                        scene: Self.value("-scene", in: arguments))
         } else {
             client = TDLibTelegramClient(config: config)
         }
@@ -59,6 +70,8 @@ final class AppModel {
         store.hooks.stateChanged = { [weak self] state in self?.stateChanged(state) }
         store.hooks.spriteAvailable = { [weak self] pet, url in self?.spriteChanged(pet: pet, url: url) }
         store.start()
+        if let hue = Self.value("-petHue", in: arguments).flatMap(Double.init) { Self.recolourBundledPet(degrees: hue) }
+        refreshAccent()
         applyLaunchArguments(arguments)
         IntentBridge.shared.answer = { [weak self] questionID, optionID in
             try await self?.answerFromIntent(questionID: questionID, optionID: optionID)
@@ -79,7 +92,19 @@ final class AppModel {
 
     // MARK: Navigation
 
-    func select(_ section: AppSection) { self.section = section }
+    func select(_ section: AppSection) { show(section) }
+
+    /// Pet, Dashboard and Settings live in the pet's sheet on iPhone, in the detail column on iPad;
+    /// both shells read `section` and `petPath`.
+    func show(_ section: AppSection) {
+        switch section {
+        case .chat: self.section = .chat
+        case .pet: showPet = true
+        case .dashboard, .settings:
+            self.section = section
+            petPath = [section]
+        }
+    }
 
     func open(topic: TopicID) {
         section = .chat
@@ -91,8 +116,8 @@ final class AppModel {
         guard url.scheme == "hermes" else { return }
         switch url.host() {
         case "chat": open(topic: TopicID(url.lastPathComponent) ?? .main)
-        case "pet": section = .pet
-        case "dashboard": section = .dashboard
+        case "pet": showPet = true
+        case "dashboard": show(.dashboard)
         case "call": startCall()
         default: break
         }
@@ -122,7 +147,29 @@ final class AppModel {
     }
 
     private func spriteChanged(pet: PetState, url: URL) {
+        refreshAccent()
         writeWidgetSnapshot()
+    }
+
+    private func refreshAccent() {
+        guard let url = store.spriteURL ?? BundledPet.load()?.spritesheet,
+              let frame = SpriteSheet.cached(url: url)?.frame(.idle, 0) else { return }
+        accent = PetAccent(sprite: frame)
+    }
+
+    /// Demo: another pet's colour, by turning the bundled sprite's hue (`-petHue 200`).
+    private static func recolourBundledPet(degrees: Double) {
+        guard let url = BundledPet.load()?.spritesheet, let image = SpriteSheet.decode(url) else { return }
+        let filter = CIFilter(name: "CIHueAdjust")!
+        filter.setValue(CIImage(cgImage: image), forKey: kCIInputImageKey)
+        filter.setValue(degrees * .pi / 180, forKey: kCIInputAngleKey)
+        guard let out = filter.outputImage, let cg = CIContext().createCGImage(out, from: out.extent) else { return }
+        SpriteSheet.register(SpriteSheet(image: cg), for: url)
+    }
+
+    static func value(_ flag: String, in args: [String]) -> String? {
+        guard let i = args.firstIndex(of: flag), i + 1 < args.count else { return nil }
+        return args[i + 1]
     }
 
     func writeWidgetSnapshot() {
@@ -179,7 +226,8 @@ final class AppModel {
             guard let i = args.firstIndex(of: flag), i + 1 < args.count else { return nil }
             return args[i + 1]
         }
-        if let s = value("-section").flatMap(AppSection.init(rawValue:)) { section = s }
+        if let s = value("-section").flatMap(AppSection.init(rawValue:)) { show(s) }
+        if args.contains("-pet") { showPet = true }
         if let t = value("-topic").flatMap(TopicID.init) { selectedTopic = t }
         if args.contains("-unlocked"), let t = selectedTopic { unlockedTopics.insert(t) }
         if args.contains("-newSubchat") { showNewSubchat = true }

@@ -1,4 +1,5 @@
 import HermesCore
+import HermesUI
 import SwiftUI
 
 struct RootView: View {
@@ -8,6 +9,32 @@ struct RootView: View {
 
     var body: some View {
         @Bindable var model = model
+        Group {
+            if let page = model.catalogPage {
+                NavigationStack { ComponentCatalog(page: page) }
+            } else {
+                content
+            }
+        }
+        .petAccent(model.accent)
+        .animation(.smooth, value: store.auth)
+        .animation(.smooth, value: store.bot)
+        .fullScreenCover(isPresented: $model.callPresented) { CallView() }
+        .sheet(isPresented: $model.askNotifications) { NotificationsPrompt() }
+        .overlay(alignment: .top) {
+            if let toast = model.toast {
+                Toast(toast).transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: model.toast)
+        .onChange(of: scenePhase) { _, phase in
+            // Private sub-chats lock again when the app leaves the screen.
+            if phase == .background { model.unlockedTopics.removeAll() }
+            if phase == .active { model.writeWidgetSnapshot() }
+        }
+    }
+
+    @ViewBuilder private var content: some View {
         Group {
             switch store.auth {
             case .ready:
@@ -24,85 +51,12 @@ struct RootView: View {
                 LoginFlow()
             }
         }
-        .animation(.smooth, value: store.auth)
-        .animation(.smooth, value: store.bot)
-        .fullScreenCover(isPresented: $model.callPresented) { CallView() }
-        .sheet(isPresented: $model.askNotifications) { NotificationsPrompt() }
-        .overlay(alignment: .top) {
-            if let toast = model.toast {
-                Text(toast)
-                    .font(.subheadline.weight(.medium))
-                    .padding(.horizontal, 16).padding(.vertical, 10)
-                    .glassEffect()
-                    .padding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-        }
-        .animation(.snappy, value: model.toast)
-        .onChange(of: scenePhase) { _, phase in
-            // Private sub-chats lock again when the app leaves the screen.
-            if phase == .background { model.unlockedTopics.removeAll() }
-            if phase == .active { model.writeWidgetSnapshot() }
-        }
     }
 }
 
-struct NotificationsPrompt: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(spacing: 22) {
-            PetSpriteView(animation: .waiting, size: 110)
-            Text("Don't miss Hermes' questions").font(.title2.weight(.bold)).multilineTextAlignment(.center)
-            Text("Hermes asks before anything risky, and tells you when long work is done. With AirPods, Siri can read it out.")
-                .multilineTextAlignment(.center).foregroundStyle(.secondary)
-            Button {
-                Task {
-                    await NotificationService.shared.requestAuthorization()
-                    model.askNotifications = false
-                    dismiss()
-                }
-            } label: { Text("Turn On Notifications").font(.headline).frame(maxWidth: .infinity, minHeight: 34) }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            Button("Not Now") { model.askNotifications = false; dismiss() }
-        }
-        .padding(28)
-        .presentationDetents([.medium])
-    }
-}
-
-struct LaunchView: View {
-    var body: some View {
-        PetSpriteView(animation: .idle, size: 120)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-struct FindingBotView: View {
-    @Environment(HermesStore.self) private var store
-
-    var body: some View {
-        VStack(spacing: 20) {
-            PetSpriteView(animation: store.botError == nil ? .jumping : .failed, size: 140)
-            if let error = store.botError {
-                Text("Couldn't reach Hermes").font(.title2.weight(.semibold))
-                Text(error).font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                Button("Try Again") { store.retryConnectBot() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-            } else {
-                Text("Finding @\(store.config.botUsername)…").font(.headline).foregroundStyle(.secondary)
-            }
-        }
-        .padding(32)
-        .frame(maxWidth: 440)
-    }
-}
-
-/// iPhone (compact width): tabs. iPad and wide windows: a split view. Chosen by size class, so an
-/// iPad in Slide Over or a narrow Stage Manager window gets the iPhone layout.
+/// Compact width: one navigation stack, the chat is the app (no tab bar, design-rules 1.3).
+/// Regular width: a split view whose sidebar lists the chats. Chosen by size class, so Slide Over
+/// and narrow Stage Manager windows get the compact layout.
 struct AppShell: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(AppModel.self) private var model
@@ -113,132 +67,18 @@ struct AppShell: View {
             if sizeClass == .regular {
                 SplitShell()
             } else {
-                TabShell()
+                NavigationStack {
+                    ChatScreen(topic: model.selectedTopic ?? .main, compact: true)
+                        .id(model.selectedTopic ?? .main)
+                }
             }
+        }
+        .sheet(isPresented: $model.showPet) {
+            PetSheet()
+                .petAccent(model.accent)
         }
         .sheet(isPresented: $model.showNewSubchat) { NewSubchatSheet() }
     }
-}
-
-struct TabShell: View {
-    @Environment(AppModel.self) private var model
-    @Environment(HermesStore.self) private var store
-
-    var body: some View {
-        @Bindable var model = model
-        TabView(selection: $model.section) {
-            Tab(AppSection.chat.title, systemImage: AppSection.chat.symbol, value: .chat) {
-                NavigationStack { CompactChatRoot() }
-            }
-            .badge(store.questions.count)
-            Tab(AppSection.pet.title, systemImage: AppSection.pet.symbol, value: .pet) {
-                NavigationStack { PetScreen() }
-            }
-            Tab(AppSection.dashboard.title, systemImage: AppSection.dashboard.symbol, value: .dashboard) {
-                NavigationStack { DashboardView() }
-            }
-            Tab(AppSection.settings.title, systemImage: AppSection.settings.symbol, value: .settings) {
-                NavigationStack { SettingsView() }
-            }
-        }
-        .tabBarMinimizeBehavior(.onScrollDown)
-        // Away from the chat, what Hermes is doing stays one tap away, as Music's player does.
-        // Not on the chat tab: its title already says it, and the composer needs the room.
-        .modifier(AgentAccessoryModifier(enabled: model.section != .chat && (store.agent.status != .idle || !store.questions.isEmpty)))
-    }
-}
-
-/// `isEnabled:` came in iOS 26.1; on 26.0 there's no accessory rather than one always shown.
-struct AgentAccessoryModifier: ViewModifier {
-    let enabled: Bool
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26.1, *) {
-            content.tabViewBottomAccessory(isEnabled: enabled) { AgentAccessory() }
-        } else {
-            content
-        }
-    }
-}
-
-/// The tab bar's accessory: Hermes' status (or its question) and the chat it's in.
-struct AgentAccessory: View {
-    @Environment(AppModel.self) private var model
-    @Environment(HermesStore.self) private var store
-    @Environment(\.tabViewBottomAccessoryPlacement) private var placement
-
-    var body: some View {
-        Button {
-            model.open(topic: store.questions.first?.chat ?? store.agent.chat ?? .main)
-        } label: {
-            HStack(spacing: 10) {
-                PetSpriteView(animation: nil, size: 26)
-                if let q = store.questions.first {
-                    Label(q.summary ?? q.text, systemImage: "hand.raised.fill")
-                        .foregroundStyle(.tint)
-                        .lineLimit(1)
-                } else {
-                    VStack(alignment: .leading, spacing: 0) {
-                        AgentStatusLabel(agent: store.agent, compact: true)
-                        if placement != .inline, let task = store.agent.task {
-                            Text(task).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-            .font(.subheadline.weight(.medium))
-            .padding(.horizontal, 16)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-/// The chat tab on iPhone: the main chat is the root (the daily case); sub-chats come from the
-/// title menu and push.
-struct CompactChatRoot: View {
-    @Environment(AppModel.self) private var model
-    @State private var showSubchats = false
-
-    var body: some View {
-        @Bindable var model = model
-        ChatView(topic: .main)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { showSubchats = true } label: {
-                        Label("Sub-chats", systemImage: "list.bullet")
-                    }
-                }
-            }
-            .sheet(isPresented: $showSubchats) {
-                NavigationStack {
-                    ThreadList(selection: Binding(get: { nil }, set: { topic in
-                        showSubchats = false
-                        if let topic, topic != .main { model.selectedTopic = topic; pushed = topic }
-                    }))
-                    .navigationTitle("Chats")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) { Button(role: .close) { showSubchats = false } }
-                    }
-                }
-                .presentationDetents([.medium, .large])
-            }
-            .navigationDestination(item: $pushed) { topic in ChatView(topic: topic) }
-            .onAppear {
-                if let t = model.selectedTopic, t != .main, pushed == nil { pushed = t }
-            }
-            .onChange(of: model.selectedTopic) { _, t in
-                if let t, t != .main { pushed = t }
-            }
-    }
-
-    @State private var pushed: TopicID?
-}
-
-extension TopicID: @retroactive Identifiable {
-    public var id: Int32 { self }
 }
 
 struct SplitShell: View {
@@ -246,15 +86,15 @@ struct SplitShell: View {
     @State private var columns: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        @Bindable var model = model
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar()
-                .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 360)
+                .sidebarColumnWidth()
         } detail: {
             NavigationStack {
                 switch model.section {
-                case .chat: ChatView(topic: model.selectedTopic ?? .main).id(model.selectedTopic)
-                case .pet: PetScreen()
+                case .chat, .pet:
+                    ChatScreen(topic: model.selectedTopic ?? .main, compact: false)
+                        .id(model.selectedTopic ?? .main)
                 case .dashboard: DashboardView()
                 case .settings: SettingsView()
                 }
@@ -262,4 +102,8 @@ struct SplitShell: View {
         }
         .navigationSplitViewStyle(.balanced)
     }
+}
+
+extension TopicID: @retroactive Identifiable {
+    public var id: Int32 { self }
 }

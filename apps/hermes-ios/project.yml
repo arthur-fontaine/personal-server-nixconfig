@@ -36,6 +36,24 @@ targets:
         SKIP_INSTALL: YES
         APPLICATION_EXTENSION_API_ONLY: YES
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) $(HERMES_PAID_FLAG)
+  # The design system (design-rules 9): the screens compose its components and tokens; its
+  # build phase runs DesignCheck, which fails the build on styling that bypasses it.
+  HermesUI:
+    type: framework
+    platform: iOS
+    sources:
+      - path: HermesUI/Sources
+    preBuildScripts:
+      - name: Design check
+        basedOnDependencyAnalysis: false
+        script: '"$SRCROOT/scripts/design-check.sh"'
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).ui
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+        # The checker builds a Mac tool from Tools/DesignCheck: outside the script sandbox.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
   HermesApp:
     type: application
     platform: iOS
@@ -48,6 +66,7 @@ targets:
         optional: true
     dependencies:
       - target: HermesCore
+      - target: HermesUI
       - target: HermesWidgets
       - package: TDLibKit
     info:
@@ -142,6 +161,17 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).core.tests
         GENERATE_INFOPLIST_FILE: YES
+  HermesUIComponentTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: HermesUI/Tests
+    dependencies:
+      - target: HermesUI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).ui.tests
+        GENERATE_INFOPLIST_FILE: YES
   HermesUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -161,10 +191,11 @@ schemes:
       targets:
         HermesApp: all
         HermesCoreTests: [test]
+        HermesUIComponentTests: [test]
     run:
       config: Debug
     test:
       config: Debug
-      targets: [HermesCoreTests, HermesUITests]
+      targets: [HermesCoreTests, HermesUIComponentTests, HermesUITests]
     archive:
       config: Release

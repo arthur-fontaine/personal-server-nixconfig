@@ -331,6 +331,16 @@
         }
       }
     },
+    "Found 41 snapshots older than 90 days, the oldest from 12 March. Deleting them needs your go-ahead: once pruned, restic can't bring": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "J’ai trouvé 41 instantanés de plus de 90 jours, le plus ancien du 12 mars. Les supprimer demande ton accord : une fois élagués, restic ne pourra pas les"
+          }
+        }
+      }
+    },
     "Good morning! Three things overnight: the **nightly backup failed** at 03:12, Léa replied about Saturday, and your Lisbon flight is now boarding at gate 34 on Thursday.": {
       "localizations": {
         "fr": {

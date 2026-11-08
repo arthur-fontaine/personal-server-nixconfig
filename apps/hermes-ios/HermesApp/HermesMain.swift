@@ -11,7 +11,6 @@ struct HermesMain: App {
             RootView()
                 .environment(model)
                 .environment(model.store)
-                .tint(Color.accentColor)
                 .onOpenURL { model.open($0) }
         }
         .commands { HermesCommands(model: model) }

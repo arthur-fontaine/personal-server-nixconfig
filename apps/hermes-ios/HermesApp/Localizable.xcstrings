@@ -28,22 +28,6 @@
         }
       }
     },
-    "%@ · via %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$@ · via %2$@"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ · via %@"
-          }
-        }
-      }
-    },
     "%@, last 24 hours": {
       "localizations": {
         "fr": {
@@ -70,58 +54,34 @@
         }
       }
     },
-    "%lld xp · %lld to next level": {
+    "%@, via %@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "%1$lld xp · %2$lld to next level"
+            "value": "%1$@, via %2$@"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld xp · %lld avant le niveau suivant"
+            "value": "%1$@, via %2$@"
           }
         }
       }
     },
-    "+%lld more": {
+    "%lld XP, %lld to the next level": {
       "localizations": {
         "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "+%lld more"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "+%lld more"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld XP, %2$lld to the next level"
           }
         },
         "fr": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "+%lld autre"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "+%lld autres"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld XP, encore %2$lld pour le niveau suivant"
           }
         }
       }
@@ -216,6 +176,36 @@
         }
       }
     },
+    "Allow Once": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autoriser une fois"
+          }
+        }
+      }
+    },
+    "Allow for This Session": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autoriser pour la session"
+          }
+        }
+      }
+    },
+    "Always Allow": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toujours autoriser"
+          }
+        }
+      }
+    },
     "Answer Hermes": {
       "localizations": {
         "fr": {
@@ -256,26 +246,6 @@
         }
       }
     },
-    "Approval needed": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Accord nécessaire"
-          }
-        }
-      }
-    },
-    "At": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le"
-          }
-        }
-      }
-    },
     "Attach": {
       "localizations": {
         "fr": {
@@ -307,12 +277,12 @@
         }
       }
     },
-    "Big file · %@": {
+    "Big file, on %@": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gros fichier · %@"
+            "value": "Gros fichier, sur %@"
           }
         }
       }
@@ -517,16 +487,6 @@
         }
       }
     },
-    "Copied": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Copié"
-          }
-        }
-      }
-    },
     "Copy": {
       "localizations": {
         "fr": {
@@ -607,16 +567,6 @@
         }
       }
     },
-    "Custom": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Personnalisé"
-          }
-        }
-      }
-    },
     "Dashboard": {
       "localizations": {
         "fr": {
@@ -688,12 +638,12 @@
         }
       }
     },
-    "Details": {
+    "Deny": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Détails"
+            "value": "Refuser"
           }
         }
       }
@@ -724,16 +674,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Télécharger (%@, Wi-Fi)"
-          }
-        }
-      }
-    },
-    "Encrypted": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chiffrée"
           }
         }
       }
@@ -784,16 +724,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Erreurs"
-          }
-        }
-      }
-    },
-    "Expires": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expire"
           }
         }
       }
@@ -905,16 +835,6 @@
         }
       }
     },
-    "Grows as Hermes finishes work and you answer it.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Grandit quand Hermes termine un travail et quand tu lui réponds."
-          }
-        }
-      }
-    },
     "HERMES_TG_API_ID and HERMES_TG_API_HASH aren't set in this build.": {
       "localizations": {
         "fr": {
@@ -975,16 +895,6 @@
         }
       }
     },
-    "Hermes asks": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hermes demande"
-          }
-        }
-      }
-    },
     "Hermes asks before anything risky, and tells you when long work is done. With AirPods, Siri can read it out.": {
       "localizations": {
         "fr": {
@@ -1031,26 +941,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hermes recompile l’app"
-          }
-        }
-      }
-    },
-    "Hermes is waiting in %@": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hermes t’attend dans %@"
-          }
-        }
-      }
-    },
-    "Hermes is waiting in the main chat": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hermes t’attend dans la discussion principale"
           }
         }
       }
@@ -1145,16 +1035,6 @@
         }
       }
     },
-    "Hide command": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Masquer la commande"
-          }
-        }
-      }
-    },
     "High": {
       "comment": "Reasoning effort",
       "localizations": {
@@ -1217,6 +1097,7 @@
       }
     },
     "LFM3-Omni-2B (on device)": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1246,6 +1127,16 @@
         }
       }
     },
+    "Level": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niveau"
+          }
+        }
+      }
+    },
     "Level %lld": {
       "localizations": {
         "fr": {
@@ -1267,6 +1158,7 @@
       }
     },
     "Listening failed.": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1293,16 +1185,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Local"
-          }
-        }
-      }
-    },
-    "Locked": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Verrouillée"
           }
         }
       }
@@ -1344,16 +1226,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Faible"
-          }
-        }
-      }
-    },
-    "Lv %lld": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Niv. %lld"
           }
         }
       }
@@ -1471,6 +1343,16 @@
         }
       }
     },
+    "More Answers": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autres réponses"
+          }
+        }
+      }
+    },
     "Mute": {
       "localizations": {
         "fr": {
@@ -1501,6 +1383,16 @@
         }
       }
     },
+    "Needs": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Besoins"
+          }
+        }
+      }
+    },
     "New Sub-chat": {
       "localizations": {
         "fr": {
@@ -1517,16 +1409,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Suivant"
-          }
-        }
-      }
-    },
-    "No": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Non"
           }
         }
       }
@@ -1592,6 +1474,16 @@
         }
       }
     },
+    "Not Sent": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non envoyé"
+          }
+        }
+      }
+    },
     "Not configured": {
       "localizations": {
         "fr": {
@@ -1613,6 +1505,7 @@
       }
     },
     "Not enough memory for the voice model.": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1833,22 +1726,12 @@
         }
       }
     },
-    "Preset": {
+    "Private chat": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Préréglage"
-          }
-        }
-      }
-    },
-    "Private": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Privée"
+            "value": "Discussion privée"
           }
         }
       }
@@ -1859,16 +1742,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sous-discussion privée"
-          }
-        }
-      }
-    },
-    "Proposal": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Proposition"
           }
         }
       }
@@ -1899,6 +1772,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mémoriser avec %@"
+          }
+        }
+      }
+    },
+    "Remove %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retirer %@"
           }
         }
       }
@@ -2009,7 +1892,17 @@
         }
       }
     },
-    "Show command": {
+    "Share": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partager"
+          }
+        }
+      }
+    },
+    "Show Command": {
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2060,6 +1953,7 @@
       }
     },
     "Speaking failed.": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2115,16 +2009,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sous-discussion"
-          }
-        }
-      }
-    },
-    "Sub-chats": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sous-discussions"
           }
         }
       }
@@ -2191,6 +2075,7 @@
       }
     },
     "The voice model couldn't read the audio (%d).": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2201,6 +2086,7 @@
       }
     },
     "The voice model didn't load.": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2211,6 +2097,7 @@
       }
     },
     "The voice projector didn't load.": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2251,6 +2138,7 @@
       }
     },
     "This llama.cpp build can't run LFM3 speech.": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2326,16 +2214,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Déverrouiller"
-          }
-        }
-      }
-    },
-    "Unlocked": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Déverrouillée"
           }
         }
       }
@@ -2497,16 +2375,6 @@
         }
       }
     },
-    "Waiting for you": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "En attente de ta réponse"
-          }
-        }
-      }
-    },
     "When the session ends": {
       "localizations": {
         "fr": {
@@ -2547,16 +2415,6 @@
         }
       }
     },
-    "Your main chat": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ta discussion principale"
-          }
-        }
-      }
-    },
     "Your password's hint: %@": {
       "localizations": {
         "fr": {
@@ -2587,32 +2445,12 @@
         }
       }
     },
-    "a sub-chat": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "une sous-discussion"
-          }
-        }
-      }
-    },
     "away": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "absent"
-          }
-        }
-      }
-    },
-    "code": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "code"
           }
         }
       }

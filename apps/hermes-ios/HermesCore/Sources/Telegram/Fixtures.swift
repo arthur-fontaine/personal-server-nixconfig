@@ -49,6 +49,9 @@ public enum Fixtures {
         ]
     }
 
+    /// Hermes' reply caught mid-sentence, for the `review` scene.
+    public static let reviewDraft = L("Found 41 snapshots older than 90 days, the oldest from 12 March. Deleting them needs your go-ahead: once pruned, restic can't bring")
+
     public static func approvalMessage(id: MessageID, now: Date) -> ChatMessage {
         let options = [(L("Once"), "ea:once:7"), (L("Session"), "ea:session:7"), (L("Always"), "ea:always:7"), (L("Deny"), "ea:deny:7")]
         return ChatMessage(
