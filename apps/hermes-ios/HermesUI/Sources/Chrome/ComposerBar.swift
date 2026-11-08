@@ -202,7 +202,8 @@ public struct UploadBar: View {
         let shape = RoundedRectangle(cornerRadius: Radius.composerField, style: .continuous)
         VStack(alignment: .leading, spacing: Spacing.xxs.points) {
             title.textRole(.caption)
-            ProgressView(progress)
+            // The bar alone: `ProgressView(Progress)` adds its own "42% completed" lines.
+            ProgressView(value: progress.fractionCompleted)
         }
         .inset(.horizontal, .m)
         .inset(.vertical, .xs)

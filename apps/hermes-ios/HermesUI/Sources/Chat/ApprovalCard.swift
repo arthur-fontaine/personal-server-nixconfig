@@ -89,7 +89,9 @@ public struct FileCard: View {
                     .accessibilityHidden(true)
                     .accessibilityIdentifier("round.filesymbol")
                 VStack(alignment: .leading, spacing: Spacing.xxs.points) {
+                    // A file name is an identifier: one line, truncated in the middle, never hyphenated.
                     Text(verbatim: title).textRole(.subheadline).fontWeight(.semibold)
+                        .lineLimit(1).truncationMode(.middle)
                     detail.textRole(.caption).tone(.secondary)
                 }
                 Spacer(minLength: Spacing.xs.points)
