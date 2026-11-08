@@ -74,8 +74,8 @@ final class ReviewShots: XCTestCase {
         let pet = app.descendants(matching: .any).matching(identifier: "toolbar.pet").firstMatch
         XCTAssertTrue(pet.waitForExistence(timeout: 10))
         Thread.sleep(forTimeInterval: 2)
-        pet.tap()
-        Thread.sleep(forTimeInterval: 0.3)
+        // The heart lasts a second: shoot straight after the tap.
+        pet.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         try shot("pet-caress")
         Thread.sleep(forTimeInterval: 1.5)
         pet.press(forDuration: 0.8)
