@@ -62,8 +62,11 @@ final class ReviewShots: XCTestCase {
     }
 
     func testChatLandscape() throws {
-        let app = launch(["-scene", "review"])
+        // Rotated before the launch (launch() would put an iPhone back in portrait).
         XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-scene", "review"] + extra
+        app.launch()
         let card = app.descendants(matching: .any)["chat.approval"]
         XCTAssertTrue(card.waitForExistence(timeout: 10))
         settle(card)

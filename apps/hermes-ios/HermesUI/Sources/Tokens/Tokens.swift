@@ -90,6 +90,12 @@ enum Metric {
     /// icon centred at 53.75): from the row's 12-pt inset, 30 wide then 8 puts the label exactly on
     /// the list's and the icon within ¾ pt of its centre.
     static let sidebarIconColumn: CGFloat = 30
+    /// A sidebar row's height (the iPad sidebar's own rows measure 52 pt).
+    static let sidebarRow: CGFloat = 52
+    /// A system bar item's height (measured: Apple's trailing items and our pet's glass circle
+    /// are 36 pt): a custom view in the bar is padded sideways only, so it must be this tall for
+    /// its glass to be a circle.
+    static let barItem: CGFloat = 36
     /// Sidebar column width on iPad.
     static let sidebarMin: CGFloat = 280
     static let sidebarIdeal: CGFloat = 320

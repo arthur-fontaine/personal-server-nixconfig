@@ -33,6 +33,7 @@ run "$pad" light light "" testChat
 run "$pad" dark dark "" testChat
 run "$pad" light compact "-compactWidth" testChat
 run "$phone" light light "" testChatLandscape
+run "$phone" dark dark "" testChatLandscape
 # Accessibility settings (design-rules 7.1): Increase Contrast through simctl, Reduce
 # Transparency and Reduce Motion through the simulator's accessibility defaults.
 xcrun simctl ui "$phone" increase_contrast enabled

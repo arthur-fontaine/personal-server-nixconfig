@@ -60,28 +60,14 @@ struct ChatScreen: View {
         // The pet (design-rules 11.3–11.4): a tap caresses it, a long press offers New Pet…; it
         // shows Hermes' state through its animation row.
         ToolbarItem(placement: .topBarLeading) {
-            BarButton(Text(petLabel), action: { store.caress() }) {
-                if let frame = PetSpriteView.sheet(store: store)?.frame(store.petAnimation, 0) {
-                    PetAvatar.toolbarImage(frame, heart: heart ? model.accent : nil)
-                } else {
-                    Image(systemName: "pawprint")
-                }
-            }
-            .contextMenu {
-                // The pet and what Hermes does as the menu's header: context, and room for the
-                // item's title.
-                Section(petLabel) {
-                    Button { model.showNewPet = true } label: {
-                        Label { Text("New Pet…").lineLimit(1) } icon: { Image(systemName: "sparkles") }
-                    }
-                    .barMonochrome()
-                }
-            }
+            BarMenuButton(image: petImage, title: petLabel, primaryAction: { store.caress() },
+                          menuTitle: petLabel, items: [
+                              BarMenuItem(String(localized: "New Pet…"), systemImage: "sparkles") { model.showNewPet = true },
+                          ])
             .sensoryFeedback(.impact(flexibility: .soft), trigger: store.caressedAt)
             .accessibilityHint(Text("Caresses the pet"))
             .accessibilityAction(named: Text("Caress")) { store.caress() }
             .accessibilityAction(named: Text("New Pet")) { model.showNewPet = true }
-            // Under -geometryProbe, "caressed" once a caress registered: what UI tests read (11.3).
             .accessibilityValue(Self.probing && store.caressedAt != nil ? Text(verbatim: "caressed") : Text(verbatim: ""))
             .accessibilityIdentifier("toolbar.pet")
         }
@@ -93,6 +79,14 @@ struct ChatScreen: View {
         }
     }
 
+    /// The bar's pet: the still frame Hermes' state (or a reaction) picks, with the caress' heart.
+    private var petImage: UIImage {
+        guard let frame = PetSpriteView.sheet(store: store)?.frame(store.petAnimation, 0) else {
+            return UIImage(systemName: "pawprint") ?? UIImage()
+        }
+        return PetAvatar.toolbarUIImage(frame, heart: heart ? model.accent : nil)
+    }
+
     /// "Pip, waiting for your approval": the pet and what Hermes is doing.
     private var petLabel: String {
         let doing = store.agent.status != .idle ? (store.agent.task ?? store.petMood.caption) : store.petMood.caption
@@ -101,14 +95,15 @@ struct ChatScreen: View {
         return "\(store.pet?.name ?? String(localized: "Pet")), \(continued)"
     }
 
-    /// Hermes' state in this chat, or the connection's, in words (secondary, as Apple's subtitles).
+    /// Only the connection's state: Hermes' own is already on screen (the pet in the bar, the
+    /// draft or typing indicator, the approval card), and a subtitle over a resting transcript
+    /// fights the text beneath it.
     private var subtitle: String {
-        if store.connection != .ready {
-            return store.connection == .waitingForNetwork ? String(localized: "Waiting for network…") : String(localized: "Connecting…")
+        switch store.connection {
+        case .ready: ""
+        case .waitingForNetwork: String(localized: "Waiting for network…")
+        default: String(localized: "Connecting…")
         }
-        let a = store.agent
-        if a.status != .idle, a.chat == topic || a.busyChats.contains(topic) { return a.task ?? a.status.label }
-        return ""
     }
 
     private var conversation: some View {
@@ -154,10 +149,6 @@ struct ChatScreen: View {
                 }
             }
             .defaultScrollAnchor(.bottom)
-            // A chat rests on text: the bar's title and subtitle need a calm backdrop (HIG,
-            // Adopting Liquid Glass: "Optimize for legibility when content scrolls beneath
-            // controls"); the hard edge effect gives them one.
-            .scrollEdgeEffectStyle(.hard, for: .top)
             .scrollDismissesKeyboard(.interactively)
             .onScrollGeometryChange(for: Bool.self) { geo in
                 geo.visibleRect.maxY >= geo.contentSize.height - 80

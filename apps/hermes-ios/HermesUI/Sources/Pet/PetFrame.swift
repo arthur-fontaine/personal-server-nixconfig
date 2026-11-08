@@ -40,6 +40,11 @@ public extension PetAvatar where Sprite == EmptyView {
     /// `heart`: after a caress (design-rules 11.3), a tiny heart in the pet's colour at its
     /// top-trailing corner, drawn into the same image so the item stays the bar's circle.
     static func toolbarImage(_ frame: CGImage, heart accent: PetAccent? = nil) -> Image {
+        Image(uiImage: toolbarUIImage(frame, heart: accent)).renderingMode(.original)
+    }
+
+    /// The same, for UIKit's bar button.
+    static func toolbarUIImage(_ frame: CGImage, heart accent: PetAccent? = nil) -> UIImage {
         let side = PetSize.toolbar.width
         let scale = UITraitCollection.current.displayScale
         let format = UIGraphicsImageRendererFormat()
@@ -61,6 +66,6 @@ public extension PetAvatar where Sprite == EmptyView {
                 }
             }
         }
-        return Image(uiImage: image).renderingMode(.original)
+        return image
     }
 }
