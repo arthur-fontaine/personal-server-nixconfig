@@ -126,8 +126,12 @@ public struct CenteredPet: View {
 /// A still of the pet, centred optically and pixel-exact, as a PNG — for the widgets and the
 /// Live Activity, which load it instead of decoding the whole sheet in their small memory budget.
 public enum PetStill {
-    public static func png(frame: CGImage, centering: PetCentering, inCircle: Bool) -> Data? {
-        let side = Metric.stillPixels
+    /// `.widget` for Home and Lock Screen widgets; `.activity` for the Live Activity and the
+    /// Dynamic Island, which draw a grey placeholder for a larger image (round 6).
+    public enum Size: Sendable, CaseIterable { case widget, activity }
+
+    public static func png(frame: CGImage, centering: PetCentering, inCircle: Bool, size: Size = .widget) -> Data? {
+        let side = size == .widget ? Metric.stillPixels : Metric.activityStillPixels
         guard let ctx = CGContext(data: nil, width: Int(side), height: Int(side), bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }

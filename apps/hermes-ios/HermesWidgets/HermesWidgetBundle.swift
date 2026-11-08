@@ -65,7 +65,7 @@ struct HermesLiveActivity: Widget {
             let st = context.state
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    PetFrame(file: context.attributes.spritesheetFile, animation: st.petMood.animation).petSquare(.activity)
+                    PetFrame(file: context.attributes.spritesheetFile, animation: st.petMood.animation, small: true).petSquare(.activity)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     if st.question == nil, st.status != .idle {
@@ -77,7 +77,7 @@ struct HermesLiveActivity: Widget {
                     if let q = st.question { QuestionButtons(question: q) }
                 }
             } compactLeading: {
-                PetFrame(file: context.attributes.spritesheetFile, animation: st.petMood.animation).petSquare(.island)
+                PetFrame(file: context.attributes.spritesheetFile, animation: st.petMood.animation, small: true).petSquare(.island)
             } compactTrailing: {
                 Image(systemName: st.status.widgetSymbol)
             } minimal: {

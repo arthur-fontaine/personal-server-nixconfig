@@ -61,9 +61,9 @@ public enum SharedContainer {
 
     /// A still of the sheet `sheet` (its first frame of `animation`, centred optically; `circle`:
     /// fitted to a circle), rendered by the app. Named after the sheet, so it goes with it.
-    public static func stillURL(sheet: String, animation: PetAnimation, circle: Bool, group: String?) -> URL? {
+    public static func stillURL(sheet: String, animation: PetAnimation, circle: Bool, small: Bool = false, group: String?) -> URL? {
         let base = (sheet as NSString).deletingPathExtension
-        return url(group: group)?.appending(path: "\(base)-\(animation.rawValue)-\(circle ? "circle" : "square").png")
+        return url(group: group)?.appending(path: "\(base)-\(animation.rawValue)-\(circle ? "circle" : "square")\(small ? "-small" : "").png")
     }
 
     public static func spritesheet(named name: String?, group: String?) -> URL? {
