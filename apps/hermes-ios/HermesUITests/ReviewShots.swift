@@ -79,7 +79,8 @@ final class ReviewShots: XCTestCase {
         try shot("pet-caress")
         Thread.sleep(forTimeInterval: 1.5)
         pet.press(forDuration: 0.8)
-        Thread.sleep(forTimeInterval: 0.8)
+        // Let the menu finish morphing out of the bar item.
+        Thread.sleep(forTimeInterval: 2)
         try shot("pet-menu")
     }
 
