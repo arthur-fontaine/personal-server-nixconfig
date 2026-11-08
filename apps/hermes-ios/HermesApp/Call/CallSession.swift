@@ -67,6 +67,12 @@ final class CallSession {
             engine = AppleVoiceEngine()
         }
         engineName = engine!.name
+        // Screenshot hook: the call screen without the audio engine. On some hosts the simulator's
+        // audio unit times out talking to the Mac's audio server and aborts the app (AURemoteIO).
+        if ProcessInfo.processInfo.arguments.contains("-noAudio") {
+            phase = .listening
+            return
+        }
         do {
             try configureAudio()
         } catch {
