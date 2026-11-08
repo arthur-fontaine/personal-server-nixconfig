@@ -2,36 +2,64 @@
 import SwiftUI
 import Testing
 
-/// The rules HermesUI encodes, proved on its own values (design-rules 9.3, 9.5).
+/// The rules HermesUI encodes, proved on its own values (design-rules 9.3, 9.5, 14.1).
 struct PetAccentTests {
-    /// Pets of every hue, saturated and dull, dark and light.
-    static let pets: [RGB] = stride(from: 0.0, to: 1.0, by: 1.0 / 24).flatMap { h in
-        [RGB(h: h, s: 0.8, l: 0.5), RGB(h: h, s: 0.3, l: 0.75), RGB(h: h, s: 0.9, l: 0.2)]
-    } + [RGB(hex: 0xF2A43A) /* Pip's amber */, RGB(hex: 0xFFE500), RGB(hex: 0x00FF66)]
+    static let pip = RGB(hex: 0xF3A73E)
+    static let violet = RGB(hex: 0x7B61FF)
+    /// Synthetic extremes: pure primaries, a neon, a near-black navy, a pastel near white, a grey.
+    static let extremes: [RGB] = [RGB(hex: 0xFFFF00), RGB(hex: 0x0000FF), RGB(hex: 0xFF0000), RGB(hex: 0x00FF66),
+                                  RGB(hex: 0x0A0A40), RGB(hex: 0xFFF0F5), RGB(hex: 0x888899)]
+    static let hues: [RGB] = stride(from: 0.0, to: 1.0, by: 1.0 / 12).map { RGB(h: $0, s: 0.8, l: 0.55) }
+    static let pets: [RGB] = [pip, violet] + extremes + hues
 
-    @Test(arguments: pets)
-    func accentReadsOnEveryBackground(_ pet: RGB) {
+    static func check(_ pet: RGB, role: PetAccent.Role) -> [String] {
+        var issues: [String] = []
         let accent = PetAccent(base: pet)
-        for appearance in PetAccent.Appearance.allCases {
-            let shade = accent.shades[appearance]!
-            for (i, bg) in appearance.backgrounds.enumerated() {
-                let ratio = shade.accent.contrast(with: bg)
-                // Text needs 4.5:1 (7:1 on the screen's background with Increase Contrast); controls
-                // need 3:1, so text's bar covers them.
-                #expect(ratio >= appearance.required(onBackgroundAt: i),
-                        "\(pet.hex) \(appearance): \(shade.accent.hex) on \(bg.hex) = \(ratio)")
-                #expect(ratio >= 3)
+        let base = OKLCH(pet)
+        for a in PetAccent.Appearance.allCases {
+            let shade = role == .text ? accent.shades[a]! : accent.fills[a]!
+            // Contrast met.
+            if PetAccent.passes(shade.accent, role: role, appearance: a) == nil { issues.append("\(a) \(role): \(shade.accent.hex) fails its targets") }
+            if role == .fill, shade.accent.contrast(with: shade.label) < 4.5 { issues.append("\(a): label on fill < 4.5") }
+            // The pet's own colour when it already passes.
+            if PetAccent.passes(pet, role: role, appearance: a) != nil, shade.accent != pet { issues.append("\(a) \(role): moved although the pet passes") }
+            // Hue kept (unless the gamut took the chroma).
+            let got = OKLCH(shade.accent)
+            if base.c > 0.04, got.c > 0.02 {
+                let dh = min(abs(got.h - base.h), 360 - abs(got.h - base.h))
+                if dh > 2 { issues.append("\(a) \(role): hue moved \(dh)°") }
             }
-            #expect(shade.accent.contrast(with: shade.label) >= 4.5, "\(pet.hex) \(appearance): label on accent")
+            // Closest: a lightness 0.005 nearer the pet doesn't pass.
+            if shade.accent != pet, base.c > 0.04 {
+                let dl = got.l - base.l
+                if abs(dl) > 0.006 {
+                    let nearer = PetAccent.candidate(base, l: got.l - (dl > 0 ? 0.005 : -0.005))
+                    if PetAccent.passes(nearer, role: role, appearance: a) != nil { issues.append("\(a) \(role): a nearer lightness passes") }
+                }
+            }
         }
+        return issues
     }
 
-    @Test func keepsThePetsHue() {
-        let amber = PetAccent(base: RGB(hex: 0xF2A43A))
-        for a in PetAccent.Appearance.allCases {
-            let h = amber.shades[a]!.accent.hsl.h
-            #expect(abs(h - RGB(hex: 0xF2A43A).hsl.h) < 0.02, "\(a): hue moved to \(h)")
-        }
+    @Test(arguments: pets)
+    func textShade(_ pet: RGB) { #expect(Self.check(pet, role: .text).isEmpty, "\(pet.hex): \(Self.check(pet, role: .text))") }
+
+    @Test(arguments: pets)
+    func fill(_ pet: RGB) { #expect(Self.check(pet, role: .fill).isEmpty, "\(pet.hex): \(Self.check(pet, role: .fill))") }
+
+    /// Pip's fill is its own amber in dark mode and the nearest passing amber in light; the violet
+    /// pet's fill is its own colour in light (its label whichever of black or white reads better).
+    @Test func pipAndViolet() {
+        let pip = PetAccent(base: Self.pip), violet = PetAccent(base: Self.violet)
+        #expect(pip.fills[.dark]!.accent == Self.pip)
+        #expect(OKLCH(pip.fills[.light]!.accent).l < OKLCH(Self.pip).l)
+        #expect(violet.fills[.light]!.accent == Self.violet)
+        let v = violet.fills[.light]!
+        #expect(v.accent.contrast(with: v.label) >= v.accent.contrast(with: v.labelIsWhite ? .black : .white))
+    }
+
+    @Test func oklabRoundTrips() {
+        for c in Self.pets { #expect(OKLab(c).rgb.clamped().contrast(with: c) < 1.01) }
     }
 }
 

@@ -91,7 +91,7 @@ public struct ComposerBar<MenuItems: View>: View {
                 .dynamicTypeSize(...DynamicTypeSize.large)
                 .foregroundStyle(enabled ? AnyShapeStyle(OnAccentStyle()) : AnyShapeStyle(.tertiary))
                 .frame(width: Metric.sendButton, height: Metric.sendButton)
-                .background(enabled ? AnyShapeStyle(.tint) : Surface.fill.style, in: Circle())
+                .background(enabled ? AnyShapeStyle(AccentFillStyle()) : Surface.fill.style, in: Circle())
                 .contentTransition(.symbolEffect(.replace))
                 // The hit area is the full 44-pt square at the field's corner.
                 .frame(width: Metric.composerControl, height: Metric.composerControl)

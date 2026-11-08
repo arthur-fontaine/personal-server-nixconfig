@@ -123,6 +123,8 @@ public struct ActionRow: View {
         case .primary:
             Button(action: a.perform) { label.foregroundStyle(OnAccentStyle()) }
                 .buttonStyle(.borderedProminent)
+                // The pet's own hue, its label black or white by contrast (13.2).
+                .accentFillTint()
                 .controlSize(.large)
                 .accessibilityIdentifier("action.\(a.id)")
         case .secondary:

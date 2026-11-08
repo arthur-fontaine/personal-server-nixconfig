@@ -104,6 +104,10 @@ public struct QuoteBlock: View {
 public struct CodeBlock: View {
     let code: String
     let wraps: Bool
+    /// Whether text runs past the trailing edge (13.1: then the edge fades, so a cut line reads as
+    /// "scrolls", not as a mistake).
+    @State private var overflowsTrailing = false
+    @Environment(\.layoutDirection) private var direction
     @Environment(\.containerCornerRadius) private var containerRadius
     @Environment(\.containerInset) private var containerInset
 
@@ -123,6 +127,12 @@ public struct CodeBlock: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) { text.fixedSize() }
+                    .onScrollGeometryChange(for: Bool.self) { g in
+                        g.contentSize.width - (g.contentOffset.x + g.containerSize.width) > 1
+                    } action: { _, overflows in
+                        withAnimation(.easeOut) { overflowsTrailing = overflows }
+                    }
+                    .mask { trailingFade }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -133,6 +143,19 @@ public struct CodeBlock: View {
         .geometryProbe(radius: radius, inset: Block.padding.points)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(wraps ? "approval.code" : "chat.code")
+    }
+
+    /// Opaque, then a gradient over the trailing `Metric.codeFade` when text runs past it; none when
+    /// it fits or is scrolled to its end. The gradient's own drawing isn't mirrored in a
+    /// right-to-left layout, so its direction is.
+    private var trailingFade: some View {
+        HStack(spacing: 0) {
+            Rectangle()
+            LinearGradient(colors: [.black, overflowsTrailing ? .clear : .black],
+                           startPoint: direction == .rightToLeft ? .trailing : .leading,
+                           endPoint: direction == .rightToLeft ? .leading : .trailing)
+                .frame(width: Metric.codeFade)
+        }
     }
 
     private var text: some View {

@@ -2,16 +2,22 @@ import CoreGraphics
 import SwiftUI
 import UIKit
 
-/// The app's one accent: the pet's colour (design-rules 4.2–4.3, 9.3).
+/// The app's one accent: the pet's colour (design-rules 4.2–4.3, 9.3, 13.2, 14.1).
 ///
-/// Read from the sprite (opaque, saturated pixels bucketed by hue; outlines, highlights and greys
-/// excluded), then one shade per appearance: the hue kept, the lightness moved until the accent
-/// reads at ≥ 4.5:1 against every background it sits on (text) — so ≥ 3:1 for controls too — and
-/// its label, black or white, reads at ≥ 4.5:1 on it. With Increase Contrast it is pushed to
-/// ≥ 7:1 on the screen's background. Unit-tested on several hues (`PetAccentTests`).
+/// Computed in OKLCH. The pet's dominant colour (opaque pixels weighted by area × chroma;
+/// outlines, near-black, near-white and greys ignored) gives a hue and a chroma; per appearance,
+/// the lightness is bisected for the colour **closest to the pet** (hue kept, chroma kept within
+/// the sRGB gamut) that meets its target against the real backgrounds:
+/// - **text** (links, a selected sidebar label, `Tone.accent`): ≥ 4.5:1 (7:1 on the screen's own
+///   background with Increase Contrast);
+/// - **fill** (Allow Once, send/stop, selection fills): ≥ 3:1, with its label — black or white —
+///   at ≥ 4.5:1 on it.
+/// When the pet's colour already passes, it is used as is. `PetAccentTests` checks contrast, hue
+/// and that no closer lightness passes, for Pip, the violet pet and synthetic extremes.
 public struct PetAccent: Equatable, Sendable {
     let base: RGB
     let shades: [Appearance: Shade]
+    let fills: [Appearance: Shade]
 
     public init(sprite: CGImage) {
         self.init(base: PetAccent.dominant(in: sprite) ?? PetAccent.fallbackBase)
@@ -23,9 +29,13 @@ public struct PetAccent: Equatable, Sendable {
 
     init(base: RGB) {
         self.base = base
-        var s: [Appearance: Shade] = [:]
-        for a in Appearance.allCases { s[a] = Self.shade(for: base, appearance: a) }
+        var s: [Appearance: Shade] = [:], f: [Appearance: Shade] = [:]
+        for a in Appearance.allCases {
+            s[a] = Self.closest(to: base, role: .text, appearance: a)
+            f[a] = Self.closest(to: base, role: .fill, appearance: a)
+        }
         shades = s
+        fills = f
     }
 
     struct Shade: Equatable, Sendable {
@@ -34,14 +44,15 @@ public struct PetAccent: Equatable, Sendable {
         var label: RGB { labelIsWhite ? .white : .black }
     }
 
+    enum Role: Sendable { case text, fill }
+
     enum Appearance: CaseIterable, Sendable {
         case light, dark, lightHighContrast, darkHighContrast
 
         var isDark: Bool { self == .dark || self == .darkHighContrast }
         var isHighContrast: Bool { self == .lightHighContrast || self == .darkHighContrast }
 
-        /// What the accent is drawn on: systemBackground, secondarySystemBackground (cards, the
-        /// approval card's buttons), tertiarySystemBackground and the grouped background.
+        /// What the accent is drawn on: systemBackground, then the grouped and card fills.
         var backgrounds: [RGB] {
             switch self {
             case .light: [.white, RGB(hex: 0xF2F2F7)]
@@ -51,7 +62,7 @@ public struct PetAccent: Equatable, Sendable {
             }
         }
 
-        /// 4.5:1 for text on every background; 7:1 on the screen's own with Increase Contrast.
+        /// Text: 4.5:1 on every background; 7:1 on the screen's own with Increase Contrast.
         func required(onBackgroundAt index: Int) -> Double { isHighContrast && index == 0 ? 7 : 4.5 }
 
         init(_ traits: UITraitCollection) {
@@ -61,35 +72,67 @@ public struct PetAccent: Equatable, Sendable {
         }
     }
 
-    static func shade(for c: RGB, appearance: Appearance) -> Shade {
-        let (h, s0, l0) = c.hsl
-        let s = min(max(s0, 0.45), 0.85)
-        var l = l0
-        let step = appearance.isDark ? 0.005 : -0.005
-        for _ in 0..<400 {
-            let a = RGB(h: h, s: s, l: l)
-            if let shade = acceptable(a, appearance) { return shade }
-            l = min(max(l + step, 0), 1)
+    /// Does `c` meet `role`'s targets in `appearance`? The shade (with its label) if so.
+    static func passes(_ c: RGB, role: Role, appearance a: Appearance) -> Shade? {
+        let white = c.contrast(with: .white), black = c.contrast(with: .black)
+        switch role {
+        case .text:
+            for (i, bg) in a.backgrounds.enumerated() where c.contrast(with: bg) < a.required(onBackgroundAt: i) { return nil }
+            return Shade(accent: c, labelIsWhite: white >= black)
+        case .fill:
+            if a.backgrounds.contains(where: { c.contrast(with: $0) < 3 }) { return nil }
+            guard max(white, black) >= 4.5 else { return nil }
+            return Shade(accent: c, labelIsWhite: white > black)
         }
-        // Black or white always pass; unreachable for any real hue, kept total.
-        let a = appearance.isDark ? RGB.white : RGB.black
-        return Shade(accent: a, labelIsWhite: !appearance.isDark)
     }
 
-    static func acceptable(_ a: RGB, _ appearance: Appearance) -> Shade? {
-        for (i, bg) in appearance.backgrounds.enumerated() where a.contrast(with: bg) < appearance.required(onBackgroundAt: i) {
-            return nil
-        }
-        let white = a.contrast(with: .white), black = a.contrast(with: .black)
-        guard max(white, black) >= 4.5 else { return nil }
-        return Shade(accent: a, labelIsWhite: white >= black)
+    /// The colour of the pet's hue (chroma kept within gamut) at OKLab lightness `l`.
+    static func candidate(_ base: OKLCH, l: Double) -> RGB {
+        OKLCH(l: l, c: base.c, h: base.h).inGamut()
     }
 
+    /// The passing colour nearest to `base`: its own colour if it passes; else, of the lightnesses
+    /// above and below it, the nearest one where the targets start to hold, found by bisection.
+    static func closest(to base: RGB, role: Role, appearance a: Appearance) -> Shade {
+        if let ok = passes(base, role: role, appearance: a) { return ok }
+        let lch = OKLCH(base)
+        var best: (dl: Double, shade: Shade)?
+        for direction in [-1.0, 1.0] {
+            // Step out to the first passing lightness, then bisect the boundary.
+            var outside = lch.l, inside: Double?
+            var l = lch.l
+            while (direction < 0 ? l > 0 : l < 1) {
+                l = min(max(l + direction * 0.01, 0), 1)
+                if passes(candidate(lch, l: l), role: role, appearance: a) != nil { inside = l; break }
+                outside = l
+            }
+            guard var hi = inside else { continue }
+            var lo = outside
+            for _ in 0..<40 {
+                let mid = (lo + hi) / 2
+                if passes(candidate(lch, l: mid), role: role, appearance: a) != nil { hi = mid } else { lo = mid }
+            }
+            let shade = passes(candidate(lch, l: hi), role: role, appearance: a)!
+            let dl = abs(hi - lch.l)
+            if best == nil || dl < best!.dl { best = (dl, shade) }
+        }
+        if let best { return best.shade }
+        let c: RGB = a.isDark ? .white : .black
+        return Shade(accent: c, labelIsWhite: !a.isDark)
+    }
+
+    /// Accent text (AA on every background).
     var color: Color { Color(uiColor: UIColor { [shades] t in shades[Appearance(t)]!.accent.uiColor }) }
-    var labelColor: Color { Color(uiColor: UIColor { [shades] t in shades[Appearance(t)]!.label.uiColor }) }
+    /// The fill of filled controls, and the label that goes on it.
+    var fillColor: Color { Color(uiColor: UIColor { [fills] t in fills[Appearance(t)]!.accent.uiColor }) }
+    var fillLabelColor: Color { Color(uiColor: UIColor { [fills] t in fills[Appearance(t)]!.label.uiColor }) }
 
     // MARK: Dominant colour
 
+    /// Opaque pixels, weighted by chroma (area counts through the number of pixels), bucketed by
+    /// OKLCH hue; outlines and near-black (L < 0.3), near-white (L > 0.93), greys (C < 0.04) and
+    /// translucent pixels don't vote. The heaviest bucket (with its neighbours when a gradient
+    /// straddles the edge) is averaged in OKLab.
     static func dominant(in image: CGImage) -> RGB? {
         let w = image.width, h = image.height
         var data = [UInt8](repeating: 0, count: w * h * 4)
@@ -97,50 +140,139 @@ public struct PetAccent: Equatable, Sendable {
                                   space: CGColorSpaceCreateDeviceRGB(),
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
-        let bins = 24
+        let bins = 36
         var weight = [Double](repeating: 0, count: bins)
         var sum = [(Double, Double, Double)](repeating: (0, 0, 0), count: bins)
-        for i in stride(from: 0, to: data.count, by: 4) where data[i + 3] > 200 {
-            let c = RGB(r: Double(data[i]) / 255, g: Double(data[i + 1]) / 255, b: Double(data[i + 2]) / 255)
-            let (hue, s, l) = c.hsl
-            // Outlines, highlights and greys are the drawing, not the character's colour.
-            guard s > 0.25, l > 0.15, l < 0.82 else { continue }
-            let bin = min(Int(hue * Double(bins)), bins - 1)
-            let wgt = s * s
-            weight[bin] += wgt
-            sum[bin].0 += c.r * wgt; sum[bin].1 += c.g * wgt; sum[bin].2 += c.b * wgt
+        for i in stride(from: 0, to: data.count, by: 4) where data[i + 3] > 230 {
+            let lab = OKLab(RGB(r: Double(data[i]) / 255, g: Double(data[i + 1]) / 255, b: Double(data[i + 2]) / 255))
+            let lch = OKLCH(lab)
+            guard lch.l > 0.3, lch.l < 0.93, lch.c > 0.04 else { continue }
+            let bin = min(Int(lch.h / 360 * Double(bins)), bins - 1)
+            weight[bin] += lch.c
+            sum[bin].0 += lab.l * lch.c; sum[bin].1 += lab.a * lch.c; sum[bin].2 += lab.b * lch.c
         }
         guard let best = weight.indices.max(by: { weight[$0] < weight[$1] }), weight[best] > 0 else { return nil }
-        // A gradient straddling a bin edge is one colour.
         var t = (0.0, 0.0, 0.0), wt = 0.0
         for d in -1...1 {
             let b = (best + d + bins) % bins
             guard d == 0 || weight[b] > weight[best] * 0.25 else { continue }
             t.0 += sum[b].0; t.1 += sum[b].1; t.2 += sum[b].2; wt += weight[b]
         }
-        return RGB(r: t.0 / wt, g: t.1 / wt, b: t.2 / wt)
+        return OKLab(l: t.0 / wt, a: t.1 / wt, b: t.2 / wt).rgb.clamped()
+    }
+}
+
+// MARK: - OKLab / OKLCH (Björn Ottosson, 2020)
+
+struct OKLab: Equatable, Sendable {
+    var l, a, b: Double
+
+    init(l: Double, a: Double, b: Double) { self.l = l; self.a = a; self.b = b }
+
+    init(_ c: RGB) {
+        let r = c.linear(c.r), g = c.linear(c.g), b = c.linear(c.b)
+        let l = cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+        let m = cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+        let s = cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+        self.l = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s
+        self.a = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s
+        self.b = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s
+    }
+
+    /// Linear-light sRGB components, possibly out of [0, 1].
+    var linearRGB: (Double, Double, Double) {
+        let l_ = l + 0.3963377774 * a + 0.2158037573 * b
+        let m_ = l - 0.1055613458 * a - 0.0638541728 * b
+        let s_ = l - 0.0894841775 * a - 1.2914855480 * b
+        let l3 = l_ * l_ * l_, m3 = m_ * m_ * m_, s3 = s_ * s_ * s_
+        return (4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3,
+                -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3,
+                -0.0041960863 * l3 - 0.7034186147 * m3 + 1.7076147010 * s3)
+    }
+
+    var rgb: RGB {
+        let (r, g, b) = linearRGB
+        return RGB(r: RGB.gamma(r), g: RGB.gamma(g), b: RGB.gamma(b))
+    }
+
+    /// Euclidean distance in OKLab (ΔE_OK).
+    func distance(to o: OKLab) -> Double { ((l - o.l) * (l - o.l) + (a - o.a) * (a - o.a) + (b - o.b) * (b - o.b)).squareRoot() }
+}
+
+struct OKLCH: Equatable, Sendable {
+    var l, c, h: Double
+
+    init(l: Double, c: Double, h: Double) { self.l = l; self.c = c; self.h = h }
+    init(_ lab: OKLab) {
+        l = lab.l
+        c = (lab.a * lab.a + lab.b * lab.b).squareRoot()
+        let deg = atan2(lab.b, lab.a) * 180 / .pi
+        h = deg < 0 ? deg + 360 : deg
+    }
+    init(_ rgb: RGB) { self.init(OKLab(rgb)) }
+
+    var lab: OKLab { OKLab(l: l, a: c * cos(h * .pi / 180), b: c * sin(h * .pi / 180)) }
+
+    /// This colour, its chroma reduced (by bisection, hue and lightness kept) until it is in sRGB.
+    func inGamut() -> RGB {
+        func fits(_ c: Double) -> Bool {
+            let (r, g, b) = OKLCH(l: l, c: c, h: h).lab.linearRGB
+            let e = 1e-6
+            return [r, g, b].allSatisfy { $0 >= -e && $0 <= 1 + e }
+        }
+        if fits(c) { return lab.rgb.clamped() }
+        var lo = 0.0, hi = c
+        for _ in 0..<30 {
+            let mid = (lo + hi) / 2
+            if fits(mid) { lo = mid } else { hi = mid }
+        }
+        return OKLCH(l: l, c: lo, h: h).lab.rgb.clamped()
     }
 }
 
 public extension View {
     /// The app's tint and the label colour for what's filled with it.
     func petAccent(_ accent: PetAccent) -> some View {
-        tint(accent.color).environment(\.onAccent, accent.labelColor)
+        tint(accent.color)
+            .environment(\.accentFill, accent.fillColor)
+            .environment(\.onAccent, accent.fillLabelColor)
     }
 }
 
 extension EnvironmentValues {
     @Entry var onAccent: Color = .white
+    @Entry var accentFill: Color = .accentColor
 }
 
-/// The label on an accent fill: black or white, whichever the accent was checked against.
+/// The label on an accent fill: black or white, whichever reads at ≥ 4.5:1 on it.
 struct OnAccentStyle: ShapeStyle {
     func resolve(in environment: EnvironmentValues) -> Color { environment.onAccent }
+}
+
+/// The fill of a filled control: the pet's own hue (13.2).
+struct AccentFillStyle: ShapeStyle {
+    func resolve(in environment: EnvironmentValues) -> Color { environment.accentFill }
+}
+
+extension View {
+    /// Filled controls in this subtree take the pet's own hue rather than the text shade.
+    func accentFillTint() -> some View { modifier(AccentFillTint()) }
+}
+
+struct AccentFillTint: ViewModifier {
+    @Environment(\.accentFill) private var fill
+    func body(content: Content) -> some View { content.tint(fill) }
 }
 
 // MARK: - Colour maths (WCAG 2.x)
 
 struct RGB: Equatable, Hashable, Sendable {
+    func linear(_ c: Double) -> Double { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+    static func gamma(_ c: Double) -> Double {
+        c <= 0.0031308 ? 12.92 * c : 1.055 * pow(max(c, 0), 1 / 2.4) - 0.055
+    }
+    func clamped() -> RGB { RGB(r: min(max(r, 0), 1), g: min(max(g, 0), 1), b: min(max(b, 0), 1)) }
+
     var r, g, b: Double
 
     init(r: Double, g: Double, b: Double) { self.r = r; self.g = g; self.b = b }
