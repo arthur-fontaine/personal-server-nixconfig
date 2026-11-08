@@ -73,6 +73,21 @@ final class ReplyFlowTests: XCTestCase {
         XCTAssertEqual(context.frame.minX, visible.minX, accuracy: 0.5, "context \(context.frame) vs bubble \(visible)")
     }
 
+    /// Over a bubble narrower than the context's 160-pt minimum ("Yes, go ahead"), the context keeps
+    /// its minimum and ends on the bubble's trailing edge.
+    func testContextOverAShortBubble() throws {
+        let app = launch()
+        let context = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Reply to Hermes: The external disk")).firstMatch
+        let bubble = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "You: Yes, go ahead")).allElementsBoundByIndex
+        XCTAssertTrue(context.waitForExistence(timeout: 5))
+        let visible = try XCTUnwrap(bubble.map { $0.frame }.min { $0.width < $1.width })
+        XCTAssertLessThan(visible.width, 160)
+        // The element's frame is its content (the excerpt truncates a little short of the edge):
+        // check where the bar starts, and that the context stays within the bubble's trailing edge.
+        XCTAssertEqual(context.frame.minX, visible.maxX - 160, accuracy: 0.5, "context \(context.frame) vs bubble \(visible)")
+        XCTAssertLessThanOrEqual(context.frame.maxX, visible.maxX + 0.5)
+    }
+
     func testTappingAContextReachesTheOriginal() throws {
         let app = launch()
         let context = app.descendants(matching: .any).matching(identifier: "chat.reply").allElementsBoundByIndex.last { $0.isHittable }
