@@ -72,7 +72,7 @@ struct PrivateGate: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(role: .cancel) { askPassphrase = false } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Unlock") {
+                    ConfirmButton("Unlock") {
                         let pw = passphrase
                         askPassphrase = false
                         passphrase = ""
@@ -184,7 +184,7 @@ struct NewSubchatFields: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Create") {
+                ConfirmButton("Create") {
                     let chosen = preset ?? presets.first?.name ?? "aside"
                     creating = true
                     Task {

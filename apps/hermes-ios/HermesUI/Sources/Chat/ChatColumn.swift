@@ -79,6 +79,8 @@ public struct MessageText: View {
             .textSelection(.enabled)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+            // Links: the one place accent text stays (15.2), in its readable shade.
+            .accentLinks()
     }
 }
 
@@ -195,7 +197,9 @@ public struct UserBubble: View {
                 .inset(.horizontal, Bubble.horizontal)
                 .inset(.vertical, Bubble.vertical)
                 .frame(minHeight: minHeight)
-                .surface(.fill, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .background(AccentTintStyle(), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
                 .opacity(state == .pending ? Fade.pending : 1)
                 .geometryProbe(radius: radius, inset: Bubble.vertical.points)
                 .accessibilityIdentifier("chat.bubble")

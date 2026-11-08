@@ -2,18 +2,19 @@ import CoreGraphics
 import SwiftUI
 import UIKit
 
-/// The app's one accent: the pet's colour (design-rules 4.2–4.3, 9.3, 13.2, 14.1).
+/// The app's one accent: the pet's colour (design-rules 4.2, 9.3, 14.1, 15).
 ///
-/// Computed in OKLCH. The pet's dominant colour (opaque pixels weighted by area × chroma;
-/// outlines, near-black, near-white and greys ignored) gives a hue and a chroma; per appearance,
-/// the lightness is bisected for the colour **closest to the pet** (hue kept, chroma kept within
-/// the sRGB gamut) that meets its target against the real backgrounds:
-/// - **text** (links, a selected sidebar label, `Tone.accent`): ≥ 4.5:1 (7:1 on the screen's own
-///   background with Increase Contrast);
-/// - **fill** (Allow Once, send/stop, selection fills): ≥ 3:1, with its label — black or white —
-///   at ≥ 4.5:1 on it.
-/// When the pet's colour already passes, it is used as is. `PetAccentTests` checks contrast, hue
-/// and that no closer lightness passes, for Pip, the violet pet and synthetic extremes.
+/// Computed in OKLCH from the pet's dominant colour (opaque pixels weighted by area × chroma;
+/// outlines, near-black, near-white and greys ignored):
+/// - the **fill** (Allow Once, send/stop, toggles, bars, selection) is **the pet's colour as it is**
+///   (15.1): its only constraint is its label — black or white, whichever reads better — at
+///   ≥ 4.5:1; only if neither does, the lightness moves the least needed (hue and chroma kept).
+///   No fill-vs-background ratio: the label and the system shape identify a filled control, as
+///   with Apple's own orange and yellow buttons.
+/// - the **text** shade is rare (15.2: links in messages): the colour closest to the pet that
+///   reads at ≥ 4.5:1 on every background (7:1 on the screen's own with Increase Contrast).
+/// `PetAccentTests`: contrast met, hue kept, the pet's own colour whenever it passes, no nearer
+/// lightness passing, for Pip, the violet pet and synthetic extremes.
 public struct PetAccent: Equatable, Sendable {
     let base: RGB
     let shades: [Appearance: Shade]
@@ -80,7 +81,6 @@ public struct PetAccent: Equatable, Sendable {
             for (i, bg) in a.backgrounds.enumerated() where c.contrast(with: bg) < a.required(onBackgroundAt: i) { return nil }
             return Shade(accent: c, labelIsWhite: white >= black)
         case .fill:
-            if a.backgrounds.contains(where: { c.contrast(with: $0) < 3 }) { return nil }
             guard max(white, black) >= 4.5 else { return nil }
             return Shade(accent: c, labelIsWhite: white > black)
         }
@@ -120,6 +120,12 @@ public struct PetAccent: Equatable, Sendable {
         let c: RGB = a.isDark ? .white : .black
         return Shade(accent: c, labelIsWhite: !a.isDark)
     }
+
+    /// A light tint of the pet's colour behind primary text (15.3: selection, the owner's bubble).
+    var tintColor: Color {
+        Color(uiColor: UIColor { [fills] t in fills[Appearance(t)]!.accent.uiColor.withAlphaComponent(PetAccent.lightTint) })
+    }
+    static let lightTint = 0.2
 
     /// Accent text (AA on every background).
     var color: Color { Color(uiColor: UIColor { [shades] t in shades[Appearance(t)]!.accent.uiColor }) }
@@ -232,16 +238,22 @@ struct OKLCH: Equatable, Sendable {
 
 public extension View {
     /// The app's tint and the label colour for what's filled with it.
+    /// The app's tint is the pet's fill (toggles, bars, prominent buttons are fills); accent text
+    /// (links) reads the text shade from `accentText`.
     func petAccent(_ accent: PetAccent) -> some View {
-        tint(accent.color)
+        tint(accent.fillColor)
             .environment(\.accentFill, accent.fillColor)
             .environment(\.onAccent, accent.fillLabelColor)
+            .environment(\.accentText, accent.color)
+            .environment(\.accentTint, accent.tintColor)
     }
 }
 
 extension EnvironmentValues {
     @Entry var onAccent: Color = .white
     @Entry var accentFill: Color = .accentColor
+    @Entry var accentText: Color = .accentColor
+    @Entry var accentTint: Color = .clear
 }
 
 /// The label on an accent fill: black or white, whichever reads at ≥ 4.5:1 on it.
@@ -249,9 +261,29 @@ struct OnAccentStyle: ShapeStyle {
     func resolve(in environment: EnvironmentValues) -> Color { environment.onAccent }
 }
 
-/// The fill of a filled control: the pet's own hue (13.2).
+/// The fill of a filled control: the pet's own colour (15.1).
 struct AccentFillStyle: ShapeStyle {
     func resolve(in environment: EnvironmentValues) -> Color { environment.accentFill }
+}
+
+/// Accent text (links): the readable shade of the pet's colour.
+struct AccentTextStyle: ShapeStyle {
+    func resolve(in environment: EnvironmentValues) -> Color { environment.accentText }
+}
+
+/// A light tint of the pet's colour behind primary text.
+struct AccentTintStyle: ShapeStyle {
+    func resolve(in environment: EnvironmentValues) -> Color { environment.accentTint }
+}
+
+public extension View {
+    /// Links inside this text in the readable shade of the pet's colour (15.2).
+    func accentLinks() -> some View { modifier(AccentLinks()) }
+}
+
+struct AccentLinks: ViewModifier {
+    @Environment(\.accentText) private var text
+    func body(content: Content) -> some View { content.tint(text) }
 }
 
 extension View {

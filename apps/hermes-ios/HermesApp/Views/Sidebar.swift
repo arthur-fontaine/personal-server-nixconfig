@@ -10,13 +10,11 @@ struct Sidebar: View {
     @Environment(HermesStore.self) private var store
 
     var body: some View {
-        List(selection: selectionBinding) {
+        List {
             Section("Chats") {
                 row(.main, unread: store.mainThread.unreadCount)
                 ForEach(store.threads) { thread in row(thread.id, unread: thread.unreadCount) }
-                Button { model.showNewSubchat = true } label: {
-                    Label { Text("New Sub-chat…") } icon: { Image(systemName: "plus").accessibilityHidden(true) }
-                }
+                ListActionRow(Text("New Sub-chat…"), detail: nil, systemImage: "plus") { model.showNewSubchat = true }
             }
         }
         .listStyle(.sidebar)
@@ -31,36 +29,15 @@ struct Sidebar: View {
         }
     }
 
-    /// The tag outermost: the list's selection reads it from the row itself.
+    /// A chat: its public name (a private one is "Private chat"), selected with the pet's light tint.
     private func row(_ topic: TopicID, unread: Int) -> some View {
-        // The symbol is decoration: VoiceOver reads the chat's name, not "Move" or "Conversation".
-        Label {
-            Text(ChatTitle.name(topic, store: store))
-        } icon: {
-            Image(systemName: ChatTitle.symbol(topic, store: store)).accessibilityHidden(true)
+        SidebarRow(Text(ChatTitle.name(topic, store: store)), systemImage: ChatTitle.symbol(topic, store: store),
+                   selected: model.section == .chat && (model.selectedTopic ?? .main) == topic) {
+            model.open(topic: topic)
+        } badge: {
+            UnreadBadge(unread > 0 ? Text(unread, format: .number) : nil)
         }
-        .badge(unread)
-            .accessibilityIdentifier("sidebar.chat.\(topic)")
-            .tag(SidebarItem.topic(topic))
+        .accessibilityIdentifier("sidebar.chat.\(topic)")
     }
 
-    enum SidebarItem: Hashable {
-        case topic(TopicID)
-        case section(AppSection)
-    }
-
-    private var selectionBinding: Binding<SidebarItem?> {
-        Binding {
-            switch model.section {
-            case .chat: .topic(model.selectedTopic ?? .main)
-            case .dashboard, .settings: .section(model.section)
-            }
-        } set: { item in
-            switch item {
-            case .topic(let t)?: model.open(topic: t)
-            case .section(let s)?: model.section = s
-            case nil: break
-            }
-        }
-    }
 }

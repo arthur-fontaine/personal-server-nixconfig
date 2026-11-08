@@ -100,6 +100,7 @@ struct PhoneStep<Pet: View>: View {
 
 struct CodeStep<Pet: View>: View {
     @Environment(HermesStore.self) private var store
+    @Environment(\.openURL) private var openURL
     let pet: Pet
     let phone: String
     let via: String
@@ -135,10 +136,10 @@ struct CodeStep<Pet: View>: View {
             if let error { Text(error).textRole(.footnote).tone(.destructive) }
         } actions: {
             if via == "Telegram", let tg = URL(string: "tg://") {
-                Link(destination: tg) { Label("Open Telegram", systemImage: "paperplane") }
+                SecondaryButton("Open Telegram", systemImage: "paperplane", fullWidth: true) { openURL(tg) }
             }
             if let nextVia {
-                Button("Send by \(nextVia)") { Task { try? await store.resendCode() } }
+                SecondaryButton("Send by \(nextVia)", fullWidth: true) { Task { try? await store.resendCode() } }
             }
         }
         .onAppear { focused = true }
@@ -164,6 +165,7 @@ struct CodeStep<Pet: View>: View {
 
 struct PasswordStep<Pet: View>: View {
     @Environment(HermesStore.self) private var store
+    @Environment(\.openURL) private var openURL
     let pet: Pet
     let hint: String
     @State private var password = ""
@@ -185,7 +187,9 @@ struct PasswordStep<Pet: View>: View {
         } actions: {
             PrimaryButton("Sign In", isBusy: busy, fullWidth: true, action: submit)
                 .disabled(password.isEmpty)
-            Link("Forgot your password?", destination: URL(string: "https://telegram.org/faq#q-i-forgot-my-password")!)
+            SecondaryButton("Forgot Your Password?", fullWidth: true) {
+                openURL(URL(string: "https://telegram.org/faq#q-i-forgot-my-password")!)
+            }
         }
         .onAppear { focused = true }
     }

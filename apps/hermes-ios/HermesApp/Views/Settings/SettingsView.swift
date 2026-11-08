@@ -29,6 +29,7 @@ struct SettingsView: View {
                 } label: {
                     Label("Voice", systemImage: "person.wave.2")
                 }
+                .valuePicker()
             } header: {
                 Text("Call mode")
             } footer: {
@@ -42,9 +43,13 @@ struct SettingsView: View {
                     Text(notificationLabel).tone(.secondary)
                 }
                 if notifications == .notDetermined {
-                    Button("Turn On Notifications") { Task { await NotificationService.shared.requestAuthorization(); await refresh() } }
+                    ListActionRow(Text("Turn On Notifications"), detail: nil, systemImage: "bell") {
+                        Task { await NotificationService.shared.requestAuthorization(); await refresh() }
+                    }
                 } else if notifications == .denied {
-                    Button("Open Settings") { UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!) }
+                    ListActionRow(Text("Open Settings"), detail: nil, systemImage: "gear") {
+                        UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+                    }
                 }
             } header: {
                 Text("Notifications")
@@ -81,7 +86,7 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    Button {
+                    ListActionRow(Text("Reinstall Now"), detail: nil, systemImage: "arrow.triangle.2.circlepath", isBusy: reinstalling) {
                         reinstalling = true
                         Task {
                             defer { reinstalling = false }
@@ -90,8 +95,6 @@ struct SettingsView: View {
                                 model.showToast("Hermes is rebuilding the app")
                             } catch { model.showToast(error.localizedDescription) }
                         }
-                    } label: {
-                        HStack { Label("Reinstall Now", systemImage: "arrow.triangle.2.circlepath"); if reinstalling { Spacer(); ProgressView() } }
                     }
                 } header: {
                     Text("Devices")

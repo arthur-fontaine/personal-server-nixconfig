@@ -10,15 +10,17 @@ public struct ListActionRow: View {
     let systemImage: String
     let destructive: Bool
     let fillsComposer: Bool
+    let isBusy: Bool
     let action: () -> Void
 
     public init(_ title: Text, detail: Text?, systemImage: String, destructive: Bool = false,
-                fillsComposer: Bool = false, action: @escaping () -> Void) {
+                fillsComposer: Bool = false, isBusy: Bool = false, action: @escaping () -> Void) {
         self.title = title
         self.detail = detail
         self.systemImage = systemImage
         self.destructive = destructive
         self.fillsComposer = fillsComposer
+        self.isBusy = isBusy
         self.action = action
     }
 
@@ -35,6 +37,7 @@ public struct ListActionRow: View {
                         .accessibilityHidden(true)
                 }
                 Spacer(minLength: Spacing.xs.points)
+                if isBusy { ProgressView() }
                 if fillsComposer {
                     Image(systemName: "text.cursor").textRole(.footnote).tone(.tertiary).accessibilityHidden(true)
                 }

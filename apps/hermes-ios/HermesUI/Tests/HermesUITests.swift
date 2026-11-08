@@ -6,7 +6,7 @@ import Testing
 /// The rules HermesUI encodes, proved on its own values (design-rules 9.3, 9.5, 14.1).
 struct PetAccentTests {
     static let pip = RGB(hex: 0xF3A73E)
-    static let violet = RGB(hex: 0x7B61FF)
+    static let violet = RGB(hex: 0x6B4CE6)
     /// Synthetic extremes: pure primaries, a neon, a near-black navy, a pastel near white, a grey.
     static let extremes: [RGB] = [RGB(hex: 0xFFFF00), RGB(hex: 0x0000FF), RGB(hex: 0xFF0000), RGB(hex: 0x00FF66),
                                   RGB(hex: 0x0A0A40), RGB(hex: 0xFFF0F5), RGB(hex: 0x888899)]
@@ -48,15 +48,18 @@ struct PetAccentTests {
     @Test(arguments: pets)
     func fill(_ pet: RGB) { #expect(Self.check(pet, role: .fill).isEmpty, "\(pet.hex): \(Self.check(pet, role: .fill))") }
 
-    /// Pip's fill is its own amber in dark mode and the nearest passing amber in light; the violet
-    /// pet's fill is its own colour in light (its label whichever of black or white reads better).
-    @Test func pipAndViolet() {
-        let pip = PetAccent(base: Self.pip), violet = PetAccent(base: Self.violet)
-        #expect(pip.fills[.dark]!.accent == Self.pip)
-        #expect(OKLCH(pip.fills[.light]!.accent).l < OKLCH(Self.pip).l)
-        #expect(violet.fills[.light]!.accent == Self.violet)
-        let v = violet.fills[.light]!
-        #expect(v.accent.contrast(with: v.label) >= v.accent.contrast(with: v.labelIsWhite ? .black : .white))
+    /// 15.4: the fill is the pet's own colour (ΔE 0) in every appearance — Pip's amber with a black
+    /// label, the violet pet's with a white one.
+    @Test func fillsAreThePetsColour() {
+        for (pet, white) in [(Self.pip, false), (Self.violet, true)] {
+            let accent = PetAccent(base: pet)
+            for a in PetAccent.Appearance.allCases {
+                let fill = accent.fills[a]!
+                #expect(OKLab(fill.accent).distance(to: OKLab(pet)) < 1e-9, "\(pet.hex) \(a): fill \(fill.accent.hex)")
+                #expect(fill.labelIsWhite == white, "\(pet.hex) \(a): label")
+                #expect(fill.accent.contrast(with: fill.label) >= 4.5)
+            }
+        }
     }
 
     @Test func oklabRoundTrips() {

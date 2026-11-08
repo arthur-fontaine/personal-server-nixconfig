@@ -106,11 +106,12 @@ public struct FileCard: View {
 
     private var badge: some View {
         Image(systemName: symbol)
-            .tone(.accent)
+            .foregroundStyle(OnAccentStyle())
             // The badge is a fixed circle: its glyph keeps its size (10.1, 3.4).
             .dynamicTypeSize(...DynamicTypeSize.large)
             .frame(width: Metric.fileSymbol, height: Metric.fileSymbol)
-            .surface(.elevated, in: Circle())
+            // The pet's colour as a fill with its label, not as text (15.2).
+            .background(AccentFillStyle(), in: Circle())
             .accessibilityHidden(true)
             .accessibilityIdentifier("round.filesymbol")
     }

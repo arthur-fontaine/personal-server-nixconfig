@@ -27,7 +27,7 @@ struct NewPetSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(role: .cancel) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Hatch") {
+                    ConfirmButton("Hatch") {
                         var req = AppRequest.petGenerate(prompt: prompt)
                         if !name.isEmpty { req.payload["name"] = .string(name) }
                         Task {
