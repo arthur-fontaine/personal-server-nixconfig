@@ -150,9 +150,13 @@ struct ChatScreen: View {
             }
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
-            .onScrollGeometryChange(for: Bool.self) { geo in
-                geo.visibleRect.maxY >= geo.contentSize.height - 80
-            } action: { _, isAtBottom in
+            // The distance from the content's end to the visible bottom (the composer bar's
+            // inset counted, it grows at accessibility sizes). A number, not a Bool: a Bool's
+            // change back to true was dropped while the lazy stack re-estimated its size.
+            .onScrollGeometryChange(for: CGFloat.self) { geo in
+                geo.contentSize.height - (geo.visibleRect.maxY - geo.contentInsets.bottom)
+            } action: { _, distance in
+                let isAtBottom = distance <= 80
                 atBottom = isAtBottom
                 if isAtBottom { following = true }
             }

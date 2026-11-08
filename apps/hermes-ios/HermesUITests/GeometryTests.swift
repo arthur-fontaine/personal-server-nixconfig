@@ -93,6 +93,8 @@ final class GeometryTests: XCTestCase {
             XCTAssertEqual(gap, expected, accuracy: tolerance, "\(a.speaker)→\(b.speaker) gap \(gap)")
             XCTAssertTrue(scale.contains { abs($0 - gap) <= tolerance }, "gap \(gap) off the scale")
         }
+        // At rest at the bottom, there's nothing to jump to.
+        XCTAssertFalse(app.buttons["Latest"].exists, "“Latest” shown while at the bottom")
         // The composer never touches the transcript's last item.
         let card = one(app, "chat.approval").frame, composer = one(app, "composer").frame
         XCTAssertEqual(composer.minY - card.maxY, 16, accuracy: tolerance, "the last item breathes above the composer")
@@ -163,6 +165,7 @@ final class GeometryTests: XCTestCase {
     /// the screen.
     func testAccessibilitySize() {
         let app = launch(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+        XCTAssertFalse(app.buttons["Latest"].exists, "“Latest” shown while at the bottom (AX5)")
         let primary = one(app, "action.once").frame, deny = one(app, "action.deny").frame
         let card = one(app, "chat.approval").frame
         XCTAssertLessThan(primary.maxY, deny.minY + tolerance, "stacked, primary first")
