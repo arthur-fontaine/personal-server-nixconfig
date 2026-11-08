@@ -96,6 +96,46 @@ final class ReviewShots: XCTestCase {
         try shot("pet-menu")
     }
 
+    /// Phase 2's screens, each from its launch hook.
+    func testScreens() throws {
+        let screens: [(String, [String])] = [
+            ("settings", ["-noQuestion", "-section", "settings"]),
+            ("dashboard", ["-noQuestion", "-section", "dashboard"]),
+            ("commands", ["-noQuestion", "-commands"]),
+            ("private", ["-noQuestion", "-topic", "31"]),
+            ("newsub", ["-noQuestion", "-newSubchat"]),
+            ("login", ["-demoLogin"]),
+            ("call", ["-noQuestion", "-call", "-noAudio"]),
+        ]
+        for (name, args) in screens {
+            let app = launch(args)
+            Thread.sleep(forTimeInterval: 2.5)
+            // The call asks for the microphone the first time: accept it (SpringBoard's prompt).
+            let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons
+                .matching(NSPredicate(format: "label IN %@", ["Allow", "Autoriser"])).firstMatch
+            for _ in 0..<2 where allow.waitForExistence(timeout: 1) { allow.tap(); Thread.sleep(forTimeInterval: 1) }
+            try shot(name)
+            if name == "dashboard" { app.swipeUp(); Thread.sleep(forTimeInterval: 1); try shot("dashboard-2") }
+            if name == "settings" { app.swipeUp(); Thread.sleep(forTimeInterval: 1); try shot("settings-2") }
+            if name == "login" {
+                app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Telegram")).firstMatch.tap()
+                Thread.sleep(forTimeInterval: 1.5)
+                try shot("login-phone")
+            }
+            app.terminate()
+        }
+    }
+
+    /// The Live Activity on the lock screen / Home Screen and in the Dynamic Island.
+    func testLiveActivity() throws {
+        let app = launch(["-scene", "review"])
+        Thread.sleep(forTimeInterval: 4)
+        XCUIDevice.shared.press(.home)
+        Thread.sleep(forTimeInterval: 2.5)
+        try shot("liveactivity")
+        app.terminate()
+    }
+
     func testCatalog() throws {
         for page in ["type", "surfaces", "actions", "approval", "chat", "files", "composer", "accent"] {
             let app = launch(["-catalog", page])
