@@ -65,7 +65,7 @@ fails a test.
 
 | Layer | What it guarantees | Where |
 | --- | --- | --- |
-| **HermesUI** (framework) | Tokens are types — `Spacing` (4-pt grid: 4…32), `Rhythm` (24 between speakers, 12 within a turn), `TextRole` (Dynamic Type styles, monospaced only for code), `Tone`, `Surface` (system fill tiers), `Emphasis`, `PetSize`, `IconSize` — and no public API takes a number or a colour. Components encode the rules: `CardSurface` (fill, clip and hit from one shape, no stroke API, corner = inset + inner control radius, so concentric), `ActionRow` (one height, capsules in a row, rounded rectangles concentric with the card when stacked — always at AX sizes —, primary trailing and never destructive, "…" a circle of the row's height), `ApprovalCard`, `ChatColumn` (the one leading edge: the system margin; 672-pt readable width), `TranscriptRow` (the rhythm by speaker), `UserBubble`, `CodeBlock`, `IconButton`, `PetAvatar` (square, circle-clipped), `ComposerBar`/`BarButton`/`Toast` (`Chrome/`: the only glass), `PetAccent` | `HermesUI/Sources` |
+| **HermesUI** (framework) | Tokens are types — `Spacing` (4-pt grid: 4…32), `Rhythm` (24 between speakers, 8 between bubbles, 16 between a reply's blocks), `TextRole` (Dynamic Type styles, monospaced only for code), `Tone`, `Surface` (system fill tiers), `Emphasis`, `PetSize`, `IconSize` — and no public API takes a number or a colour. Components encode the rules: `CardSurface` (fill, clip and hit from one shape, no stroke API, corner = inset + inner control radius, so concentric), `ActionRow` (one height, capsules in a row, rounded rectangles concentric with the card when stacked — always at AX sizes —, primary trailing and never destructive, "…" a circle of the row's height), `ApprovalCard`, `ChatColumn` (the one leading edge: the system margin; 672-pt readable width), `TranscriptRow` (the rhythm by speaker), `UserBubble`, `CodeBlock`, `IconButton`, `PetAvatar` (square, circle-clipped), `ComposerBar`/`BarButton`/`Toast` (`Chrome/`: the only glass), `PetAccent` | `HermesUI/Sources` |
 | **DesignCheck** (build phase of HermesUI) | A SwiftSyntax checker failing the build on: styling modifiers in a screen (`.padding`, `.font`, `.foregroundStyle`, `.background`, `.tint`, `.buttonStyle`…), layout numbers outside `Tokens.swift`, raw colours and font sizes, shapes drawn by a screen, strokes/borders/shadows anywhere, Liquid Glass outside `Chrome/`, numbers or colours in HermesUI's public API. One fixture per rule (`swift test` in `Tools/DesignCheck`). Screens not migrated yet are listed in `Tools/DesignCheck/phase2-screens.txt`, which only shrinks | `Tools/DesignCheck`, `scripts/design-check.sh` |
 | **Unit tests** | The accent reads at ≥ 4.5:1 (7:1 on the background with Increase Contrast) on every system background, light and dark, for 75 pet colours, with a ≥ 4.5:1 label; `ActionRow` refuses a destructive or second primary; spacing on the grid; concentric radii; the rhythm | `HermesUI/Tests` |
 | **Geometric UI tests** | On the running app (iPhone 17 Pro, iPad Pro 13"): one leading x for text, code, card and composer (16 pt on iPhone); the readable column; every gap on the scale and by relation; the approval's buttons one height ≥ 44, primary trailing; measured concentric corners; hit targets; stacked answers at AX5; round controls with \|w − h\| ≤ ½ pt; no private sub-chat name on screen | `HermesUITests/GeometryTests.swift` |
@@ -212,9 +212,11 @@ Hidden: the "App" topic (machine traffic)
   concentric corner (the 12-pt minimum outside a card), monospaced `.callout`, scrolling sideways,
   Copy in the context menu; quotes behind a quiet rule.
 - The owner's messages: a neutral bubble (`secondarySystemFill`, as Messages' other party),
-  trailing, a capsule at one line (12 × 8 pt padding); not the accent, which stays for what acts.
-- Rhythm: 24 pt between speakers, 12 pt within a turn; a centred time when messages are > 20 min
-  apart.
+  trailing, 16 × 12 pt padding (ChatGPT and Claude measure ≈ 16 × 14), a 46-pt capsule at one
+  line; not the accent, which stays for what acts. Code blocks have 16 pt of padding, the approval
+  card 20.
+- Rhythm: 24 pt between speakers, 8 pt between the owner's bubbles, 16 pt between the blocks of
+  a reply; a centred time when messages are > 20 min apart.
 - Hermes' open question is the transcript's last item: an `ApprovalCard` (content layer, the
   grouped fill, no glass): the summary as `.headline`, *Show Command* as a disclosure, then Allow
   Once (prominent, trailing), Deny (red label on the neutral fill), "…" for the other answers. The

@@ -21,18 +21,21 @@ public enum Spacing: CaseIterable, Sendable {
     }
 }
 
-/// Vertical rhythm of a conversation (design-rules 2.4): one gap per relation, never chosen per
-/// screen.
+/// Vertical rhythm of a conversation (design-rules 2.4, 12.3): one gap per relation, never
+/// chosen per screen.
 public enum Rhythm: Sendable {
     /// Between two speakers' turns.
     case turn
-    /// Between two items of one speaker's turn (paragraphs, a code block, a card).
-    case withinTurn
+    /// Between two of the owner's bubbles in one turn.
+    case bubbles
+    /// Between the blocks of Hermes' reply (paragraphs, code, the card).
+    case blocks
 
     var spacing: Spacing {
         switch self {
         case .turn: .xl
-        case .withinTurn: .s
+        case .bubbles: .xs
+        case .blocks: .m
         }
     }
 }
@@ -58,6 +61,19 @@ enum Metric {
     /// The approval card's height cap at accessibility sizes; beyond it the card scrolls, as
     /// system alerts do, so the conversation keeps room.
     static let cardMaxHeightAX: CGFloat = 360
+    /// The padding `.bordered` puts around its label at `.controlSize(.large)` (measured on the
+    /// iOS 26.2 simulator: a 20.33-pt square label gives a 60.33 × 50.33 button). A label of
+    /// (row − 2 × horizontal) × (row − 2 × vertical) makes the button a square as tall as the row,
+    /// so its `.circle` border is a full circle; GeometryTests checks it is round and of the row's
+    /// height.
+    static let largeButtonHorizontalPadding: CGFloat = 20
+    static let largeButtonVerticalPadding: CGFloat = 15
+
+    /// The label that makes a `.large` bordered button a square `rowHeight` tall.
+    static func squareLargeButtonLabel(rowHeight: CGFloat) -> CGSize {
+        CGSize(width: max(rowHeight - 2 * largeButtonHorizontalPadding, 0),
+               height: max(rowHeight - 2 * largeButtonVerticalPadding, 0))
+    }
     /// Typing indicator dot.
     static let typingDot: CGFloat = 6
     /// A quote's leading rule (Mail's quote bar).
@@ -84,8 +100,9 @@ enum Radius {
     static let bubble: CGFloat = (Metric.bodyLine + 2 * Bubble.vertical.points) / 2
 
     /// A free-standing block in the conversation (code): the corner a concentric block falls back
-    /// to when no container gives it one; equal to an inset-grouped list row's inner corner.
-    static let blockMinimum: CGFloat = Spacing.s.points
+    /// to when no container gives it one — its own padding, so the text sits in the corner's
+    /// straight part.
+    static let blockMinimum: CGFloat = Block.padding.points
 }
 
 extension Radius {
@@ -93,9 +110,19 @@ extension Radius {
     static let composerField: CGFloat = Metric.composerControl / 2
 }
 
+/// The owner's bubble (design-rules 12.1, reference/metrics.md: ChatGPT and Claude ≈ 16 × 14):
+/// 16 × 12, a 46-pt capsule at one line.
 enum Bubble {
-    static let horizontal: Spacing = .s
-    static let vertical: Spacing = .xs
+    static let horizontal: Spacing = .m
+    static let vertical: Spacing = .s
+}
+
+/// Inner padding of chat surfaces (design-rules 12.2).
+enum Block {
+    /// Code blocks.
+    static let padding: Spacing = .m
+    /// The approval card.
+    static let card: Spacing = .l
 }
 
 /// Pet sprite sizes (the sprite is 192×208, so the frame keeps that ratio).

@@ -38,7 +38,8 @@ public struct TranscriptRow<Content: View>: View {
 
     static func gap(_ speaker: Speaker, after previous: Speaker?) -> Spacing? {
         guard let previous else { return nil }
-        return (previous == speaker ? Rhythm.withinTurn : Rhythm.turn).spacing
+        if previous != speaker { return Rhythm.turn.spacing }
+        return (speaker == .owner ? Rhythm.bubbles : Rhythm.blocks).spacing
     }
 
     public var body: some View {
@@ -49,10 +50,10 @@ public struct TranscriptRow<Content: View>: View {
 }
 
 /// The scroll view's bottom, to scroll to. It is the gap between the last item and the composer,
-/// so scrolling to it keeps that gap (a turn's inner rhythm).
+/// so scrolling to it keeps that gap (a reply's block rhythm).
 public struct ScrollAnchor: View {
     public init() {}
-    public var body: some View { Color.clear.frame(height: Rhythm.withinTurn.spacing.points) }
+    public var body: some View { Color.clear.frame(height: Rhythm.blocks.spacing.points) }
 }
 
 /// The conversation's typography: every block of one message is `MessageBlocks`, spaced within a
@@ -61,7 +62,7 @@ public struct MessageBlocks<Content: View>: View {
     let content: Content
     public init(@ViewBuilder content: () -> Content) { self.content = content() }
     public var body: some View {
-        VStack(alignment: .leading, spacing: Rhythm.withinTurn.spacing.points) { content }
+        VStack(alignment: .leading, spacing: Rhythm.blocks.spacing.points) { content }
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -129,7 +130,7 @@ public struct CodeBlock: View {
         .contextMenu {
             Button { UIPasteboard.general.string = code } label: { Label("Copy", systemImage: "doc.on.doc") }
         }
-        .geometryProbe(radius: radius, inset: Spacing.s.points)
+        .geometryProbe(radius: radius, inset: Block.padding.points)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(wraps ? "approval.code" : "chat.code")
     }
@@ -138,7 +139,7 @@ public struct CodeBlock: View {
         Text(verbatim: code)
             .textRole(.code)
             .textSelection(.enabled)
-            .inset(.all, .s)
+            .inset(.all, Block.padding)
     }
 }
 

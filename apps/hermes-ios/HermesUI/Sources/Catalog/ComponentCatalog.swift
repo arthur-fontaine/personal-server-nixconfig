@@ -92,7 +92,7 @@ public struct ComponentCatalog: View {
             }
         case .chat:
             section("UserBubble (sent, pending, failed)") {
-                VStack(spacing: Rhythm.withinTurn.spacing.points) {
+                VStack(spacing: Rhythm.bubbles.spacing.points) {
                     UserBubble("Yes, go ahead")
                     UserBubble("What happened with the backup last night? It was supposed to run at 3.", state: .pending)
                     UserBubble("Remind me to call mum", state: .failed)
