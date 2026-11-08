@@ -31,8 +31,7 @@ The layout follows [arthur-fontaine/nixconfig](https://github.com/arthur-fontain
   repeated blocks), or ask mode; `/mode` switches. Approval cards name a long
   command in plain words.
 - **Integrations, each optional**: WhatsApp, Instagram, Discord, Home
-  Assistant, HomeKit, 1Password, RunPod, GitHub notifications, TinyFish (web
-  search, page reading and images).
+  Assistant, HomeKit, 1Password, RunPod, GitHub notifications.
 - **The Hermes app** on your iPhone and iPad, optional: a Telegram client of
   that DM, fed by a hidden topic (what Hermes is doing, its questions, stats, a
   pet), with spoken notifications and calls; built here with the current pet,

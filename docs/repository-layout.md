@@ -42,7 +42,6 @@ modules/
     plugins/outbox/       says so when the gateway will not send an attachment of a reply (Python)
     plugins/lost_turns/   settles your Telegram turn cut off by a gateway crash, so the chat never waits for /discard (Python)
     plugins/cache_warm/   keeps an idle chat's prompt cache warm (the Pi extension cache-warmer), /warm (Python)
-    plugins/tinyfish/     web_search, web_fetch and view_image through TinyFish, with the tinyfish integration (Python)
     plugins/sideload/     Hermes' access to the sideload service: list, install, remove (Python)
     plugins/front_desk/   caps a turn of the main chat: past it, only handing the work to a background subagent (Python)
     plugins/app_topic/    the iOS app's side: its hidden Telegram topic, stats, pets, big files, call turns (Python; docs/app.md)
@@ -63,7 +62,7 @@ modules/
 
 ```sh
 nix flake check                                   # everything below
-nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval, outbox, lost_turns, front_desk, tinyfish, cache_warm, app_topic)
+nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval, outbox, lost_turns, front_desk, cache_warm, app_topic)
 nix build .#checks.aarch64-darwin.coding-agent    # the coding agent's plugin, against a fake sidecar
 nix build .#checks.aarch64-darwin.sandbox         # the coding agent's sidecar tests, in its build
 nix build .#checks.aarch64-darwin.sideload        # sideload and Hermes' plugin, against fake Apple tools

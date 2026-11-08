@@ -24,9 +24,6 @@ in
     homeassistant = integration ''
       Home Assistant: its devices read and controlled (Hermes' official plugin,
       the ha_* tools) and their state changes as events'';
-    tinyfish = integration ''
-      TinyFish: web_search with filters, web_fetch (pages as Markdown) and
-      view_image (free up to 12,000 searches a day, with an API key)'';
     homekit = integration ''
       HomeKit: your home's accessories, through HomeClaw (a Mac App Store app
       the bootstrap installs), and their changes as events'';

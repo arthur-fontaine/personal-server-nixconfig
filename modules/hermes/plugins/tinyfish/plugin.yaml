@@ -1,8 +1,0 @@
-name: tinyfish
-version: 2.0.0
-description: "web_search, web_fetch (Markdown, images and links, 40k cut) and view_image through TinyFish (TINYFISH_API_KEY), ported from the Pi extension web."
-author: "personal-server-nixconfig"
-provides_tools:
-  - web_search
-  - web_fetch
-  - view_image
