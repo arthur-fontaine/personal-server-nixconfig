@@ -8,8 +8,10 @@ cd "$(dirname "$0")/.."
 out="$(mkdir -p "$1" && cd "$1" && pwd)"
 phone="iPhone 17 Pro"; pad="iPad Pro 13-inch (M5)"
 dd="${DERIVED_DATA:-$HOME/Library/Caches/hermes-ios/DerivedData}"
+# Signed ad hoc: unsigned, the app and the widget extension get no app group, and the widgets
+# and the Live Activity can't read the pet's stills (they draw the fallback symbol).
 GIT_CONFIG_GLOBAL=/dev/null xcodebuild build-for-testing -project Hermes.xcodeproj -scheme HermesApp \
-  -destination "platform=iOS Simulator,name=$phone" -derivedDataPath "$dd" CODE_SIGNING_ALLOWED=NO -quiet || exit 1
+  -destination "platform=iOS Simulator,name=$phone" -derivedDataPath "$dd" CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM= -quiet || exit 1
 for d in "$phone" "$pad"; do
   xcrun simctl boot "$d" 2>/dev/null; xcrun simctl bootstatus "$d" >/dev/null
   xcrun simctl status_bar "$d" override --time 9:41 --batteryState discharging --batteryLevel 100 --wifiBars 3 2>/dev/null

@@ -31,6 +31,6 @@ for d in "${devices[@]}"; do
   SCREENSHOT_DIR="$out" TEST_RUNNER_SCREENSHOT_DIR="$out" TEST_RUNNER_SCREENSHOT_LANGUAGE="$lang" \
     xcodebuild test -project Hermes.xcodeproj -scheme HermesApp \
     -only-testing:HermesUITests -destination "platform=iOS Simulator,name=$d" \
-    -derivedDataPath "${DERIVED_DATA:-$HOME/Library/Caches/hermes-ios/DerivedData}" CODE_SIGNING_ALLOWED=NO -quiet || true
+    -derivedDataPath "${DERIVED_DATA:-$HOME/Library/Caches/hermes-ios/DerivedData}" CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM= -quiet || true
 done
 ls "$out"
