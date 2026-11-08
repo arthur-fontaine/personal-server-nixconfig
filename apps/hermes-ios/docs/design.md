@@ -115,18 +115,19 @@ Hidden: the "App" topic (machine traffic)
 ### iPhone (compact width)
 
 - One `NavigationStack` whose root is the open chat; picking a chat in the title menu replaces it.
-- The system toolbar: the pet (a still frame of the row Hermes' state picks, drawn as the image
-  of the bar's own circular item; a caress redraws it with the reaction and a heart for a second),
-  the chat's name as title (`toolbarTitleMenu`) with Hermes' state as `navigationSubtitle`,
-  Call. Never the app's name as a title (HIG Toolbars): the main chat is "Main chat".
+- The system toolbar: the pet (a still frame of the row Hermes' state picks, in the bar's own
+  36-pt circular item; a tap caresses it — the reaction and a heart for a second —, a long press
+  opens New Pet… anchored to the item, UIKit's `UIButton` primary action + menu as Safari's Back),
+  the chat's name as title (`toolbarTitleMenu`), Call. A subtitle only for the connection
+  ("Connecting…"): Hermes' state is the pet, the draft and the approval card. Never the app's name as a title (HIG Toolbars): the main chat is "Main chat".
 - The composer is pinned with `safeAreaBar(edge: .bottom)`, so the scroll edge effect runs under
   it; Stop replaces Send while Hermes writes. The transcript follows its bottom as it grows until
   the owner scrolls away.
 
 ### iPad and wide windows (regular width)
 
-- `NavigationSplitView`: the sidebar lists the chats (system rows, badges), New Sub-chat…, then
-  Dashboard and Settings at its foot; the detail is the chat in a 672-pt readable column with the
+- `NavigationSplitView`: the sidebar lists the chats (system rows, badges), New Sub-chat…, with
+  Dashboard and Settings pinned at its foot (`safeAreaBar`, the list's 52-pt rows); the detail is the chat in a 672-pt readable column with the
   pet leading and Call trailing. A narrow window (Slide Over, Stage Manager) gets the iPhone layout by size class.
 - Keyboard: ⌘↩ sends, ⌘N new sub-chat, ⌘⇧C call.
 
