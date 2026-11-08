@@ -280,6 +280,8 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     "at once, a notice when it ends; `sideload_remove` uninstalls. Re-signing"
     "before expiry happens by itself. A device not in `sideload_devices` must be"
     "plugged into this Mac once (the user runs `bootstrap-macos.sh sideload-devices`)."
+    "A refused install (no team in Xcode, no Apple Development certificate) says"
+    "what the user does at the Mac: pass its words on as they are."
   ] ++ lib.optionals server.hermes.app.delivery.enable [
     "Your own iOS app is the sideload app `hermes`: reinstall it with"
     "`sideload_install` after a new pet, when the user asks, or after a failed install."
