@@ -52,6 +52,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).ui
         GENERATE_INFOPLIST_FILE: YES
         SKIP_INSTALL: YES
+        # Linked by the widget extension too (the pet's optical centring).
+        APPLICATION_EXTENSION_API_ONLY: YES
         # The checker builds a Mac tool from Tools/DesignCheck: outside the script sandbox.
         ENABLE_USER_SCRIPT_SANDBOXING: NO
   HermesApp:
@@ -133,6 +135,7 @@ targets:
       - path: Shared
     dependencies:
       - target: HermesCore
+      - target: HermesUI
     info:
       path: HermesWidgets/Info.plist
       properties:

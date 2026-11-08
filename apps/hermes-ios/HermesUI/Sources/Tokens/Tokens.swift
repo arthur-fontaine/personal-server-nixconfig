@@ -81,6 +81,10 @@ enum Metric {
     }
     /// The fade over a code block's trailing edge when its text runs past it (13.1).
     static let codeFade: CGFloat = Spacing.xl.points
+    /// A square's ratio, and the unit cell of a sprite.
+    static let square: CGFloat = 1
+    /// One pixel, counting inclusive pixel bounds.
+    static let pixel: CGFloat = 1
     /// Typing indicator dot.
     static let typingDot: CGFloat = 6
     /// A quote's leading rule (Mail's quote bar).

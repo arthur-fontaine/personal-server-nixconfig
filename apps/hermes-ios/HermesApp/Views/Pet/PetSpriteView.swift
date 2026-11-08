@@ -51,7 +51,8 @@ struct PetSpriteView: View {
     private func frameImage(_ sheet: SpriteSheet, _ row: PetAnimation, _ index: Int) -> some View {
         Group {
             if let cg = sheet.frame(row, index) {
-                Image(decorative: cg, scale: 1).resizable().interpolation(.none).scaledToFit()
+                // Centred optically over every frame it can show (design-rules 14.2).
+                CenteredPet(frame: cg, centering: Self.centering(store: store, stills: false))
             } else {
                 EmptyView()
             }
@@ -61,6 +62,18 @@ struct PetSpriteView: View {
     private var accessibilityText: String {
         guard let pet = store?.pet else { return String(localized: "Pet") }
         return String(localized: "\(pet.name), \(store?.petMood.caption ?? "")")
+    }
+
+    /// The pet's optical centring for a container showing every frame (`stills: false`) or only
+    /// each row's first frame (the bar's still image), cached per pet version and sheet.
+    static func centering(store: HermesStore?, stills: Bool) -> PetCentering {
+        guard let sheet = sheet(store: store) else { return .identity }
+        let key = "\(store?.pet?.id ?? "pip")-\(store?.pet?.version ?? 0)-\(ObjectIdentifier(sheet).hashValue)-\(stills)"
+        return .cached(key) {
+            PetAnimation.allCases.flatMap { row in
+                (stills ? [0] : Array(0..<row.frameCount)).compactMap { sheet.frame(row, $0) }
+            }
+        }
     }
 
     static func sheet(store: HermesStore?) -> SpriteSheet? {

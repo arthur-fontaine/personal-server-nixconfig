@@ -1,6 +1,7 @@
 import ActivityKit
 import AppIntents
 import HermesCore
+import HermesUI
 import SwiftUI
 import WidgetKit
 
@@ -24,15 +25,20 @@ enum WidgetData {
     }
 }
 
-/// One frame of the pet: widgets can't animate a sprite, so they show the mood's first frame.
+/// One frame of the pet: widgets can't animate a sprite, so they show the mood's first frame,
+/// centred optically over the first frames of every row (design-rules 14.2) — in the circle of a
+/// circular complication, or in its square elsewhere.
 struct PetFrame: View {
     let file: String?
     let animation: PetAnimation
     var frame = 0
+    var inCircle = false
 
     var body: some View {
-        if let cg = WidgetData.sheet(file)?.frame(animation, frame) {
-            Image(decorative: cg, scale: 1).resizable().interpolation(.none).scaledToFit()
+        if let sheet = WidgetData.sheet(file), let cg = sheet.frame(animation, frame) {
+            CenteredPet(frame: cg, centering: PetCentering.cached("widget-\(file ?? "")") {
+                PetAnimation.allCases.compactMap { sheet.frame($0, 0) }
+            }, inCircle: inCircle)
         } else {
             Image(systemName: "bird.fill").resizable().scaledToFit().padding(6)
         }
@@ -104,7 +110,7 @@ struct PetWidgetView: View {
         case .accessoryCircular:
             ZStack {
                 AccessoryWidgetBackground()
-                PetFrame(file: s.spritesheetFile, animation: s.mood.animation).padding(4)
+                PetFrame(file: s.spritesheetFile, animation: s.mood.animation, inCircle: true)
             }
             .widgetAccentable()
         case .accessoryRectangular:
