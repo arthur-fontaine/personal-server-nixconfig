@@ -16,6 +16,47 @@ Hermes** (is it working, is the server fine, how's the pet).
 | Things 3 | Calm surfaces, one accent colour, delight in small motion (the checkbox) | Restraint: one accent, white space, spring on completion | — |
 | Apple HIG, iOS 26 | Liquid Glass for the control layer only, content edge to edge; `NavigationSplitView` that collapses to a stack; standard bars pick up the material themselves | Standard bars/sheets/toolbars, glass only on our floating controls (composer, question tray, call controls) | Custom bar backgrounds (they fight the scroll-edge effect) |
 
+## Research for the redesign (November 2026)
+
+The first design was rejected as dated, cramped and generic (a single amber accent,
+compact cards, ALL-CAPS labels, a four-tab bar). What premium iOS 26 apps and assistants do
+instead:
+
+- **Glass is the navigation layer, nothing else.** "Best used for the navigation layer that
+  floats above the content"; "avoid stacking glass on glass… use fills and transparency"; two
+  variants, regular and clear, never mixed; tint only to bring emphasis to the primary element
+  ([Meet Liquid Glass, WWDC25](https://developer.apple.com/videos/play/wwdc2025/219/),
+  [notes](https://wwdcnotes.com/documentation/wwdc25-219-meet-liquid-glass/)). "Reduce your use
+  of custom backgrounds in controls and navigation elements… avoid overusing Liquid Glass
+  effects" ([Adopting Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass)).
+- **Shape is concentric, type is bolder and left-aligned.** Three shapes: fixed, capsule,
+  concentric (inner radius = outer radius − padding); capsules for touch controls, especially
+  near the screen's edge on iPhone; "typography is bolder and left-aligned"
+  ([Get to know the new design system, WWDC25](https://developer.apple.com/videos/play/wwdc2025/356/),
+  [notes](https://wwdcnotes.com/documentation/wwdc25-356-get-to-know-the-new-design-system/)).
+- **Assistants have no tab bar.** ChatGPT on iOS 26: a drawer button and a glass action
+  group at the top, a floating capsule composer, replies as plain text with no bubble, the
+  user's turns in a pale bubble, a lot of empty space; voice is one object (the orb), not a
+  screen of controls ([App Store screenshots](https://apps.apple.com/us/app/chatgpt/id6448311069)).
+  Claude: the same drawer, serif reading type for answers; its latest update puts what it makes
+  beside the chat on iPad ([announcement](https://x.com/claudeai/status/2115859377488072879)).
+  Gemini's 2026 redesign: a pill prompt box with voice on the right and one "+" menu for every
+  tool ([eWeek](https://www.eweek.com/news/google-gemini-ui-redesign-tools-menu/)).
+- **Calm comes from spacing, not from cards.** Things 3.22 for OS 26: "wider spacing that
+  feels a bit more relaxed", glassy buttons that "respond to your touch with a subtle glow and
+  scale", a touch of glass in the sidebar only
+  ([Things blog](https://culturedcode.com/things/blog/2025/09/things-for-os-26/)).
+- **What not to copy.** Telegram's Liquid Glass update kept its old top bar under a new tab
+  bar ("a weird mix of the old and new",
+  [r/ios](https://www.reddit.com/r/ios/comments/1o39tm6/telegrams_liquid_glass_update_a_weird_mix_of_the/));
+  its Android port's four-tab bar was received poorly
+  ([9to5Google](https://9to5google.com/2026/02/07/telegram-for-android-redesign-goes-all-in-on-liquid-glass-rolling-out-now/)).
+
+Concretely: a 4-pt grid used as 8 / 12 / 16 / 24 / 32; 24 pt margins on iPhone; 28 pt between
+turns; body at the Dynamic Type `.body` size with about 6 pt of extra leading; one
+bold title style per screen; capsule controls 44–52 pt tall; one colour, used for
+one job.
+
 ## Principles
 
 1. **One conversation, full width.** Hermes' messages are not bubbles: they
