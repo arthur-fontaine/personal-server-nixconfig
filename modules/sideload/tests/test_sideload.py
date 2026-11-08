@@ -82,11 +82,31 @@ name = json.loads(spec)["name"] if spec.lstrip().startswith("{") else "HermesApp
 Path(f"{name}.xcodeproj").mkdir(exist_ok=True)
 ''',
     "security": r'''
-import sys
+import json, os, sys
 from pathlib import Path
 args = sys.argv[1:]
+# The login keychain's identities: FAKE_DIR/identities.json, {name: certificate subject}.
+ids = Path(os.environ["FAKE_DIR"]) / "identities.json"
+identities = json.loads(ids.read_text()) if ids.exists() else {}
+if args[:1] == ["find-identity"]:
+    for i, name in enumerate(identities, 1):
+        print(f'  {i}) {i:040X} "{name}"')
+    print(f"     {len(identities)} valid identities found")
+    sys.exit(0)
+if args[:1] == ["find-certificate"]:
+    name = args[args.index("-c") + 1]
+    if name not in identities:
+        sys.exit(44)
+    print("-----BEGIN CERTIFICATE-----\n" + identities[name] + "\n-----END CERTIFICATE-----")
+    sys.exit(0)
 assert args[:3] == ["cms", "-D", "-i"], args
 sys.stdout.write(Path(args[3]).read_text())
+''',
+    # Prints the subject the fake security put in the PEM, as LibreSSL does.
+    "openssl": r'''
+import sys
+assert sys.argv[1:] == ["x509", "-noout", "-subject"], sys.argv
+print("subject= " + sys.stdin.read().splitlines()[1])
 ''',
     "defaults": r'''
 import os, sys
@@ -225,6 +245,85 @@ class Teams(Base):
         self.cfg.team_id = None
         with self.assertRaisesRegex(cli.SideloadError, "no Apple Account in Xcode"):
             cli.team(self.cfg)
+
+    def xcode27(self, identities: dict) -> None:
+        """Xcode 27 keeps only the account list in its preferences."""
+        (self.fake / "xcode.plist").write_text(plistlib.dumps({
+            "DVTDeveloperAccountManagerAppleIDLists": {"IDE.Prod": [{"username": "arthur@example.com"}]},
+            "IDELastViewedSettingsPane": "Accounts"}).decode())
+        (self.fake / "identities.json").write_text(json.dumps(identities))
+        self.cfg.team_id = None
+
+    def test_xcode27_team_from_the_development_certificate(self):
+        self.xcode27({"Apple Development: arthur@example.com (Q2W3E4R5T6)":
+                      "/UID=ABCDEF1234/CN=Apple Development: arthur@example.com (Q2W3E4R5T6)/OU=FREE000027/O=Arthur Fontaine/C=FR"})
+        self.assertEqual(cli.find_team(self.cfg), {"id": "FREE000027", "paid": False, "source": "development certificate"})
+        self.cfg.paid = True
+        self.assertEqual(cli.team(self.cfg), {"id": "FREE000027", "paid": True})
+
+    def test_xcode27_account_without_certificate(self):
+        self.xcode27({})
+        with self.assertRaisesRegex(cli.SideloadError, "Manage Certificates"):
+            cli.team(self.cfg)
+
+    def test_configured_team_first(self):
+        self.xcode27({})
+        self.cfg.team_id = "CONF000001"
+        self.assertEqual(cli.find_team(self.cfg)["source"], "configuration")
+
+    def test_team_command(self):
+        self.xcode27({})
+        config = self.root / "config.json"
+        config.write_text(json.dumps({**self.config, "team": {}}))
+        os.environ["SIDELOAD_CONFIG"] = str(config)
+        try:
+            self.assertEqual(cli.main(["team"]), 1)
+            (self.fake / "identities.json").write_text(json.dumps({"Apple Development: a (B)": "/CN=Apple Development: a (B)/OU=FREE000027"}))
+            self.assertEqual(cli.main(["team"]), 0)
+        finally:
+            os.environ.pop("SIDELOAD_CONFIG")
+
+
+class Failures(Base):
+    def main(self, *argv) -> int:
+        config = self.root / "config.json"
+        config.write_text(json.dumps(self.config))
+        os.environ["SIDELOAD_CONFIG"] = str(config)
+        try:
+            return cli.main(list(argv))
+        finally:
+            os.environ.pop("SIDELOAD_CONFIG")
+
+    def test_install_without_a_team_is_refused_logged_and_kept(self):
+        self.config["team"] = {}
+        self.assertEqual(self.main("install", "hermes", "--reason", "first install"), 1)
+        self.assertFalse(list(self.cfg.requests.glob("*.json")))  # nothing queued
+        self.assertIn("no Apple Account in Xcode", self.cfg.log_file.read_text())
+        self.assertIn("no Apple Account in Xcode", cli.app_status(self.cfg, self.state(), "hermes")["last_error"]["error"])
+
+    def test_team_lost_after_queueing_is_logged_and_answered(self):
+        request = cli.queue(self.cfg, "hermes", ["UDID-A"], "asked")
+        self.cfg.team_id = None
+        cli.cmd_run(self.cfg)
+        self.assertIn("no Apple Account", self.done(request)["results"]["UDID-A"]["error"])
+        self.assertIn("no Apple Account", self.state()["last_error"]["error"])
+        self.assertIn("hermes on UDID-A: failed", self.cfg.log_file.read_text())
+
+    def test_a_crashed_job_still_answers_each_request(self):
+        request = cli.queue(self.cfg, "hermes", [], "first install")
+        from unittest import mock
+        with mock.patch.object(cli, "refresh_seen", side_effect=RuntimeError("boom")), self.assertRaises(RuntimeError):
+            cli.cmd_run(self.cfg)
+        done = self.done(request)
+        self.assertIn("the job failed", done["results"]["*"]["error"])
+        self.assertIn("the job failed", self.state()["last_error"]["error"])
+        self.assertIsNone(self.state()["running"])
+
+    def test_a_success_clears_the_last_error(self):
+        cli.note_error(self.cfg, "earlier")
+        cli.queue(self.cfg, "hermes", ["UDID-A"], "asked")
+        cli.cmd_run(self.cfg)
+        self.assertIsNone(self.state()["last_error"])
 
 
 class HermesApp(Base):

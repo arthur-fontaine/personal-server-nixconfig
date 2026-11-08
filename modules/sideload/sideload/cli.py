@@ -4,6 +4,7 @@ and keep them signed.
     sideload devices              the devices Xcode can install on (JSON)
     sideload apps                 the apps it knows, where each is installed, when it expires
     sideload limits               the free team's limits: apps per device, App IDs this week
+    sideload team                 the signing team found, and where (JSON); exit 1 with what to do when none
     sideload status [APP]         the whole state, or one app's
     sideload add APP (--ipa PATH|URL | --project PATH|GIT-URL [--scheme S] [--ref R] [--keep-bundle-id]) [--name N]
     sideload install APP [--device UDID]... [--reason TEXT] [--wait]
@@ -88,9 +89,31 @@ class SideloadError(Exception):
     pass
 
 
+def log_line(cfg: Config, text: str) -> None:
+    """One line in sideload.log (the job's own log), for what fails before or outside a build's log."""
+    try:
+        cfg.log_file.parent.mkdir(parents=True, exist_ok=True)
+        with cfg.log_file.open("a") as f:
+            f.write(f"{iso(now())} {text}\n")
+    except OSError:
+        pass
+
+
+def note_error(cfg: Config, error: str, app_id: str | None = None) -> None:
+    """Kept for `sideload status` (last_error) and logged: an empty log never means nothing was tried."""
+    log_line(cfg, f"error{f' ({app_id})' if app_id else ''}: {error}")
+    try:
+        state = load_state(cfg)
+        state["last_error"] = {"at": iso(now()), "app": app_id, "error": error}
+        save_state(cfg, state)
+    except Exception:  # noqa: BLE001 (the state itself may be what fails)
+        pass
+
+
 class Config:
     def __init__(self, data: dict):
         self.home = Path(data.get("home") or Path.home())
+        self.log_file = Path(data.get("log_file") or self.home / "Library/Logs/sideload.log")
         self.state_dir = Path(data.get("state_dir") or self.home / "Library/Application Support/sideload")
         self.cache_dir = Path(data.get("cache_dir") or self.home / "Library/Caches/sideload")
         team = data.get("team") or {}
@@ -102,7 +125,7 @@ class Config:
         self.apps = dict(data.get("apps") or {})
         self.tools = {"xcrun": "xcrun", "xcodebuild": "xcodebuild", "xcodegen": "xcodegen", "security": "security",
                       "defaults": "defaults", "launchctl": "launchctl", "codesign": "codesign", "ditto": "ditto",
-                      "git": "git", **(data.get("tools") or {})}
+                      "git": "git", "openssl": "openssl", **(data.get("tools") or {})}
         self.install_timeout = int(data.get("install_timeout", 900))
         self.build_timeout = int(data.get("build_timeout", 5400))
 
@@ -206,6 +229,7 @@ def app_status(cfg: Config, state: dict, app_id: str) -> dict:
     expiries = [parse_iso(d["profile_expires"]) for d in devices if d["profile_expires"]]
     running = state.get("running")
     return {"v": 1, "devices": devices, "team": state.get("team"), "updated": state.get("updated"),
+            "last_error": state.get("last_error"),
             "running": running if running and app_id in (running.get("apps") or []) else None,
             "next_refresh": iso(min(expiries) - cfg.refresh_before) if expiries else None}
 
@@ -276,15 +300,18 @@ def find_teams(value) -> list[dict]:
     return found
 
 
-def xcode_teams(cfg: Config) -> list[dict]:
-    """The teams of the Apple Accounts signed in to Xcode (Settings → Accounts)."""
+def xcode_prefs(cfg: Config) -> dict:
     result = run_tool(cfg, "defaults", "export", "com.apple.dt.Xcode", "-", timeout=30)
     if result.returncode != 0 or not result.stdout:
-        return []
+        return {}
     try:
-        prefs = plistlib.loads(result.stdout.encode())
+        return plistlib.loads(result.stdout.encode())
     except Exception:  # noqa: BLE001
-        return []
+        return {}
+
+
+def xcode_teams(prefs: dict) -> list[dict]:
+    """The teams Xcode 26 and earlier kept in its preferences (Settings → Accounts)."""
     teams = []
     for key in ("IDEProvisioningTeamByIdentifier", "IDEProvisioningTeams"):
         for t in find_teams(prefs.get(key)):
@@ -293,15 +320,69 @@ def xcode_teams(cfg: Config) -> list[dict]:
     return teams
 
 
-def team(cfg: Config) -> dict:
+def xcode_account(prefs: dict) -> bool:
+    """An Apple Account signed in to Xcode: Xcode 27 keeps only this list in its preferences."""
+    def any_value(value) -> bool:
+        if isinstance(value, dict):
+            return any(any_value(v) for v in value.values())
+        if isinstance(value, list):
+            return any(any_value(v) if isinstance(v, (dict, list)) else True for v in value)
+        return bool(value)
+    return any_value(prefs.get("DVTDeveloperAccountManagerAppleIDLists"))
+
+
+def certificate_teams(cfg: Config) -> list[str]:
+    """The team ids of the "Apple Development" identities in the login keychain: a
+    development certificate's subject carries its team as OU. Xcode 27 no
+    longer writes the teams to its preferences, but its account makes this
+    certificate (Manage Certificates…, or a first automatic signing)."""
+    result = run_tool(cfg, "security", "find-identity", "-v", "-p", "codesigning", timeout=30)
+    names = re.findall(r'"(Apple Development: [^"]+)"', result.stdout or "") if result.returncode == 0 else []
+    teams: list[str] = []
+    for name in dict.fromkeys(names):
+        pem = run_tool(cfg, "security", "find-certificate", "-c", name, "-p", timeout=30)
+        if pem.returncode != 0 or not pem.stdout:
+            continue
+        subject = subprocess.run([cfg.tools["openssl"], "x509", "-noout", "-subject"], input=pem.stdout,
+                                 capture_output=True, text=True, timeout=30)
+        match = re.search(r"\bOU\s*=\s*([A-Z0-9]{10})\b", subject.stdout or "")
+        if match and match.group(1) not in teams:
+            teams.append(match.group(1))
+    return teams
+
+
+NO_ACCOUNT = ("no Apple Account in Xcode: in the service account's Xcode, Settings › Accounts › + › Apple Account "
+              "(scripts/bootstrap-macos.sh sideload-account)")
+# Xcode 27 signs in without making a development certificate, and without one
+# nothing here names the team. Given the team id (server.sideload.team.id),
+# the first build (xcodebuild -allowProvisioningUpdates) makes the certificate.
+NO_CERTIFICATE = ("Xcode is signed in but has no Apple Development certificate yet: in Hermes' Xcode, "
+                  "Xcode › Settings › Accounts › your account › Manage Certificates… › + › Apple Development. "
+                  "With a paid team, setting server.sideload.team.id (developer.apple.com › Account › Membership) also works: "
+                  "the first build then makes the certificate")
+
+
+def find_team(cfg: Config) -> dict:
+    """The signing team and where it was found: the configuration, Xcode's
+    preferences (Xcode 26 and earlier), then the development certificate. A
+    certificate does not say whether the team is paid: `paid` (the
+    configuration's team.paid) decides, free by default."""
     if cfg.team_id:
-        return {"id": cfg.team_id, "paid": cfg.paid}
-    teams = xcode_teams(cfg)
+        return {"id": cfg.team_id, "paid": cfg.paid, "source": "configuration"}
+    prefs = xcode_prefs(cfg)
+    teams = xcode_teams(prefs)
     wanted = [t for t in teams if t["free"] != cfg.paid] or teams
-    if not wanted:
-        raise SideloadError("no Apple Account in Xcode: sign the service account's Xcode in (Settings → Accounts), "
-                            "or run scripts/bootstrap-macos.sh sideload-account")
-    return {"id": wanted[0]["id"], "paid": not wanted[0]["free"]}
+    if wanted:
+        return {"id": wanted[0]["id"], "paid": not wanted[0]["free"], "source": "xcode preferences"}
+    found = certificate_teams(cfg)
+    if found:
+        return {"id": found[0], "paid": cfg.paid, "source": "development certificate"}
+    raise SideloadError(NO_CERTIFICATE if xcode_account(prefs) else NO_ACCOUNT)
+
+
+def team(cfg: Config) -> dict:
+    found = find_team(cfg)
+    return {"id": found["id"], "paid": found["paid"]}
 
 
 def bundle_prefix(definition: dict, team_id: str, app_id: str) -> str:
@@ -716,6 +797,9 @@ def run_once(cfg: Config) -> bool:
                 state["team"] = team_info
         except SideloadError as error:
             team_info = None
+            log.write(f"!! {error}\n")
+            log_line(cfg, f"error: {error}")
+            state["last_error"] = {"at": iso(now()), "app": None, "error": str(error)}
             for app_id, targets in jobs.items():
                 results[app_id] = {u: {"ok": False, "error": str(error)} for u in targets}
         for app_id, targets in jobs.items() if team_info else []:
@@ -754,7 +838,12 @@ def run_once(cfg: Config) -> bool:
 
     state["running"] = None
     state["last_log"] = str(log_path)
+    if any(r.get("ok") for mine in results.values() for r in mine.values()):
+        state["last_error"] = None
     save_state(cfg, state)
+    for app_id, mine in results.items():
+        for udid, r in mine.items():
+            log_line(cfg, f"{app_id} on {udid}: " + ("done" if r.get("ok") else f"failed: {r.get('error')}"))
     finish(cfg, requests, results, log_path)
     prune(logs.glob("run-*.log"), KEEP_LOGS)
     return True
@@ -826,10 +915,16 @@ def cmd_run(cfg: Config) -> int:
         try:
             while run_once(cfg):
                 pass
-        except Exception:
+        except Exception as error:
             state = load_state(cfg)
             state["running"] = None
             save_state(cfg, state)
+            note_error(cfg, f"the job failed: {error!r}")
+            # Each request waiting gets an answer in done/, so none hangs without why.
+            requests = pending(cfg)
+            results = {r.get("app"): {u: {"ok": False, "error": f"the job failed: {error!r}"} for u in r.get("devices") or ["*"]}
+                       for r in requests}
+            finish(cfg, requests, results, cfg.log_file)
             raise
     return 0
 
@@ -846,8 +941,10 @@ def start(cfg: Config) -> None:
         if run_tool(cfg, "launchctl", "kickstart", f"gui/{os.getuid()}/{cfg.label}", timeout=30).returncode == 0:
             return
     # No launchd job (a test, or the session's agents not loaded yet): detached.
-    subprocess.Popen([sys.executable, os.path.abspath(sys.argv[0]), "run"], start_new_session=True,
-                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    cfg.log_file.parent.mkdir(parents=True, exist_ok=True)
+    with cfg.log_file.open("a") as out:
+        subprocess.Popen([sys.executable, os.path.abspath(sys.argv[0]), "run"], start_new_session=True,
+                         stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT)
 
 
 def wait_for(cfg: Config, request_id: str, timeout: float) -> dict | None:
@@ -958,7 +1055,7 @@ def cmd_forget(cfg: Config, app_id: str) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="sideload", description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("devices", "apps", "limits", "run"):
+    for name in ("devices", "apps", "limits", "run", "team"):
         sub.add_parser(name)
     status = sub.add_parser("status")
     status.add_argument("app", nargs="?")
@@ -988,6 +1085,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.command in ("devices", "apps", "limits"):
             print(json.dumps({"devices": cmd_devices, "apps": cmd_apps, "limits": cmd_limits}[args.command](cfg), indent=2))
             return 0
+        if args.command == "team":
+            print(json.dumps({"team": find_team(cfg)}, indent=2))
+            return 0
         if args.command == "status":
             state = load_state(cfg)
             print(json.dumps(app_status(cfg, state, args.app) if args.app else state, indent=2))
@@ -1000,6 +1100,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         state = load_state(cfg)
         app_definition(cfg, state, args.app)  # an unknown app fails here, not in the job
+        if args.command == "install":
+            team(cfg)  # so does a missing team, rather than in the job's log
         request = queue(cfg, args.app, args.device, args.reason, args.command)
         start(cfg)
         if not args.wait:
@@ -1010,6 +1112,8 @@ def main(argv: list[str] | None = None) -> int:
         results = (done or {}).get("results") or {}
         return 0 if done and results and all(r.get("ok") for r in results.values()) else 1
     except SideloadError as error:
+        if args.command in ("install", "remove", "add", "forget"):
+            note_error(cfg, f"{args.command} refused: {error}", getattr(args, "app", None))
         print(json.dumps({"error": str(error)}), file=sys.stderr)
         return 1
 
