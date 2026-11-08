@@ -1,7 +1,7 @@
 # Sideload: iOS apps on your iPhone and iPad
 
 With `server.sideload.enable` (the bootstrap's "Sideload" step; on by itself
-with the Hermes app), this Mac installs iOS apps on your iPhones and iPads
+with the Hermes app, its app `hermes`: [app.md](app.md#delivery)), this Mac installs iOS apps on your iPhones and iPads
 over Wi-Fi, without the App Store or TestFlight, and keeps them signed. It is
 a service of its own (`modules/sideload`), not part of Hermes: Hermes only
 calls it (below).
