@@ -51,7 +51,7 @@ public enum DesignCheck {
         "buttonStyle", "buttonBorderShape", "controlSize", "tint", "lineSpacing", "kerning", "tracking",
         "listRowBackground", "listRowInsets", "scenePadding", "contentMargins", "safeAreaPadding",
         "containerShape", "glassEffect", "opacity", "blur", "brightness", "saturation", "colorMultiply",
-        "shadow", "stroke", "strokeBorder", "border", "textCase",
+        "shadow", "stroke", "strokeBorder", "border", "textCase", "dynamicTypeSize", "allowsTightening",
     ]
     /// Arguments that are layout numbers wherever they appear.
     static let layoutLabels: Set<String> = [
