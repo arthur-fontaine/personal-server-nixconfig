@@ -52,7 +52,7 @@ struct StoreTests {
         #expect(store.agent.status == .error)
         store._apply(.messageChanged(chat, Fixtures.appMessage(id: 803, json: #"{"v":1,"type":"state","agent":{"status":"working"}}"#)))
         #expect(store.agent.status == .error)
-        #expect(store.petMood == .sad)
+        #expect(store.petMood == .idle)
     }
 
     @Test func answeringPressesTheButtonData() async throws {
@@ -83,12 +83,33 @@ struct StoreTests {
         try await waitUntil { client.sent.contains { $0.contains("\"ack\"") && $0.contains("950") } }
     }
 
-    @Test func petActionIsOptimisticThenConfirmedByAReply() async throws {
+    @Test func aCaressStaysInTheApp() async throws {
         let (store, client) = try await makeStore()
-        let hunger = try #require(store.pet?.hunger)
-        try await store.perform(.feed)
-        #expect(client.sent.contains { $0.contains("pet.feed") })
-        try await waitUntil { (store.pet?.hunger ?? 1) < hunger }
+        let sent = client.sent.count
+        store.caress()
+        #expect(store.petReaction == .jumping && store.petAnimation == .jumping && store.caressedAt != nil)
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(client.sent.count == sent)
+    }
+
+    @Test func thePetWavesAtANewQuestionAndNodsAtTheAnswer() async throws {
+        let (store, _) = try await makeStore()
+        let chat = FakeTelegramClient.botChat.chatID
+        store.petReaction = nil
+        store._apply(.newMessage(chat, Fixtures.appMessage(id: 905, json: #"{"v":3,"type":"state","agent":{"status":"waiting_user"},"questions":[{"id":"cl:new","kind":"clarify","chat":0,"message_id":1005,"text":"Which?","options":[{"id":"a","label":"A","data_b64":"YQ=="}]}]}"#)))
+        #expect(store.petReaction == .waving && store.petMood == .waiting)
+        store.petReaction = nil
+        let q = try #require(store.questions.first { $0.id == "cl:new" })
+        _ = try await store.answer(q, with: q.options[0])
+        #expect(store.petReaction == .jumping)
+    }
+
+    @Test func aFinishedTurnGivesAHappyBeat() async throws {
+        let (store, _) = try await makeStore()
+        let chat = FakeTelegramClient.botChat.chatID
+        let until = ISO8601DateFormatter().string(from: .now.addingTimeInterval(10))
+        store._apply(.newMessage(chat, Fixtures.appMessage(id: 906, json: #"{"v":3,"type":"state","agent":{"status":"idle"},"pet":{"id":"pip","mood":"happy","animation":"jump","mood_until":"\#(until)"}}"#)))
+        #expect(store.petMood == .happy && store.petAnimation == .jumping)
     }
 
     @Test func callTurnsAreMarkedMainChatMessages() async throws {
@@ -176,31 +197,25 @@ struct PetTests {
         #expect(PetAnimation(alias: "nope") == nil)
     }
 
-    @Test func moodFollowsAgentThenNeeds() {
-        let pet = PetState(id: "p", name: "P", hunger: 0.2, energy: 0.8, happiness: 0.9)
-        #expect(PetMood(agent: .working, pet: pet) == .busy)
-        #expect(PetMood(agent: .thinking, pet: pet).animation == .review)
-        #expect(PetMood(agent: .waitingUser, pet: pet).animation == .waiting)
-        #expect(PetMood(agent: .idle, pet: pet) == .happy)
-        var hungry = pet; hungry.hunger = 0.9
-        #expect(PetMood(agent: .idle, pet: hungry) == .hungry)
-        var asleep = pet; asleep.asleep = true
-        #expect(PetMood(agent: .working, pet: asleep) == .asleep)
+    @Test func moodMirrorsHermes() {
+        let now = Date(timeIntervalSince1970: 1000)
+        #expect(PetMood(agent: .working, reported: nil, until: nil, now: now) == .working)
+        #expect(PetMood(agent: .thinking, reported: .happy, until: now + 5, now: now) == .working)
+        #expect(PetMood(agent: .waitingUser, reported: nil, until: nil, now: now) == .waiting)
+        #expect(PetMood(agent: .idle, reported: nil, until: nil, now: now) == .idle)
+        // A beat shows until its end, then the pet rests, even with an error still on the status.
+        #expect(PetMood(agent: .idle, reported: .happy, until: now + 5, now: now) == .happy)
+        #expect(PetMood(agent: .error, reported: .confused, until: now + 5, now: now) == .confused)
+        #expect(PetMood(agent: .error, reported: .confused, until: now - 1, now: now) == .idle)
+        // A beat without an end (a v2 server's lasting "happy") is not one.
+        #expect(PetMood(agent: .idle, reported: .happy, until: nil, now: now) == .idle)
+        #expect(PetMood.allCases.map(\.animation) == [.idle, .running, .waiting, .jumping, .failed])
     }
 
-    @Test func levelProgressUsesTheProtocolCurve() {
-        // Level n needs 100·n·(n+1)/2: level 6 spans 1500…2100.
-        #expect(PetState.totalXP(forLevel: 5) == 1500)
-        let pet = PetState(id: "p", name: "P", xp: 1800, level: 6, xpForNextLevel: 2100)
-        #expect(abs(pet.levelProgress - 0.5) < 0.001)
-    }
-
-    @Test func actionsAreOfferedByState() {
-        var pet = PetState(id: "p", name: "P")
-        #expect(PetAction.available(for: pet) == [.feed, .play, .sleep])
-        pet.asleep = true
-        #expect(PetAction.available(for: pet) == [.feed, .wake])
-        #expect(PetAction.wake.optimisticallyApplied(to: pet).asleep == false)
+    @Test func moodDecodesOldSnapshots() throws {
+        let old = #"{"petName":"Pip","petLevel":6,"levelProgress":0.6,"hunger":0.35,"energy":0.7,"happiness":0.82,"asleep":false,"mood":"content","agentStatus":"idle","updatedAt":0}"#
+        let snap = try JSONDecoder().decode(SharedSnapshot.self, from: Data(old.utf8))
+        #expect(snap.petName == "Pip" && snap.mood == .idle)
     }
 
     @Test func manifestReadsCodexPetJSON() throws {

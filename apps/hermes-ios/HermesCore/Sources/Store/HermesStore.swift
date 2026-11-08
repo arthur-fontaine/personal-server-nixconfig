@@ -40,10 +40,12 @@ public final class HermesStore {
     private var slotIDs: [String: MessageID] = [:]
     private var pendingReplies: [MessageID: CheckedContinuation<ReplyPayload, Error>] = [:]
     private var earlyReplies: [MessageID: ReplyPayload] = [:]
-    /// Optimistic pet until the next state slot.
-    public private(set) var optimisticPet: PetState?
-    /// One-shot animation requested by the user (feed/play), cleared by the view.
+    private var seenQuestions: Set<String> = []
+    /// A one-shot row the pet plays over its mood, then the view clears it: `.jumping` for a
+    /// caress or an answered question (the nod), `.waving` toward a question that just arrived.
     public var petReaction: PetAnimation?
+    /// When the owner last caressed the pet: the trigger for its haptic and heart.
+    public private(set) var caressedAt: Date?
 
     // MARK: Uploads
     public private(set) var uploads: [UUID: UploadProgress] = [:]
@@ -72,9 +74,17 @@ public final class HermesStore {
 
     // MARK: - Derived
 
-    public var pet: PetState? { optimisticPet ?? state.pet }
+    public var pet: PetState? { state.pet }
     public var agent: AgentState { state.agent ?? AgentState(status: .idle) }
-    public var petMood: PetMood { PetMood(agent: state.agent?.status, pet: pet) }
+    public var petMood: PetMood {
+        PetMood(agent: state.agent?.status, reported: state.pet?.mood, until: state.pet?.moodUntil)
+    }
+    /// The row to play now: a reaction, else the mood's loop (thinking reads, as Hermes' own pet does).
+    public var petAnimation: PetAnimation {
+        if let petReaction { return petReaction }
+        if state.agent?.status == .thinking { return .review }
+        return petMood.animation
+    }
     public var questions: [PendingQuestion] { state.questions }
 
     public func messages(in topic: TopicID) -> [ChatMessage] { messages[topic] ?? [] }
@@ -360,6 +370,7 @@ public final class HermesStore {
         guard let data else { throw TelegramError.server(code: 400, message: L("This button can't be pressed from here.")) }
         let toast = try await client.pressButton(chat: bot.chatID, message: messageID, data: data)
         state.questions.removeAll { $0.id == question.id }
+        petReaction = .jumping
         hooks.stateChanged(state)
         return toast
     }
@@ -393,7 +404,11 @@ public final class HermesStore {
             slotIDs["state"] = m.id
             let oldSprite = state.pet?.spriteMessageID
             state = s
-            optimisticPet = nil
+            // The pet looks toward a question as it arrives: not one replayed at launch, nor one
+            // answered here that a lagging state still lists.
+            let ids = Set(s.questions.map(\.id))
+            if !replay, !ids.isSubset(of: seenQuestions) { petReaction = .waving }
+            seenQuestions = seenQuestions.count > 500 ? ids : seenQuestions.union(ids)
             hooks.stateChanged(s)
             if let spriteID = s.pet?.spriteMessageID ?? s.slots["sprite"], spriteID != oldSprite || spriteURL == nil {
                 loadSprite(messageID: spriteID)
@@ -491,14 +506,11 @@ public final class HermesStore {
 
     // MARK: - Pet
 
-    public func perform(_ action: PetAction) async throws {
-        if let pet { optimisticPet = action.optimisticallyApplied(to: pet) }
-        petReaction = action.reaction
-        let reply = try await sendRequest(action.request)
-        if let reply, !reply.ok {
-            optimisticPet = nil
-            throw TelegramError.server(code: 400, message: reply.errorMessage ?? L("Your pet doesn't want to."))
-        }
+    /// A stroke or long press on the pet: a happy reaction, here only. Hermes isn't told: it
+    /// would be a Telegram message per stroke for nothing Hermes acts on, and no counter is kept.
+    public func caress() {
+        petReaction = .jumping
+        caressedAt = .now
     }
 
     public func refreshStats() {

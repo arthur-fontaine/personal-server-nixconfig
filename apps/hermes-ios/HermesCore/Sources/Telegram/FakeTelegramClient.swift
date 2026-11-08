@@ -166,8 +166,7 @@ public final class FakeTelegramClient: TelegramClient {
         }
         Task {
             try? await Task.sleep(for: .seconds(3))
-            appState.agent = AgentState(status: .idle)
-            pushState()
+            finishTurn()
         }
         return nil
     }
@@ -214,7 +213,15 @@ public final class FakeTelegramClient: TelegramClient {
         let final = ChatMessage(id: nextID, topic: topic, date: .now, isOutgoing: false, text: Markdownish.parse(shown))
         store[topic, default: []].append(final)
         emit(.newMessage(chat, final))
+        finishTurn()
+    }
+
+    /// As the server does: a turn that ends well gives the pet a short happy beat.
+    private func finishTurn() {
         appState.agent = AgentState(status: .idle)
+        appState.pet?.mood = .happy
+        appState.pet?.moodUntil = .now.addingTimeInterval(10)
+        appState.pet?.animation = .jumping
         pushState()
     }
 
@@ -223,6 +230,12 @@ public final class FakeTelegramClient: TelegramClient {
     }
 
     private func pushState() {
+        if let status = appState.agent?.status, status != .idle, status != .error {
+            let mood = PetMood(agent: status, reported: nil, until: nil)
+            appState.pet?.mood = mood
+            appState.pet?.moodUntil = nil
+            appState.pet?.animation = status == .thinking ? .review : mood.animation
+        }
         emit(.messageChanged(Self.botChat.chatID, Fixtures.appMessage(id: 803, json: encodeState())))
     }
 
@@ -237,21 +250,13 @@ public final class FakeTelegramClient: TelegramClient {
         try? await Task.sleep(for: .milliseconds(300))
         var replyData = "{}"
         switch type {
-        case "pet.feed", "pet.play", "pet.sleep", "pet.wake":
-            if var pet = appState.pet {
-                let action = PetAction(rawValue: String(type.dropFirst(4)))!
-                pet = action.optimisticallyApplied(to: pet)
-                pet.xp += action == .play ? 15 : 5
-                appState.pet = pet
-                pushState()
-            }
         case "call.state":
             replyData = #"{"active":true}"#
         case "ack", "hello", "stats.refresh": if type != "stats.refresh" { return }
         default: break
         }
         nextID += 1
-        emit(.newMessage(Self.botChat.chatID, Fixtures.appMessage(id: nextID, json: #"{"v":2,"type":"reply","re":\#(serverID),"ok":true,"data":\#(replyData)}"#)))
+        emit(.newMessage(Self.botChat.chatID, Fixtures.appMessage(id: nextID, json: #"{"v":3,"type":"reply","re":\#(serverID),"ok":true,"data":\#(replyData)}"#)))
     }
 
     /// Scripted: a question arrives (Live Activity and banner demos).

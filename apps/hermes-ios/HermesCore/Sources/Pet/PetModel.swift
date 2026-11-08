@@ -121,131 +121,80 @@ public enum PetAnimation: String, Sendable, CaseIterable, Codable {
     public var isOneShot: Bool { self == .waving || self == .jumping }
 }
 
-/// What the pet looks like it feels, from Hermes' status and its own gauges.
-public enum PetMood: String, Sendable, Codable, CaseIterable {
-    case content, happy, focused, busy, attentive, sad, hungry, sleepy, asleep
+/// What the pet shows: what Hermes is doing (protocol v3, §5), and nothing else. No needs,
+/// no levels: nothing asks for care, nothing degrades when ignored.
+public enum PetMood: String, Sendable, Codable, CaseIterable, Hashable {
+    /// Hermes is idle.
+    case idle
+    /// Hermes is thinking or running a tool.
+    case working
+    /// A question is open for the owner.
+    case waiting
+    /// A short beat after a turn finished.
+    case happy
+    /// A short beat after a turn failed.
+    case confused
 
-    public init(agent: AgentStatus?, pet: PetState?) {
-        if pet?.asleep == true { self = .asleep; return }
-        // Agent activity wins over the backend's needs-based mood, which lags by up to 3 s.
-        switch agent ?? .idle {
-        case .thinking: self = .focused
-        case .working: self = .busy
-        case .waitingUser: self = .attentive
-        case .error: self = .sad
-        case .idle:
-            // Protocol §5's order: hungry, tired, sad, happy, content.
-            if let pet, pet.hunger > 0.7 { self = .hungry }
-            else if let pet, pet.energy < 0.2 { self = .sleepy }
-            else if let pet, pet.happiness < 0.3 { self = .sad }
-            else if let pet, pet.happiness > 0.7 { self = .happy }
-            else { self = .content }
+    /// A mood as the backend names it. Protocol v2's needs-based moods and unknown values
+    /// read as the nearest v3 one, so an older server or an old snapshot still decodes.
+    public init(reported: String?) {
+        switch reported?.lowercased() {
+        case "working", "focused", "busy": self = .working
+        case "waiting", "attentive": self = .waiting
+        case "happy": self = .happy
+        case "confused": self = .confused
+        default: self = .idle
         }
     }
 
+    public init(from decoder: Decoder) throws {
+        self.init(reported: try? decoder.singleValueContainer().decode(String.self))
+    }
+
+    /// The live mood. Hermes' status wins (it arrives in the same state message, and the
+    /// store also hears answered questions first); a happy or confused beat shows until
+    /// `until`, and one without an end (a v2 server's lasting "happy") is ignored.
+    public init(agent: AgentStatus?, reported: PetMood?, until: Date?, now: Date = .now) {
+        switch agent ?? .idle {
+        case .thinking, .working: self = .working
+        case .waitingUser: self = .waiting
+        case .idle, .error:
+            if let reported, reported == .happy || reported == .confused, let until, now < until {
+                self = reported
+            } else {
+                self = .idle
+            }
+        }
+    }
+
+    /// The Codex row it loops.
     public var animation: PetAnimation {
         switch self {
-        case .content, .happy: .idle
-        case .focused: .review
-        case .busy: .running
-        case .attentive: .waiting
-        case .sad, .hungry: .failed
-        case .sleepy, .asleep: .idle
-        }
-    }
-
-    /// Asleep plays the idle row slower and dimmed.
-    public var speed: Double {
-        switch self {
-        case .asleep: 0.35
-        case .sleepy: 0.6
-        default: 1
+        case .idle: .idle
+        case .working: .running
+        case .waiting: .waiting
+        case .happy: .jumping
+        case .confused: .failed
         }
     }
 
     public var caption: String {
         switch self {
-        case .content: L("Content")
-        case .happy: L("Happy")
-        case .focused: L("Thinking it over")
-        case .busy: L("Hard at work")
-        case .attentive: L("Waiting for you")
-        case .sad: L("Something went wrong")
-        case .hungry: L("Hungry")
-        case .sleepy: L("Sleepy")
-        case .asleep: L("Asleep")
+        case .idle: L("Resting")
+        case .working: L("Working")
+        case .waiting: L("Waiting for you")
+        case .happy: L("All done")
+        case .confused: L("Something went wrong")
         }
     }
 
     public var symbol: String {
         switch self {
-        case .content: "face.smiling"
-        case .happy: "heart"
-        case .focused: "brain"
-        case .busy: "hammer"
-        case .attentive: "hand.raised"
-        case .sad: "exclamationmark.triangle"
-        case .hungry: "fork.knife"
-        case .sleepy: "moon"
-        case .asleep: "moon.zzz"
+        case .idle: "moon.zzz"
+        case .working: "hammer"
+        case .waiting: "hand.raised"
+        case .happy: "checkmark.circle"
+        case .confused: "questionmark.circle"
         }
-    }
-}
-
-public enum PetAction: String, Sendable, CaseIterable, Identifiable {
-    case feed, play, sleep, wake
-
-    public var id: String { rawValue }
-
-    public var request: AppRequest {
-        switch self {
-        case .feed: .petFeed
-        case .play: .petPlay
-        case .sleep: .petSleep
-        case .wake: .petWake
-        }
-    }
-
-    public var title: String {
-        switch self {
-        case .feed: L("Feed")
-        case .play: L("Play")
-        case .sleep: L("Sleep")
-        case .wake: L("Wake")
-        }
-    }
-
-    public var symbol: String {
-        switch self {
-        case .feed: "fork.knife"
-        case .play: "tennisball.fill"
-        case .sleep: "moon.zzz.fill"
-        case .wake: "sun.max.fill"
-        }
-    }
-
-    /// The reaction played at once, before the backend confirms.
-    public var reaction: PetAnimation {
-        switch self {
-        case .feed, .play: .jumping
-        case .sleep: .idle
-        case .wake: .waving
-        }
-    }
-
-    /// The backend owns the gauges; the app shows this optimistic guess until the next state.
-    public func optimisticallyApplied(to pet: PetState) -> PetState {
-        var p = pet
-        switch self {
-        case .feed: p.hunger = max(0, p.hunger - 0.35); p.happiness = min(1, p.happiness + 0.05)
-        case .play: p.happiness = min(1, p.happiness + 0.2); p.energy = max(0, p.energy - 0.1); p.hunger = min(1, p.hunger + 0.05)
-        case .sleep: p.asleep = true
-        case .wake: p.asleep = false
-        }
-        return p
-    }
-
-    public static func available(for pet: PetState) -> [PetAction] {
-        pet.asleep ? [.feed, .wake] : [.feed, .play, .sleep]
     }
 }

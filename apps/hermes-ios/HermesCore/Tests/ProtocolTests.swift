@@ -56,11 +56,11 @@ struct EnvelopeTests {
     }
 
     @Test func encodesRequestsAsFencedJSON() throws {
-        let text = AppProtocol.encode(.petFeed)
+        let text = AppProtocol.encode(.statsRefresh)
         #expect(text.hasPrefix("```json\n") && text.hasSuffix("\n```"))
         let obj = try JSONSerialization.jsonObject(with: try #require(AppProtocol.extractJSON(from: text))) as? [String: Any]
-        #expect(obj?["type"] as? String == "pet.feed")
-        #expect(obj?["v"] as? Int == 2)
+        #expect(obj?["type"] as? String == "stats.refresh")
+        #expect(obj?["v"] as? Int == 3)
     }
 
     @Test func encodesAckAndPushRegister() throws {
@@ -112,9 +112,7 @@ struct StateTests {
         "manifest": {"id": "pip", "displayName": "Pip", "description": "…",
                      "spritesheetPath": "spritesheet.webp", "version": 3},
         "sprite_message_id": 790,
-        "animation": "run",
-        "mood": "focused", "hunger": 35, "energy": 70, "happiness": 82,
-        "xp": 1240, "level": 6, "xp_next": 1500, "asleep": false,
+        "mood": "working", "animation": "run", "mood_until": null,
         "updated_at": "2026-11-07T21:39:51Z"
       },
       "subchats": [
@@ -143,7 +141,7 @@ struct StateTests {
         #expect(q.options[0].data == Data("ea:once:7".utf8))
         #expect(q.options[3].isDestructive && !q.options[0].isDestructive)
         let pet = try #require(s.pet)
-        #expect(pet.hunger == 0.35 && pet.happiness == 0.82)
+        #expect(pet.mood == .working && pet.moodUntil == nil)
         #expect(pet.animation == .running)
         #expect(pet.spriteMessageID == 790)
         #expect(pet.manifest?.displayName == "Pip")
@@ -167,11 +165,17 @@ struct StateTests {
         #expect(s.questions.first?.kind == .approval)
     }
 
-    @Test func gaugesAcceptFractionsAndPercent() throws {
-        let s = try decodeState(#"{"v":1,"type":"state","pet":{"hunger":0.5,"energy":100,"happiness":-3}}"#)
-        #expect(s.pet?.hunger == 0.5)
-        #expect(s.pet?.energy == 1)
-        #expect(s.pet?.happiness == 0)
+    @Test func aBeatCarriesItsEnd() throws {
+        let s = try decodeState(#"{"v":3,"type":"state","pet":{"id":"pip","mood":"happy","animation":"jump","mood_until":"2026-11-07T21:40:13Z"}}"#)
+        #expect(s.pet?.mood == .happy && s.pet?.animation == .jumping)
+        #expect(s.pet?.moodUntil == ISO8601DateFormatter().date(from: "2026-11-07T21:40:13Z"))
+    }
+
+    @Test func aV2PetStillDecodesWithoutItsNeeds() throws {
+        let s = try decodeState(#"{"v":2,"type":"state","pet":{"id":"pip","name":"Pip","mood":"hungry","hunger":90,"xp":12,"level":2,"asleep":true}}"#)
+        #expect(s.pet?.name == "Pip" && s.pet?.mood == .idle)
+        #expect(try decodeState(#"{"v":2,"type":"state","pet":{"mood":"focused"}}"#).pet?.mood == .working)
+        #expect(try decodeState(#"{"v":2,"type":"state","pet":{"mood":"attentive"}}"#).pet?.mood == .waiting)
     }
 }
 

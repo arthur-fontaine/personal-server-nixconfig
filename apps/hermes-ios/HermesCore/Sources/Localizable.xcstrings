@@ -61,6 +61,16 @@
         }
       }
     },
+    "All done": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminé"
+          }
+        }
+      }
+    },
     "Allowed": {
       "localizations": {
         "fr": {
@@ -111,16 +121,6 @@
         }
       }
     },
-    "Asleep": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Endormi"
-          }
-        }
-      }
-    },
     "Auto": {
       "localizations": {
         "fr": {
@@ -167,16 +167,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Modifier une règle"
-          }
-        }
-      }
-    },
-    "Content": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Content"
           }
         }
       }
@@ -301,16 +291,6 @@
         }
       }
     },
-    "Feed": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nourrir"
-          }
-        }
-      }
-    },
     "Find a quiet place to stay near Alfama, 3 nights from the 14th": {
       "localizations": {
         "fr": {
@@ -357,26 +337,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bien reçu, j’ai envoyé le lien à Léa en précisant qu’il expire dans 10 jours."
-          }
-        }
-      }
-    },
-    "Happy": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Heureux"
-          }
-        }
-      }
-    },
-    "Hard at work": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "En plein travail"
           }
         }
       }
@@ -437,16 +397,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "L’effort de réflexion du modèle"
-          }
-        }
-      }
-    },
-    "Hungry": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Affamé"
           }
         }
       }
@@ -621,16 +571,6 @@
         }
       }
     },
-    "Play": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Jouer"
-          }
-        }
-      }
-    },
     "Reading list": {
       "localizations": {
         "fr": {
@@ -657,6 +597,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rappelle-moi d’appeler maman ce soir"
+          }
+        }
+      }
+    },
+    "Resting": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Au repos"
           }
         }
       }
@@ -767,26 +717,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Question en aparté"
-          }
-        }
-      }
-    },
-    "Sleep": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dormir"
-          }
-        }
-      }
-    },
-    "Sleepy": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fatigué"
           }
         }
       }
@@ -912,16 +842,6 @@
       }
     },
     "Thinking": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Réfléchit"
-          }
-        }
-      }
-    },
-    "Thinking it over": {
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1111,16 +1031,6 @@
         }
       }
     },
-    "Wake": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Réveiller"
-          }
-        }
-      }
-    },
     "What Hermes may do without asking": {
       "localizations": {
         "fr": {
@@ -1187,16 +1097,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Oui, vas-y"
-          }
-        }
-      }
-    },
-    "Your pet doesn't want to.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ton compagnon n’en a pas envie."
           }
         }
       }

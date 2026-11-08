@@ -75,13 +75,10 @@ struct PetSpriteView: View {
 extension PetMood {
     var tint: Color {
         switch self {
-        case .content, .happy: .accentColor
-        case .focused: .indigo
-        case .busy: .blue
-        case .attentive: .orange
-        case .sad: .red
-        case .hungry: .pink
-        case .sleepy, .asleep: .purple
+        case .idle, .happy: .accentColor
+        case .working: .blue
+        case .waiting: .orange
+        case .confused: .red
         }
     }
 }

@@ -76,12 +76,6 @@ extension KeyedDecodingContainer {
         return decodeInt64(key).map { TopicID(truncatingIfNeeded: $0) }
     }
 
-    /// A gauge in 0…1, scaling 0…100 values.
-    func decodeGauge(_ key: Key) -> Double? {
-        guard let v = decodeDouble(key) else { return nil }
-        return min(max(v > 1 ? v / 100 : v, 0), 1)
-    }
-
     /// Unix seconds (or milliseconds), or ISO 8601.
     func decodeFlexibleDate(_ key: Key) -> Date? {
         if let d = decodeDouble(key) { return Date(timeIntervalSince1970: d > 1e12 ? d / 1000 : d) }

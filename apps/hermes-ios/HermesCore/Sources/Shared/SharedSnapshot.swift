@@ -4,12 +4,6 @@ import Foundation
 /// TDLib). The spritesheet is copied next to it.
 public struct SharedSnapshot: Codable, Sendable, Equatable {
     public var petName: String
-    public var petLevel: Int
-    public var levelProgress: Double
-    public var hunger: Double
-    public var energy: Double
-    public var happiness: Double
-    public var asleep: Bool
     public var mood: PetMood
     public var agentStatus: AgentStatus
     public var agentTask: String?
@@ -17,16 +11,9 @@ public struct SharedSnapshot: Codable, Sendable, Equatable {
     public var spritesheetFile: String?
     public var updatedAt: Date
 
-    public init(petName: String, petLevel: Int, levelProgress: Double, hunger: Double, energy: Double, happiness: Double,
-                asleep: Bool, mood: PetMood, agentStatus: AgentStatus, agentTask: String?, questionText: String?,
+    public init(petName: String, mood: PetMood, agentStatus: AgentStatus, agentTask: String?, questionText: String?,
                 spritesheetFile: String?, updatedAt: Date = .now) {
         self.petName = petName
-        self.petLevel = petLevel
-        self.levelProgress = levelProgress
-        self.hunger = hunger
-        self.energy = energy
-        self.happiness = happiness
-        self.asleep = asleep
         self.mood = mood
         self.agentStatus = agentStatus
         self.agentTask = agentTask
@@ -36,8 +23,7 @@ public struct SharedSnapshot: Codable, Sendable, Equatable {
     }
 
     public static let placeholder = SharedSnapshot(
-        petName: "Pip", petLevel: 6, levelProgress: 0.6, hunger: 0.35, energy: 0.7, happiness: 0.82, asleep: false,
-        mood: .content, agentStatus: .idle, agentTask: nil, questionText: nil, spritesheetFile: nil)
+        petName: "Pip", mood: .idle, agentStatus: .idle, agentTask: nil, questionText: nil, spritesheetFile: nil)
 }
 
 public enum SharedContainer {

@@ -83,8 +83,8 @@ public enum Fixtures {
             questions: [approvalQuestion(messageID: 1005)],
             pet: PetState(id: "pip", name: "Pip", version: 3,
                           spriteMessageID: 790,
-                          manifest: PetManifest(id: "pip", displayName: "Pip", description: L("A small winged messenger.")), mood: "content", hunger: 0.35, energy: 0.7, happiness: 0.82,
-                          xp: 2240, level: 6, xpForNextLevel: 2800),
+                          manifest: PetManifest(id: "pip", displayName: "Pip", description: L("A small winged messenger.")),
+                          mood: .waiting, animation: .waiting),
             subchats: [
                 SubchatInfo(topicID: 31, name: L("Taxes 2026"), preset: "secret", encrypted: true, unlocked: false),
                 SubchatInfo(topicID: 12, name: L("Home server"), preset: "project"),
@@ -101,7 +101,7 @@ public enum Fixtures {
 
     /// Serializes a state the way the backend does, so the fake goes through the real decoder.
     public static func stateJSON(_ s: AppState) -> String {
-        var o: [String: Any] = ["v": 1, "type": "state"]
+        var o: [String: Any] = ["v": AppProtocol.version, "type": "state"]
         if let a = s.agent {
             var agent: [String: Any] = ["status": a.status.rawValue, "chat": Int(a.chat ?? 0)]
             agent["task"] = a.task
@@ -120,8 +120,8 @@ public enum Fixtures {
         if let p = s.pet {
             o["pet"] = ["id": p.id, "name": p.name, "version": p.version, "sprite_message_id": p.spriteMessageID ?? 0,
                         "manifest": ["id": p.id, "displayName": p.name, "spritesheetPath": "spritesheet.webp"],
-                        "hunger": Int(p.hunger * 100), "energy": Int(p.energy * 100), "happiness": Int(p.happiness * 100),
-                        "xp": p.xp, "level": p.level, "xp_next": p.xpForNextLevel ?? 0, "asleep": p.asleep]
+                        "mood": (p.mood ?? .idle).rawValue, "animation": (p.animation?.rawValue).map { $0 as Any } ?? NSNull(),
+                        "mood_until": p.moodUntil.map { $0.timeIntervalSince1970 as Any } ?? NSNull()]
         }
         o["subchats"] = s.subchats.map { ["topic_id": Int($0.topicID), "name": $0.name ?? "", "preset": $0.preset ?? NSNull(),
                                           "encrypted": $0.encrypted, "unlocked": $0.unlocked, "ttl": $0.ttl ?? NSNull()] }
