@@ -23,6 +23,11 @@ enum WidgetData {
         if let url = SharedContainer.spritesheet(named: file, group: group) { return SpriteSheet.cached(url: url) }
         return nil
     }
+
+    /// The pet's own accent, as the app computes it (design-rules 14.1).
+    static func accent(_ file: String?) -> PetAccent {
+        sheet(file)?.frame(.idle, 0).map(PetAccent.init(sprite:)) ?? .fallback
+    }
 }
 
 /// One frame of the pet: widgets can't animate a sprite, so they show the mood's first frame,
@@ -40,22 +45,12 @@ struct PetFrame: View {
                 PetAnimation.allCases.compactMap { sheet.frame($0, 0) }
             }, inCircle: inCircle)
         } else {
-            Image(systemName: "bird.fill").resizable().scaledToFit().padding(6)
+            Image(systemName: "bird.fill").resizable().scaledToFit()
         }
     }
 }
 
 extension AgentStatus {
-    var widgetTint: Color {
-        switch self {
-        case .idle: .secondary
-        case .thinking: .indigo
-        case .working: .blue
-        case .waitingUser: .orange
-        case .error: .red
-        }
-    }
-
     var widgetSymbol: String {
         switch self {
         case .idle: "moon.zzz"
@@ -89,10 +84,9 @@ struct PetWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "HermesPet", provider: PetProvider()) { entry in
             PetWidgetView(entry: entry)
-                .containerBackground(for: .widget) {
-                    Color(uiColor: .systemBackground)
-                }
-                .widgetURL(URL(string: "hermes://pet"))
+                .petAccent(WidgetData.accent(entry.snapshot.spritesheetFile))
+                .widgetSystemBackground()
+                .widgetURL(URL(string: "hermes://chat/0"))
         }
         .configurationDisplayName("Pet")
         .description("Your Hermes pet and what Hermes is doing.")
@@ -114,13 +108,12 @@ struct PetWidgetView: View {
             }
             .widgetAccentable()
         case .accessoryRectangular:
-            HStack(spacing: 6) {
-                PetFrame(file: s.spritesheetFile, animation: s.mood.animation).frame(width: 40)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(s.petName).font(.headline).widgetAccentable()
-                    Label(s.agentStatus.label, systemImage: s.agentStatus.widgetSymbol).font(.caption)
-                    if let q = s.questionText { Text(q).font(.caption2).lineLimit(1) }
-                    else { Text(s.mood.caption).font(.caption2) }
+            HGroup(spacing: .xs) {
+                PetFrame(file: s.spritesheetFile, animation: s.mood.animation).petSquare(.row)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(s.petName).textRole(.headline).widgetAccentable()
+                    Label(s.agentStatus.label, systemImage: s.agentStatus.widgetSymbol).textRole(.caption)
+                    Text(s.questionText ?? s.mood.caption).textRole(.caption).lineLimit(1)
                 }
             }
         case .accessoryInline:
@@ -128,21 +121,22 @@ struct PetWidgetView: View {
         case .systemMedium:
             // The pet in Hermes' state and what Hermes does: a companion, nothing to look after
             // (design-rules 11.1–11.3).
-            HStack(spacing: 16) {
-                PetFrame(file: s.spritesheetFile, animation: s.mood.animation).frame(width: 96, height: 104)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(s.petName).font(.headline)
+            HGroup(spacing: .m) {
+                PetFrame(file: s.spritesheetFile, animation: s.mood.animation).petSquare(.widget)
+                VGroup(spacing: .xxs) {
+                    Text(s.petName).textRole(.headline)
                     Label(s.questionText ?? s.agentTask ?? s.mood.caption, systemImage: s.agentStatus.widgetSymbol)
-                        .font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
+                        .textRole(.subheadline).tone(.secondary).lineLimit(3)
                 }
                 Spacer(minLength: 0)
             }
         default:
-            VStack(spacing: 4) {
-                PetFrame(file: s.spritesheetFile, animation: s.mood.animation).frame(height: 78)
-                Text(s.petName).font(.headline).lineLimit(1)
+            VGroup(alignment: .center, spacing: .xxs) {
+                PetFrame(file: s.spritesheetFile, animation: s.mood.animation).petSquare(.activity)
+                Spacer(minLength: 0)
+                Text(s.petName).textRole(.headline).lineLimit(1)
                 Label(s.agentStatus.label, systemImage: s.agentStatus.widgetSymbol)
-                    .font(.caption2.weight(.medium)).foregroundStyle(s.agentStatus.widgetTint)
+                    .textRole(.caption).tone(s.agentStatus == .waitingUser ? .accent : .secondary)
             }
         }
     }
@@ -154,25 +148,24 @@ struct HermesLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: HermesActivityAttributes.self) { context in
             LockScreenActivity(context: context)
-                .activityBackgroundTint(Color(.systemBackground).opacity(0.6))
+                .petAccent(WidgetData.accent(context.attributes.spritesheetFile))
                 .widgetURL(URL(string: "hermes://chat/\(context.state.chat)"))
         } dynamicIsland: { context in
             let st = context.state
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    PetFrame(file: context.attributes.spritesheetFile, animation: st.petMood.animation)
-                        .frame(width: 44, height: 48)
+                    PetFrame(file: context.attributes.spritesheetFile, animation: st.petMood.animation).petSquare(.activity)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     if st.question == nil, st.status != .idle {
-                        Text(st.since, style: .timer).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(maxWidth: 56)
+                        Text(st.since, style: .timer).textRole(.caption).monospacedDigit().tone(.secondary)
                     }
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VGroup(spacing: .xxs) {
                         Label(st.question != nil ? String(localized: "Hermes needs you") : st.status.label, systemImage: st.status.widgetSymbol)
-                            .font(.subheadline.weight(.semibold)).foregroundStyle(st.status.widgetTint)
-                        Text(st.question?.title ?? st.task ?? "").font(.caption).lineLimit(2)
+                            .textRole(.headline)
+                        Text(st.question?.title ?? st.task ?? "").textRole(.caption).lineLimit(2)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -180,14 +173,13 @@ struct HermesLiveActivity: Widget {
                     if let q = st.question { QuestionButtons(question: q) }
                 }
             } compactLeading: {
-                PetFrame(file: context.attributes.spritesheetFile, animation: st.petMood.animation).frame(width: 22, height: 24)
+                PetFrame(file: context.attributes.spritesheetFile, animation: st.petMood.animation).petSquare(.island)
             } compactTrailing: {
-                Image(systemName: st.status.widgetSymbol).foregroundStyle(st.status.widgetTint)
+                Image(systemName: st.status.widgetSymbol)
             } minimal: {
-                Image(systemName: st.status.widgetSymbol).foregroundStyle(st.status.widgetTint)
+                Image(systemName: st.status.widgetSymbol)
             }
             .widgetURL(URL(string: "hermes://chat/\(st.chat)"))
-            .keylineTint(st.status.widgetTint)
         }
     }
 }
@@ -197,27 +189,28 @@ struct LockScreenActivity: View {
 
     var body: some View {
         let st = context.state
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                PetFrame(file: context.attributes.spritesheetFile, animation: st.petMood.animation).frame(width: 48, height: 52)
-                VStack(alignment: .leading, spacing: 2) {
+        VGroup(spacing: .s) {
+            HGroup(spacing: .s) {
+                PetFrame(file: context.attributes.spritesheetFile, animation: st.petMood.animation).petSquare(.activity)
+                VGroup(spacing: .xxs) {
                     Label(st.question != nil ? String(localized: "Hermes needs you") : st.status.label, systemImage: st.status.widgetSymbol)
-                        .font(.headline).foregroundStyle(st.status.widgetTint)
+                        .textRole(.headline)
                     Text(st.question?.title ?? st.task ?? (st.status == .idle ? String(localized: "Done") : ""))
-                        .font(.subheadline).lineLimit(2)
-                    if let name = st.chatName { Text(name).font(.caption).foregroundStyle(.secondary) }
+                        .textRole(.subheadline).lineLimit(2)
+                    // Through ChatTitle on the app side: a private sub-chat arrives as "Private chat".
+                    if let name = st.chatName { Text(name).textRole(.caption).tone(.secondary) }
                 }
                 Spacer(minLength: 0)
                 if st.question == nil, st.status != .idle {
-                    Text(st.since, style: .timer).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(maxWidth: 56)
+                    Text(st.since, style: .timer).textRole(.caption).monospacedDigit().tone(.secondary)
                 }
             }
             if let q = st.question {
-                if let detail = q.detail { Text(detail).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1) }
+                if let detail = q.detail { Text(detail).textRole(.code).tone(.secondary).lineLimit(1) }
                 QuestionButtons(question: q)
             }
         }
-        .padding(16)
+        .widgetInset()
     }
 }
 
@@ -227,22 +220,16 @@ struct QuestionButtons: View {
     let question: ActivityQuestion
 
     var body: some View {
-        HStack(spacing: 8) {
+        HGroup(spacing: .xs) {
             ForEach(question.options, id: \.id) { o in
-                Group {
-                    if o.destructive {
-                        Button(intent: DeclineQuestionIntent(questionID: question.id, optionID: o.id)) { label(o) }
-                            .tint(.red)
-                    } else {
-                        Button(intent: AnswerQuestionIntent(questionID: question.id, optionID: o.id)) { label(o) }
-                    }
+                if o.destructive {
+                    Button(intent: DeclineQuestionIntent(questionID: question.id, optionID: o.id)) { AnswerLabel(o.label) }
+                        .answerButton(destructive: true)
+                } else {
+                    Button(intent: AnswerQuestionIntent(questionID: question.id, optionID: o.id)) { AnswerLabel(o.label) }
+                        .answerButton(destructive: false)
                 }
-                .buttonStyle(.bordered)
             }
         }
-    }
-
-    private func label(_ o: ActivityQuestion.Option) -> some View {
-        Text(o.label).font(.caption.weight(.semibold)).lineLimit(1).frame(maxWidth: .infinity)
     }
 }

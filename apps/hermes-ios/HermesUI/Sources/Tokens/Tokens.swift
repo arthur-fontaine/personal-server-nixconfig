@@ -171,11 +171,20 @@ public enum PetSize: Hashable, Sendable {
     case hero
     /// Full screen (call, launch).
     case stage
+    /// The Dynamic Island's compact leading side.
+    case island
+    /// A Live Activity on the lock screen, the expanded Dynamic Island.
+    case activity
+    /// A medium Home Screen widget.
+    case widget
 
     var width: CGFloat {
         switch self {
+        case .island: 24
         case .toolbar: 28
         case .row: 40
+        case .activity: 48
+        case .widget: 96
         case .hero: 128
         case .stage: 200
         }
