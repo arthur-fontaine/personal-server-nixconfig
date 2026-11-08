@@ -35,8 +35,13 @@ public struct CallButton: View {
             .accessibilityLabel(title)
             .accessibilityShowsLargeContentViewer()
             title.textRole(.caption).tone(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityHidden(true)
         }
+        // One fixed column per button, as the Phone app's grid: centres stay 96 pt apart whatever
+        // the label's language or size; a long label wraps inside its column (design-rules 2.4).
+        .frame(width: Metric.callColumn, alignment: .top)
     }
 
     private var isOn: Bool { if case .toggle(true) = kind { true } else { false } }
@@ -57,7 +62,7 @@ public struct CallControls<Content: View>: View {
 
     public var body: some View {
         GlassEffectContainer(spacing: Spacing.xl.points) {
-            HStack(alignment: .top, spacing: Spacing.xl.points) { content }
+            HStack(alignment: .top, spacing: 0) { content }
         }
     }
 }

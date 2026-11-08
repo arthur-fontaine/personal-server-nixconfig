@@ -67,10 +67,11 @@ struct PrivateGate: View {
                     Toggle("Remember with \(PrivateVault.biometryName)", isOn: $remember)
                 }
             }
+            .groupedRows()
             .navigationTitle("Unlock")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button(role: .cancel) { askPassphrase = false } }
+                ToolbarItem(placement: .cancellationAction) { DismissButton(.cancel) { askPassphrase = false } }
                 ToolbarItem(placement: .confirmationAction) {
                     ConfirmButton("Unlock") {
                         let pw = passphrase
@@ -135,7 +136,7 @@ struct NewSubchatSheet: View {
     var body: some View {
         NavigationStack {
             NewSubchatFields(onCreated: { dismiss() })
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button(role: .cancel) { dismiss() } } }
+                .toolbar { ToolbarItem(placement: .cancellationAction) { DismissButton(.cancel) { dismiss() } } }
         }
         .presentationDetents([.large])
     }
@@ -162,24 +163,15 @@ struct NewSubchatFields: View {
             Section("Name") {
                 TextField("e.g. Taxes 2026", text: $name)
             }
-            // The system's choice of one: an inline picker, its checkmark on the chosen kind.
-            Picker(selection: Binding(get: { preset ?? presets.first?.name ?? "aside" }, set: { preset = $0 })) {
+            // A choice of one, its checkmark on the chosen kind.
+            Section("Kind") {
                 ForEach(presets) { p in
-                    Label {
-                        VGroup(spacing: .xxs) {
-                            Text(PresetNames.name(p.name))
-                            Text(Self.blurb(p)).textRole(.footnote).tone(.secondary)
-                        }
-                    } icon: {
-                        Image(systemName: Self.symbol(p)).accessibilityHidden(true)
-                    }
-                    .tag(p.name)
+                    ChoiceRow(Text(PresetNames.name(p.name)), detail: Text(Self.blurb(p)), systemImage: Self.symbol(p),
+                              isSelected: (preset ?? presets.first?.name ?? "aside") == p.name) { preset = p.name }
                 }
-            } label: {
-                Text("Kind")
             }
-            .pickerStyle(.inline)
         }
+        .groupedRows()
         .navigationTitle("New Sub-chat")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

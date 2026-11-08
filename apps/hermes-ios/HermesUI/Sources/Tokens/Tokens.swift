@@ -98,6 +98,8 @@ enum Metric {
     static let captionHeight: CGFloat = 180
     /// A call control (the Phone app's are about this size).
     static let callButton: CGFloat = 72
+    /// A call control's column: the button and the gap the Phone app leaves between two (96 pt).
+    static let callColumn: CGFloat = callButton + Spacing.xl.points
     /// Typing indicator dot.
     static let typingDot: CGFloat = 6
     /// A quote's leading rule (Mail's quote bar).
@@ -111,6 +113,8 @@ enum Metric {
     static let sidebarIconColumn: CGFloat = 30
     /// A sidebar row's height (the iPad sidebar's own rows measure 52 pt).
     static let sidebarRow: CGFloat = 52
+    /// A grouped row's icon column (the system's, for SF Symbols at body size).
+    static let rowIcon: CGFloat = 28
     /// A system bar item's height (measured: Apple's trailing items and our pet's glass circle
     /// are 36 pt): a custom view in the bar is padded sideways only, so it must be this tall for
     /// its glass to be a circle.

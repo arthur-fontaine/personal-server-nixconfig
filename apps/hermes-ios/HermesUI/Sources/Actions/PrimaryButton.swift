@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The one prominent action of a screen (HIG Buttons: "use a button that has a prominent visual
 /// style for the most likely action"): `.borderedProminent` at `.large`, the pet's fill with its
-/// label (13.2, 14.1), a progress indicator while it works, never destructive.
+/// label (15.1), a progress indicator while it works, never destructive.
 public struct PrimaryButton: View {
     let title: Text
     let systemImage: String?
@@ -36,8 +36,23 @@ public struct PrimaryButton: View {
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
+        .wrappingButtonShape()
         .accentFillTint()
         .disabled(isBusy)
+    }
+}
+
+extension View {
+    /// A capsule while the label is one line; at accessibility sizes, where it wraps, a rounded
+    /// rectangle whose corner is the one-line capsule's (as the owner's bubble), so a long label
+    /// never makes an oval (design-rules 5.3).
+    func wrappingButtonShape() -> some View { modifier(WrappingButtonShape()) }
+}
+
+struct WrappingButtonShape: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var size
+    func body(content: Content) -> some View {
+        content.buttonBorderShape(size.isAccessibilitySize ? .roundedRectangle(radius: Radius.field) : .capsule)
     }
 }
 
@@ -67,5 +82,6 @@ public struct SecondaryButton: View {
             .buttonStyle(.bordered)
             .tint(.gray)
             .controlSize(.large)
+            .wrappingButtonShape()
     }
 }

@@ -45,6 +45,7 @@
       }
     },
     "%@, last 24 hours": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -70,6 +71,49 @@
         }
       }
     },
+    "%lld": {
+      "shouldTranslate": false
+    },
+    "%lld calls": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld call"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld calls"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld appel"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld appels"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "+33 6 12 34 56 78": {
       "localizations": {
         "fr": {
@@ -81,6 +125,7 @@
       }
     },
     "24 h": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -89,6 +134,9 @@
           }
         }
       }
+    },
+    "@%@": {
+      "shouldTranslate": false
     },
     "A side question that knows everything but leaves no trace once its session ends.": {
       "localizations": {
@@ -221,6 +269,7 @@
       }
     },
     "Attach": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -281,7 +330,18 @@
         }
       }
     },
+    "CPU, last 24 hours": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CPU, dernières 24 heures"
+          }
+        }
+      }
+    },
     "Cached": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -672,12 +732,33 @@
         }
       }
     },
-    "End call": {
+    "End": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Raccrocher"
+          }
+        }
+      }
+    },
+    "End call": {
+      "extractionState": "stale",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raccrocher"
+          }
+        }
+      }
+    },
+    "Energy, last 24 hours": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Énergie, dernières 24 heures"
           }
         }
       }
@@ -770,6 +851,7 @@
       }
     },
     "Finding @%@…": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -779,7 +861,28 @@
         }
       }
     },
+    "Finding Hermes": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recherche de Hermes"
+          }
+        }
+      }
+    },
+    "Forgot Your Password?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mot de passe oublié ?"
+          }
+        }
+      }
+    },
     "Forgot your password?": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -795,6 +898,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Personnelle gratuite"
+          }
+        }
+      }
+    },
+    "From the cache": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Depuis le cache"
           }
         }
       }
@@ -880,6 +993,7 @@
       }
     },
     "Hermes is writing": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -981,6 +1095,7 @@
       }
     },
     "Hour": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -991,6 +1106,7 @@
       }
     },
     "In": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1041,7 +1157,18 @@
         }
       }
     },
+    "Last used": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernière utilisation"
+          }
+        }
+      }
+    },
     "Last used %@": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1196,6 +1323,16 @@
         }
       }
     },
+    "Memory, last 24 hours": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mémoire, dernières 24 heures"
+          }
+        }
+      }
+    },
     "Message": {
       "localizations": {
         "fr": {
@@ -1248,6 +1385,7 @@
       }
     },
     "More Answers": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1399,6 +1537,7 @@
       }
     },
     "Not Sent": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1531,6 +1670,7 @@
       }
     },
     "Out": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1591,6 +1731,7 @@
       }
     },
     "Permission mode": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1650,12 +1791,32 @@
         }
       }
     },
+    "Power, last 24 hours": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puissance, dernières 24 heures"
+          }
+        }
+      }
+    },
     "Private chat": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Discussion privée"
+          }
+        }
+      }
+    },
+    "Provider": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fournisseur"
           }
         }
       }
@@ -1691,6 +1852,7 @@
       }
     },
     "Remove %@": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1716,6 +1878,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Résultats"
+          }
+        }
+      }
+    },
+    "Role": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rôle"
           }
         }
       }
@@ -1807,6 +1979,7 @@
       }
     },
     "Share": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1817,6 +1990,7 @@
       }
     },
     "Show Command": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1898,6 +2072,7 @@
       }
     },
     "Stop": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1913,6 +2088,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stockage"
+          }
+        }
+      }
+    },
+    "Storage used": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stockage utilisé"
           }
         }
       }
@@ -1939,11 +2124,22 @@
     },
     "Temp": {
       "comment": "Sub-chat preset: temporary",
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Temp."
+          }
+        }
+      }
+    },
+    "Temperature": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Température"
           }
         }
       }
@@ -2092,6 +2288,26 @@
         }
       }
     },
+    "Tokens in": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetons en entrée"
+          }
+        }
+      }
+    },
+    "Tokens out": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetons en sortie"
+          }
+        }
+      }
+    },
     "Try Again": {
       "localizations": {
         "fr": {
@@ -2163,11 +2379,22 @@
       }
     },
     "Up": {
+      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Actif depuis"
+          }
+        }
+      }
+    },
+    "Up for": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allumé depuis"
           }
         }
       }
