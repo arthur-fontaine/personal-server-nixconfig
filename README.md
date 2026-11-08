@@ -86,7 +86,10 @@ sudo server-rebuild
 ```
 
 Hermes does the same for any change you ask of it, a Cloudflare tunnel as much
-as its own settings. Host-specific values (SSH keys, the models, the
+as its own settings. A few of its own settings (MCP servers, skills, plugin
+settings, models) it may also change without a push, in a local overlay
+`sudo server-rebuild` checks and tells you about (docs/hermes.md, "Local
+overlay"). Host-specific values (SSH keys, the models, the
 integrations, ...) go under
 `server = { ... };` in `hosts/shared.nix` or a git-ignored `hosts/local.nix`
 (see `hosts/local.nix.example`).

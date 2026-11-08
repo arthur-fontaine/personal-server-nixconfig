@@ -96,7 +96,25 @@ in
      darwin-rebuild switch). If it fails, fix forward with a new commit.
   7. Tell the user what changed, with the commit hashes.
 
-  Never run `brew`, `defaults write`, `launchctl load`, installers or `curl | sh`
+  ${lib.optionalString server.hermes.localOverrides.enable (lib.concatMapStrings (line: "${line}\n  ") [
+    "## Your local overlay: a few of your own settings, no push"
+    ""
+    "MCP servers (not the repository's), skills on or off (and skill folders"
+    "under ~/.hermes), the settings of enabled plugins (not guard,"
+    "owner_approval or app_topic) and models (main, fallbacks, reasoning,"
+    "auxiliary tasks) you may change in `~/.hermes/local/overrides.json`, the"
+    "shape `docs/hermes.md` gives (section \"Local overlay\"). Everything else"
+    "(permissions, access, Telegram, integrations, the system) goes through the"
+    "repository. An MCP server's key: `\${NAME}` in its env or headers, the value"
+    "in `~/.hermes/local/secrets.env` (never one of the main secrets file's names)."
+    "Apply with `sudo server-rebuild`: it checks the file as root and refuses"
+    "all of it if one key is not allowed (the previous overlay stays); the user"
+    "gets a message saying what changed. `sudo server-rebuild"
+    "--overrides-rollback [<timestamp>]` restores a version"
+    "(`~/.hermes/local/history/`), `--no-overrides` applies without it. Tell"
+    "the user why you changed it."
+    ""
+  ])}Never run `brew`, `defaults write`, `launchctl load`, installers or `curl | sh`
   to change the machine. For a quick one-off tool, `nix shell nixpkgs#<pkg>` or
   `nix profile install nixpkgs#<pkg>` (your own profile) is fine; anything that
   should stay goes into the repository.

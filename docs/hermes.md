@@ -91,6 +91,7 @@ Enforced by macOS, not by the model (`modules/hermes/system/access`):
 | reads anything | an inherited ACL on your home; `sudo hermes-read cat\|ls\|stat <path>` for the rest |
 | writes or deletes only what it created in the last 24 h | it runs as its own account, so your files were never writable; `hermes-freeze` (every 5 min) hands its files to you behind a deny ACL once they are 24 h old, so it must copy them to change them |
 | changes the system only through this repository | it clones, commits, pushes, then `sudo server-rebuild` |
+| changes a few of its own settings without a push | its local overlay, `~/.hermes/local/overrides.json`, checked by root at `sudo server-rebuild` (below) |
 | installs any software | `nix shell` / `nix profile install` for itself, this repository for good |
 
 The exceptions are its own state, which must stay writable to work at all:
@@ -101,6 +102,59 @@ commands and the freeze daemon reach Desktop, Documents and Downloads through
 the Full Disk Access granted once to their launcher
 (`modules/hermes/system/access/full-disk.nix`); without it, files in those
 folders are neither readable nor frozen.
+
+
+### Local overlay
+
+Hermes may change a few of its own settings without a push, in
+`~/.hermes/local/overrides.json` (`modules/hermes/system/access/overrides`,
+`server.hermes.localOverrides.enable`, on by default). `sudo server-rebuild`
+reads it as Hermes, checks it as root (`overrides.py`), and refuses the whole
+file if one key or value is not allowed: the overlay applied before stays, and
+you are told. Allowed, and nothing else:
+
+```json
+{
+  "mcp_servers": { "notion": { "url": "https://mcp.notion.com/mcp",
+                               "headers": { "Authorization": "Bearer ${NOTION_KEY}" },
+                               "tools": { "include": ["search"] } } },
+  "skills": { "disable": ["arxiv"], "enable": ["notion"],
+              "external_dirs": ["/Users/hermes/.hermes/local/skills"] },
+  "plugins": { "entries": { "cache_warm": { "settings": { } } } },
+  "model": { "provider": "openai-codex", "model": "gpt-5.5" },
+  "fallbacks": [ { "provider": "opencode-go", "model": "deepseek-v4.1-flash" } ],
+  "reasoning_effort": "high",
+  "auxiliary": { "compression": { "provider": "opencode-go", "model": "…", "timeout": 60 } }
+}
+```
+
+- MCP servers the repository does not define; a stdio `command` or an HTTPS
+  (or loopback) `url`; secrets only by name, `${NAME}` in `env` or `headers`.
+- Skills off or back on, and skill folders under `~/.hermes`.
+- The settings of plugins already enabled, never `guard`, `owner_approval` or
+  `app_topic`, never `plugins.enabled` or a plugin's grants.
+- The main model, fallbacks (after the repository's), reasoning effort, the
+  auxiliary tasks' models.
+
+Never: permissions, guard and its rules, trusted platforms, Telegram, access
+rules and mutable paths, integrations, approvals, the terminal, anything of
+the system. Those go through the repository.
+
+An MCP server's key: Hermes writes it in `~/.hermes/local/secrets.env`;
+server-rebuild copies only the names the overlay uses, never one the main
+secrets file sets nor one that steers Hermes (`TELEGRAM_*`, `HERMES_*`,
+proxies, `*_BASE_URL`, …), into `/etc/hermes/local-secrets.env`, which Hermes
+reads after `/etc/hermes/secrets.env`.
+
+The checked copy goes to `hosts/hermes-overrides.json` in the admin's
+checkout (git-ignored), merged into Hermes' settings by
+`modules/hermes/agent/overrides.nix`. Each applied version is kept in
+`/var/db/hermes-overrides/history/` and `~/.hermes/local/history/`;
+`sudo server-rebuild --overrides-rollback [<timestamp>]` applies one again
+(by default the one before), `sudo server-rebuild --no-overrides` applies
+without the overlay this once. Each change reaches you in Telegram in plain
+words ("Local config: + MCP server notion; − model fallback …"). Auto mode
+reviews the write and the rebuild like any action.
 
 ## Apple apps
 

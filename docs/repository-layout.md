@@ -27,7 +27,7 @@ modules/
     options/              server.hermes.*: account, model, memory, sub-chats, access, the app (the sandbox's: coding-agent/)
     system/               what it is to macOS (nix-darwin)
       user.nix            its own account, with home-manager
-      access/             read.nix, freeze.nix (+ freeze.py), rebuild.nix, secrets.nix
+      access/             read.nix, freeze.nix (+ freeze.py), rebuild.nix (+ overrides/: the local overlay's checker and server-rebuild), secrets.nix
       applications.nix    the apps it uses, copied into /Applications
       sideload.nix        the Hermes app as a sideload app, hermes-app, Hermes' sideload plugin
     agent/                its home-manager configuration
@@ -64,6 +64,7 @@ modules/
 nix flake check                                   # everything below
 nix build .#checks.aarch64-darwin.unii            # the plugins' tests (unii, guard, owner_approval, outbox, lost_turns, front_desk, cache_warm, app_topic)
 nix build .#checks.aarch64-darwin.coding-agent    # the coding agent's plugin, against a fake sidecar
+nix build .#checks.aarch64-darwin.overrides       # the local overlay's checker and server-rebuild, with stubs
 nix build .#checks.aarch64-darwin.sandbox         # the coding agent's sidecar tests, in its build
 nix build .#checks.aarch64-darwin.sideload        # sideload and Hermes' plugin, against fake Apple tools
 nix build .#checks.aarch64-darwin.events          # the events daemon's tests
