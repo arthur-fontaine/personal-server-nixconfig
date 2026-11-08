@@ -33,7 +33,7 @@ struct CommandPalette: View {
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search commands")
             .navigationTitle("Commands")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button(role: .close) { dismiss() } } }
             .navigationDestination(for: Destination.self) { d in
                 switch d {
                 case .model: ModelMenu(topic: topic) { dismiss() }

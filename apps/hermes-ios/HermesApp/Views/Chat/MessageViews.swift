@@ -7,6 +7,7 @@ import SwiftUI
 struct MessageRow: View {
     @Environment(HermesStore.self) private var store
     @Environment(AppModel.self) private var model
+    @Environment(\.colorSchemeContrast) private var contrast
     let message: ChatMessage
 
     var body: some View {
@@ -43,7 +44,11 @@ struct MessageRow: View {
                 Text(text)
                     .textSelection(.enabled)
                     .padding(.horizontal, 14).padding(.vertical, 9)
-                    .background(Color.accentColor.opacity(0.16), in: .rect(cornerRadius: 20))
+                    .background(Color.accentColor.opacity(contrast == .increased ? 0.3 : 0.16), in: .rect(cornerRadius: 20))
+                    .overlay {
+                        // Increase Contrast: the faint tint alone doesn't outline the bubble.
+                        if contrast == .increased { RoundedRectangle(cornerRadius: 20).strokeBorder(Color.accentColor, lineWidth: 1) }
+                    }
                     .opacity(message.sendState == .pending ? 0.6 : 1)
             }
             // At most ~80 % of the column: the leading inset, not containerRelativeFrame, which
@@ -142,7 +147,7 @@ struct StreamingDraftRow: View {
                     Button { store.stopDraft(in: draft.topic) } label: {
                         Label("Stop", systemImage: "stop.fill").font(.caption.weight(.semibold))
                     }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.bordered)
                     .controlSize(.small)
                 }
             }
@@ -196,7 +201,7 @@ struct InlineKeyboard: View {
                                 }
                                 .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.glass)
+                            .buttonStyle(.bordered)
                             .tint(QuestionOption(id: "", label: button.label).isDestructive ? .red : nil)
                         }
                     }

@@ -15,11 +15,12 @@ struct PrivateGate: View {
 
     var body: some View {
         VStack(spacing: 18) {
+            // Content, not a control: no glass.
             Image(systemName: "lock.fill")
                 .font(.system(size: 44, weight: .semibold))
                 .foregroundStyle(.tint)
                 .frame(width: 96, height: 96)
-                .glassEffect(in: .circle)
+                .background(.tint.opacity(0.12), in: .circle)
             Text(store.thread(topic)?.name ?? "Private sub-chat").font(.title2.weight(.semibold))
             Text("This sub-chat is encrypted. Unlock it with \(PrivateVault.biometryName) to read it.")
                 .multilineTextAlignment(.center)
@@ -27,7 +28,7 @@ struct PrivateGate: View {
             Button(action: unlock) {
                 Label(working ? "Unlocking…" : "Unlock", systemImage: "faceid").frame(minWidth: 180)
             }
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(working)
             if let error { Text(error).font(.footnote).foregroundStyle(.red) }
@@ -80,7 +81,7 @@ struct PrivateGate: View {
             .navigationTitle("Unlock")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { askPassphrase = false } }
+                ToolbarItem(placement: .cancellationAction) { Button(role: .cancel) { askPassphrase = false } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Unlock") {
                         let pw = passphrase
@@ -108,7 +109,7 @@ struct NewSubchatSheet: View {
     var body: some View {
         NavigationStack {
             NewSubchatFields(onCreated: { dismiss() })
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button(role: .cancel) { dismiss() } } }
         }
         .presentationDetents([.large])
     }

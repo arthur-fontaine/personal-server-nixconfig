@@ -64,7 +64,7 @@ struct NotificationsPrompt: View {
                     dismiss()
                 }
             } label: { Text("Turn On Notifications").font(.headline).frame(maxWidth: .infinity, minHeight: 34) }
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.borderedProminent)
             .controlSize(.large)
             Button("Not Now") { model.askNotifications = false; dismiss() }
         }
@@ -90,7 +90,7 @@ struct FindingBotView: View {
                 Text("Couldn't reach Hermes").font(.title2.weight(.semibold))
                 Text(error).font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 Button("Try Again") { store.retryConnectBot() }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.large)
             } else {
                 Text("Finding @\(store.config.botUsername)…").font(.headline).foregroundStyle(.secondary)
@@ -122,6 +122,7 @@ struct AppShell: View {
 
 struct TabShell: View {
     @Environment(AppModel.self) private var model
+    @Environment(HermesStore.self) private var store
 
     var body: some View {
         @Bindable var model = model
@@ -129,6 +130,7 @@ struct TabShell: View {
             Tab(AppSection.chat.title, systemImage: AppSection.chat.symbol, value: .chat) {
                 NavigationStack { CompactChatRoot() }
             }
+            .badge(store.questions.count)
             Tab(AppSection.pet.title, systemImage: AppSection.pet.symbol, value: .pet) {
                 NavigationStack { PetScreen() }
             }
@@ -140,6 +142,56 @@ struct TabShell: View {
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
+        // Away from the chat, what Hermes is doing stays one tap away, as Music's player does.
+        // Not on the chat tab: its title already says it, and the composer needs the room.
+        .modifier(AgentAccessoryModifier(enabled: model.section != .chat && (store.agent.status != .idle || !store.questions.isEmpty)))
+    }
+}
+
+/// `isEnabled:` came in iOS 26.1; on 26.0 there's no accessory rather than one always shown.
+struct AgentAccessoryModifier: ViewModifier {
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.1, *) {
+            content.tabViewBottomAccessory(isEnabled: enabled) { AgentAccessory() }
+        } else {
+            content
+        }
+    }
+}
+
+/// The tab bar's accessory: Hermes' status (or its question) and the chat it's in.
+struct AgentAccessory: View {
+    @Environment(AppModel.self) private var model
+    @Environment(HermesStore.self) private var store
+    @Environment(\.tabViewBottomAccessoryPlacement) private var placement
+
+    var body: some View {
+        Button {
+            model.open(topic: store.questions.first?.chat ?? store.agent.chat ?? .main)
+        } label: {
+            HStack(spacing: 10) {
+                PetSpriteView(animation: nil, size: 26)
+                if let q = store.questions.first {
+                    Label(q.summary ?? q.text, systemImage: "hand.raised.fill")
+                        .foregroundStyle(.tint)
+                        .lineLimit(1)
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        AgentStatusLabel(agent: store.agent, compact: true)
+                        if placement != .inline, let task = store.agent.task {
+                            Text(task).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .font(.subheadline.weight(.medium))
+            .padding(.horizontal, 16)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -168,7 +220,7 @@ struct CompactChatRoot: View {
                     .navigationTitle("Chats")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
-                        ToolbarItem(placement: .confirmationAction) { Button("Done") { showSubchats = false } }
+                        ToolbarItem(placement: .confirmationAction) { Button(role: .close) { showSubchats = false } }
                     }
                 }
                 .presentationDetents([.medium, .large])
