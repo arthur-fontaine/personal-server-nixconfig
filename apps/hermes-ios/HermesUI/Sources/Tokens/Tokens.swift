@@ -103,6 +103,9 @@ enum Metric {
     static let callColumn: CGFloat = callButton + Spacing.xl.points
     /// A pre-rendered still for the widgets and the Live Activity: the medium widget's pet at @3x.
     static let stillPixels: CGFloat = 288
+    /// The Live Activity's still: its 48-pt pet at @2x (pixel art, scaled without smoothing), small
+    /// enough for ActivityKit to draw.
+    static let activityStillPixels: CGFloat = 96
     /// Typing indicator dot.
     static let typingDot: CGFloat = 6
     /// A quote's leading rule (Mail's quote bar).

@@ -12,10 +12,13 @@ enum PetStills {
         for animation in PetAnimation.allCases {
             guard let frame = sheet.frame(animation, 0) else { continue }
             for circle in [false, true] {
-                guard let url = SharedContainer.stillURL(sheet: name, animation: animation, circle: circle, group: group),
-                      !FileManager.default.fileExists(atPath: url.path),
-                      let png = PetStill.png(frame: frame, centering: centering, inCircle: circle) else { continue }
-                try? png.write(to: url, options: .atomic)
+                for size in PetStill.Size.allCases {
+                    guard let url = SharedContainer.stillURL(sheet: name, animation: animation, circle: circle,
+                                                             small: size == .activity, group: group),
+                          !FileManager.default.fileExists(atPath: url.path),
+                          let png = PetStill.png(frame: frame, centering: centering, inCircle: circle, size: size) else { continue }
+                    try? png.write(to: url, options: .atomic)
+                }
             }
         }
     }

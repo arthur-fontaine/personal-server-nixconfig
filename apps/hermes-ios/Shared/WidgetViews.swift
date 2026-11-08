@@ -29,9 +29,12 @@ struct PetFrame: View {
     let file: String?
     let animation: PetAnimation
     var inCircle = false
+    /// The Live Activity's small still (ActivityKit draws a placeholder for a large one).
+    var small = false
 
     var body: some View {
-        if let file, let url = SharedContainer.stillURL(sheet: file, animation: animation, circle: inCircle, group: WidgetData.group),
+        if let file, let url = SharedContainer.stillURL(sheet: file, animation: animation, circle: inCircle, small: small,
+                                                       group: WidgetData.group),
            let image = UIImage(contentsOfFile: url.path) {
             Image(uiImage: image).resizable().interpolation(.none).scaledToFit().accessibilityHidden(true)
         } else {
@@ -122,7 +125,7 @@ struct LockScreenActivity: View {
         let st = state
         VGroup(spacing: .s) {
             HGroup(spacing: .s) {
-                PetFrame(file: attributes.spritesheetFile, animation: st.petMood.animation).petSquare(.activity)
+                PetFrame(file: attributes.spritesheetFile, animation: st.petMood.animation, small: true).petSquare(.activity)
                 VGroup(spacing: .xxs) {
                     Label(st.question != nil ? String(localized: "Hermes needs you") : st.status.label, systemImage: st.status.widgetSymbol)
                         .textRole(.headline)

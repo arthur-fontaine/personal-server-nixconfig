@@ -50,7 +50,7 @@ struct WidgetGallery: View {
                 }
                 section("Dynamic Island") {
                     HGroup(spacing: .xs) {
-                        PetFrame(file: sprite, animation: PetMood.working.animation).petSquare(.island)
+                        PetFrame(file: sprite, animation: PetMood.working.animation, small: true).petSquare(.island)
                         Spacer(minLength: 0)
                         Image(systemName: AgentStatus.working.widgetSymbol)
                     }
@@ -58,7 +58,7 @@ struct WidgetGallery: View {
                     .islandCanvas(.compact)
                     VGroup(spacing: .s) {
                         HGroup(spacing: .s) {
-                            PetFrame(file: sprite, animation: PetMood.waiting.animation).petSquare(.activity)
+                            PetFrame(file: sprite, animation: PetMood.waiting.animation, small: true).petSquare(.activity)
                             IslandCenter(state: question)
                         }
                         QuestionButtons(question: question.question!)
