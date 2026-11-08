@@ -112,7 +112,7 @@ public struct ActionRow: View {
 
     @ViewBuilder private func button(_ a: Action, lines: Int?) -> some View {
         let label = HStack(spacing: Spacing.xs.points) {
-            if a.isBusy { ProgressView() }
+            if a.isBusy { ProgressView().tint(a.emphasis == .primary ? AnyShapeStyle(OnAccentStyle()) : AnyShapeStyle(Color(uiColor: .label))) }
             a.title.lineLimit(lines).fixedSize(horizontal: lines == 1, vertical: lines == nil)
         }
         .frame(maxWidth: .infinity)
@@ -124,7 +124,8 @@ public struct ActionRow: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
         case .secondary:
-            Button(action: a.perform) { label.foregroundStyle(.primary) }
+            // The label colour itself: `.primary` would resolve against the grey tint.
+            Button(action: a.perform) { label.foregroundStyle(Color(uiColor: .label)) }
                 .buttonStyle(.bordered)
                 .tint(.gray)
                 .controlSize(.large)
@@ -146,10 +147,10 @@ public struct ActionRow: View {
             }
         } label: {
             if lines == nil {
-                Text("More Answers").frame(maxWidth: .infinity).foregroundStyle(.primary)
+                Text("More Answers").frame(maxWidth: .infinity).foregroundStyle(Color(uiColor: .label))
             } else {
                 Image(systemName: "ellipsis")
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color(uiColor: .label))
                     .frame(width: reportedHeight, height: reportedHeight)
                     .background(Surface.fill.style, in: Circle())
                     .contentShape(Circle())

@@ -29,7 +29,7 @@ public struct ApprovalCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if let command {
                     DisclosureGroup(isExpanded: $showCommand) {
-                        CodeBlock(command).padding(.top, Spacing.xs.points)
+                        CodeBlock(command, wrapping: true).padding(.top, Spacing.xs.points)
                     } label: {
                         Text("Show Command").textRole(.body)
                             // The row is a control: at least the hit target tall, all of it tappable.

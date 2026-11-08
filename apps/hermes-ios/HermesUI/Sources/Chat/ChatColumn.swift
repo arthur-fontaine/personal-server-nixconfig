@@ -102,21 +102,27 @@ public struct QuoteBlock: View {
 /// in the context menu.
 public struct CodeBlock: View {
     let code: String
+    let wraps: Bool
     @Environment(\.containerCornerRadius) private var containerRadius
     @Environment(\.containerInset) private var containerInset
 
-    public init(_ code: String) { self.code = code }
+    /// `wrapping`: a command to be approved is read whole, so it wraps instead of scrolling.
+    public init(_ code: String, wrapping: Bool = false) {
+        self.code = code
+        wraps = wrapping
+    }
 
     public var body: some View {
         let nested = containerRadius > 0
         let radius = max(containerRadius - containerInset, Radius.blockMinimum)
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        ScrollView(.horizontal, showsIndicators: false) {
-            Text(verbatim: code)
-                .textRole(.code)
-                .textSelection(.enabled)
-                .fixedSize()
-                .inset(.all, .s)
+        Group {
+            if wraps {
+                text.fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) { text.fixedSize() }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .surface(nested ? .elevated : .grouped, in: shape)
@@ -125,7 +131,14 @@ public struct CodeBlock: View {
         }
         .geometryProbe(radius: radius, inset: Spacing.s.points)
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("chat.code")
+        .accessibilityIdentifier(wraps ? "approval.code" : "chat.code")
+    }
+
+    private var text: some View {
+        Text(verbatim: code)
+            .textRole(.code)
+            .textSelection(.enabled)
+            .inset(.all, .s)
     }
 }
 

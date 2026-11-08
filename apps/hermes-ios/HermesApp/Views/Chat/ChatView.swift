@@ -29,7 +29,7 @@ struct ChatScreen: View {
                                          active: scenePhase == .active))
         .navigationSubtitle(subtitle)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarTitleMenu { if compact { ChatsMenu() } }
+        .modifier(ChatsTitleMenu(enabled: compact))
         .toolbar { toolbar }
         .task(id: topic) {
             if store.messages(in: topic).isEmpty { await store.loadHistory(topic) }

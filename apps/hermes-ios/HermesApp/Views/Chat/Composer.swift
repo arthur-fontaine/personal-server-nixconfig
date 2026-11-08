@@ -78,7 +78,8 @@ struct Composer: View {
         return .send(enabled: canSend)
     }
 
-    private var placeholder: String { topic == .main ? String(localized: "Message Hermes") : String(localized: "Message") }
+    /// Short as Messages' own, so it fits at accessibility sizes.
+    private var placeholder: String { String(localized: "Message") }
 
     private var canSend: Bool {
         !sending && (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !files.isEmpty)
