@@ -79,6 +79,8 @@ enum Metric {
         CGSize(width: max(rowHeight - 2 * largeButtonHorizontalPadding, 0),
                height: max(rowHeight - 2 * largeButtonVerticalPadding, 0))
     }
+    /// The fade over a code block's trailing edge when its text runs past it (13.1).
+    static let codeFade: CGFloat = Spacing.xl.points
     /// Typing indicator dot.
     static let typingDot: CGFloat = 6
     /// A quote's leading rule (Mail's quote bar).
