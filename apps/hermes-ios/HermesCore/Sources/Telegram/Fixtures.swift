@@ -45,11 +45,17 @@ public enum Fixtures {
                 me(4001, 44, L("Find a quiet place to stay near Alfama, 3 nights from the 14th"), 4000),
                 bot(4002, 44, L("Three options under €160 a night, all with good reviews for quiet:\n1. **Casa do Largo**: €142, terrace, 4 min from the tram\n2. **Alfama Patio**: €155, breakfast included\n3. **Memmo Alfama**: €159, pool, the most central\nShall I hold one?"), 3990),
             ],
-            57: [
-                bot(5001, 57, L("Saved: “The Pragmatic Programmer”, 20th anniversary edition."), 9000),
-            ],
+            // A long log of saves: more than a page of history, so a reply to the first one makes
+            // the app page back to reach it (design-rules 16.2).
+            57: [bot(5001, 57, L("Saved: “The Pragmatic Programmer”, 20th anniversary edition."), 9000)]
+                + Self.readingList.enumerated().map { i, title in
+                    bot(5002 + MessageID(i), 57, L("Saved: “\(title)”."), 8900 - Double(i) * 5)
+                }
+                + [me(5100, 57, L("Which edition did you pick?"), 60, replyTo: 5001)],
         ]
     }
+
+    static let readingList = (1...70).map { L("Essays, volume \($0)") }
 
     /// Hermes' reply caught mid-sentence, for the `review` scene.
     public static let reviewDraft = L("Found 41 snapshots older than 90 days, the oldest from 12 March. Deleting them needs your go-ahead: once pruned, restic can't bring")

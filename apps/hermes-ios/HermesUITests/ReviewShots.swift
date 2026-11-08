@@ -149,11 +149,17 @@ final class ReviewShots: XCTestCase {
             try shot("replies-chip")
             app.buttons["Cancel Reply"].tap()
         }
-        let context = app.descendants(matching: .any).matching(identifier: "chat.reply").allElementsBoundByIndex.first { $0.isHittable }
-        context?.tap()
-        Thread.sleep(forTimeInterval: 0.6)
-        try shot("replies-original")
         app.terminate()
+        // The jump: the original is beyond the first page of the Reading list; captured while lit,
+        // then again with Reduce Motion (no scroll animation, the same highlight).
+        for (name, extra) in [("replies-original", [String]()), ("replies-original-reducemotion", ["-reduceMotion"])] {
+            let list = launch(["-noQuestion", "-topic", "57"] + extra)
+            let context = list.descendants(matching: .any).matching(identifier: "chat.reply").firstMatch
+            if context.waitForExistence(timeout: 5) { context.tap() }
+            Thread.sleep(forTimeInterval: 0.7)
+            try shot(name)
+            list.terminate()
+        }
     }
 
     /// The widgets and the Live Activity as the extension draws them, at each family's size.

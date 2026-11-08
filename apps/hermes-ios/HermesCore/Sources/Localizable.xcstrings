@@ -281,6 +281,16 @@
         }
       }
     },
+    "Essays, volume %lld": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Essais, volume %lld"
+          }
+        }
+      }
+    },
     "Every action but reads waits for your yes.": {
       "localizations": {
         "fr": {
@@ -681,6 +691,16 @@
         }
       }
     },
+    "Saved: “%@”.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistré : « %@ »."
+          }
+        }
+      }
+    },
     "Saved: “The Pragmatic Programmer”, 20th anniversary edition.": {
       "localizations": {
         "fr": {
@@ -1057,6 +1077,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Qu’est-il arrivé à la sauvegarde ?"
+          }
+        }
+      }
+    },
+    "Which edition did you pick?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu as choisi quelle édition ?"
           }
         }
       }

@@ -45,6 +45,15 @@ struct ReplyTests {
         #expect(await store.loadAround(1001, in: .main))
     }
 
+    @Test func reachingAnOriginalPagesBack() async throws {
+        let (store, _) = try await store.makeStore()
+        await store.loadHistory(57)
+        #expect(!store.messages(in: 57).contains { $0.id == 5001 }, "the first save is beyond the first page")
+        #expect(await store.loadAround(5001, in: 57))
+        let ids = store.messages(in: 57).map(\.id)
+        #expect(ids.first == 5001 && ids == ids.sorted() && Set(ids).count == ids.count, "loaded without a gap or a duplicate")
+    }
+
     @Test func sendingAReplyPassesItsOriginal() async throws {
         let (store, client) = try await store.makeStore()
         try await store.send("And the photos?", in: .main, replyTo: 1003)

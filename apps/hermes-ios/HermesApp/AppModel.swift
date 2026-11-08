@@ -47,6 +47,8 @@ final class AppModel {
     var accent: PetAccent = .fallback
     /// `-catalog <page>`: HermesUI's component catalogue instead of the app (design reviews).
     let widgetGallery = ProcessInfo.processInfo.arguments.contains("-widgetGallery")
+    /// Review: Reduce Motion's behaviour without the system setting (a simulator can't script it).
+    let reduceMotion = ProcessInfo.processInfo.arguments.contains("-reduceMotion")
     let catalogPage = AppModel.value("-catalog", in: ProcessInfo.processInfo.arguments).flatMap(CatalogPage.init(rawValue:))
     var showNewSubchat = false
     var showCommands = false

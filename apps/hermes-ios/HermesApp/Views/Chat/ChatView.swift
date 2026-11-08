@@ -17,11 +17,13 @@ struct ChatScreen: View {
     @State private var following = true
     /// The heart a caress leaves on the bar's pet, for a second; none with Reduce Motion.
     @State private var heart = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.reducesMotion) private var reduceMotion
     @FocusState private var composerFocused: Bool
     /// The message the composer replies to (16.3), and the original a reply just jumped to (16.2).
     @State private var replyingTo: ChatMessage?
     @State private var highlighted: MessageID?
+    /// After a jump to an original: don't resume following the bottom until the owner scrolls.
+    @State private var jumped = false
 
     var body: some View {
         Group {
@@ -165,12 +167,12 @@ struct ChatScreen: View {
             } action: { _, distance in
                 let isAtBottom = distance <= 80
                 atBottom = isAtBottom
-                if isAtBottom { following = true }
+                if isAtBottom, !jumped { following = true }
             }
             // The transcript follows its bottom as it grows (new messages, a draft, the card) until
             // the owner scrolls away, and again once they're back at the bottom (as Messages).
             .onScrollPhaseChange { _, phase in
-                if phase == .interacting { following = false }
+                if phase == .interacting { following = false; jumped = false }
             }
             .onChange(of: messages.last?.id) {
                 if following || messages.last?.isOutgoing == true {
@@ -197,6 +199,7 @@ struct ChatScreen: View {
                     VGroup(alignment: .center, spacing: .s) {
                         if !atBottom {
                             FloatingButton("Latest", systemImage: "arrow.down") {
+                                jumped = false
                                 withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
                             }
                             .transition(.scale.combined(with: .opacity))
@@ -217,12 +220,18 @@ struct ChatScreen: View {
     /// Scrolls to a reply's original and lights it for a moment, loading older pages first when
     /// it isn't loaded yet (16.2). With Reduce Motion the jump isn't animated.
     private func showOriginal(_ id: MessageID, proxy: ScrollViewProxy) {
+        // Not following first: older pages growing the content mustn't pull the view back down,
+        // and being at the bottom when the jump starts mustn't turn following back on.
+        jumped = true
+        following = false
         Task {
             guard await store.loadAround(id, in: topic) else {
                 model.showToast(String(localized: "Message deleted"))
                 return
             }
-            following = false
+            // Let the new rows lay out before scrolling to one of them.
+            await Task.yield()
+            try? await Task.sleep(for: .milliseconds(100))
             withAnimation(reduceMotion ? nil : .smooth) { proxy.scrollTo(id, anchor: .center) }
             highlighted = id
             try? await Task.sleep(for: .seconds(1.5))
