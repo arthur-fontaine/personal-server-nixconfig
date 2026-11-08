@@ -50,9 +50,11 @@ final class LiveActivityController {
 
     private func start(_ content: HermesActivityAttributes.ContentState, store: HermesStore) {
         let pet = store.pet
-        let sprite = (store.spriteURL ?? BundledPet.load()?.spritesheet).flatMap {
+        let source = store.spriteURL ?? BundledPet.load()?.spritesheet
+        let sprite = source.flatMap {
             SharedContainer.storeSpritesheet($0, petID: pet?.id ?? "pip", version: pet?.version ?? 0, group: store.config.appGroup)
         }
+        if let sprite, let source { PetStills.ensure(sheet: sprite, source: source, group: store.config.appGroup) }
         let attributes = HermesActivityAttributes(petName: pet?.name ?? "Pip", spritesheetFile: sprite)
         #if HERMES_PAID
         let pushType: PushType? = .token

@@ -10,7 +10,9 @@ struct RootView: View {
     var body: some View {
         @Bindable var model = model
         Group {
-            if let page = model.catalogPage {
+            if model.widgetGallery {
+                WidgetGallery(sprite: model.writeWidgetStills())
+            } else if let page = model.catalogPage {
                 NavigationStack {
                     ComponentCatalog(page: page, petFrame: BundledPet.load().flatMap { SpriteSheet.cached(url: $0.spritesheet)?.frame(.idle, 0) })
                 }

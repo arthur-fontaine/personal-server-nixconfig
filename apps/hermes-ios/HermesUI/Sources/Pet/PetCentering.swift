@@ -1,4 +1,5 @@
 import CoreGraphics
+import UIKit
 import SwiftUI
 
 /// Optical centring of the pet (design-rules 14.2). A sprite cell has the character somewhere in
@@ -119,5 +120,23 @@ public struct CenteredPet: View {
         }
         .aspectRatio(Metric.square, contentMode: .fit)
         .accessibilityHidden(true)
+    }
+}
+
+/// A still of the pet, centred optically and pixel-exact, as a PNG — for the widgets and the
+/// Live Activity, which load it instead of decoding the whole sheet in their small memory budget.
+public enum PetStill {
+    public static func png(frame: CGImage, centering: PetCentering, inCircle: Bool) -> Data? {
+        let side = Metric.stillPixels
+        guard let ctx = CGContext(data: nil, width: Int(side), height: Int(side), bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.interpolationQuality = .none
+        let r = centering.drawRect(cell: CGSize(width: frame.width, height: frame.height), canvas: side,
+                                   circle: inCircle ? side : nil)
+        // Core Graphics' origin is at the bottom left.
+        ctx.draw(frame, in: CGRect(x: r.minX, y: side - r.maxY, width: r.width, height: r.height))
+        guard let image = ctx.makeImage() else { return nil }
+        return UIImage(cgImage: image).pngData()
     }
 }
