@@ -64,6 +64,31 @@ def notify_title(subchats: list[dict], chat: int | None) -> tuple[str, bool]:
         return "Hermes", True
     return (f"Hermes · {sub['name']}" if sub.get("name") else "Hermes"), False
 
+def is_private(subchats: list[dict], chat: int | None) -> bool:
+    return any(chat and s["topic_id"] == chat and s.get("encrypted") for s in subchats)
+
+
+def private_notification(kind: str) -> tuple[str, str]:
+    """A private sub-chat's notification body and spoken text (design-rules 1.4b): nothing of the
+    content leaves the app — lock screen, banners, AirPods and Siri announcements, pushes. The app
+    shows them in the owner's language from the `private` flag."""
+    if kind in ("question", "approval"):
+        return "Hermes needs you", "Hermes needs your answer."
+    return "New message", "New message from Hermes."
+
+
+def activity_redacted(subchats: list[dict], agent: dict, question: dict | None) -> tuple[dict, dict | None]:
+    """The Live Activity's content without a private sub-chat's content: no task, no question
+    text or summary, and only approval buttons (their labels are the standard ones; a clarify's
+    choices are content: answered in the app)."""
+    if is_private(subchats, agent.get("chat")):
+        agent = {**agent, "task": None}
+    if question and is_private(subchats, question.get("chat")):
+        question = {**question, "text": "", "summary": None, "command": None, "spoken": None,
+                    "options": question.get("options") if question.get("kind") == "approval" else []}
+    return agent, question
+
+
 class App:
     def __init__(self, home: Path, config: dict):
         self.home = Path(home)
@@ -533,7 +558,7 @@ class App:
             if signature != getattr(self, "_activity_sig", None):
                 self._activity_sig = signature
                 try:
-                    await activity(state["agent"], question)
+                    await activity(*activity_redacted(self.subchats(), state["agent"], question))
                 except Exception:
                     logger.debug("app_topic: activity push failed", exc_info=True)
 
@@ -665,6 +690,8 @@ class App:
     async def notify(self, chat: int, message_id: int | None, kind: str, body: str, spoken: str,
                      interruption: str | None = None) -> None:
         title, private = notify_title(self.subchats(), chat)
+        if private:
+            body, spoken = private_notification(kind)
         obj = protocol.message("notify", chat=chat, message_id=message_id, kind=kind,
                                interruption=interruption or ("time-sensitive" if kind in ("question", "approval")
                                                              else "active"),

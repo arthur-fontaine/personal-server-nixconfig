@@ -271,6 +271,51 @@ def test_notify_title() -> None:
     assert app_mod.notify_title([], 455) == ("Hermes", False)
 
 
+def test_private_notification() -> None:
+    subs = [{"topic_id": 455, "name": "Taxes", "encrypted": True},
+            {"topic_id": 456, "name": "Lisbon trip", "encrypted": False}]
+    assert app_mod.is_private(subs, 455) and not app_mod.is_private(subs, 456)
+    assert not app_mod.is_private(subs, 0) and not app_mod.is_private(subs, None)
+    assert app_mod.private_notification("message") == ("New message", "New message from Hermes.")
+    assert app_mod.private_notification("approval") == ("Hermes needs you", "Hermes needs your answer.")
+    # The Live Activity push: nothing of a private chat's content.
+    agent = {"status": "working", "task": "Filing the 2025 tax return", "chat": 455}
+    question = {"id": "q", "kind": "clarify", "chat": 455, "text": "Which bank for the refund?",
+                "summary": "Bank?", "options": [{"id": "1", "label": "Boursorama"}]}
+    a, q = app_mod.activity_redacted(subs, agent, question)
+    assert a["task"] is None and a["status"] == "working"
+    assert q["text"] == "" and q["summary"] is None and q["options"] == [] and q["id"] == "q"
+    approval = {"id": "a", "kind": "approval", "chat": 455, "text": "rm -rf taxes/", "command": "rm -rf taxes/",
+                "options": [{"id": "once", "label": "Allow Once"}]}
+    _, q = app_mod.activity_redacted(subs, agent, approval)
+    assert q["command"] is None and q["text"] == "" and q["options"] == approval["options"]
+    # Elsewhere, untouched.
+    public = {**agent, "chat": 456}
+    assert app_mod.activity_redacted(subs, public, {**question, "chat": 456}) == (public, {**question, "chat": 456})
+
+
+async def _private_notify_reaches_nothing() -> None:
+    posted, pushed = [], []
+    app = app_mod.App.__new__(app_mod.App)
+    app.subchats = lambda: [{"topic_id": 455, "name": "Taxes", "encrypted": True}]
+    async def post(obj): posted.append(obj)
+    async def push(obj): pushed.append(obj)
+    app.post = post
+    app.extra_handlers = {"_push_notify": push}
+    await app.notify(455, 7, "message", "Your refund from Boursorama is 1,240 €", "Your refund is 1,240 euros.")
+    await app.notify(455, 8, "approval", "rm -rf taxes/", "Hermes wants to delete the taxes folder.")
+    for obj in posted + pushed:
+        assert "Taxes" not in obj["title"] and obj["private"]
+    assert [(o["body"], o["spoken"]) for o in posted] == [("New message", "New message from Hermes."),
+                                                         ("Hermes needs you", "Hermes needs your answer.")]
+    assert all("Boursorama" not in repr(o) and "rm -rf" not in repr(o) for o in posted + pushed)
+
+
+def test_private_notify_reaches_nothing() -> None:
+    import asyncio
+    asyncio.run(_private_notify_reaches_nothing())
+
+
 def test_gofile_token() -> None:
     a = bigfiles.Gofile.website_token("tok", now=0)
     assert a == bigfiles.Gofile.website_token("tok", now=14399) != bigfiles.Gofile.website_token("tok", now=14400)
