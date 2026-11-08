@@ -136,6 +136,17 @@ final class ReviewShots: XCTestCase {
         app.terminate()
     }
 
+    /// The widgets and the Live Activity as the extension draws them, at each family's size.
+    func testWidgetGallery() throws {
+        let app = launch(["-widgetGallery"])
+        Thread.sleep(forTimeInterval: 2.5)
+        try shot("widgets")
+        app.swipeUp()
+        Thread.sleep(forTimeInterval: 1.5)
+        try shot("widgets-2")
+        app.terminate()
+    }
+
     func testCatalog() throws {
         for page in ["type", "surfaces", "actions", "approval", "chat", "files", "composer", "accent"] {
             let app = launch(["-catalog", page])

@@ -23,8 +23,8 @@ run() { # device appearance tag args tests…
     -destination "platform=iOS Simulator,name=$d" -derivedDataPath "$dd" "${only[@]}" 2>&1 | grep -E 'error:|Executed .* tests' | tail -2
 }
 AX="-UIPreferredContentSizeCategoryName UICTContentSizeCategoryAccessibilityXXXL"
-run "$phone" light light "" testChat testChatsMenu testPet testScreens testLiveActivity testCatalog
-run "$phone" dark dark "" testChat testChatsMenu testPet testScreens testLiveActivity testCatalog
+run "$phone" light light "" testChat testChatsMenu testPet testScreens testLiveActivity testWidgetGallery testCatalog
+run "$phone" dark dark "" testChat testChatsMenu testPet testScreens testLiveActivity testWidgetGallery testCatalog
 run "$phone" light ax5 "$AX" testChat testScreens testCatalog
 run "$phone" light fr "-AppleLanguages (fr) -AppleLocale fr_FR" testChat testChatsMenu testPet testScreens
 run "$phone" light otherpet-light "-petHue 200" testChat testPet

@@ -46,6 +46,7 @@ final class AppModel {
     /// The app's one colour, read from the pet's sprite (design-rules 4.2).
     var accent: PetAccent = .fallback
     /// `-catalog <page>`: HermesUI's component catalogue instead of the app (design reviews).
+    let widgetGallery = ProcessInfo.processInfo.arguments.contains("-widgetGallery")
     let catalogPage = AppModel.value("-catalog", in: ProcessInfo.processInfo.arguments).flatMap(CatalogPage.init(rawValue:))
     var showNewSubchat = false
     var showCommands = false
@@ -164,11 +165,21 @@ final class AppModel {
         return args[i + 1]
     }
 
+    /// The pet's sheet and stills in the app group (for the widget gallery); the sheet's name.
+    func writeWidgetStills() -> String? {
+        guard let url = store.spriteURL ?? BundledPet.load()?.spritesheet,
+              let name = SharedContainer.storeSpritesheet(url, petID: store.pet?.id ?? "pip", version: store.pet?.version ?? 0,
+                                                          group: config.appGroup) else { return nil }
+        PetStills.ensure(sheet: name, source: url, group: config.appGroup)
+        return name
+    }
+
     func writeWidgetSnapshot() {
         let pet = store.pet
         var spriteFile: String?
         if let url = store.spriteURL ?? BundledPet.load()?.spritesheet {
             spriteFile = SharedContainer.storeSpritesheet(url, petID: pet?.id ?? "pip", version: pet?.version ?? 0, group: config.appGroup)
+            if let spriteFile { PetStills.ensure(sheet: spriteFile, source: url, group: config.appGroup) }
         }
         let snap = SharedSnapshot(
             petName: pet?.name ?? "Pip", mood: store.petMood, agentStatus: store.agent.status, agentTask: store.agent.task,

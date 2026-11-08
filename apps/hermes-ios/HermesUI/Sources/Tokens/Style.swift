@@ -70,6 +70,9 @@ public enum Emphasis: Sendable {
 public extension View {
     /// A system grouped list (Form, inset-grouped List) in a readable column on wide screens, its
     /// grouped background running edge to edge (as Settings on iPad; design-rules 2.2, 6.3).
+    /// A screen on the grouped background, as a list's (the review gallery).
+    func groupedBackground() -> some View { background(Color(uiColor: .systemGroupedBackground)) }
+
     func readableGroupedList() -> some View {
         groupedRows()
             .frame(maxWidth: Metric.readableWidth)

@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 // The only file with layout numbers (design-rules 2.3, 9.2). Everything public is a type, never a
 // number: screens say `.m` or `.turn`, components turn it into points here. DesignCheck fails the
@@ -100,6 +101,8 @@ enum Metric {
     static let callButton: CGFloat = 72
     /// A call control's column: the button and the gap the Phone app leaves between two (96 pt).
     static let callColumn: CGFloat = callButton + Spacing.xl.points
+    /// A pre-rendered still for the widgets and the Live Activity: the medium widget's pet at @3x.
+    static let stillPixels: CGFloat = 288
     /// Typing indicator dot.
     static let typingDot: CGFloat = 6
     /// A quote's leading rule (Mail's quote bar).
@@ -225,4 +228,24 @@ enum HeartBadge {
 /// How long the heart a caress leaves stays, for the app's timing.
 public enum CaressTiming {
     public static var heart: Duration { .seconds(HeartBadge.seconds) }
+}
+
+/// The review gallery's widget and activity sizes on a 6.3-inch iPhone (HIG Widgets,
+/// "Specifications"; the Dynamic Island's compact and expanded shapes).
+enum WidgetCanvas {
+    static let wide: CGFloat = 364
+    static let corner: CGFloat = 24
+    static let islandCorner: CGFloat = 44
+    static let islandCompact = CGSize(width: 250, height: 37)
+
+    static func size(_ family: WidgetFamily) -> CGSize {
+        switch family {
+        case .systemSmall: CGSize(width: 170, height: 170)
+        case .systemMedium: CGSize(width: wide, height: 170)
+        case .accessoryCircular: CGSize(width: 76, height: 76)
+        case .accessoryRectangular: CGSize(width: 172, height: 76)
+        case .accessoryInline: CGSize(width: 257, height: 26)
+        default: CGSize(width: wide, height: 382)
+        }
+    }
 }
