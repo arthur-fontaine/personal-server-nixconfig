@@ -35,6 +35,7 @@ public struct SidebarFooterRow: View {
             HStack(spacing: Spacing.xs.points) {
                 // The sidebar's symbol scale (its folder measures ≈ 24 pt wide at the default size).
                 Image(systemName: systemImage).imageScale(.large).frame(width: Metric.sidebarIconColumn)
+                    .accessibilityHidden(true)
                 title
             }
             .tone(selected ? .accent : .primary)
