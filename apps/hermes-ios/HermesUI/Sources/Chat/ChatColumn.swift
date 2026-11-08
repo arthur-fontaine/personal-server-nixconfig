@@ -203,8 +203,9 @@ public struct UserBubble: View {
                 .geometryProbe(radius: radius, inset: Bubble.vertical.points)
                 .accessibilityIdentifier("chat.bubble")
         }
+        // Its own width, not the row's: whoever places it puts it on the trailing side, and a
+        // reply's context can then take the visible bubble's width (round 7's T1).
         .padding(.leading, Metric.bubbleLeadingRoom)
-        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }
 

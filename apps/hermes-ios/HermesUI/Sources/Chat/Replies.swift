@@ -95,25 +95,27 @@ public struct ReplyPair<Context: View, Bubble: View>: View {
 struct ReplyPairLayout: Layout {
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         guard subviews.count == 2 else { return .zero }
-        let (context, bubble) = measure(proposal, subviews)
-        return CGSize(width: max(bubble.width, context.width + Metric.bubbleLeadingRoom),
-                      height: context.height + Spacing.s.points + bubble.height)
+        let m = measure(proposal, subviews)
+        return CGSize(width: max(m.row.width, m.context.width), height: m.context.height + Spacing.s.points + m.row.height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         guard subviews.count == 2 else { return }
-        let (context, bubble) = measure(proposal, subviews)
-        subviews[0].place(at: CGPoint(x: bounds.maxX - context.width, y: bounds.minY), anchor: .topLeading,
-                          proposal: ProposedViewSize(context))
-        subviews[1].place(at: CGPoint(x: bounds.maxX - bubble.width, y: bounds.minY + context.height + Spacing.s.points),
-                          anchor: .topLeading, proposal: ProposedViewSize(bubble))
+        let m = measure(proposal, subviews)
+        subviews[0].place(at: CGPoint(x: bounds.maxX - m.context.width, y: bounds.minY), anchor: .topLeading,
+                          proposal: ProposedViewSize(m.context))
+        subviews[1].place(at: CGPoint(x: bounds.maxX - m.row.width, y: bounds.minY + m.context.height + Spacing.s.points),
+                          anchor: .topLeading, proposal: ProposedViewSize(m.row))
     }
 
-    private func measure(_ proposal: ProposedViewSize, _ subviews: Subviews) -> (CGSize, CGSize) {
-        let bubble = subviews[1].sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
-        let width = max(bubble.width - Metric.bubbleLeadingRoom, Metric.replyMinWidth)
+    /// `UserBubble` is its own width plus its leading room: the visible bubble is that less the
+    /// room (round 7's T1: the bubble used to fill the row, so the row's width was taken).
+    private func measure(_ proposal: ProposedViewSize, _ subviews: Subviews) -> (context: CGSize, row: CGSize, bubble: CGFloat) {
+        let row = subviews[1].sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        let bubble = row.width - Metric.bubbleLeadingRoom
+        let width = min(max(bubble, Metric.replyMinWidth), proposal.width ?? row.width)
         let context = CGSize(width: width, height: subviews[0].sizeThatFits(ProposedViewSize(width: width, height: nil)).height)
-        return (context, bubble)
+        return (context, row, bubble)
     }
 }
 
