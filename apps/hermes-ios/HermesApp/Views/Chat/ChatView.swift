@@ -71,8 +71,10 @@ struct ChatScreen: View {
                 // The pet and what Hermes does as the menu's header: context, and room for the
                 // item's title.
                 Section(petLabel) {
-                    Button { model.showNewPet = true } label: { Label("New Pet…", systemImage: "sparkles") }
-                        .barMonochrome()
+                    Button { model.showNewPet = true } label: {
+                        Label { Text("New Pet…").lineLimit(1) } icon: { Image(systemName: "sparkles") }
+                    }
+                    .barMonochrome()
                 }
             }
             .sensoryFeedback(.impact(flexibility: .soft), trigger: store.caressedAt)
@@ -94,7 +96,9 @@ struct ChatScreen: View {
     /// "Pip, waiting for your approval": the pet and what Hermes is doing.
     private var petLabel: String {
         let doing = store.agent.status != .idle ? (store.agent.task ?? store.petMood.caption) : store.petMood.caption
-        return "\(store.pet?.name ?? String(localized: "Pet")), \(doing)"
+        // A sentence continued after the name: "Pip, waiting for your approval".
+        let continued = doing.prefix(1).lowercased(with: .current) + doing.dropFirst()
+        return "\(store.pet?.name ?? String(localized: "Pet")), \(continued)"
     }
 
     /// Hermes' state in this chat, or the connection's, in words (secondary, as Apple's subtitles).
