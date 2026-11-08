@@ -316,7 +316,12 @@ stream's final edit, and for a question):
   private (encrypted) sub-chat's name: there it is `Hermes` and `private` is
   `true`, and the app titles it "Hermes · Private chat" in the owner's
   language (the name stays inside the unlocked chat). `body`: the message as
-  plain text (markdown removed), ≤ 240 chars.
+  plain text (markdown removed), ≤ 240 chars — except in a private sub-chat,
+  where `body` is `New message` (`Hermes needs you` for a question) and
+  `spoken` `New message from Hermes.` (`Hermes needs your answer.`): nothing
+  of its content leaves the app (design-rules 1.4b); the app shows them in
+  the owner's language. The Live Activity push drops a private sub-chat's
+  task, its question's text, summary and command, and a clarify's choices.
 - `spoken`: what Siri reads (Announce Notifications): no markdown, no URLs
   (a link becomes "a link to example.com"), no code (a block becomes "a code
   block"), emoji removed, units and symbols written out (`%` → "percent",

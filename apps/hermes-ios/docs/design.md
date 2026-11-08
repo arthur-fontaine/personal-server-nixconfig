@@ -215,9 +215,14 @@ Hidden: the "App" topic (machine traffic)
 - Hermes' messages: no bubble, `.body`, full column width; code blocks on the grouped fill with a
   concentric corner (the 12-pt minimum outside a card), monospaced `.callout`, scrolling sideways,
   Copy in the context menu; quotes behind a quiet rule.
-- The owner's messages: a neutral bubble (`secondarySystemFill`, as Messages' other party),
-  trailing, 16 × 12 pt padding (ChatGPT and Claude measure ≈ 16 × 14), a 46-pt capsule at one
-  line; not the accent, which stays for what acts. Code blocks have 16 pt of padding, the approval
+- The owner's messages: a bubble in the pet's light tint (15.3), trailing, 16 × 12 pt padding
+  (ChatGPT and Claude measure ≈ 16 × 14), a 48-pt capsule at one line.
+- Replies (16): above a reply, `ReplyContext` — a pet-colour bar, the original's author in
+  footnote semibold and its first line in secondary — on the reply's side (within the bubble's
+  width above the owner's). Tapping it pages back to the original, scrolls to it and lights it;
+  a gone original reads "Message deleted". Swipe a message toward the trailing edge, or Reply in
+  its menu, and the composer shows a `ReplyChip`; sending carries `replyTo`. A long press opens
+  the message's menu (Reply, Copy, Select Text) as Messages'; text is selected in a sheet. Code blocks have 16 pt of padding, the approval
   card 20.
 - Rhythm: 24 pt between speakers, 8 pt between the owner's bubbles, 16 pt between the blocks of
   a reply; a centred time when messages are > 20 min apart.
@@ -244,10 +249,13 @@ for code. Regular and semibold. Everything works to AX5: answers stack, nothing 
 
 ## Colour
 
-- One accent: the pet's colour (`PetAccent`), the dominant hue of its sprite, its lightness moved
-  per appearance until it reads at ≥ 4.5:1 on every system background (7:1 on the screen's with
-  Increase Contrast) and its label (black or white) at ≥ 4.5:1. It colours the primary answer, the
-  send/stop button, links and selection — not the toolbar (monochrome), not the bubbles.
+- One accent: the pet's colour (`PetAccent`, computed in OKLCH from the sprite's dominant colour,
+  design-rules 14–15). It **fills**: the primary answer, send/stop, confirm buttons, switches,
+  bars, charts, the reply bar — the pet's colour as it is, its label black or white at ≥ 4.5:1
+  (the lightness moves only when neither reaches it). Selection and the owner's bubble take a
+  light tint of it (20 %) behind primary text. Accent **text** is rare: links in messages, in the
+  closest shade that reads at 4.5:1 (7:1 with Increase Contrast). The app's tint is the label
+  colour, so menus, checkmarks, chevrons and the toolbar stay monochrome.
 - Everything else is semantic: `.primary`/`.secondary`, the system background and fill tiers.
   Destructive is the system red role, never prominent.
 
