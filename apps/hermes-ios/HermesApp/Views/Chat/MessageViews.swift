@@ -17,16 +17,19 @@ struct MessageRow: View {
 
     var body: some View {
         VGroup(alignment: message.isOutgoing ? .trailing : .leading, spacing: .s) {
-            if let reply = store.replyPreview(for: message) {
-                ReplyContext(ReplyText.kind(reply), above: message.isOutgoing ? .owner : .hermes, accessibilityLabel: ReplyText.label(reply)) { onShowOriginal(reply.originalID) }
-                    .accessibilityIdentifier("chat.reply")
-            }
+            let reply = store.replyPreview(for: message)
             if message.isOutgoing {
                 if !message.displayText.isEmpty {
-                    UserBubble(message.displayText, state: bubbleState)
-                        .accessibilityLabel(Text("You: \(message.displayText)"))
+                    if let reply {
+                        ReplyPair { context(reply, above: .owner) } bubble: { bubble }
+                    } else {
+                        bubble
+                    }
+                } else if let reply {
+                    context(reply, above: .owner)
                 }
             } else {
+                if let reply { context(reply, above: .hermes) }
                 RichMessageText(segments: MessageSegments.make(message.text))
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel(Text("Hermes: \(message.displayText)"))
@@ -48,6 +51,16 @@ struct MessageRow: View {
         .sheet(isPresented: $selecting) { SelectTextSheet(message.displayText) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(message.isOutgoing ? "chat.owner" : "chat.hermes")
+    }
+
+    private var bubble: some View {
+        UserBubble(message.displayText, state: bubbleState)
+            .accessibilityLabel(Text("You: \(message.displayText)"))
+    }
+
+    private func context(_ reply: ReplyPreview, above speaker: Speaker) -> some View {
+        ReplyContext(ReplyText.kind(reply), above: speaker, accessibilityLabel: ReplyText.label(reply)) { onShowOriginal(reply.originalID) }
+            .accessibilityIdentifier("chat.reply")
     }
 
     private var bubbleState: UserBubble.State {

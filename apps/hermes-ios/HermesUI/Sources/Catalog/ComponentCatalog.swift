@@ -135,12 +135,17 @@ public struct ComponentCatalog: View {
             section("ReplyContext (above Hermes, above the owner's bubble, loading, deleted), ReplyChip") {
                 ReplyContext(.original(author: Text(verbatim: "You"), excerpt: Text(verbatim: "Remind me to call mum tonight")),
                              above: .hermes, accessibilityLabel: Text(verbatim: "Reply to you: Remind me to call mum tonight")) {}
-                VStack(alignment: .trailing, spacing: Spacing.s.points) {
+                ReplyPair {
                     ReplyContext(.original(author: Text(verbatim: "Hermes"),
                                            excerpt: Text(verbatim: "The external disk was full, so restic stopped before pruning:")),
                                  above: .owner, accessibilityLabel: Text(verbatim: "Reply to Hermes")) {}
-                    UserBubble("Yes, go ahead")
-                }
+                } bubble: { UserBubble("Here's the video from Saturday for Léa") }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                ReplyPair {
+                    ReplyContext(.original(author: Text(verbatim: "Hermes"),
+                                           excerpt: Text(verbatim: "The external disk was full, so restic stopped before pruning:")),
+                                 above: .owner, accessibilityLabel: Text(verbatim: "Reply to Hermes")) {}
+                } bubble: { UserBubble("Yes") }
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 ReplyContext(.loading, above: .hermes, accessibilityLabel: Text(verbatim: "Reply")) {}
                 ReplyContext(.deleted, above: .hermes, accessibilityLabel: Text(verbatim: "Reply to a deleted message")) {}

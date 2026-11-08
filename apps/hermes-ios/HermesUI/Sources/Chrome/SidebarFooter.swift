@@ -15,6 +15,7 @@ public struct SidebarFooter<Content: View>: View {
 }
 
 public struct SidebarFooterRow: View {
+    @Environment(\.dynamicTypeSize) private var size
     let title: Text
     let systemImage: String
     let selected: Bool
@@ -32,12 +33,18 @@ public struct SidebarFooterRow: View {
         Button(action: action) {
             // The list's own row layout: an icon column, then the label; monochrome, the accent when
             // selected (as the sidebar's rows above).
-            HStack(spacing: Spacing.xs.points) {
+            // At accessibility sizes the symbol outgrows its column: it goes above the label, as
+            // grouped rows do (3.4; round 6's S7).
+            let layout = size.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xxs.points))
+                : AnyLayout(HStackLayout(spacing: Spacing.xs.points))
+            layout {
                 // The sidebar's symbol scale (its folder measures ≈ 24 pt wide at the default size).
-                Image(systemName: systemImage).imageScale(.large).frame(width: Metric.sidebarIconColumn)
+                Image(systemName: systemImage).imageScale(.large)
+                    .frame(minWidth: Metric.sidebarIconColumn, alignment: size.isAccessibilitySize ? .leading : .center)
                     .accessibilityHidden(true)
                 title
             }
+            .inset(.vertical, size.isAccessibilitySize ? .xs : .xxs)
             .tone(.primary)
             .textRole(.body)
             .frame(maxWidth: .infinity, minHeight: Metric.sidebarRow, alignment: .leading)

@@ -29,8 +29,9 @@ run "$phone" light light "" testChat testChatsMenu testPet testReplies testScree
 run "$phone" dark dark "" testChat testChatsMenu testPet testReplies testScreens testLiveActivity testWidgetGallery testCatalog
 run "$phone" light ax5 "$AX" testChat testScreens testCatalog
 run "$phone" light fr "-AppleLanguages (fr) -AppleLocale fr_FR" testChat testChatsMenu testPet testReplies testScreens
-run "$phone" light otherpet-light "-petHue 200" testChat testPet
-run "$phone" dark otherpet-dark "-petHue 200" testChat testPet
+# The violet pet (15.4): Pip with its dominant colour moved to #6B4CE6.
+run "$phone" light violet-light "-petColor 6B4CE6" testChat testPet
+run "$phone" dark violet-dark "-petColor 6B4CE6" testChat testPet
 run "$pad" light light "" testChat testScreens
 run "$pad" dark dark "" testChat
 run "$pad" light compact "-compactWidth" testChat

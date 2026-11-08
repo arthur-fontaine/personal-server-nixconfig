@@ -62,6 +62,18 @@ struct PetAccentTests {
         }
     }
 
+    /// The violet pet of the review tour (`-petColor 6B4CE6`): Pip recoloured; its dominant colour is
+    /// the violet, so its fill is the violet with a white label (15.4).
+    @Test func violetPetIsPipRecoloured() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appending(path: "../../Pet/spritesheet.webp")
+        let src = try #require(CGImageSourceCreateWithURL(url as CFURL, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) })
+        let violet = try #require(PetRecolour.image(src, toHex: "6B4CE6"))
+        let dominant = try #require(PetAccent.dominant(in: violet))
+        #expect(OKLab(dominant).distance(to: OKLab(Self.violet)) < 0.02, "dominant \(dominant.hex)")
+        let fill = PetAccent(sprite: violet).fills[.light]!
+        #expect(fill.labelIsWhite)
+    }
+
     @Test func oklabRoundTrips() {
         for c in Self.pets { #expect(OKLab(c).rgb.clamped().contrast(with: c) < 1.01) }
     }
