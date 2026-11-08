@@ -11,6 +11,7 @@ struct Composer: View {
     @Environment(AppModel.self) private var model
     let topic: TopicID
     var focused: FocusState<Bool>.Binding
+    @Binding var replyingTo: ChatMessage?
     @State private var text = ""
     @State private var files: [PendingFile] = []
     @State private var importing = false
@@ -35,6 +36,15 @@ struct Composer: View {
                         }
                     }
                 }
+            }
+            if let original = replyingTo {
+                let excerpt = ReplyPreview.excerpt(of: original)
+                ReplyChip(author: ReplyText.author(original.isOutgoing ? .you : .hermes), excerpt: Text(verbatim: excerpt),
+                          accessibilityLabel: original.isOutgoing ? Text("Replying to you: \(excerpt)") : Text("Replying to Hermes: \(excerpt)")) {
+                    replyingTo = nil
+                }
+                .accessibilityIdentifier("composer.reply")
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             ComposerBar(text: $text, placeholder: Text(placeholder), action: composerAction, focus: focused,
                         onSend: send, onStop: { store.stopDraft(in: topic) }) {
@@ -114,8 +124,10 @@ struct Composer: View {
     private func send() {
         let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let urls = files.map(\.url)
+        let replyTo = replyingTo?.id
         text = ""
         files = []
+        replyingTo = nil
         sending = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         Task {
@@ -124,7 +136,7 @@ struct Composer: View {
                 for u in urls { try? FileManager.default.removeItem(at: u) }
             }
             do {
-                try await store.send(body, in: topic, files: urls)
+                try await store.send(body, in: topic, files: urls, replyTo: replyTo)
             } catch {
                 text = body
                 model.showToast(error.localizedDescription)

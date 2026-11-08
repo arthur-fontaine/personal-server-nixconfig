@@ -191,6 +191,49 @@ public struct AttachmentChip: View {
     }
 }
 
+/// The message being replied to, above the composer (design-rules 16.3): the pet-colour bar, its
+/// author and first line, and × to cancel. Glass, as the composer it belongs to; the AttachmentChip's
+/// shape and its 44-pt ×.
+public struct ReplyChip: View {
+    let author: Text
+    let excerpt: Text
+    let label: Text
+    let onClose: () -> Void
+
+    public init(author: Text, excerpt: Text, accessibilityLabel label: Text, onClose: @escaping () -> Void) {
+        self.author = author
+        self.excerpt = excerpt
+        self.label = label
+        self.onClose = onClose
+    }
+
+    public var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Radius.composerField, style: .continuous)
+        HStack(spacing: Spacing.xs.points) {
+            Capsule().fill(AccentFillStyle()).frame(width: Metric.replyBar).inset(.vertical, .xs)
+            VStack(alignment: .leading, spacing: 0) {
+                author.textRole(.caption).fontWeight(.semibold)
+                excerpt.textRole(.caption).tone(.secondary)
+            }
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(label)
+            Button(action: onClose) {
+                Image(systemName: "xmark.circle.fill").tone(.secondary)
+                    .dynamicTypeSize(...DynamicTypeSize.large)
+                    .frame(width: Metric.hitTarget, height: Metric.hitTarget)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Cancel Reply"))
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .inset(.leading, .s)
+        .glassEffect(.regular, in: shape)
+    }
+}
+
 /// An upload in progress, above the composer. Takes a Foundation `Progress`, not a number
 /// (design-rules 9.2).
 public struct UploadBar: View {
@@ -207,7 +250,7 @@ public struct UploadBar: View {
         VStack(alignment: .leading, spacing: Spacing.xxs.points) {
             title.textRole(.caption)
             // The bar alone: `ProgressView(Progress)` adds its own "42% completed" lines.
-            ProgressView(value: progress.fractionCompleted)
+            ProgressView(value: progress.fractionCompleted).progressViewStyle(PetProgress())
         }
         .inset(.horizontal, .m)
         .inset(.vertical, .xs)

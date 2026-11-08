@@ -67,7 +67,8 @@ public struct MessageBlocks<Content: View>: View {
     }
 }
 
-/// Hermes' prose: no bubble, `.body`, selectable (design-rules 3.1, brief "Chat").
+/// Hermes' prose: no bubble, `.body`. A long press opens the message's menu (Reply, Copy, Select
+/// Text, as Messages'); its text is selected in `SelectTextSheet` (brief "Chat": selectable).
 public struct MessageText: View {
     let text: AttributedString
     public init(_ text: AttributedString) { self.text = text }
@@ -76,7 +77,6 @@ public struct MessageText: View {
     public var body: some View {
         Text(text)
             .textRole(.body)
-            .textSelection(.enabled)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             // Links: the one place accent text stays (15.2), in its readable shade.
@@ -192,7 +192,6 @@ public struct UserBubble: View {
             }
             Text(verbatim: text)
                 .textRole(.body)
-                .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
                 .inset(.horizontal, Bubble.horizontal)
                 .inset(.vertical, Bubble.vertical)

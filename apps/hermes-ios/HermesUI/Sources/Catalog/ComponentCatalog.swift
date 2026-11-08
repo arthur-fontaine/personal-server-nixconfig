@@ -61,7 +61,7 @@ public struct ComponentCatalog: View {
                 ForEach(Spacing.allCases, id: \.self) { sp in
                     HStack(spacing: Spacing.s.points) {
                         Text(verbatim: "\(sp)").textRole(.caption).tone(.secondary)
-                        Capsule().fill(.tint).frame(width: sp.points, height: Spacing.xs.points)
+                        Capsule().fill(AccentFillStyle()).frame(width: sp.points, height: Spacing.xs.points)
                     }
                 }
             }
@@ -131,6 +131,21 @@ public struct ComponentCatalog: View {
                         PetAvatar<EmptyView>.toolbarImage(petFrame, centering: PetCentering(frames: [petFrame]), heart: PetAccent(sprite: petFrame))
                     }
                 }
+            }
+            section("ReplyContext (above Hermes, above the owner's bubble, loading, deleted), ReplyChip") {
+                ReplyContext(.original(author: Text(verbatim: "You"), excerpt: Text(verbatim: "Remind me to call mum tonight")),
+                             above: .hermes, accessibilityLabel: Text(verbatim: "Reply to you: Remind me to call mum tonight")) {}
+                VStack(alignment: .trailing, spacing: Spacing.s.points) {
+                    ReplyContext(.original(author: Text(verbatim: "Hermes"),
+                                           excerpt: Text(verbatim: "The external disk was full, so restic stopped before pruning:")),
+                                 above: .owner, accessibilityLabel: Text(verbatim: "Reply to Hermes")) {}
+                    UserBubble("Yes, go ahead")
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                ReplyContext(.loading, above: .hermes, accessibilityLabel: Text(verbatim: "Reply")) {}
+                ReplyContext(.deleted, above: .hermes, accessibilityLabel: Text(verbatim: "Reply to a deleted message")) {}
+                ReplyChip(author: Text(verbatim: "Hermes"), excerpt: Text(verbatim: "Found 41 snapshots older than 90 days"),
+                          accessibilityLabel: Text(verbatim: "Replying to Hermes")) {}
             }
             section("TypingIndicator, TimeLabel") {
                 TypingIndicator()

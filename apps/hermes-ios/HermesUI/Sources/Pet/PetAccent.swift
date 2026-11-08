@@ -238,10 +238,11 @@ struct OKLCH: Equatable, Sendable {
 
 public extension View {
     /// The app's tint and the label colour for what's filled with it.
-    /// The app's tint is the pet's fill (toggles, bars, prominent buttons are fills); accent text
-    /// (links) reads the text shade from `accentText`.
+    /// The app's tint is the label colour: menus' glyphs, checkmarks, chevrons, the caret stay
+    /// monochrome (15.2). The pet's colour goes only where it fills — prominent buttons, switches,
+    /// bars, charts — which read it from `accentFill`; links read `accentText`.
     func petAccent(_ accent: PetAccent) -> some View {
-        tint(accent.fillColor)
+        tint(.primary)
             .environment(\.accentFill, accent.fillColor)
             .environment(\.onAccent, accent.fillLabelColor)
             .environment(\.accentText, accent.color)

@@ -26,13 +26,13 @@ public struct Sparkline: View {
             switch kind {
             case .line:
                 AreaMark(x: .value("Hour", i), y: .value("Value", v))
-                    .foregroundStyle(.tint.opacity(Fade.chartArea))
+                    .foregroundStyle(AccentFillStyle().opacity(Fade.chartArea))
                     .interpolationMethod(.catmullRom)
                 LineMark(x: .value("Hour", i), y: .value("Value", v))
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(AccentFillStyle())
                     .interpolationMethod(.catmullRom)
             case .bars:
-                BarMark(x: .value("Hour", i), y: .value("Value", v)).foregroundStyle(.tint)
+                BarMark(x: .value("Hour", i), y: .value("Value", v)).foregroundStyle(AccentFillStyle())
             }
         }
         .chartXAxis(.hidden)
@@ -55,6 +55,7 @@ public struct UsageBar: View {
 
     public var body: some View {
         ProgressView(value: value)
+            .progressViewStyle(.linear)
             // A colour, never `.tint` itself: a tint that reads the tint recursed until SwiftUI
             // crashed (round 5's dashboard).
             .tint(value > Metric.criticalUsage ? .red : fill)

@@ -136,6 +136,26 @@ final class ReviewShots: XCTestCase {
         app.terminate()
     }
 
+    /// Replies (16): the context above a reply, the chip after a swipe, the original lit after a tap.
+    func testReplies() throws {
+        let app = launch(["-noQuestion"])
+        Thread.sleep(forTimeInterval: 2.5)
+        try shot("replies")
+        let bubble = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "call mum")).firstMatch
+        if bubble.waitForExistence(timeout: 3) {
+            let start = bubble.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 140, dy: 0)), withVelocity: .fast, thenHoldForDuration: 0.1)
+            Thread.sleep(forTimeInterval: 1.5)
+            try shot("replies-chip")
+            app.buttons["Cancel Reply"].tap()
+        }
+        let context = app.descendants(matching: .any).matching(identifier: "chat.reply").allElementsBoundByIndex.first { $0.isHittable }
+        context?.tap()
+        Thread.sleep(forTimeInterval: 0.6)
+        try shot("replies-original")
+        app.terminate()
+    }
+
     /// The widgets and the Live Activity as the extension draws them, at each family's size.
     func testWidgetGallery() throws {
         let app = launch(["-widgetGallery"])

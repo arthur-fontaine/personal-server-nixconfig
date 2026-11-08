@@ -41,7 +41,16 @@ struct GroupedRows: ViewModifier {
         content
             .labelStyle(RowLabelStyle())
             .toggleStyle(PetSwitch(fill: fill))
+            .progressViewStyle(PetProgress())
             .tint(.primary)
+    }
+}
+
+/// A progress bar in the pet's fill (15.1), the app's tint being the label colour.
+struct PetProgress: ProgressViewStyle {
+    @Environment(\.accentFill) private var fill
+    func makeBody(configuration: Configuration) -> some View {
+        ProgressView(configuration).progressViewStyle(.linear).tint(fill)
     }
 }
 

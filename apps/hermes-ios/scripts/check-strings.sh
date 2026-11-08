@@ -7,11 +7,15 @@ here="$(cd "$(dirname "$0")/.." && pwd)"
 dd="${1:-$HOME/Library/Caches/hermes-ios/DerivedData}"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 status=0
-for pair in "HermesApp:HermesApp" "HermesWidgets:HermesWidgets"; do
-  dir="${pair%%:*}"; target="${pair##*:}"
+# HermesUI's strings resolve in the app's catalogue (Text looks them up in the main bundle).
+for pair in "HermesApp:HermesApp HermesUI" "HermesWidgets:HermesWidgets"; do
+  dir="${pair%%:*}"; targets="${pair##*:}"
   mkdir -p "$tmp/$dir"; cp "$here/$dir/Localizable.xcstrings" "$tmp/$dir/"
-  find "$dd/Build/Intermediates.noindex" -path "*/$target.build/*" -name '*.stringsdata' > "$tmp/$dir/list"
-  [ -s "$tmp/$dir/list" ] || { echo "check-strings: no .stringsdata for $target under $dd (build first)"; exit 2; }
+  : > "$tmp/$dir/list"
+  for target in $targets; do
+    find "$dd/Build/Intermediates.noindex" -path "*/$target.build/*" -name '*.stringsdata' >> "$tmp/$dir/list"
+  done
+  [ -s "$tmp/$dir/list" ] || { echo "check-strings: no .stringsdata for $targets under $dd (build first)"; exit 2; }
   xargs xcrun xcstringstool sync "$tmp/$dir/Localizable.xcstrings" --stringsdata < "$tmp/$dir/list" >/dev/null
   python3 -I - "$tmp/$dir/Localizable.xcstrings" "$dir" <<'PY' || status=1
 import json, sys

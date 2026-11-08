@@ -285,7 +285,6 @@
       }
     },
     "Attach": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -433,6 +432,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Annuler"
+          }
+        }
+      }
+    },
+    "Cancel Reply": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler la réponse"
           }
         }
       }
@@ -1039,7 +1048,6 @@
       }
     },
     "Hermes is writing": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1151,7 +1159,6 @@
       }
     },
     "Hour": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1429,6 +1436,16 @@
         }
       }
     },
+    "Message deleted": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message supprimé"
+          }
+        }
+      }
+    },
     "Minimal": {
       "comment": "Reasoning effort",
       "localizations": {
@@ -1461,7 +1478,6 @@
       }
     },
     "More Answers": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1623,7 +1639,6 @@
       }
     },
     "Not Sent": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1948,7 +1963,6 @@
       }
     },
     "Remove %@": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1964,6 +1978,56 @@
           "stringUnit": {
             "state": "translated",
             "value": "Répondre"
+          }
+        }
+      }
+    },
+    "Reply to Hermes: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réponse à Hermes : %@"
+          }
+        }
+      }
+    },
+    "Reply to a deleted message": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réponse à un message supprimé"
+          }
+        }
+      }
+    },
+    "Reply to you: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réponse à vous : %@"
+          }
+        }
+      }
+    },
+    "Replying to Hermes: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Répondre à Hermes : %@"
+          }
+        }
+      }
+    },
+    "Replying to you: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Répondre à vous : %@"
           }
         }
       }
@@ -2075,7 +2139,6 @@
       }
     },
     "Share": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2086,12 +2149,21 @@
       }
     },
     "Show Command": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Afficher la commande"
+          }
+        }
+      }
+    },
+    "Shows the original message": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Affiche le message d’origine"
           }
         }
       }
@@ -2168,7 +2240,6 @@
       }
     },
     "Stop": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2531,6 +2602,16 @@
         }
       }
     },
+    "Value": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valeur"
+          }
+        }
+      }
+    },
     "Version": {
       "localizations": {
         "fr": {
@@ -2628,6 +2709,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Période"
+          }
+        }
+      }
+    },
+    "You": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous"
           }
         }
       }
