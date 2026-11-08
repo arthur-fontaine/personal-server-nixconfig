@@ -94,6 +94,10 @@ enum Metric {
     static let onboardingWidth: CGFloat = 440
     /// A first-run step's text field: a large control's height.
     static let fieldHeight: CGFloat = 52
+    /// The call's live caption: about six lines of `.body`.
+    static let captionHeight: CGFloat = 180
+    /// A call control (the Phone app's are about this size).
+    static let callButton: CGFloat = 72
     /// Typing indicator dot.
     static let typingDot: CGFloat = 6
     /// A quote's leading rule (Mail's quote bar).

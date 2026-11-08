@@ -2,37 +2,36 @@ import HermesCore
 import HermesUI
 import SwiftUI
 
-/// Full-screen call: the pet in the middle acts out the call (listening, thinking, speaking),
-/// a live caption below, and the controls in one glass bar (design.md, "Call").
+/// Full-screen call, as the Phone app's: the pet's name and the duration on top, the pet in the
+/// middle acting out the call (listening, thinking, speaking), a live caption, and the controls in
+/// one row of glass circles. Dark, without decoration: the pet carries the state.
 struct CallView: View {
     @Environment(HermesStore.self) private var store
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorSchemeContrast) private var contrast
     @State private var session: CallSession?
     @State private var started = Date()
 
     var body: some View {
-        ZStack {
-            LinearGradient(colors: [tint.opacity(0.45), Color.black], startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-                .animation(.smooth(duration: 0.6), value: session?.phase)
-            VStack(spacing: 24) {
-                header
-                Spacer()
-                ZStack {
-                    Circle().fill(tint.opacity(0.25)).frame(width: 260, height: 260)
-                        .scaleEffect(1 + CGFloat(max(0, (session?.level ?? -60) + 50)) / 120)
-                        .animation(.smooth(duration: 0.15), value: session?.level)
-                    PetSpriteView(animation: animation, size: .stage)
-                }
-                Text(phaseLabel).font(.title3.weight(.medium)).foregroundStyle(.white.opacity(dim(0.85)))
-                    .contentTransition(.opacity)
-                captions
-                Spacer()
-                controls
+        VGroup(alignment: .center, spacing: .l) {
+            header
+            Spacer()
+            PetSpriteView(animation: animation, size: .stage)
+            Text(phaseLabel).textRole(.headline).tone(.secondary)
+                .contentTransition(.opacity)
+            captions
+            Spacer()
+            CallControls {
+                CallButton(session?.muted == true ? Text("Unmute") : Text("Mute"),
+                           systemImage: session?.muted == true ? "mic.slash.fill" : "mic.fill",
+                           kind: .toggle(isOn: session?.muted == true)) { session?.muted.toggle() }
+                CallButton(Text("Speaker"), systemImage: session?.speaker == true ? "speaker.wave.3.fill" : "speaker.fill",
+                           kind: .toggle(isOn: session?.speaker == true)) { session?.speaker.toggle() }
+                CallButton(Text("End"), systemImage: "phone.down.fill", kind: .end) { session?.hangUp(); dismiss() }
             }
-            .padding(24)
         }
+        .frame(maxWidth: .infinity)
+        .inset(.vertical, .xl)
+        .scenePaddingHorizontal()
         .preferredColorScheme(.dark)
         .task {
             let s = CallSession(store: store)
@@ -47,65 +46,36 @@ struct CallView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 4) {
-            Text(store.pet?.name ?? "Hermes").font(.title.weight(.semibold)).fontDesign(.rounded).foregroundStyle(.white)
+        VGroup(alignment: .center, spacing: .xxs) {
+            Text(store.pet?.name ?? "Hermes").textRole(.title)
             TimelineView(.periodic(from: started, by: 1)) { ctx in
                 Text(Duration.seconds(ctx.date.timeIntervalSince(started)).formatted(.time(pattern: .minuteSecond)))
-                    .font(.subheadline.monospacedDigit()).foregroundStyle(.white.opacity(dim(0.7)))
+                    .textRole(.subheadline).monospacedDigit().tone(.secondary)
             }
             if let name = session?.engineName, !name.isEmpty {
-                Text(name).font(.caption).foregroundStyle(.white.opacity(dim(0.5)))
+                Text(name).textRole(.caption).tone(.tertiary)
             }
         }
     }
 
+    /// The last lines said: Hermes' in the label colour, the owner's secondary and trailing.
     private var captions: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
+                VGroup(spacing: .s) {
                     ForEach(session?.lines.suffix(6) ?? []) { line in
                         Text(line.text)
-                            .font(line.fromUser ? .callout : .body)
-                            .foregroundStyle(line.fromUser ? .white.opacity(dim(0.6)) : .white)
+                            .textRole(line.fromUser ? .subheadline : .body)
+                            .tone(line.fromUser ? .secondary : .primary)
                             .frame(maxWidth: .infinity, alignment: line.fromUser ? .trailing : .leading)
                             .id(line.id)
                     }
                 }
             }
-            .frame(maxWidth: 600, maxHeight: 180)
+            .captionArea()
             .onChange(of: session?.lines.last?.text) { if let id = session?.lines.last?.id { withAnimation { proxy.scrollTo(id, anchor: .bottom) } } }
         }
     }
-
-    private var controls: some View {
-        GlassEffectContainer(spacing: 24) {
-            HStack(spacing: 24) {
-                control(session?.muted == true ? "mic.slash.fill" : "mic.fill", label: session?.muted == true ? String(localized: "Unmute") : String(localized: "Mute"),
-                        active: session?.muted == true) { session?.muted.toggle() }
-                control(session?.speaker == true ? "speaker.wave.3.fill" : "speaker.fill", label: String(localized: "Speaker"),
-                        active: session?.speaker == true) { session?.speaker.toggle() }
-                Button { session?.hangUp(); dismiss() } label: {
-                    Image(systemName: "phone.down.fill").font(.title2).foregroundStyle(.white)
-                        .frame(width: 72, height: 72)
-                }
-                .glassEffect(.regular.tint(.red).interactive(), in: .circle)
-                .accessibilityLabel("End call")
-            }
-        }
-        .padding(.bottom, 12)
-    }
-
-    private func control(_ symbol: String, label: String, active: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol).font(.title2).foregroundStyle(active ? .black : .white)
-                .frame(width: 72, height: 72)
-        }
-        .glassEffect(active ? .regular.tint(.white).interactive() : .regular.interactive(), in: .circle)
-        .accessibilityLabel(label)
-    }
-
-    /// Increase Contrast: secondary text on the dark gradient gets nearer to white.
-    private func dim(_ opacity: Double) -> Double { contrast == .increased ? min(1, opacity + 0.3) : opacity }
 
     private var animation: PetAnimation {
         switch session?.phase {
@@ -128,15 +98,6 @@ struct CallView: View {
         case .ended(let e)?: e ?? String(localized: "Call ended")
         }
     }
-
-    private var tint: Color {
-        switch session?.phase {
-        case .speaking?: .accentColor
-        case .waiting?, .transcribing?: .indigo
-        case .ended(let e)? where e != nil: .red
-        default: .blue
-        }
-    }
 }
 
 /// Settings row: the on-device voice model, its size, download progress and delete.
@@ -145,24 +106,20 @@ struct VoiceModelRow: View {
     @State private var confirmDelete = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("LFM3-Omni voice", systemImage: "waveform")
-                Spacer()
-                Text(status).foregroundStyle(.secondary).font(.subheadline)
-            }
+        VGroup(spacing: .xs) {
+            LabeledContent { Text(status) } label: { Label("LFM3-Omni voice", systemImage: "waveform") }
             switch models.state {
             case .absent, .failed:
                 Button("Download (\(ByteCountFormatter.string(fromByteCount: VoiceModelStore.totalBytes, countStyle: .file)), Wi-Fi)") {
                     models.download()
                 }
-                if case .failed(let e) = models.state { Text(e).font(.caption).foregroundStyle(.red) }
+                if case .failed(let e) = models.state { Text(e).textRole(.caption).tone(.destructive) }
             case .downloading(let p):
                 ProgressView(value: p)
-                Button("Cancel", role: .cancel) { models.cancel() }.font(.subheadline)
+                Button("Cancel", role: .cancel) { models.cancel() }
             case .waitingForWiFi:
-                Text("Waiting for Wi-Fi…").font(.caption).foregroundStyle(.secondary)
-                Button("Cancel", role: .cancel) { models.cancel() }.font(.subheadline)
+                Text("Waiting for Wi-Fi…").textRole(.caption).tone(.secondary)
+                Button("Cancel", role: .cancel) { models.cancel() }
             case .ready:
                 Button("Delete Model", role: .destructive) { confirmDelete = true }
             }
