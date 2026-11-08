@@ -4,7 +4,7 @@
 # and the Telegram API id the app logs in to Telegram with. Before xcode.sh and
 # system.sh: it writes hosts/local.nix. Signing in Xcode is sideload-account.sh,
 # your devices sideload-devices.sh, both once Hermes' session is there.
-step "The Hermes app"
+step "App · on your devices"
 
 if grep -q 'delivery' "$local_nix" 2>/dev/null \
   && keep "The Hermes app: $([ "$(setting server.hermes.app.delivery.enable)" = 1 ] && echo "built here and installed on your devices" || echo "not installed")"; then
@@ -21,6 +21,9 @@ fi
 if [ "$(setting server.hermes.app.delivery.enable)" = 1 ]; then
   [ "$(setting server.xcode.enable)" = 1 ] \
     || warn "The app needs Xcode, which is off (server.xcode.enable): the configuration will refuse it."
+  # app-topic.sh, just before, asked whether Hermes serves it.
+  [ "$(setting server.hermes.app.enable)" = 1 ] \
+    || note "Hermes does not serve the app (App · Hermes' side): it will show your chats, without Hermes' state, questions or pet."
   # The app is a Telegram client of your own account (TDLib), which needs an
   # API id of its own: Telegram gives one per account, at my.telegram.org.
   if [ -n "$(secret_value TELEGRAM_API_ID)" ] && [ -n "$(secret_value TELEGRAM_API_HASH)" ] \

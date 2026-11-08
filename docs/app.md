@@ -166,8 +166,8 @@ guest account), and `delivery.json`, written by the sideload service
 
 ## Delivery
 
-With `server.hermes.app.delivery.enable` (the bootstrap's "The Hermes app"
-step), the app is one app of the sideload service ([sideload.md](sideload.md)),
+With `server.hermes.app.delivery.enable` (the bootstrap's "App · on your
+devices" step), the app is one app of the sideload service ([sideload.md](sideload.md)),
 named `hermes`, declared in `modules/hermes/system/sideload.nix`: built from
 `apps/hermes-ios` at the deployed revision, signed with your Apple Account,
 installed on your devices over Wi-Fi and re-signed before it expires.
