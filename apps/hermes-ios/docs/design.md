@@ -66,7 +66,7 @@ fails a test.
 | Layer | What it guarantees | Where |
 | --- | --- | --- |
 | **HermesUI** (framework) | Tokens are types — `Spacing` (4-pt grid: 4…32), `Rhythm` (24 between speakers, 8 between bubbles, 16 between a reply's blocks), `TextRole` (Dynamic Type styles, monospaced only for code), `Tone`, `Surface` (system fill tiers), `Emphasis`, `PetSize`, `IconSize` — and no public API takes a number or a colour. Components encode the rules: `CardSurface` (fill, clip and hit from one shape, no stroke API, corner = inset + inner control radius, so concentric), `ActionRow` (one height, capsules in a row, rounded rectangles concentric with the card when stacked — always at AX sizes —, primary trailing and never destructive, "…" a circle of the row's height), `ApprovalCard`, `ChatColumn` (the one leading edge: the system margin; 672-pt readable width), `TranscriptRow` (the rhythm by speaker), `UserBubble`, `CodeBlock`, `IconButton`, `PetAvatar` (square, circle-clipped), `ComposerBar`/`BarButton`/`Toast` (`Chrome/`: the only glass), `PetAccent` | `HermesUI/Sources` |
-| **DesignCheck** (build phase of HermesUI) | A SwiftSyntax checker failing the build on: styling modifiers in a screen (`.padding`, `.font`, `.foregroundStyle`, `.background`, `.tint`, `.buttonStyle`…), layout numbers outside `Tokens.swift`, raw colours and font sizes, shapes drawn by a screen, strokes/borders/shadows anywhere, Liquid Glass outside `Chrome/`, numbers or colours in HermesUI's public API. One fixture per rule (`swift test` in `Tools/DesignCheck`). Screens not migrated yet are listed in `Tools/DesignCheck/phase2-screens.txt`, which only shrinks | `Tools/DesignCheck`, `scripts/design-check.sh` |
+| **DesignCheck** (build phase of HermesUI) | A SwiftSyntax checker failing the build on: styling modifiers in a screen (`.padding`, `.font`, `.foregroundStyle`, `.background`, `.tint`, `.buttonStyle`…), layout numbers outside `Tokens.swift`, raw colours and font sizes, shapes drawn by a screen, strokes/borders/shadows anywhere, Liquid Glass outside `Chrome/`, numbers or colours in HermesUI's public API. One fixture per rule (`swift test` in `Tools/DesignCheck`). Every screen and the widget extension compose HermesUI; `Tools/DesignCheck/phase2-screens.txt` (empty) only admits a temporary, listed exception | `Tools/DesignCheck`, `scripts/design-check.sh` |
 | **Unit tests** | The accent reads at ≥ 4.5:1 (7:1 on the background with Increase Contrast) on every system background, light and dark, for 75 pet colours, with a ≥ 4.5:1 label; `ActionRow` refuses a destructive or second primary; spacing on the grid; concentric radii; the rhythm | `HermesUI/Tests` |
 | **Geometric UI tests** | On the running app (iPhone 17 Pro, iPad Pro 13"): one leading x for text, code, card and composer (16 pt on iPhone); the readable column; every gap on the scale and by relation; the approval's buttons one height ≥ 44, primary trailing; measured concentric corners; hit targets; stacked answers at AX5; round controls with \|w − h\| ≤ ½ pt; no private sub-chat name on screen | `HermesUITests/GeometryTests.swift` |
 | **Review rounds** | `scripts/review-shots.sh` renders the chat, chats menu, the bar pet (caress, menu) and the component catalogue (`-catalog <page>`) in light, dark, AX5, French and with another pet; a separate reviewer inspects zoomed crops | `HermesUITests/ReviewShots.swift` |
@@ -198,14 +198,17 @@ Hidden: the "App" topic (machine traffic)
 
 | Screen | iPhone | iPad |
 | --- | --- | --- |
-| Login | full screen, centred column | same, max width 440 in a centred card |
+| Login | Apple's welcome layout (`OnboardingPage`): the pet, a bold title, one field, the primary full width at the foot | the same in a 440-pt column |
 | Chat | stack, composer pinned, the question as the last item | split view detail, readable column |
 | Sub-chats | the title menu | sidebar section |
 | New sub-chat | sheet (medium detent) | form sheet |
 | Pet | the bar's leading item: tap to caress, hold for New Pet… (no sheet) | the same, in the detail's bar |
-| Dashboard | scroll of cards | adaptive grid of cards |
-| Settings | inset grouped list | same in the detail column |
-| Call | full screen cover | full screen cover |
+| Dashboard | an inset-grouped list as Settings › Battery: window segmented, value rows, sparklines under their rows, a model's details pushed | the same in the readable column |
+| Settings | inset grouped list (pushed, inline title) | the same in the readable column |
+| Call | the Phone app's layout: name and duration, the pet, a caption, one row of round glass controls | the same |
+| Private gate | the system's empty state: lock, "Private chat", why, Unlock | the same |
+| Commands | a list: values in force as value rows, pickers with the system's checkmark, commands in the label colour (red when they confirm) | a form sheet |
+| Widgets, Live Activity | the pet (its own accent, centred optically), its name, what Hermes does; answers on the lock screen with the red refusal and the pet's fill | — |
 
 ## Message rendering
 
