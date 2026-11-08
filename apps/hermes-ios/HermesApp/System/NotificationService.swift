@@ -50,8 +50,16 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         let content = UNMutableNotificationContent()
         let title = Self.title(for: n)
         content.title = title
-        // The spoken variant reads well on screen too, and is what Announce speaks.
-        content.body = n.speechText
+        // The spoken variant reads well on screen too, and is what Announce speaks. A private
+        // sub-chat's says only that something came (1.4b), whatever the backend sent.
+        if n.chat != .main, AppModel.shared.store.isPrivate(n.chat) {
+            content.body = switch PrivateRedaction.notification(kind: n.kind) {
+            case .newMessage: String(localized: "New message")
+            case .needsYou: String(localized: "Hermes needs you")
+            }
+        } else {
+            content.body = n.speechText
+        }
         content.sound = .default
         content.threadIdentifier = "topic-\(n.chat)"
         content.targetContentIdentifier = "hermes://chat/\(n.chat)"
