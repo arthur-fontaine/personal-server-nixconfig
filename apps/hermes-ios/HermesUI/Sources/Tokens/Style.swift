@@ -77,6 +77,12 @@ public extension View {
     }
 
     func textRole(_ role: TextRole) -> some View { font(role.font) }
+
+    /// A full-screen page's horizontal margins: the system's.
+    func scenePaddingHorizontal() -> some View { scenePadding(.horizontal) }
+
+    /// The live caption under the call's pet: a readable width, a few lines tall.
+    func captionArea() -> some View { frame(maxWidth: Metric.readableWidth, maxHeight: Metric.captionHeight) }
     func tone(_ tone: Tone) -> some View { foregroundStyle(tone.style) }
 
     /// Padding from the scale only.
