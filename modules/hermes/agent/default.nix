@@ -16,6 +16,7 @@ in
     ./telegram.nix
     ./mcp.nix
     ./skills.nix
+    ./overrides.nix
     ./tools.nix
     ./computer-use.nix
     ./fast-act.nix
@@ -49,7 +50,10 @@ in
     gateway.enable = true;
     hermesHome = "${cfg.home}/.hermes";
     workingDirectory = "${cfg.home}/workspace";
-    environmentFiles = [ cfg.secretsFile ];
+    # Then the local overlay's keys (../options/overrides.nix), which never
+    # repeat one of the first file's.
+    environmentFiles = [ cfg.secretsFile ]
+      ++ [ cfg.localOverrides.secretsFile ];
 
     settings = {
       # Approvals arrive as Telegram messages; the guardian model decides the

@@ -52,7 +52,8 @@ in
       timeout = 45;
     };
 
-    fallback_providers = cfg.fallbacks
+    # The local overlay's fallbacks (./overrides.nix) come after the repository's.
+    fallback_providers = cfg.fallbacks ++ (cfg.localOverrides.overlay.fallbacks or [ ])
       ++ lib.optional (cfg.localFallback && server.uzu.enable) { provider = "uzu"; model = server.uzu.model; };
 
     providers = lib.mapAttrs (_: named) cfg.providers // lib.optionalAttrs server.uzu.enable {

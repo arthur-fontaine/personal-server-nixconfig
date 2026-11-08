@@ -13,6 +13,7 @@
     ./homeassistant.nix
     ./decision.nix
     ./app.nix
+    ./overrides.nix
     (import ../coding-agent).options
   ];
 }
