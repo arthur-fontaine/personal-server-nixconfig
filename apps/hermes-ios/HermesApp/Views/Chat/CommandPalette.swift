@@ -1,4 +1,5 @@
 import HermesCore
+import HermesUI
 import SwiftUI
 
 /// Hermes' slash commands, curated and made native (protocol §2.4): the model as a menu, the
@@ -81,43 +82,49 @@ struct CommandPalette: View {
         let c = store.controls
         if c.model != nil || c.permissionMode?.value != nil {
             Section("In this chat") {
+                // The system's value row: label, value in secondary, the disclosure chevron.
                 if let m = c.model, let selected = m.selected(in: topic) {
-                    Button { path.append(.model) } label: {
-                        CurrentRow(symbol: "cpu", title: "Model", value: selected.model)
+                    NavigationLink(value: Destination.model) {
+                        LabeledContent { Text(selected.model) } label: { Label("Model", systemImage: "cpu") }
                     }
-                    .buttonStyle(.plain)
                 }
                 if let p = c.permissionMode, let v = p.value, p.set != nil {
-                    Button { path.append(.permissions) } label: {
-                        CurrentRow(symbol: "checkmark.shield", title: "Permission mode", value: p.options.first { $0.id == v }?.label ?? v)
+                    NavigationLink(value: Destination.permissions) {
+                        LabeledContent { Text(p.options.first { $0.id == v }?.label ?? v) } label: { Label("Permission Mode", systemImage: "checkmark.shield") }
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
     }
 
-    private func row(_ cmd: CommandSpec) -> some View {
-        Button { run(cmd) } label: {
-            HStack(spacing: 14) {
-                Image(systemName: cmd.symbol)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(cmd.confirm != nil ? Color.red : Color.accentColor)
-                    .frame(width: 32, height: 32)
-                    .background((cmd.confirm != nil ? Color.red : Color.accentColor).opacity(0.12), in: .rect(cornerRadius: 9))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(cmd.label).font(.body.weight(.medium)).foregroundStyle(.primary)
-                    Text(cmd.detail.isEmpty ? (cmd.send ?? cmd.insert ?? "") : cmd.detail)
-                        .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+    @ViewBuilder private func row(_ cmd: CommandSpec) -> some View {
+        let detail = Text(cmd.detail.isEmpty ? (cmd.send ?? cmd.insert ?? "") : cmd.detail)
+        if let destination = Self.destination(cmd) {
+            NavigationLink(value: destination) {
+                Label {
+                    VGroup(spacing: .xxs) {
+                        Text(cmd.label)
+                        detail.textRole(.footnote).tone(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: cmd.symbol).tone(.secondary).accessibilityHidden(true)
                 }
-                Spacer(minLength: 4)
-                if cmd.control != nil { Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary) }
-                else if cmd.insert != nil { Image(systemName: "text.cursor").font(.footnote).foregroundStyle(.tertiary) }
             }
-            .contentShape(.rect)
+        } else {
+            ListActionRow(Text(cmd.label), detail: detail, systemImage: cmd.symbol,
+                          destructive: cmd.confirm != nil, fillsComposer: cmd.insert != nil) { run(cmd) }
+                .accessibilityHint(cmd.detail)
         }
-        .buttonStyle(.plain)
-        .accessibilityHint(cmd.detail)
+    }
+
+    static func destination(_ cmd: CommandSpec) -> Destination? {
+        switch cmd.control {
+        case "model": .model
+        case "permission_mode": .permissions
+        case "subchat_form": .subchatForm
+        case "picker": .picker(cmd.id)
+        default: nil
+        }
     }
 
     private func run(_ cmd: CommandSpec) {
@@ -145,22 +152,6 @@ struct CommandPalette: View {
     }
 }
 
-struct CurrentRow: View {
-    let symbol: String
-    let title: LocalizedStringKey
-    let value: String
-
-    var body: some View {
-        HStack {
-            Label { Text(title).foregroundStyle(.primary) } icon: { Image(systemName: symbol).foregroundStyle(.tint) }
-            Spacer()
-            Text(value).foregroundStyle(.secondary).lineLimit(1)
-            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-        }
-        .contentShape(.rect)
-    }
-}
-
 /// The model menu: the server's chain, the one in force checked, what answered last noted.
 struct ModelMenu: View {
     @Environment(HermesStore.self) private var store
@@ -172,23 +163,25 @@ struct ModelMenu: View {
         let control = store.controls.model
         List {
             Section {
-                ForEach(control?.chain ?? []) { m in
-                    Button { pick(m) } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(m.model).font(.body.weight(.medium)).foregroundStyle(.primary)
-                                Text([m.provider, roleLabel(m.role)].compactMap { $0 }.joined(separator: " · "))
-                                    .font(.footnote).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if control?.selected(in: topic) == m { Image(systemName: "checkmark").fontWeight(.semibold).foregroundStyle(.tint) }
+                // The system's choice of one: picking sets the model and closes the palette.
+                Picker(selection: Binding(get: { control?.selected(in: topic)?.id }, set: { id in
+                    if let m = control?.chain.first(where: { $0.id == id }) { pick(m) }
+                })) {
+                    ForEach(control?.chain ?? []) { m in
+                        VGroup(spacing: .xxs) {
+                            Text(m.model)
+                            Text([m.provider, roleLabel(m.role)].compactMap { $0 }.joined(separator: ", "))
+                                .textRole(.footnote).tone(.secondary)
                         }
-                        .contentShape(.rect)
+                        .tag(Optional(m.id))
                     }
-                    .buttonStyle(.plain)
+                } label: {
+                    Text("Model")
                 }
+                .pickerStyle(.inline)
+                .labelsHidden()
             } footer: {
-                VStack(alignment: .leading, spacing: 6) {
+                VGroup(spacing: .xs) {
                     if let last = control?.last[topic], last != control?.selected(in: topic) {
                         Text("The last answer came from \(last.model) (a fallback).")
                     }
@@ -224,24 +217,27 @@ struct PermissionPicker: View {
     var body: some View {
         let p = store.controls.permissionMode
         List {
-            ForEach(p?.options ?? []) { o in
-                Button {
-                    done()
-                    Task { do { try await store.setPermissionMode(o.id) } catch { model.showToast(error.localizedDescription) } }
-                } label: {
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: o.id == "auto" ? "wand.and.stars" : "hand.raised").foregroundStyle(.tint).frame(width: 28)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(o.label).font(.body.weight(.semibold)).foregroundStyle(.primary)
-                            if let d = o.description { Text(d).font(.footnote).foregroundStyle(.secondary) }
+            Picker(selection: Binding(get: { p?.value }, set: { id in
+                guard let id else { return }
+                done()
+                Task { do { try await store.setPermissionMode(id) } catch { model.showToast(error.localizedDescription) } }
+            })) {
+                ForEach(p?.options ?? []) { o in
+                    Label {
+                        VGroup(spacing: .xxs) {
+                            Text(o.label)
+                            if let d = o.description { Text(d).textRole(.footnote).tone(.secondary) }
                         }
-                        Spacer()
-                        if p?.value == o.id { Image(systemName: "checkmark").fontWeight(.semibold).foregroundStyle(.tint) }
+                    } icon: {
+                        Image(systemName: o.id == "auto" ? "wand.and.stars" : "hand.raised").accessibilityHidden(true)
                     }
-                    .contentShape(.rect)
+                    .tag(Optional(o.id))
                 }
-                .buttonStyle(.plain)
+            } label: {
+                Text("Permission Mode")
             }
+            .pickerStyle(.inline)
+            .labelsHidden()
         }
         .navigationTitle("Permission Mode")
     }
@@ -255,15 +251,20 @@ struct OptionPicker: View {
     let done: () -> Void
 
     var body: some View {
-        List(command.options, id: \.self) { option in
-            Button {
+        List {
+            Picker(selection: Binding<String?>(get: { nil }, set: { option in
+                guard let option, let text = command.text(["value": option]) else { return }
                 done()
-                guard let text = command.text(["value": option]) else { return }
                 Task { do { try await store.run(command: text, in: topic) } catch { model.showToast(error.localizedDescription) } }
+            })) {
+                ForEach(command.options, id: \.self) { option in
+                    Text(PresetNames.option(option)).tag(Optional(option))
+                }
             } label: {
-                Text(PresetNames.option(option)).foregroundStyle(.primary).frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
+                Text(command.label)
             }
-            .buttonStyle(.plain)
+            .pickerStyle(.inline)
+            .labelsHidden()
         }
         .navigationTitle(command.label)
     }

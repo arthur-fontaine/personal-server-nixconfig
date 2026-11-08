@@ -1,4 +1,5 @@
 import HermesCore
+import HermesUI
 import SwiftUI
 
 /// A private (encrypted) sub-chat stays covered until Face ID. Its passphrase lives in the
@@ -13,29 +14,17 @@ struct PrivateGate: View {
     @State private var working = false
     @State private var error: String?
 
+    /// The system's empty-state layout, as a locked note: the lock, the chat's public name
+    /// ("Private chat"), why, and Unlock.
     var body: some View {
-        VStack(spacing: 18) {
-            // Content, not a control: no glass.
-            Image(systemName: "lock.fill")
-                .font(.system(size: 44, weight: .semibold))
-                .foregroundStyle(.tint)
-                .frame(width: 96, height: 96)
-                .background(.tint.opacity(0.12), in: .circle)
-            Text(ChatTitle.name(topic, store: store)).font(.title2.weight(.semibold))
+        ContentUnavailableView {
+            Label(ChatTitle.name(topic, store: store), systemImage: "lock.fill")
+        } description: {
             Text("This sub-chat is encrypted. Unlock it with \(PrivateVault.biometryName) to read it.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-            Button(action: unlock) {
-                Label(working ? String(localized: "Unlocking…") : String(localized: "Unlock"), systemImage: "faceid").frame(minWidth: 180)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(working)
-            if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+        } actions: {
+            PrimaryButton(working ? "Unlocking…" : "Unlock", systemImage: "faceid", isBusy: working, action: unlock)
+            if let error { Text(error).textRole(.footnote).tone(.destructive) }
         }
-        .padding(32)
-        .frame(maxWidth: 440)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $askPassphrase) { passphraseSheet }
     }
 
@@ -173,25 +162,23 @@ struct NewSubchatFields: View {
             Section("Name") {
                 TextField("e.g. Taxes 2026", text: $name)
             }
-            Section("Kind") {
+            // The system's choice of one: an inline picker, its checkmark on the chosen kind.
+            Picker(selection: Binding(get: { preset ?? presets.first?.name ?? "aside" }, set: { preset = $0 })) {
                 ForEach(presets) { p in
-                    Button { preset = p.name } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: Self.symbol(p)).frame(width: 28).foregroundStyle(.tint)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(PresetNames.name(p.name)).font(.body.weight(.medium))
-                                Text(Self.blurb(p)).font(.footnote).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if (preset ?? presets.first?.name) == p.name {
-                                Image(systemName: "checkmark").foregroundStyle(.tint).fontWeight(.semibold)
-                            }
+                    Label {
+                        VGroup(spacing: .xxs) {
+                            Text(PresetNames.name(p.name))
+                            Text(Self.blurb(p)).textRole(.footnote).tone(.secondary)
                         }
-                        .contentShape(.rect)
+                    } icon: {
+                        Image(systemName: Self.symbol(p)).accessibilityHidden(true)
                     }
-                    .buttonStyle(.plain)
+                    .tag(p.name)
                 }
+            } label: {
+                Text("Kind")
             }
+            .pickerStyle(.inline)
         }
         .navigationTitle("New Sub-chat")
         .navigationBarTitleDisplayMode(.inline)

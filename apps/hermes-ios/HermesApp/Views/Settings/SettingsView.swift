@@ -111,6 +111,8 @@ struct SettingsView: View {
         }
         .readableGroupedList()
         .navigationTitle("Settings")
+        // A page pushed from the chat's menu: inline, as Settings' own sub-pages.
+        .navigationBarTitleDisplayMode(.inline)
         .task { await refresh() }
         .confirmationDialog("Log out of Telegram on this device?", isPresented: $confirmLogout, titleVisibility: .visible) {
             Button("Log Out", role: .destructive) { Task { await store.logOut() } }
