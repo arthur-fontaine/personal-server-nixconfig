@@ -228,6 +228,29 @@ public extension View {
     func barMonochrome() -> some View { tint(.primary) }
 }
 
+/// A toolbar item whose tap does one thing and whose long press opens a menu
+/// (`Menu(primaryAction:)`, the system's pattern; a context menu on a bar item is a cramped
+/// preview). Monochrome, labelled for VoiceOver, the icon alone in the bar's circle.
+public struct BarMenuButton<Icon: View, Items: View>: View {
+    let title: Text
+    let primaryAction: () -> Void
+    let icon: Icon
+    let items: Items
+
+    public init(_ title: Text, primaryAction: @escaping () -> Void, @ViewBuilder icon: () -> Icon, @ViewBuilder menu: () -> Items) {
+        self.title = title
+        self.primaryAction = primaryAction
+        self.icon = icon()
+        items = menu()
+    }
+
+    public var body: some View {
+        Menu(content: { items }, label: { icon }, primaryAction: primaryAction)
+            .accessibilityLabel(title)
+            .tint(.primary)
+    }
+}
+
 public extension BarButton where Icon == Image {
     init(_ title: LocalizedStringKey, systemImage: String, action: @escaping () -> Void) {
         self.init(Text(title), action: action) { Image(systemName: systemImage) }

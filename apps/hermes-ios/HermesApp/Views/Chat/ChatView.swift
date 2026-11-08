@@ -59,16 +59,14 @@ struct ChatScreen: View {
         // The pet (design-rules 11.3–11.4): a tap caresses it, a long press offers New Pet…; it
         // shows Hermes' state through its animation row.
         ToolbarItem(placement: .topBarLeading) {
-            BarButton(Text(petLabel), action: { store.caress() }) {
+            BarMenuButton(Text(petLabel), primaryAction: { store.caress() }) {
                 if let frame = PetSpriteView.sheet(store: store)?.frame(store.petAnimation, 0) {
                     PetAvatar.toolbarImage(frame, heart: heart ? model.accent : nil)
                 } else {
                     Image(systemName: "pawprint")
                 }
-            }
-            .contextMenu {
+            } menu: {
                 Button { model.showNewPet = true } label: { Label("New Pet…", systemImage: "sparkles") }
-                    .barMonochrome()
             }
             .sensoryFeedback(.impact(flexibility: .soft), trigger: store.caressedAt)
             .accessibilityHint(Text("Caresses the pet"))
