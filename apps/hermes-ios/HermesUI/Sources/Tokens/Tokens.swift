@@ -107,6 +107,10 @@ enum Metric {
     static let typingDot: CGFloat = 6
     /// A quote's leading rule (Mail's quote bar).
     static let quoteRule: CGFloat = 3
+    /// A reply's leading bar: as thick as a quote's rule (16.1).
+    static let replyBar: CGFloat = quoteRule
+    /// How far a message follows the finger before a swipe replies (Messages: about 60 pt).
+    static let replySwipe: CGFloat = 64
     /// File card's leading symbol box.
     static let fileSymbol: CGFloat = 40
     static let fileCardMaxWidth: CGFloat = 360

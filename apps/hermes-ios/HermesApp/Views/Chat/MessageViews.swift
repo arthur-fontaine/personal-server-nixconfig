@@ -10,9 +10,17 @@ struct MessageRow: View {
     let message: ChatMessage
     /// False when the message's question is shown as the approval card instead.
     var showsButtons = true
+    var highlighted = false
+    var onReply: () -> Void = {}
+    var onShowOriginal: (MessageID) -> Void = { _ in }
+    @State private var selecting = false
 
     var body: some View {
         VGroup(alignment: message.isOutgoing ? .trailing : .leading, spacing: .s) {
+            if let reply = store.replyPreview(for: message) {
+                ReplyContext(ReplyText.kind(reply), above: message.isOutgoing ? .owner : .hermes, accessibilityLabel: ReplyText.label(reply)) { onShowOriginal(reply.originalID) }
+                    .accessibilityIdentifier("chat.reply")
+            }
             if message.isOutgoing {
                 if !message.displayText.isEmpty {
                     UserBubble(message.displayText, state: bubbleState)
@@ -28,9 +36,16 @@ struct MessageRow: View {
             if showsButtons, !message.buttons.isEmpty, !message.isOutgoing { InlineKeyboard(message: message) }
         }
         .frame(maxWidth: .infinity, alignment: message.isOutgoing ? .trailing : .leading)
+        .replyHighlight(highlighted)
+        .swipeToReply(onReply)
         .contextMenu {
+            Button(action: onReply) { Label("Reply", systemImage: "arrowshape.turn.up.left") }
             Button { UIPasteboard.general.string = message.displayText } label: { Label("Copy", systemImage: "doc.on.doc") }
+            if !message.displayText.isEmpty {
+                Button { selecting = true } label: { Label("Select Text", systemImage: "selection.pin.in.out") }
+            }
         }
+        .sheet(isPresented: $selecting) { SelectTextSheet(message.displayText) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(message.isOutgoing ? "chat.owner" : "chat.hermes")
     }
@@ -40,6 +55,28 @@ struct MessageRow: View {
         case .pending: .pending
         case .failed: .failed
         default: .sent
+        }
+    }
+}
+
+/// A reply's words, in the owner's language (16.1, 16.4).
+enum ReplyText {
+    static func author(_ a: ReplyPreview.Author) -> Text { a == .you ? Text("You") : Text(verbatim: "Hermes") }
+
+    static func kind(_ r: ReplyPreview) -> ReplyContext.Kind {
+        switch r.content {
+        case .message(let a, let excerpt): .original(author: author(a), excerpt: Text(verbatim: excerpt))
+        case .loading: .loading
+        case .deleted: .deleted
+        }
+    }
+
+    static func label(_ r: ReplyPreview) -> Text {
+        switch r.content {
+        case .message(.you, let excerpt): Text("Reply to you: \(excerpt)")
+        case .message(.hermes, let excerpt): Text("Reply to Hermes: \(excerpt)")
+        case .loading: Text("Reply")
+        case .deleted: Text("Reply to a deleted message")
         }
     }
 }

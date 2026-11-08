@@ -19,6 +19,9 @@ struct ChatScreen: View {
     @State private var heart = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var composerFocused: Bool
+    /// The message the composer replies to (16.3), and the original a reply just jumped to (16.2).
+    @State private var replyingTo: ChatMessage?
+    @State private var highlighted: MessageID?
 
     var body: some View {
         Group {
@@ -127,7 +130,10 @@ struct ChatScreen: View {
                                 TranscriptRow(.system, after: i == 0 ? nil : Self.speaker(messages[i - 1])) { TimeLabel(message.date) }
                             }
                             TranscriptRow(Self.speaker(message), after: showTime ? .system : Self.speaker(messages[i - 1])) {
-                                MessageRow(message: message, showsButtons: !asked.contains(message.id))
+                                MessageRow(message: message, showsButtons: !asked.contains(message.id),
+                                           highlighted: highlighted == message.id,
+                                           onReply: { reply(to: message) },
+                                           onShowOriginal: { showOriginal($0, proxy: proxy) })
                             }
                             .id(message.id)
                         }
@@ -187,11 +193,32 @@ struct ChatScreen: View {
                             }
                             .transition(.scale.combined(with: .opacity))
                         }
-                        Composer(topic: topic, focused: $composerFocused)
+                        Composer(topic: topic, focused: $composerFocused, replyingTo: $replyingTo)
                     }
                 }
                 .animation(.snappy, value: atBottom)
             }
+        }
+    }
+
+    private func reply(to message: ChatMessage) {
+        replyingTo = message
+        composerFocused = true
+    }
+
+    /// Scrolls to a reply's original and lights it for a moment, loading older pages first when
+    /// it isn't loaded yet (16.2). With Reduce Motion the jump isn't animated.
+    private func showOriginal(_ id: MessageID, proxy: ScrollViewProxy) {
+        Task {
+            guard await store.loadAround(id, in: topic) else {
+                model.showToast(String(localized: "Message deleted"))
+                return
+            }
+            following = false
+            withAnimation(reduceMotion ? nil : .smooth) { proxy.scrollTo(id, anchor: .center) }
+            highlighted = id
+            try? await Task.sleep(for: .seconds(1.5))
+            if highlighted == id { highlighted = nil }
         }
     }
 
