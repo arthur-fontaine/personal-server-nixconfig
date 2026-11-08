@@ -14,7 +14,7 @@ Hermes** (is it working, is the server fine, how's the pet).
 | Telegram | Speed: instant cold start from a local DB, sticky composer, topics as a list | TDLib's local database for cold start; topics → sub-chats | Bubbles with tails and timestamps on every message, the chat list (we have one chat) |
 | Codex app | Approvals that show *what* will happen in plain words, raw command on demand; the pet reacting to the agent's state | Approval card (summary first, command collapsible), pet as the agent's mood | IDE-ish panes |
 | Things 3 | Calm surfaces, one accent colour, delight in small motion (the checkbox) | Restraint: one accent, white space, spring on completion | — |
-| Apple HIG, iOS 26 | Liquid Glass for the control layer only, content edge to edge; `NavigationSplitView` that collapses to a stack; standard bars pick up the material themselves | Standard bars/sheets/toolbars, glass only on our floating controls (composer, question tray, call controls) | Custom bar backgrounds (they fight the scroll-edge effect) |
+| Apple HIG, iOS 26 | Liquid Glass for the control layer only, content edge to edge; `NavigationSplitView` that collapses to a stack; standard bars pick up the material themselves | Standard bars/sheets/toolbars, glass only on our floating controls (composer, call controls) | Custom bar backgrounds (they fight the scroll-edge effect) |
 
 ## Research for the redesign (November 2026)
 
@@ -57,95 +57,77 @@ turns; body at the Dynamic Type `.body` size with about 6 pt of extra leading; o
 bold title style per screen; capsule controls 44–52 pt tall; one colour, used for
 one job.
 
-## Rules audit (every screen is checked against this list)
+## Correct by construction (HermesUI)
 
-Arthur chose: simple, by Apple's rules, the accent is the pet's colour, navigation from the
-chat (no tab bar). Each screenshot is audited item by item; a fail is fixed before it ships.
+The binding rules are `hermes-app-work/design-rules.md` (compiled from Apple's HIG). They are not
+checked after the fact: the app is built so that breaking one doesn't compile, fails the build, or
+fails a test.
 
-| # | Rule | How it's checked |
+| Layer | What it guarantees | Where |
 | --- | --- | --- |
-| R1 | Every spacing, padding, size and radius comes from `HermesApp/Design/Tokens.swift` (4-pt grid: 4, 8, 12, 16, 20, 24, 32); margins are the system's (`.scenePadding`, readable width on iPad) | `scripts/lint-design.sh` fails on `.padding(<n>)`, `spacing: <n>`, `.system(size:`, `cornerRadius: <n>`, `lineSpacing(<n>)`, `.frame(… <n>)` outside the token file |
-| R2 | SF Pro only, Dynamic Type text styles only (`.body`, `.headline`, `.subheadline`, `.footnote`, `.caption`); regular/semibold; monospaced only for code; works at AX5 | lint (`.system(size:`, `design: .serif/.rounded`, `.width(`); a screenshot at the largest accessibility size |
-| R3 | Semantic system colours only; one accent = the pet's colour as the app's `.tint`, ≥ 4.5:1 against every background it sits on (light: white, `#F2F2F7`; dark: black, `#1C1C1E`, `#2C2C2E`), its label black or white whichever is ≥ 4.5:1; destructive = `.red`; status dots `.green/.orange/.blue` only | contrast computed by `PetColor` (unit-tested), lint (`Color(red:` outside the colour code) |
-| R4 | Corners concentric: a card's radius = its padding + the radius of the capsules inside it; buttons and the composer are capsules; any other radius is a named token | tokens; screenshot |
-| R5 | Native components first: `NavigationStack` + `.toolbar` placements, `toolbarTitleMenu`, `navigationSubtitle`, `List`, `Menu`, sheets with detents, bordered/prominent buttons at `.controlSize(.large)`, `safeAreaInset` for the composer, the system's scroll edge effect; glass only on the bars and floating controls; no custom shadow or blur | code review; screenshot (content under the bars fades) |
-| R6 | Hit targets ≥ 44×44 pt; one leading edge for all chat content (text, code, card, composer) | screenshot measured |
-| R7 | Chat: Hermes' text without bubble at `.body`; the owner's bubble in the accent fill with its contrast label; approval card: `.headline` sentence, *Show command* disclosure, `.large` buttons | screenshot |
-| R8 | Navigation A: the pet (leading toolbar item) opens its sheet (needs, actions, then Dashboard, Settings); the title "Hermes ⌄" opens the chat list; **private sub-chats never show their name** (chat list, sidebar, title before Face ID, notifications, Live Activity, widgets, app switcher snapshot): "Private chat" + lock | screenshot of the title menu and the sidebar |
-| H1 | Text never truncated where it matters, no clipped labels in French or at AX sizes | screenshots fr/en, AX5 |
-| H2 | Light and dark both checked; Reduce Transparency/Increase Contrast left to the system | screenshots |
+| **HermesUI** (framework) | Tokens are types — `Spacing` (4-pt grid: 4…32), `Rhythm` (24 between speakers, 12 within a turn), `TextRole` (Dynamic Type styles, monospaced only for code), `Tone`, `Surface` (system fill tiers), `Emphasis`, `PetSize`, `IconSize` — and no public API takes a number or a colour. Components encode the rules: `CardSurface` (fill, clip and hit from one shape, no stroke API, corner = inset + inner control radius, so concentric), `ActionRow` (one height, capsules in a row, rounded rectangles concentric with the card when stacked — always at AX sizes —, primary trailing and never destructive, "…" a circle of the row's height), `ApprovalCard`, `ChatColumn` (the one leading edge: the system margin; 672-pt readable width), `TranscriptRow` (the rhythm by speaker), `UserBubble`, `CodeBlock`, `IconButton`, `PetAvatar` (square, circle-clipped), `ComposerBar`/`BarButton`/`Toast` (`Chrome/`: the only glass), `PetAccent` | `HermesUI/Sources` |
+| **DesignCheck** (build phase of HermesUI) | A SwiftSyntax checker failing the build on: styling modifiers in a screen (`.padding`, `.font`, `.foregroundStyle`, `.background`, `.tint`, `.buttonStyle`…), layout numbers outside `Tokens.swift`, raw colours and font sizes, shapes drawn by a screen, strokes/borders/shadows anywhere, Liquid Glass outside `Chrome/`, numbers or colours in HermesUI's public API. One fixture per rule (`swift test` in `Tools/DesignCheck`). Screens not migrated yet are listed in `Tools/DesignCheck/phase2-screens.txt`, which only shrinks | `Tools/DesignCheck`, `scripts/design-check.sh` |
+| **Unit tests** | The accent reads at ≥ 4.5:1 (7:1 on the background with Increase Contrast) on every system background, light and dark, for 75 pet colours, with a ≥ 4.5:1 label; `ActionRow` refuses a destructive or second primary; spacing on the grid; concentric radii; the rhythm | `HermesUI/Tests` |
+| **Geometric UI tests** | On the running app (iPhone 17 Pro, iPad Pro 13"): one leading x for text, code, card and composer (16 pt on iPhone); the readable column; every gap on the scale and by relation; the approval's buttons one height ≥ 44, primary trailing; measured concentric corners; hit targets; stacked answers at AX5; round controls with \|w − h\| ≤ ½ pt; no private sub-chat name on screen | `HermesUITests/GeometryTests.swift` |
+| **Review rounds** | `scripts/review-shots.sh` renders the chat, chats menu, pet sheet and the component catalogue (`-catalog <page>`) in light, dark, AX5, French and with another pet; a separate reviewer inspects zoomed crops | `HermesUITests/ReviewShots.swift` |
+
+The yardstick for margins, bars, rows and fills is Apple's own apps measured on the same simulator
+(16-pt margins, 44-pt Back items, 36-pt trailing items, 26-pt grouped sections, Messages' composer:
+a "+" circle and a glass field).
 
 ## Principles
 
 1. **One conversation, full width.** Hermes' messages are not bubbles: they
    read as a document (like ChatGPT/Claude), full width, the owner's own
-   messages are compact tinted bubbles on the right. That gives code blocks
+   messages are compact neutral bubbles on the right. That gives code blocks
    and tables room and makes streaming read as writing, not chatting.
-2. **The answer is always one tap away.** A pending question floats above the
-   composer as a glass tray wherever you are; the Live Activity carries the same
-   buttons on the lock screen and in the Dynamic Island.
+2. **The answer is always one tap away.** A pending question is the last item of
+   its chat, above the composer; the Live Activity carries the same buttons on
+   the lock screen and in the Dynamic Island.
 3. **The pet is the agent's face.** One character expresses Hermes' state
    everywhere: the chat header, the call screen, the widget, the Live
    Activity, the app icon. No spinners where the pet can say it.
 4. **Glass for controls, never for content.** System bars as they come; our
-   floating controls (composer, question tray, call controls) in one
-   `GlassEffectContainer` each. Buttons that scroll with the content (inline
-   keyboards, pet actions, the login steps) are bordered, and buttons inside a
-   glass surface are filled, never glass on glass (as in system alerts). Native
-   components over drawn ones: the sidebar's own selection, `Gauge` and
-   `ProgressView` for needs and level, `.badge` for unread counts and pending
-   questions, the tab bar's bottom accessory for Hermes' status away from the
-   chat.
+   floating controls (the composer, call controls) in one `GlassEffectContainer`
+   each, and only in HermesUI's `Chrome/` (DesignCheck enforces it). The
+   approval card and everything that scrolls are content: system fills, bordered
+   and prominent buttons. Native components over drawn ones: system rows and
+   their selection, `Gauge` for needs and level, `.badge` for unread counts.
 5. **Fast and honest.** Cold start shows the last messages from TDLib's DB
    before the network is up; a thin status line says "Connecting…" rather than
    a blocking spinner.
 
 ## Information architecture
 
+No tab bar: the chat is the app (Arthur: « une navbar en bas … ultra has been et useless »).
+
 ```
-Hermes
-├── Chats
-│   ├── Hermes (main chat)               ← default
-│   └── Sub-chats (forum topics)        ← 🔒 private ones behind Face ID
-│        └── + New sub-chat (preset, name) → "/sub new …" in the main chat
-├── Pet          (status, needs, feed/play/sleep, level)
-├── Dashboard    (models usage 24h/7d/30d · machine: CPU, RAM, disk, power)
-└── Settings     (account, devices & reinstall, notifications, big files, about)
-Overlays: Call (full screen) · Question tray · Login (first run)
+Main chat (root)
+├── toolbar leading: the pet → its sheet: mood, needs, Feed/Play/Nap, level,
+│                                       then Dashboard and Settings (pushed in the sheet)
+├── title "Main chat ⌄" → the chats (main, sub-chats; a private one is "Private chat" + lock),
+│                          New Sub-chat
+└── toolbar trailing: Call
+Overlays: Call (full screen) · Login (first run) · New sub-chat (sheet)
 Hidden: the "App" topic (machine traffic)
 ```
 
 ### iPhone (compact width)
 
-- `TabView` with four tabs: **Chat**, **Pet**, **Dashboard**, **Settings**,
-  with iOS 26's tab bar that minimizes on scroll. The call button sits in the
-  chat's toolbar. The Chat tab's badge counts Hermes' open questions; on the
-  other tabs, while Hermes works or waits, the tab bar's bottom accessory shows
-  its status (or its question) and opens that chat (iOS 26.1+).
-- Chat tab = `NavigationStack`: root is the **main chat** (the daily case: one
-  tap fewer). The title menu (`Hermes ▾`) opens the sub-chat list as a sheet
-  with detents; picking one pushes it.
-- Landscape iPhone: same structure; the composer keeps its height.
+- One `NavigationStack` whose root is the open chat; picking a chat in the title menu replaces it.
+- The system toolbar: the pet (a still frame of its sprite as the image of the bar's own circular
+  item), the chat's name as title (`toolbarTitleMenu`) with Hermes' state as `navigationSubtitle`,
+  Call. Never the app's name as a title (HIG Toolbars): the main chat is "Main chat".
+- The composer is pinned with `safeAreaBar(edge: .bottom)`, so the scroll edge effect runs under
+  it; Stop replaces Send while Hermes writes. The transcript follows its bottom as it grows until
+  the owner scrolls away.
 
 ### iPad and wide windows (regular width)
 
-- `NavigationSplitView`, three columns, which collapses to the iPhone layout
-  in Slide Over / narrow Stage Manager windows (by size class, not device):
-  - **Sidebar**: the pet card on top (its mood at a glance), then *Chats*
-    (main + sub-chats, private ones with a lock), then *Pet*, *Dashboard*,
-    *Settings*.
-  - **Content/detail**: the selected chat, the conversation column capped at
-    a readable 760 pt and centred, so a 13" landscape iPad isn't a 1300 pt-wide
-    line of text.
-  - **Inspector** (chat only, regular width): a trailing inspector with the
-    agent's live status, pending questions and the sub-chat's policy, toggled
-    from the toolbar; on by default in landscape ≥ 1180 pt.
-- Dashboard on iPad: a two/three-column adaptive grid of cards (`LazyVGrid`
-  with adaptive columns), not a stretched list.
-- Pet on iPad: sprite and needs side by side.
-- Keyboard: ⌘↩ sends, ⌘N new sub-chat, ⌘1…4 sections, ⌘⇧C call; hardware
-  keyboard return sends, ⇧↩ new line.
-- Multiple windows supported (`UIApplicationSupportsMultipleScenes`).
+- `NavigationSplitView`: the sidebar lists the pet (its sheet), the chats (system rows, badges),
+  New Sub-chat, Dashboard, Settings; the detail is the chat in a 672-pt readable column, Call
+  trailing. A narrow window (Slide Over, Stage Manager) gets the iPhone layout by size class.
+- Keyboard: ⌘↩ sends, ⌘N new sub-chat, ⌘⇧C call.
 
 ## User flows
 
@@ -177,9 +159,9 @@ Hidden: the "App" topic (machine traffic)
 - **Approve from the lock screen**: Live Activity "Hermes needs you · Delete
   backups older than 90 days" → *Once* / *Deny* buttons, no unlock for Deny,
   Face ID for Allow (App Intent `authenticationPolicy`).
-- **Approve in app**: the question tray slides up over the composer: summary
-  in a sentence, *Show command* reveals the raw command in mono, buttons below.
-  Answered → the tray collapses with a spring and a success haptic.
+- **Approve in app**: the approval card is the chat's last item: the summary as
+  a question, *Show Command* reveals the raw command in mono, Allow Once / Deny /
+  "…" below. Answered → the card goes, with a success haptic.
 - **Private sub-chat**: tap 🔒 Taxes → Face ID → the view unblurs; if Hermes
   says it's locked, the app sends `/sub unlock` with the Keychain passphrase
   and deletes it. Leaving the app relocks the view (not the server).
@@ -215,53 +197,32 @@ Hidden: the "App" topic (machine traffic)
 | Screen | iPhone | iPad |
 | --- | --- | --- |
 | Login | full screen, centred column | same, max width 440 in a centred card |
-| Chat | stack, composer pinned, question tray above it | split view detail, readable column, inspector |
-| Sub-chats | sheet from the title menu | sidebar section |
+| Chat | stack, composer pinned, the question as the last item | split view detail, readable column |
+| Sub-chats | the title menu | sidebar section |
 | New sub-chat | sheet (medium detent) | form sheet |
-| Pet | scroll: sprite, mood line, needs, actions, level | two columns: sprite / needs+actions |
+| Pet | sheet from the pet in the bar (medium/large) | the same sheet, from the sidebar |
 | Dashboard | scroll of cards | adaptive grid of cards |
 | Settings | inset grouped list | same in the detail column |
 | Call | full screen cover | full screen cover |
 
 ## Message rendering
 
-- Hermes' messages: full-width text, `.body` with 1.35 line height, Telegram
-  entities rendered (bold, italic, code, links, block quotes); `pre` blocks in
-  a rounded mono card with the language and a copy button, horizontally
-  scrollable (no wrapping in code).
-- The owner's messages: right-aligned bubble, accent tint at 15 %, max 80 %
-  width.
-- Time stamps are not on every message: a centred day/time separator when the
-  gap is > 20 min (Messages-style).
-- Inline keyboards: a row of bordered buttons under the message; once Hermes
-  edits the card (answered), the buttons go.
-- `[fichier: url]`: a file card (icon by extension, name, service, *Open*),
-  on both sides; the marker itself is hidden from the text.
-- Attachments from Telegram: documents as file cards, photos inline (thumbnail
-  first, full size on tap).
-
-### Streaming
-
-TDLib delivers a bot's native draft as `updatePendingMessage` (main chat) and
-the topics' streaming as `updateMessageContent` edits. Both render the same:
-
-- One `StreamingText` view per in-flight message; it renders the full text
-  each update (they come every ~100–300 ms) but **appends without re-layout**
-  of earlier lines: the text is split into settled paragraphs (cached
-  `AttributedString`s) and the last, growing paragraph. Only the last one
-  re-renders.
-- The newest characters fade in over 150 ms (opacity mask on the tail),
-  ChatGPT-style; no per-character animation (it janks on long code).
-- Scroll follows the bottom only while the user is at the bottom (within
-  80 pt); otherwise a "↓ New" glass pill appears.
-- When the final message arrives it replaces the draft in place with the same
-  id slot, so nothing jumps.
+- Hermes' messages: no bubble, `.body`, full column width; code blocks on the grouped fill with a
+  concentric corner (the 12-pt minimum outside a card), monospaced `.callout`, scrolling sideways,
+  Copy in the context menu; quotes behind a quiet rule.
+- The owner's messages: a neutral bubble (`secondarySystemFill`, as Messages' other party),
+  trailing, a capsule at one line (12 × 8 pt padding); not the accent, which stays for what acts.
+- Rhythm: 24 pt between speakers, 12 pt within a turn; a centred time when messages are > 20 min
+  apart.
+- Hermes' open question is the transcript's last item: an `ApprovalCard` (content layer, the
+  grouped fill, no glass): the summary as `.headline`, *Show Command* as a disclosure, then Allow
+  Once (prominent, trailing), Deny (red label on the neutral fill), "…" for the other answers. The
+  message the question came with doesn't repeat its buttons.
+- Inline keyboards: `ActionRow`s of secondary buttons.
 
 ## Motion
 
 - Springs everywhere (`.smooth`, `.snappy`); nothing linear except progress.
-- Question tray: slides up from the composer (matched glass morph inside the
-  composer's `GlassEffectContainer`).
 - Sending: the bubble rises from the composer (matched geometry).
 - Pet: sprite frames at the atlas' own rhythm (≈ 4–9 fps), never
   interpolated; a reaction (feed/play) plays the one-shot row then returns.
@@ -269,28 +230,18 @@ the topics' streaming as `updateMessageContent` edits. Both render the same:
 
 ## Typography
 
-- SF Pro (system) for UI and chat; Dynamic Type everywhere, from xSmall to
-  AX5 (chat body uses `.body`, never fixed sizes).
-- SF Mono for code, commands and numbers in the dashboard (`.monospacedDigit()`
-  on all live figures so they don't jitter).
-- Headlines in the dashboard and pet: `.title2.weight(.semibold)`, rounded
-  design (`.fontDesign(.rounded)`) for the pet's name and level only: the pet
-  is the one playful element.
+SF Pro only, Dynamic Type text styles only (`TextRole`): `.body` for messages, `.headline` for a
+card's question, `.subheadline`/`.footnote`/`.caption` for secondary lines, `.callout.monospaced()`
+for code. Regular and semibold. Everything works to AX5: answers stack, nothing truncates.
 
 ## Colour
 
-- Accent: **Hermes amber** `#F2A43A` (light) / `#F6B451` (dark): warm, the
-  messenger's gold, distinct from Telegram blue and system blue. Used for the
-  owner's bubble tint, primary buttons, the pet's level ring.
-- Status colours, used only for status: working = blue (`.blue`),
-  thinking = indigo, waiting for you = amber (accent), error = red,
-  idle = secondary.
-- Backgrounds: system grouped backgrounds; no custom bar colours (Liquid
-  Glass decides).
-- Dark mode first-class; the pet sits on a soft radial gradient of its mood
-  colour.
-- Contrast: every text/background pair ≥ 4.5:1; glass controls use
-  `.regular` glass with `.tint` only for the primary action.
+- One accent: the pet's colour (`PetAccent`), the dominant hue of its sprite, its lightness moved
+  per appearance until it reads at ≥ 4.5:1 on every system background (7:1 on the screen's with
+  Increase Contrast) and its label (black or white) at ≥ 4.5:1. It colours the primary answer, the
+  send/stop button, links and selection — not the toolbar (monochrome), not the bubbles.
+- Everything else is semantic: `.primary`/`.secondary`, the system background and fill tiers.
+  Destructive is the system red role, never prominent.
 
 ## App icon
 
@@ -306,13 +257,10 @@ a sub-chat, a private one, the palette, the new sub-chat form, pet,
 dashboard, settings, login, call) on an iPhone 17 Pro and an iPad Pro 13", in
 portrait and landscape. What it showed and what the layouts do:
 
-- iPhone portrait: tabs; landscape (compact height): the question tray drops
-  the command disclosure and the pet goes two-column, so the conversation
-  keeps room.
+- iPhone: one stack, the chat at its root; landscape keeps the same structure.
 - iPad: split view with the floating iOS 26 sidebar; the conversation's
   readable column is padded inside the detail's safe area (not measured from
-  the container, which extends under the sidebar); the inspector shows in
-  landscape; the dashboard grid has two columns in portrait, three in
+  the container, which extends under the sidebar); the dashboard grid has two columns in portrait, three in
   landscape; sheets are form-sized (the palette full-height, since a half
   height shows three rows).
 - Narrow iPad windows (Slide Over, Stage Manager) fall back to the iPhone
@@ -322,9 +270,9 @@ portrait and landscape. What it showed and what the layouts do:
 
 English and French, following the device. French uses *tu*, Apple's French
 terms and French typography (no-break spaces before `:`, `?`, `!`, guillemets).
-Layouts are measured rather than sized for English: the question tray's answers
-go from one row to two columns when the labels don't fit (`ViewThatFits`), and
-costs use the narrow currency form ("0,48 $").
+Layouts are measured rather than sized for English: an `ActionRow` stacks its
+answers when a label doesn't fit on one line (`ViewThatFits`), and costs use the
+narrow currency form ("0,48 $").
 
 ## Accessibility
 
