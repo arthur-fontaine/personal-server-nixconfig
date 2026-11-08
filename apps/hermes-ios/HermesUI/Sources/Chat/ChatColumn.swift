@@ -210,6 +210,8 @@ enum Fade {
     static let pending = 0.6
     /// A hand-drawn control while pressed.
     static let pressed = 0.5
+    /// The area under a sparkline's line.
+    static let chartArea = 0.15
 }
 
 /// Hermes is writing: three dots, the only motion besides the text itself (design-rules 7.1).

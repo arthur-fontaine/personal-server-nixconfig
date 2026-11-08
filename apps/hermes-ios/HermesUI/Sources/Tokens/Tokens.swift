@@ -85,6 +85,11 @@ enum Metric {
     static let square: CGFloat = 1
     /// One pixel, counting inclusive pixel bounds.
     static let pixel: CGFloat = 1
+    /// A sparkline under a list row (a third of a row's width tall on iPhone, as Battery's).
+    static let chartHeight: CGFloat = 64
+    static let chartTicks = 3
+    /// Past this, usage is shown in red.
+    static let criticalUsage = 0.9
     /// Typing indicator dot.
     static let typingDot: CGFloat = 6
     /// A quote's leading rule (Mail's quote bar).
