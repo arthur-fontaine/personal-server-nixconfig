@@ -148,7 +148,8 @@ final class ReviewShots: XCTestCase {
     }
 
     func testCatalog() throws {
-        for page in ["type", "surfaces", "actions", "approval", "chat", "files", "composer", "accent"] {
+        for page in ["type", "surfaces", "actions", "approval", "chat", "files", "composer", "accent",
+                     "buttons", "lists", "metrics", "call", "onboarding", "bar"] {
             let app = launch(["-catalog", page])
             Thread.sleep(forTimeInterval: 2)
             try shot("catalog-\(page)")
