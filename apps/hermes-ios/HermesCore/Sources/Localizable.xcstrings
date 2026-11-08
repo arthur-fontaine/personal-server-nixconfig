@@ -471,6 +471,16 @@
         }
       }
     },
+    "Merged: the fix is on main, and the gateway hasn't restarted since.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fusionné : le correctif est sur main, et la passerelle n’a pas redémarré depuis."
+          }
+        }
+      }
+    },
     "Model": {
       "localizations": {
         "fr": {

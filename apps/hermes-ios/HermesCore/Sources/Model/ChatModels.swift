@@ -129,6 +129,38 @@ public struct ChatMessage: Hashable, Sendable, Codable, Identifiable {
     public var fileLinks: [FileLink] { FileLink.parse(text.text) }
 }
 
+/// What a reply shows above itself (design-rules 16.1): who wrote the original and its first
+/// line — or that it is still being fetched, or gone.
+public struct ReplyPreview: Hashable, Sendable {
+    public enum Author: Hashable, Sendable { case you, hermes }
+    public enum Content: Hashable, Sendable {
+        case message(author: Author, excerpt: String)
+        case loading
+        case deleted
+    }
+
+    public var originalID: MessageID
+    public var content: Content
+
+    public init(originalID: MessageID, content: Content) {
+        self.originalID = originalID
+        self.content = content
+    }
+
+    public init(original m: ChatMessage) {
+        self.init(originalID: m.id, content: .message(author: m.isOutgoing ? .you : .hermes, excerpt: Self.excerpt(of: m)))
+    }
+
+    /// The original's first line of text (code fences and file markers left out), or its file's
+    /// name when it has no text.
+    public static func excerpt(of m: ChatMessage) -> String {
+        let line = m.displayText.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty && !$0.hasPrefix("```") }
+        return line ?? m.attachment?.name ?? m.fileLinks.first?.url.lastPathComponent ?? ""
+    }
+}
+
 /// A message the bot is still writing: Telegram's native draft in the main chat
 /// (`updatePendingMessage`), shown until the real message arrives.
 public struct StreamingDraft: Hashable, Sendable {
