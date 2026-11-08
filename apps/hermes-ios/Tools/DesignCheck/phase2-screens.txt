@@ -6,5 +6,4 @@
 ../../HermesApp/Views/Dashboard/DashboardView.swift
 ../../HermesApp/Views/Login/LoginFlow.swift
 ../../HermesApp/Views/Onboarding/Onboarding.swift
-../../HermesApp/Views/Settings/SettingsView.swift
 ../../HermesWidgets/HermesWidgetBundle.swift

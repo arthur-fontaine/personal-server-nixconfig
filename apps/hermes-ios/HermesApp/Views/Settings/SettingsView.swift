@@ -1,4 +1,5 @@
 import HermesCore
+import HermesUI
 import SwiftUI
 import UserNotifications
 
@@ -16,7 +17,7 @@ struct SettingsView: View {
                 LabeledContent("Agent", value: "@\(store.bot?.username ?? store.config.botUsername)")
                 LabeledContent("Connection", value: connectionLabel)
                 if store.config.demo {
-                    Label("Demo data: this build has no Telegram API id.", systemImage: "theatermasks").foregroundStyle(.secondary)
+                    Label("Demo data: this build has no Telegram API id.", systemImage: "theatermasks").tone(.secondary)
                 }
             }
 
@@ -38,7 +39,7 @@ struct SettingsView: View {
                 HStack {
                     Label("Notifications", systemImage: "bell.badge")
                     Spacer()
-                    Text(notificationLabel).foregroundStyle(.secondary)
+                    Text(notificationLabel).tone(.secondary)
                 }
                 if notifications == .notDetermined {
                     Button("Turn On Notifications") { Task { await NotificationService.shared.requestAuthorization(); await refresh() } }
@@ -66,16 +67,17 @@ struct SettingsView: View {
             if !store.delivery.devices.isEmpty {
                 Section {
                     ForEach(store.delivery.devices) { d in
-                        VStack(alignment: .leading, spacing: 3) {
+                        VGroup(spacing: .xxs) {
                             HStack {
-                                Text(d.name).font(.body.weight(.medium))
-                                if d.reachable == false { Text("away").font(.caption).foregroundStyle(.secondary) }
+                                Text(d.name).textRole(.body)
+                                if d.reachable == false { Text("away").textRole(.caption).tone(.secondary) }
                                 Spacer()
-                                if let b = d.build { Text(b).font(.caption).foregroundStyle(.secondary) }
+                                if let b = d.build { Text(b).textRole(.caption).tone(.secondary) }
                             }
                             if let exp = d.profileExpiry {
+                                // Orange within two days of the signature's end.
                                 Text("Signature valid until \(exp.formatted(date: .abbreviated, time: .shortened))")
-                                    .font(.caption).foregroundStyle(exp.timeIntervalSinceNow < 2 * 86400 ? .orange : .secondary)
+                                    .textRole(.caption).tone(exp.timeIntervalSinceNow < 2 * 86400 ? .warning : .secondary)
                             }
                         }
                     }
@@ -107,10 +109,7 @@ struct SettingsView: View {
                 LabeledContent("Apple team", value: store.config.paidTeam ? String(localized: "Paid") : String(localized: "Free personal"))
             }
         }
-        // A readable column in a wide window, as Settings does on iPad.
-        .frame(maxWidth: 720)
-        .frame(maxWidth: .infinity)
-        .background(Color(.systemGroupedBackground))
+        .readableGroupedList()
         .navigationTitle("Settings")
         .task { await refresh() }
         .confirmationDialog("Log out of Telegram on this device?", isPresented: $confirmLogout, titleVisibility: .visible) {
