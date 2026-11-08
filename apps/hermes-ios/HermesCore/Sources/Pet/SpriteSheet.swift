@@ -10,9 +10,17 @@ public final class SpriteSheet: @unchecked Sendable {
     private var cache: [Int: CGImage] = [:]
     private let lock = NSLock()
 
-    public init?(url: URL, layout: PetAtlasLayout = .codex) {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCache: true] as CFDictionary) else { return nil }
+    public convenience init?(url: URL, layout: PetAtlasLayout = .codex) {
+        guard let image = Self.decode(url) else { return nil }
+        self.init(image: image, layout: layout)
+    }
+
+    public static func decode(_ url: URL) -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCache: true] as CFDictionary)
+    }
+
+    public init(image: CGImage, layout: PetAtlasLayout = .codex) {
         self.image = image
         // A sheet of another size keeps the 8×9 grid: cells scale with it.
         if image.width != layout.columns * layout.cellWidth {
@@ -36,6 +44,13 @@ public final class SpriteSheet: @unchecked Sendable {
     // One decoded sheet per file: the chat header, the sidebar and the pet screen share it.
     nonisolated(unsafe) private static var shared: [URL: SpriteSheet] = [:]
     private static let sharedLock = NSLock()
+
+    /// Puts a sheet in the cache for a file (the demo's recoloured pet).
+    public static func register(_ sheet: SpriteSheet, for url: URL) {
+        sharedLock.lock()
+        defer { sharedLock.unlock() }
+        shared[url] = sheet
+    }
 
     public static func cached(url: URL) -> SpriteSheet? {
         sharedLock.lock()

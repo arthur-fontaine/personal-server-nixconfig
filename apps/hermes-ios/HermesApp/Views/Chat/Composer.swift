@@ -1,9 +1,11 @@
 import HermesCore
+import HermesUI
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The floating glass composer. Files over Telegram's cap say where they'll go before sending.
+/// The composer: `ComposerBar` with the attach menu, files waiting and uploads above it. Files
+/// over Telegram's cap say where they'll go before sending.
 struct Composer: View {
     @Environment(HermesStore.self) private var store
     @Environment(AppModel.self) private var model
@@ -17,63 +19,36 @@ struct Composer: View {
     @State private var lastTyping = Date.distantPast
 
     var body: some View {
-        GlassEffectContainer(spacing: 10) {
-            VStack(spacing: 8) {
-                ForEach(store.uploads.values.sorted { $0.name < $1.name }, id: \.name) { u in
-                    UploadRow(upload: u)
-                }
-                if !files.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(files) { f in fileChip(f) }
-                        }
-                    }
-                }
-                HStack(alignment: .bottom, spacing: 10) {
-                    Menu {
-                        Button { model.showCommands = true } label: { Label("Commands", systemImage: "command") }
-                        Divider()
-                        Button { importing = true } label: { Label("File", systemImage: "doc") }
-                        PhotosPicker(selection: $photos, maxSelectionCount: 10, matching: .any(of: [.images, .videos])) {
-                            Label("Photos & Videos", systemImage: "photo.on.rectangle")
-                        }
-                    } label: {
-                        Image(systemName: "plus").font(.title3.weight(.medium)).frame(width: 32, height: 32)
-                    }
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.circle)
-                    .accessibilityLabel("Attach")
-                    .accessibilityIdentifier("composer.attach")
-
-                    HStack(alignment: .bottom) {
-                        TextField(placeholder, text: $text, axis: .vertical)
-                            .lineLimit(1...8)
-                            .focused(focused)
-                            .accessibilityIdentifier("composer.field")
-                            .padding(.vertical, 11)
-                            .padding(.leading, 16)
-                            .onChange(of: text) { old, new in
-                                // "/" on an empty composer opens the palette instead of Telegram's raw commands.
-                                if old.isEmpty, new == "/" { text = ""; model.showCommands = true }
-                                typingPing()
+        VGroup(spacing: .xs) {
+            ForEach(store.uploads.values.sorted { $0.name < $1.name }, id: \.name) { u in
+                UploadBar(title: Text("Uploading \(u.name) to \(u.service)"), fraction: u.fraction)
+            }
+            if !files.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HGroup(spacing: .xs) {
+                        ForEach(files) { f in
+                            let size = f.size.formatted(.byteCount(style: .file))
+                            AttachmentChip(symbol: FileKind.symbol(for: f.url.lastPathComponent), name: f.url.lastPathComponent,
+                                           detail: f.size > store.client.uploadLimit ? String(localized: "\(size), via \(store.uploader.serviceName)") : size) {
+                                files.removeAll { $0.id == f.id }
                             }
-                        // Inside the glass field: filled, as Messages' send button (never glass on glass).
-                        Button(action: send) {
-                            Image(systemName: sending ? "ellipsis" : "arrow.up")
-                                .font(.body.weight(.bold))
-                                .frame(width: 22, height: 22)
-                                .contentTransition(.symbolEffect(.replace))
                         }
-                        .buttonStyle(.borderedProminent)
-                        .buttonBorderShape(.circle)
-                        .disabled(!canSend)
-                        .keyboardShortcut(.return, modifiers: .command)
-                        .padding(5)
-                        .accessibilityLabel("Send")
-                        .accessibilityIdentifier("composer.send")
                     }
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 22))
                 }
+            }
+            ComposerBar(text: $text, placeholder: Text(placeholder), action: composerAction, focus: focused,
+                        onSend: send, onStop: { store.stopDraft(in: topic) }) {
+                Button { model.showCommands = true } label: { Label("Commands", systemImage: "command") }
+                Divider()
+                Button { importing = true } label: { Label("File", systemImage: "doc") }
+                PhotosPicker(selection: $photos, maxSelectionCount: 10, matching: .any(of: [.images, .videos])) {
+                    Label("Photos & Videos", systemImage: "photo.on.rectangle")
+                }
+            }
+            .onChange(of: text) { old, new in
+                // "/" on an empty composer opens the palette instead of Telegram's raw commands.
+                if old.isEmpty, new == "/" { text = ""; model.showCommands = true }
+                typingPing()
             }
         }
         .sheet(isPresented: Bindable(model).showCommands) {
@@ -96,27 +71,17 @@ struct Composer: View {
         }
     }
 
+    /// Stop replaces Send while Hermes writes here and the draft can be stopped.
+    private var composerAction: ComposerAction {
+        if sending { return .sending }
+        if text.isEmpty, files.isEmpty, store.drafts[topic]?.canStop == true { return .stop }
+        return .send(enabled: canSend)
+    }
+
     private var placeholder: String { topic == .main ? String(localized: "Message Hermes") : String(localized: "Message") }
 
     private var canSend: Bool {
         !sending && (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !files.isEmpty)
-    }
-
-    private func fileChip(_ f: PendingFile) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: FileKind.symbol(for: f.url.lastPathComponent))
-            VStack(alignment: .leading, spacing: 0) {
-                Text(f.url.lastPathComponent).font(.caption.weight(.semibold)).lineLimit(1).truncationMode(.middle)
-                let size = ByteCountFormatter.string(fromByteCount: f.size, countStyle: .file)
-                Text(f.size > store.client.uploadLimit ? String(localized: "\(size) · via \(store.uploader.serviceName)") : size)
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
-            Button { files.removeAll { $0.id == f.id } } label: { Image(systemName: "xmark.circle.fill") }
-                .buttonStyle(.plain).foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 10).padding(.vertical, 6)
-        .frame(maxWidth: 220)
-        .glassEffect(in: .rect(cornerRadius: 14))
     }
 
     private func addFile(_ url: URL, securityScoped: Bool) {
@@ -165,19 +130,6 @@ struct PendingFile: Identifiable, Equatable {
     let id = UUID()
     let url: URL
     let size: Int64
-}
-
-struct UploadRow: View {
-    let upload: UploadProgress
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Uploading \(upload.name) to \(upload.service)").font(.caption.weight(.medium)).lineLimit(1)
-            ProgressView(value: upload.fraction)
-        }
-        .padding(10)
-        .glassEffect(in: .rect(cornerRadius: 14))
-    }
 }
 
 /// A photo or video from the library, as a file (videos can be many GB: never in memory).

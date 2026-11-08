@@ -1,4 +1,5 @@
 import HermesCore
+import HermesUI
 import SwiftUI
 
 /// The pet, animated from its Codex atlas. `animation: nil` follows the store (Hermes' status,
@@ -7,10 +8,16 @@ struct PetSpriteView: View {
     @Environment(HermesStore.self) private var store: HermesStore?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var animation: PetAnimation?
-    var size: CGFloat
+    var size: PetSize
     var still = false
 
     var body: some View {
+        PetAvatar(size) { sprite }
+            .accessibilityLabel(accessibilityText)
+            .accessibilityIdentifier("pet.avatar")
+    }
+
+    @ViewBuilder private var sprite: some View {
         let sheet = Self.sheet(store: store)
         let mood = store?.petMood ?? .content
         let base = animation ?? store?.pet?.animation ?? mood.animation
@@ -27,11 +34,9 @@ struct PetSpriteView: View {
                     }
                 }
             } else {
-                Image(systemName: "bird.fill").resizable().scaledToFit().foregroundStyle(.tint).padding(size * 0.2)
+                Image(systemName: "bird.fill").resizable().scaledToFit().tone(.accent)
             }
         }
-        .frame(width: size, height: size * 208 / 192)
-        .opacity(animation == nil && mood == .asleep ? 0.75 : 1)
         .task(id: reaction) {
             // A reaction plays its row once, then the mood's loop resumes.
             guard let reaction, reaction.isOneShot || reaction == .idle else { return }
@@ -50,7 +55,7 @@ struct PetSpriteView: View {
             if let cg = sheet.frame(row, index) {
                 Image(decorative: cg, scale: 1).resizable().interpolation(.none).scaledToFit()
             } else {
-                Color.clear
+                EmptyView()
             }
         }
     }
@@ -103,18 +108,20 @@ extension AgentStatus {
     }
 }
 
+/// Hermes' status in words with its symbol; secondary, as Apple's subtitles (colour is kept for
+/// actions, design-rules 4.2).
 struct AgentStatusLabel: View {
     let agent: AgentState
     var compact = false
 
     var body: some View {
-        HStack(spacing: 5) {
+        Label {
+            Text(compact || agent.task == nil ? agent.status.label : agent.task!)
+        } icon: {
             Image(systemName: agent.status.symbol)
                 .symbolEffect(.pulse, isActive: agent.status.isBusy)
-            Text(compact || agent.task == nil ? agent.status.label : agent.task!)
-                .lineLimit(1)
         }
-        .font(compact ? .caption.weight(.medium) : .subheadline.weight(.medium))
-        .foregroundStyle(agent.status.tint)
+        .textRole(compact ? .caption : .subheadline)
+        .tone(.secondary)
     }
 }

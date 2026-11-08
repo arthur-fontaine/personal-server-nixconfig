@@ -1,7 +1,10 @@
 import HermesCore
+import HermesUI
 import SwiftUI
 
-/// iPad sidebar: the pet's card on top, then the chats, then the other sections.
+/// iPad sidebar (regular width): the pet (its sheet, as from the iPhone's toolbar), the chats,
+/// then Dashboard and Settings. System sidebar rows; names through `ChatTitle`, so a private
+/// sub-chat is "Private chat" here too (design-rules 1.4).
 struct Sidebar: View {
     @Environment(AppModel.self) private var model
     @Environment(HermesStore.self) private var store
@@ -9,20 +12,22 @@ struct Sidebar: View {
     var body: some View {
         List(selection: selectionBinding) {
             Section {
-                // A selectable row like the others: the list draws its selection.
-                PetCard().tag(SidebarItem.section(.pet))
+                Button { model.showPet = true } label: {
+                    Label {
+                        VGroup(alignment: .leading, spacing: .xxs) {
+                            Text(store.pet?.name ?? String(localized: "Pet")).textRole(.headline).tone(.primary)
+                            AgentStatusLabel(agent: store.agent, compact: true)
+                        }
+                    } icon: {
+                        PetSpriteView(animation: nil, size: .row)
+                    }
+                }
+                .accessibilityIdentifier("sidebar.pet")
             }
             Section("Chats") {
-                ThreadRow(thread: store.mainThread)
-                    .badge(store.mainThread.unreadCount)
-                    .tag(SidebarItem.topic(.main))
-                ForEach(store.threads) { thread in
-                    ThreadRow(thread: thread).badge(thread.unreadCount).tag(SidebarItem.topic(thread.id))
-                }
-                Button { model.showNewSubchat = true } label: {
-                    Label("New Sub-chat", systemImage: "plus.bubble")
-                }
-                .foregroundStyle(.tint)
+                row(.main).badge(store.mainThread.unreadCount)
+                ForEach(store.threads) { thread in row(thread.id).badge(thread.unreadCount) }
+                Button { model.showNewSubchat = true } label: { Label("New Sub-chat", systemImage: "plus") }
             }
             Section {
                 ForEach([AppSection.dashboard, .settings]) { s in
@@ -31,12 +36,12 @@ struct Sidebar: View {
             }
         }
         .listStyle(.sidebar)
-        .navigationTitle("Hermes")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { model.startCall() } label: { Label("Call", systemImage: "phone.fill") }
-            }
-        }
+    }
+
+    private func row(_ topic: TopicID) -> some View {
+        Label(ChatTitle.name(topic, store: store), systemImage: ChatTitle.symbol(topic, store: store))
+            .tag(SidebarItem.topic(topic))
+            .accessibilityIdentifier("sidebar.chat.\(topic)")
     }
 
     enum SidebarItem: Hashable {
@@ -46,7 +51,10 @@ struct Sidebar: View {
 
     private var selectionBinding: Binding<SidebarItem?> {
         Binding {
-            model.section == .chat ? .topic(model.selectedTopic ?? .main) : .section(model.section)
+            switch model.section {
+            case .chat, .pet: .topic(model.selectedTopic ?? .main)
+            case .dashboard, .settings: .section(model.section)
+            }
         } set: { item in
             switch item {
             case .topic(let t)?: model.open(topic: t)
@@ -54,144 +62,5 @@ struct Sidebar: View {
             case nil: break
             }
         }
-    }
-}
-
-/// The pet at a glance: mood and needs; selecting it opens the Pet section.
-struct PetCard: View {
-    @Environment(HermesStore.self) private var store
-
-    var body: some View {
-        HStack(spacing: 12) {
-            PetSpriteView(animation: nil, size: 64)
-                .background(Circle().fill(store.petMood.tint.opacity(0.18)))
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(store.pet?.name ?? "Pip").font(.headline).fontDesign(.rounded)
-                    Text("Lv \(store.pet?.level ?? 1)").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                }
-                AgentStatusLabel(agent: store.agent, compact: true)
-                if let pet = store.pet {
-                    HStack(spacing: 6) {
-                        NeedPip(symbol: "fork.knife", value: 1 - pet.hunger)
-                        NeedPip(symbol: "bolt.fill", value: pet.energy)
-                        NeedPip(symbol: "heart.fill", value: pet.happiness)
-                    }
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, 6)
-        .accessibilityElement(children: .combine)
-    }
-}
-
-struct NeedPip: View {
-    let symbol: String
-    let value: Double
-
-    var body: some View {
-        HStack(spacing: 2) {
-            Image(systemName: symbol).font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
-            // ProgressView, not Gauge: at this size the capacity gauge draws a knob.
-            ProgressView(value: value)
-                .tint(value < 0.25 ? Color.red : .accentColor)
-                .frame(width: 22)
-        }
-    }
-}
-
-/// Main chat and sub-chats, as a list (iPhone sheet) — the iPad sidebar uses `ThreadRow` directly.
-struct ThreadList: View {
-    @Environment(HermesStore.self) private var store
-    @Environment(AppModel.self) private var model
-    @Binding var selection: TopicID?
-
-    var body: some View {
-        List {
-            Section {
-                Button { selection = .main } label: { ThreadRow(thread: store.mainThread) }
-                    .badge(store.mainThread.unreadCount)
-            }
-            Section("Sub-chats") {
-                ForEach(store.threads) { thread in
-                    Button { selection = thread.id } label: { ThreadRow(thread: thread) }
-                        .badge(thread.unreadCount)
-                }
-                Button { model.showNewSubchat = true } label: {
-                    Label("New Sub-chat", systemImage: "plus.bubble")
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-struct ThreadRow: View {
-    @Environment(HermesStore.self) private var store
-    let thread: ChatThread
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ThreadIcon(thread: thread, isPrivate: store.isPrivate(thread.id))
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text(thread.isMain ? "Hermes" : thread.name).font(.body.weight(.medium)).lineLimit(1)
-                    if store.isPrivate(thread.id) {
-                        Image(systemName: "lock.fill").font(.caption2).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 4)
-                    if store.agent.busyChats.contains(thread.id) || (store.agent.status.isBusy && store.agent.chat == thread.id) {
-                        ProgressView().controlSize(.mini)
-                    } else if let date = thread.lastMessage?.date {
-                        Text(date, format: .relative(presentation: .numeric, unitsStyle: .narrow))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Text(preview).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-            }
-        }
-        .contentShape(.rect)
-        .accessibilityElement(children: .combine)
-    }
-
-    private var preview: String {
-        if store.isPrivate(thread.id) {
-            return store.subchat(thread.id)?.unlocked == true ? String(localized: "Unlocked") : String(localized: "Private")
-        }
-        if let preset = store.subchat(thread.id)?.preset, thread.lastMessage == nil { return PresetNames.name(preset) }
-        guard let m = thread.lastMessage else { return thread.isMain ? String(localized: "Your main chat") : "" }
-        var text = m.displayText.replacingOccurrences(of: "\n", with: " ")
-        if text.isEmpty, !m.fileLinks.isEmpty || m.attachment != nil { text = String(localized: "File") }
-        return m.isOutgoing ? String(localized: "You: \(text)") : text
-    }
-}
-
-struct ThreadIcon: View {
-    let thread: ChatThread
-    let isPrivate: Bool
-
-    var body: some View {
-        ZStack {
-            Circle().fill(color.gradient)
-            if thread.isMain {
-                PetSpriteView(animation: .idle, size: 30, still: true)
-            } else if let emoji = thread.iconEmoji {
-                Text(emoji).font(.system(size: 18))
-            } else {
-                Text(String(thread.name.prefix(1))).font(.headline).foregroundStyle(.white)
-            }
-        }
-        .frame(width: 38, height: 38)
-    }
-
-    private var color: Color {
-        thread.isMain ? .accentColor.opacity(0.35) : Color(rgb: thread.iconColor).opacity(isPrivate ? 0.5 : 0.85)
-    }
-}
-
-extension Color {
-    init(rgb: Int32) {
-        self.init(red: Double((rgb >> 16) & 0xFF) / 255, green: Double((rgb >> 8) & 0xFF) / 255, blue: Double(rgb & 0xFF) / 255)
     }
 }

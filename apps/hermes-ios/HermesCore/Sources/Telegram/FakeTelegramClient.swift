@@ -21,11 +21,19 @@ public final class FakeTelegramClient: TelegramClient {
     private var model = "deepseek-v4.1-flash"
     private var sentLog: [String] = []
 
-    public init(startsLoggedIn: Bool = true, withQuestion: Bool = true, now: Date = .now) {
+    /// `review`: the main chat ends on the backup question, Hermes' reply still streaming and its
+    /// approval pending — one screen with prose, code, a draft and a question (design reviews).
+    private let scene: String?
+
+    public init(startsLoggedIn: Bool = true, withQuestion: Bool = true, scene: String? = nil, now: Date = .now) {
         (events, continuation) = AsyncStream.makeStream(bufferingPolicy: .unbounded)
         self.startsLoggedIn = startsLoggedIn
+        self.scene = scene
         store = Fixtures.messages(now: now)
         appState = Fixtures.state(now: now)
+        if scene == "review" {
+            store[.main] = (store[.main] ?? []).filter { $0.id <= 1004 }
+        }
         if !withQuestion {
             appState.questions = []
             appState.agent = AgentState(status: .idle)
@@ -44,6 +52,12 @@ public final class FakeTelegramClient: TelegramClient {
     public func start() {
         emit(.auth(startsLoggedIn ? .ready : .waitPhoneNumber))
         emit(.connection(.ready))
+        if scene == "review" {
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                emit(.draft(Self.botChat.chatID, StreamingDraft(draftID: 1, topic: .main, text: Markdownish.parse(Fixtures.reviewDraft), canStop: true)))
+            }
+        }
     }
 
     private func emit(_ e: TelegramEvent) { continuation.yield(e) }

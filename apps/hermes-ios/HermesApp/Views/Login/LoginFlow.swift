@@ -1,4 +1,5 @@
 import HermesCore
+import HermesUI
 import SwiftUI
 
 /// Welcome → phone → code → password (only with 2FA). Each step is one field and one button.
@@ -12,7 +13,7 @@ struct LoginFlow: View {
                 .ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 28) {
-                    PetSpriteView(animation: petAnimation, size: 132)
+                    PetSpriteView(animation: petAnimation, size: .hero)
                         .padding(.top, 48)
                     Group {
                         switch store.auth {

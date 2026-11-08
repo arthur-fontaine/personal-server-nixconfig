@@ -1,4 +1,5 @@
 import HermesCore
+import HermesUI
 import SwiftUI
 
 /// Full-screen call: the pet in the middle acts out the call (listening, thinking, speaking),
@@ -22,7 +23,7 @@ struct CallView: View {
                     Circle().fill(tint.opacity(0.25)).frame(width: 260, height: 260)
                         .scaleEffect(1 + CGFloat(max(0, (session?.level ?? -60) + 50)) / 120)
                         .animation(.smooth(duration: 0.15), value: session?.level)
-                    PetSpriteView(animation: animation, size: 200)
+                    PetSpriteView(animation: animation, size: .stage)
                 }
                 Text(phaseLabel).font(.title3.weight(.medium)).foregroundStyle(.white.opacity(dim(0.85)))
                     .contentTransition(.opacity)

@@ -1,67 +1,46 @@
 import HermesCore
+import HermesUI
 import QuickLook
 import SwiftUI
 
-/// One message. Hermes' messages read as a document, full width; the owner's are compact
-/// tinted bubbles on the right (design.md, "Message rendering").
+/// One message. Hermes' read as a document, full width, no bubble; the owner's are neutral
+/// bubbles on the trailing side (design-rules 6, reference/metrics.md).
 struct MessageRow: View {
     @Environment(HermesStore.self) private var store
-    @Environment(AppModel.self) private var model
-    @Environment(\.colorSchemeContrast) private var contrast
     let message: ChatMessage
+    /// False when the message's question is shown as the approval card instead.
+    var showsButtons = true
 
     var body: some View {
-        VStack(alignment: message.isOutgoing ? .trailing : .leading, spacing: 8) {
+        VGroup(alignment: message.isOutgoing ? .trailing : .leading, spacing: .s) {
             if message.isOutgoing {
-                outgoing
+                if !message.displayText.isEmpty {
+                    UserBubble(message.displayText, state: bubbleState)
+                        .accessibilityLabel(Text("You: \(message.displayText)"))
+                }
             } else {
-                incoming
+                RichMessageText(segments: MessageSegments.make(message.text))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(Text("Hermes: \(message.displayText)"))
             }
-            ForEach(message.fileLinks, id: \.self) { link in
-                LinkFileCard(link: link, outgoing: message.isOutgoing)
-            }
-            if let attachment = message.attachment {
-                AttachmentCard(attachment: attachment, outgoing: message.isOutgoing)
-            }
-            if !message.buttons.isEmpty, !message.isOutgoing {
-                InlineKeyboard(message: message)
-            }
+            ForEach(message.fileLinks, id: \.self) { LinkFileCard(link: $0) }
+            if let attachment = message.attachment { AttachmentCard(attachment: attachment) }
+            if showsButtons, !message.buttons.isEmpty, !message.isOutgoing { InlineKeyboard(message: message) }
         }
         .frame(maxWidth: .infinity, alignment: message.isOutgoing ? .trailing : .leading)
         .contextMenu {
             Button { UIPasteboard.general.string = message.displayText } label: { Label("Copy", systemImage: "doc.on.doc") }
         }
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(message.isOutgoing ? "chat.owner" : "chat.hermes")
     }
 
-    @ViewBuilder private var outgoing: some View {
-        let text = message.displayText
-        if !text.isEmpty {
-            HStack(alignment: .bottom, spacing: 6) {
-                if case .failed = message.sendState {
-                    Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red)
-                }
-                Text(text)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 14).padding(.vertical, 9)
-                    .background(Color.accentColor.opacity(contrast == .increased ? 0.3 : 0.16), in: .rect(cornerRadius: 20))
-                    .overlay {
-                        // Increase Contrast: the faint tint alone doesn't outline the bubble.
-                        if contrast == .increased { RoundedRectangle(cornerRadius: 20).strokeBorder(Color.accentColor, lineWidth: 1) }
-                    }
-                    .opacity(message.sendState == .pending ? 0.6 : 1)
-            }
-            // At most ~80 % of the column: the leading inset, not containerRelativeFrame, which
-            // measures the whole scroll view, under the floating sidebar too.
-            .padding(.leading, 56)
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .accessibilityLabel("You: \(text)")
+    private var bubbleState: UserBubble.State {
+        switch message.sendState {
+        case .pending: .pending
+        case .failed: .failed
+        default: .sent
         }
-    }
-
-    @ViewBuilder private var incoming: some View {
-        RichMessageText(segments: MessageSegments.make(message.text))
-            .accessibilityLabel("Hermes: \(message.displayText)")
     }
 }
 
@@ -71,115 +50,43 @@ struct RichMessageText: View {
     let segments: [MessageSegment]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        MessageBlocks {
             ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
                 switch segment {
-                case .text(let a):
-                    Text(a)
-                        .font(.body)
-                        .lineSpacing(3)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                case .code(let code, let language):
-                    CodeBlock(code: code, language: language)
-                case .quote(let a):
-                    Text(a)
-                        .font(.body).italic()
-                        .foregroundStyle(.secondary)
-                        .padding(.leading, 12)
-                        .overlay(alignment: .leading) { Capsule().fill(.tint).frame(width: 3) }
+                case .text(let a): MessageText(a)
+                case .code(let code, _): CodeBlock(code)
+                case .quote(let a): QuoteBlock(a)
                 }
             }
         }
     }
 }
 
-struct CodeBlock: View {
-    let code: String
-    let language: String?
-    @State private var copied = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(language ?? String(localized: "code")).font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                Spacer()
-                Button {
-                    UIPasteboard.general.string = code
-                    copied = true
-                    Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
-                } label: {
-                    Label(copied ? String(localized: "Copied") : String(localized: "Copy"), systemImage: copied ? "checkmark" : "doc.on.doc")
-                        .font(.caption.weight(.medium))
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                .buttonStyle(.borderless)
-            }
-            .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 4)
-            ScrollView(.horizontal, showsIndicators: false) {
-                Text(code)
-                    .font(.system(.callout, design: .monospaced))
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .padding(.horizontal, 12).padding(.bottom, 12)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.fill.tertiary, in: .rect(cornerRadius: 14))
-    }
-}
-
-/// A draft Hermes is still writing. The smoother reveals bursts at a steady pace.
+/// A draft Hermes is still writing. The smoother reveals bursts at a steady pace; Stop is the
+/// composer's (it replaces Send).
 struct StreamingDraftRow: View {
-    @Environment(HermesStore.self) private var store
     let draft: StreamingDraft
     @State private var smoother = StreamSmoother()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            RichMessageText(segments: MessageSegments.make(
-                FormattedText(smoother.shown, entities: draft.text.entities), hidingFileLinks: true))
-            HStack(spacing: 6) {
-                TypingDots()
-                if draft.canStop {
-                    Button { store.stopDraft(in: draft.topic) } label: {
-                        Label("Stop", systemImage: "stop.fill").font(.caption.weight(.semibold))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+        RichMessageText(segments: MessageSegments.make(
+            FormattedText(smoother.shown, entities: draft.text.entities), hidingFileLinks: true))
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("chat.draft")
+            .task(id: draft.text.text) {
+                smoother.update(draft.text.text)
+                if reduceMotion { smoother.finish(); return }
+                while !smoother.isCaughtUp {
+                    smoother.tick()
+                    try? await Task.sleep(for: .milliseconds(16))
                 }
             }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .task(id: draft.text.text) {
-            smoother.update(draft.text.text)
-            if reduceMotion { smoother.finish(); return }
-            while !smoother.isCaughtUp {
-                smoother.tick()
-                try? await Task.sleep(for: .milliseconds(16))
-            }
-        }
     }
 }
 
-struct TypingDots: View {
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 0.3)) { ctx in
-            let phase = Int(ctx.date.timeIntervalSinceReferenceDate / 0.3) % 3
-            HStack(spacing: 4) {
-                ForEach(0..<3) { i in
-                    Circle().frame(width: 6, height: 6).opacity(i == phase ? 0.9 : 0.3)
-                }
-            }
-            .foregroundStyle(.secondary)
-        }
-        .accessibilityLabel("Hermes is writing")
-    }
-}
-
-/// A message's inline keyboard (Telegram buttons): the same press as in Telegram.
+/// A message's inline keyboard (Telegram buttons): one `ActionRow` per row, the same press as in
+/// Telegram.
 struct InlineKeyboard: View {
     @Environment(HermesStore.self) private var store
     @Environment(AppModel.self) private var model
@@ -188,26 +95,15 @@ struct InlineKeyboard: View {
 
     var body: some View {
         let rows = Dictionary(grouping: message.buttons, by: \.row).sorted { $0.key < $1.key }
-        VStack(alignment: .leading, spacing: 8) {
-                ForEach(rows, id: \.key) { _, buttons in
-                    HStack(spacing: 8) {
-                        ForEach(buttons) { button in
-                            Button {
-                                press(button)
-                            } label: {
-                                HStack {
-                                    if busy == button.id { ProgressView().controlSize(.small) }
-                                    Text(button.label).lineLimit(1)
-                                }
-                                .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(QuestionOption(id: "", label: button.label).isDestructive ? .red : nil)
-                        }
-                    }
-                }
+        VGroup(spacing: .s) {
+            ForEach(rows, id: \.key) { _, buttons in
+                ActionRow(primary: nil, others: buttons.map { b in
+                    Action(id: b.id, verbatim: b.label,
+                           emphasis: QuestionOption(id: "", label: b.label).isDestructive ? .destructive : .secondary,
+                           isBusy: busy == b.id) { press(b) }
+                })
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func press(_ button: InlineButton) {
@@ -229,35 +125,26 @@ struct InlineKeyboard: View {
 
 struct LinkFileCard: View {
     let link: FileLink
-    var outgoing: Bool
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        Button { openURL(link.url) } label: {
-            FileCardLabel(symbol: FileKind.symbol(for: link.displayName), title: link.displayName,
-                          subtitle: String(localized: "Big file · \(link.service)"), trailing: "arrow.up.right")
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("File on \(link.service): \(link.displayName)")
+        FileCard(symbol: FileKind.symbol(for: link.displayName), title: link.displayName,
+                 detail: Text("Big file, on \(link.service)"), trailingSymbol: "arrow.up.right") { openURL(link.url) }
+            .accessibilityLabel(Text("File on \(link.service): \(link.displayName)"))
     }
 }
 
 struct AttachmentCard: View {
     @Environment(HermesStore.self) private var store
     let attachment: FileAttachment
-    var outgoing: Bool
     @State private var previewURL: URL?
     @State private var loading = false
 
     var body: some View {
-        Button(action: open) {
-            FileCardLabel(symbol: FileKind.symbol(for: attachment.name), title: attachment.name,
-                          subtitle: ByteCountFormatter.string(fromByteCount: attachment.size, countStyle: .file),
-                          trailing: loading ? nil : "arrow.down.circle")
-            .overlay(alignment: .trailing) { if loading { ProgressView().padding(.trailing, 14) } }
-        }
-        .buttonStyle(.plain)
-        .quickLookPreview($previewURL)
+        FileCard(symbol: FileKind.symbol(for: attachment.name), title: attachment.name,
+                 detail: Text(Int64(attachment.size), format: .byteCount(style: .file)),
+                 trailingSymbol: loading ? "hourglass" : "arrow.down.circle", action: open)
+            .quickLookPreview($previewURL)
     }
 
     private func open() {
@@ -267,33 +154,6 @@ struct AttachmentCard: View {
             defer { loading = false }
             previewURL = try? await store.client.download(fileID: attachment.fileID)
         }
-    }
-}
-
-struct FileCardLabel: View {
-    let symbol: String
-    let title: String
-    let subtitle: String
-    let trailing: String?
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: symbol)
-                .font(.title3)
-                .foregroundStyle(.tint)
-                .frame(width: 40, height: 40)
-                .background(.tint.opacity(0.12), in: .rect(cornerRadius: 10))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.subheadline.weight(.semibold)).lineLimit(1).truncationMode(.middle)
-                Text(subtitle).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 8)
-            if let trailing { Image(systemName: trailing).foregroundStyle(.secondary) }
-        }
-        .padding(10)
-        .frame(maxWidth: 360)
-        .background(.fill.quaternary, in: .rect(cornerRadius: 16))
-        .contentShape(.rect)
     }
 }
 
@@ -308,19 +168,5 @@ enum FileKind {
         case "": "link"
         default: "doc"
         }
-    }
-}
-
-/// "Today 14:02" between messages more than 20 minutes apart (Messages-style).
-struct TimeSeparator: View {
-    let date: Date
-
-    var body: some View {
-        Text(date.formatted(Calendar.current.isDateInToday(date) ? .dateTime.hour().minute()
-                            : .dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute()))
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
     }
 }
