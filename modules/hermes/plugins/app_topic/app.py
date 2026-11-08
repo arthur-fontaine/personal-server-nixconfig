@@ -49,6 +49,21 @@ def _err_text(error: Exception) -> str:
     return str(error).lower()
 
 
+
+def notify_title(subchats: list[dict], chat: int | None) -> tuple[str, bool]:
+    """A notification's title, and whether its chat is private.
+
+    A private (encrypted) sub-chat's name never leaves the chat: the lock screen, the
+    notification centre and an APNs push read "Hermes", and the app labels it "Private chat" in
+    the owner's language from the `private` flag. Other sub-chats are "Hermes · <name>".
+    """
+    sub = next((s for s in subchats if chat and s["topic_id"] == chat), None)
+    if sub is None:
+        return "Hermes", False
+    if sub.get("encrypted"):
+        return "Hermes", True
+    return (f"Hermes · {sub['name']}" if sub.get("name") else "Hermes"), False
+
 class App:
     def __init__(self, home: Path, config: dict):
         self.home = Path(home)
@@ -649,14 +664,11 @@ class App:
 
     async def notify(self, chat: int, message_id: int | None, kind: str, body: str, spoken: str,
                      interruption: str | None = None) -> None:
-        title = "Hermes"
-        if chat:
-            name = next((s["name"] for s in self.subchats() if s["topic_id"] == chat and s["name"]), None)
-            title = f"Hermes · {name}" if name else title
+        title, private = notify_title(self.subchats(), chat)
         obj = protocol.message("notify", chat=chat, message_id=message_id, kind=kind,
                                interruption=interruption or ("time-sensitive" if kind in ("question", "approval")
                                                              else "active"),
-                               title=title, body=body, spoken=spoken)
+                               title=title, private=private, body=body, spoken=spoken)
         await self.post(obj)
         push = self.extra_handlers.get("_push_notify")
         if push is not None:

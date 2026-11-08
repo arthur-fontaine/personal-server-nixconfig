@@ -306,14 +306,17 @@ stream's final edit, and for a question):
 ```json
 {"v": 3, "type": "notify", "chat": 0, "message_id": 1187,
  "kind": "message", "interruption": "active",
- "title": "Hermes", "body": "The build passed. 3 warnings in the …",
+ "title": "Hermes", "private": false, "body": "The build passed. 3 warnings in the …",
  "spoken": "The build passed, with three warnings."}
 ```
 
 - `chat`/`message_id`: the message it is about (0 = main chat). For a
   question, the card's message and `kind: "question"` or `"approval"`.
-- `title`: `Hermes`, or `Hermes · <topic name>` in a sub-chat. `body`: the
-  message as plain text (markdown removed), ≤ 240 chars.
+- `title`: `Hermes`, or `Hermes · <topic name>` in a sub-chat — but never a
+  private (encrypted) sub-chat's name: there it is `Hermes` and `private` is
+  `true`, and the app titles it "Hermes · Private chat" in the owner's
+  language (the name stays inside the unlocked chat). `body`: the message as
+  plain text (markdown removed), ≤ 240 chars.
 - `spoken`: what Siri reads (Announce Notifications): no markdown, no URLs
   (a link becomes "a link to example.com"), no code (a block becomes "a code
   block"), emoji removed, units and symbols written out (`%` → "percent",
