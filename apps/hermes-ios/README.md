@@ -122,7 +122,9 @@ The voice model, LFM3-Omni-2B (Liquid AI, Q4_0, 1.05 GB + its 0.27 GB audio
 projector), is downloaded once from Settings › Call mode (Wi-Fi only,
 deletable). It transcribes what you say (on-device ASR), and Hermes' answer
 comes back over Telegram and is spoken sentence by sentence as it streams
-(the model's speech output, 24 kHz). You can talk over it to interrupt. Each
+(the model's speech output, 24 kHz), in the voice picked in Settings ›
+Call mode (female by default, or male; Apple's fallback takes an installed
+voice of the same gender). You can talk over it to interrupt. Each
 utterance is a main-chat message starting with `🎙 `; the app sends
 `call.state` so Hermes answers in a spoken style during the call. Without the
 model (not downloaded, too little memory, or the simulator, where llama.cpp

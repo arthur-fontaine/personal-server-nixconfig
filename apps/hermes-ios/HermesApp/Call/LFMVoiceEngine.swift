@@ -97,16 +97,15 @@ nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
     // MARK: ASR
 
     func transcribe(_ samples: [Float], language: String) async throws -> String {
-        let lang = Self.languageName(language)
-        return try await withCheckedThrowingContinuation { c in
-            queue.async { c.resume(with: Result { try self.transcribeSync(samples, language: lang) }) }
+        try await withCheckedThrowingContinuation { c in
+            queue.async { c.resume(with: Result { try self.transcribeSync(samples, language: language) }) }
         }
     }
 
     private func transcribeSync(_ samples: [Float], language: String) throws -> String {
         llama_memory_clear(llama_get_memory(ctx), true)
         let marker = String(cString: mtmd_default_marker())
-        let prompt = "<|im_start|>system\nPerform ASR in \(language).<|im_end|>\n<|im_start|>user\n\(marker)<|im_end|>\n<|im_start|>assistant\n<think></think>"
+        let prompt = LFMPrompt.asr(language: language, marker: marker)
         guard let bitmap = samples.withUnsafeBufferPointer({ mtmd_bitmap_init_from_audio($0.count, $0.baseAddress) }) else {
             throw VoiceEngineError.failed("Audio input")
         }
@@ -147,14 +146,14 @@ nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
 
     // MARK: TTS
 
-    func synthesize(_ text: String, language: String) -> AsyncThrowingStream<[Float], Error> {
+    func synthesize(_ text: String, language: String, voice: CallVoice) -> AsyncThrowingStream<[Float], Error> {
         let (stream, continuation) = AsyncThrowingStream<[Float], Error>.makeStream()
         let cancelled = CancelFlag()
         continuation.onTermination = { _ in cancelled.set() }
-        let voice = Self.speechLanguage(language)
+        let prompt = LFMPrompt.tts(text, language: language, voice: voice)
         queue.async {
             do {
-                try self.synthesizeSync(text, voice: voice, cancelled: cancelled) { continuation.yield($0) }
+                try self.synthesizeSync(prompt: prompt, cancelled: cancelled) { continuation.yield($0) }
                 continuation.finish()
             } catch {
                 continuation.finish(throwing: error)
@@ -163,11 +162,9 @@ nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
         return stream
     }
 
-    private func synthesizeSync(_ text: String, voice: String, cancelled: CancelFlag, emit: ([Float]) -> Void) throws {
+    private func synthesizeSync(prompt: String, cancelled: CancelFlag, emit: ([Float]) -> Void) throws {
         llama_memory_clear(llama_get_memory(ctx), true)
         mtmd_helper_gen_audio_reset(gen)
-        // The "tts" turn of the chat template, ending with <|audio_start|> (the helper checks it).
-        let prompt = "<|startoftext|><|im_start|>system\nPerform TTS in \(voice) using a female voice.<|im_end|>\n<|im_start|>user\n\(text)<|im_end|>\n<|im_start|>assistant\n<think></think><|audio_start|>"
         try prompt.withCString { cstr in
             var inp = mtmd_helper_gen_audio_inp_default()
             inp.stream = true
@@ -210,20 +207,6 @@ nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
         // OUTTYPE_PCM is float32 (mtmd-helper-gen.cpp: out_data_len = n * sizeof(float)).
         let n = len / MemoryLayout<Float>.size
         data.withMemoryRebound(to: Float.self, capacity: n) { emit(Array(UnsafeBufferPointer(start: $0, count: n))) }
-    }
-
-    // MARK: Languages
-
-    /// ASR wants the language's English name (model card: "Perform ASR in <language>.").
-    static func languageName(_ id: String) -> String {
-        let code = String(id.prefix(2))
-        return Locale(identifier: "en").localizedString(forLanguageCode: code) ?? "English"
-    }
-
-    /// TTS names English's variant (model card: "American English" or "British English").
-    static func speechLanguage(_ id: String) -> String {
-        if id.hasPrefix("en") { return id.contains("GB") ? "British English" : "American English" }
-        return languageName(id)
     }
 }
 

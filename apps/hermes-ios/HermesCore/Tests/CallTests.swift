@@ -77,3 +77,46 @@ struct VADTests {
         #expect(CallFillers.pick(language: "en", turn: 5) == "Mm-hm.")
     }
 }
+
+@Suite("call voice")
+struct CallVoiceTests {
+    @Test func ttsPromptNamesTheVoiceAndLanguage() {
+        let female = LFMPrompt.tts("Bonjour.", language: "fr-FR", voice: .female)
+        #expect(female.contains("<|im_start|>system\nPerform TTS in French using a female voice.<|im_end|>"))
+        #expect(female.contains("<|im_start|>user\nBonjour.<|im_end|>"))
+        #expect(female.hasPrefix("<|startoftext|>"))
+        #expect(female.hasSuffix("<|im_start|>assistant\n<think></think><|audio_start|>"))
+        #expect(LFMPrompt.tts("Hi.", language: "en-US", voice: .male).contains("Perform TTS in American English using a male voice."))
+        #expect(LFMPrompt.tts("Hi.", language: "en-GB", voice: .male).contains("Perform TTS in British English using a male voice."))
+    }
+
+    @Test func asrPromptNamesTheLanguage() {
+        let p = LFMPrompt.asr(language: "fr-FR", marker: "<__media__>")
+        #expect(p == "<|im_start|>system\nPerform ASR in French.<|im_end|>\n<|im_start|>user\n<__media__><|im_end|>\n<|im_start|>assistant\n<think></think>")
+    }
+
+    @Test func femaleByDefaultAndPersisted() throws {
+        let defaults = try #require(UserDefaults(suiteName: "CallVoiceTests"))
+        defaults.removePersistentDomain(forName: "CallVoiceTests")
+        #expect(CallVoice.current(defaults) == .female)
+        defaults.set(CallVoice.male.rawValue, forKey: CallVoice.defaultsKey)
+        #expect(CallVoice.current(defaults) == .male)
+        defaults.set("robot", forKey: CallVoice.defaultsKey)
+        #expect(CallVoice.current(defaults) == .female)
+        defaults.removePersistentDomain(forName: "CallVoiceTests")
+    }
+
+    @Test func appleVoiceOfTheGenderRegionThenQuality() {
+        let voices = [
+            CallVoice.Candidate(identifier: "amelie", language: "fr-CA", isMale: false, quality: 3),
+            CallVoice.Candidate(identifier: "audrey", language: "fr-FR", isMale: false, quality: 1),
+            CallVoice.Candidate(identifier: "thomas", language: "fr-FR", isMale: true, quality: 1),
+            CallVoice.Candidate(identifier: "thomas-hq", language: "fr-FR", isMale: true, quality: 2),
+            CallVoice.Candidate(identifier: "samantha", language: "en-US", isMale: false, quality: 2),
+        ]
+        #expect(CallVoice.female.pick(from: voices, language: "fr-FR") == "audrey")
+        #expect(CallVoice.male.pick(from: voices, language: "fr_FR") == "thomas-hq")
+        #expect(CallVoice.female.pick(from: voices, language: "fr-BE") == "amelie")
+        #expect(CallVoice.male.pick(from: voices, language: "en-US") == nil)
+    }
+}
