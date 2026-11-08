@@ -8,6 +8,8 @@
 [ "$(setting server.sideload.enable)" = 1 ] || return 0
 step "Sideload: your iPhones and iPads"
 
+# Seconds between refreshes (a test shortens it).
+app_refresh="${app_refresh:-15}"
 app_skipped="$agent_home/.local/state/hermes-setup/sideload-devices-skipped"
 app_devices() { as_gateway "sideload devices" 2>/dev/null || true; }
 # Ready: paired, with Developer Mode on (an install fails without it).
@@ -15,26 +17,78 @@ app_ready='.devices[]? | select(.paired and (.developer_mode == null or .develop
 app_paired() { "$JQ" -r "[$app_ready] | length" <<< "$1" 2>/dev/null || echo 0; }
 app_names() { "$JQ" -r "[$app_ready | .name] | join(\", \")" <<< "$1" 2>/dev/null; }
 
-app_show() {
-  local line
+# Seen by devicectl now; the others are only remembered by sideload.
+app_live='.devices[]? | select(has("transport"))'
+
+# The state, one "note|…" or "warn|…" line each: printed only when it changes.
+app_state() {
+  local error unreached
+  error="$("$JQ" -r '.error // empty' <<< "$1" 2>/dev/null || true)"
+  if [ -n "$error" ]; then
+    # cli.py's "devicectl list devices failed: <devicectl's own words>".
+    error="${error#devicectl list devices failed: }"
+    error="${error#ERROR: }"
+    echo "warn|Xcode can't list the devices: $(printf '%s\n' "$error" | grep -m 1 . || true)"
+  fi
+  unreached="$(app_unreached "$1")"
+  if [ "$unreached" -gt 0 ]; then
+    echo "warn|Your iPhone is plugged in but Xcode can't reach it yet. Unplug it and plug it back in, unlocked;"
+    echo "warn|then allow the accessory on the Mac's screen and tap Trust on the iPhone (enter its passcode)."
+    echo "warn|If the iPhone doesn't ask, check Settings › Privacy & Security › Wired Accessories on it."
+  fi
   if [ "$("$JQ" -r '.devices | length' <<< "$1" 2>/dev/null || echo 0)" = 0 ]; then
-    note "No iPhone or iPad yet."
+    [ "$unreached" -gt 0 ] || echo "note|No iPhone or iPad yet."
     return 0
   fi
-  while IFS= read -r line; do
-    note "$line"
-  done < <("$JQ" -r '.devices[] | "\(.name // .id) (\(.model // "?"), iOS \(.os // "?")): " + (
-      if (.paired | not) then "not paired yet: unlock it and tap Trust"
+  "$JQ" -r '.devices[] | "note|\(.name // .id) (\(.model // "?"), iOS \(.os // "?")): " + (
+      if (has("transport") | not) then "known, not seen by Xcode now"
+      elif (.paired | not) then "not paired yet: unlock it and tap Trust"
       elif .developer_mode != null and .developer_mode != "enabled" then "paired; turn on Developer Mode (Settings → Privacy & Security), then restart it"
       elif .reachable then "ready" + (if .transport == "wired" then " (by cable; Wi-Fi once unplugged)" else " (over Wi-Fi)" end)
-      else "paired, not reachable now (another network, or asleep)" end)' <<< "$1")
+      else "paired, not reachable now (another network, or asleep)" end)' <<< "$1" 2>/dev/null || true
 }
 
-# Pairs what is plugged in and not paired: the device asks to Trust this Mac.
-# True when it tried one.
+app_print() {
+  local line
+  while IFS= read -r line; do
+    case "$line" in
+      warn\|*) warn "${line#warn|}" ;;
+      *) note "${line#note|}" ;;
+    esac
+  done <<< "$1"
+}
+
+# The USB serial number of each iPhone and iPad plugged in ("?" when it has
+# none): an iPhone's is its UDID without the dash. About 0.2 s.
+app_usb() {
+  system_profiler SPUSBHostDataType 2>/dev/null | awk '
+    /^ *[^ :][^:]*:$/ { if (dev) print "?"; dev = ($0 ~ /^ *(iPhone|iPad)/); next }
+    dev && /Serial Number:/ { sub(/.*Serial Number: */, ""); print; dev = 0 }
+    END { if (dev) print "?" }' || true
+}
+
+# How many iPhones and iPads are on USB with no device devicectl lists for
+# them. Plugged in while Hermes' session was locked, macOS parks its "allow
+# this accessory" request and never asks again: unplugging it makes it ask.
+app_unreached() {
+  local ids serial count=0
+  ids=" $("$JQ" -r "[$app_live | .id | ascii_upcase | gsub(\"-\"; \"\")] | join(\" \")" <<< "$1" 2>/dev/null || true) "
+  while IFS= read -r serial; do
+    [ -n "$serial" ] || continue
+    if [ "$serial" = "?" ]; then
+      "$JQ" -e "[$app_live | select(.transport == \"wired\")] | length > 0" <<< "$1" >/dev/null 2>&1 || count=$((count + 1))
+    else
+      case "$ids" in *" $(printf '%s' "$serial" | tr '[:lower:]' '[:upper:]') "*) ;; *) count=$((count + 1)) ;; esac
+    fi
+  done <<< "$(app_usb)"
+  echo "$count"
+}
+
+# Pairs what devicectl sees plugged in and not paired: the device asks to
+# Trust this Mac. True when it tried one.
 app_pair() {
   local udid tried=1
-  for udid in $("$JQ" -r '.devices[]? | select(.paired | not) | .id' <<< "$1" 2>/dev/null); do
+  for udid in $("$JQ" -r "$app_live | select(.paired | not) | .id" <<< "$1" 2>/dev/null); do
     case " $app_asked " in *" $udid "*) continue ;; esac
     app_asked="$app_asked $udid"
     note "Pairing $udid: on the device, tap Trust and enter its passcode."
@@ -45,20 +99,37 @@ app_pair() {
 }
 
 app_devices_loop() {
-  local json choice rc
+  local json state shown="" choice key rc started
   app_asked=""
-  note "Plug each iPhone or iPad into this Mac by cable, once, and unlock it. A dialog may also"
-  note "ask on the Mac's screen to allow the accessory: allow it. Both must then share a Wi-Fi network."
+  note "Plug each iPhone or iPad into this Mac by cable, once, while Hermes' session is unlocked,"
+  note "with the iPhone unlocked too, and watch both screens: the Mac asks to allow the accessory,"
+  note "then the iPhone asks to Trust this Mac. Both must then share a Wi-Fi network."
   while :; do
     json="$(app_devices)"
     ! app_pair "$json" || json="$(app_devices)"
-    app_show "$json"
-    rc=0
-    choice="$(gum choose --timeout 15s --header "It refreshes by itself every 15 seconds." \
-      "Refresh now" "Done" "I have no device for now")" || rc=$?
-    # gum's timeout (exit 124): the automatic refresh.
-    [ "$rc" = 124 ] && continue
-    [ "$rc" = 0 ] || return 0
+    state="$(app_state "$json")"
+    if [ "$state" != "$shown" ]; then
+      app_print "$state"
+      shown="$state"
+    fi
+    # Not gum choose --timeout: on a timeout gum 0.17 leaves its menu on the
+    # screen and writes "timed out" under it, so the menus piled up every
+    # 15 s. One prompt line, erased after each wait, keeps the screen still.
+    printf '  \033[2m%s\033[0m' "Refreshes every $app_refresh s. Enter: refresh now · d: done · n: I have no device for now " >&2
+    rc=0 started=$SECONDS
+    IFS= read -r -s -n 1 -t "$app_refresh" key || rc=$?
+    printf '\r\033[2K' >&2
+    # bash 3.2's read returns 1 both on its timeout and at the end of the
+    # input: failing at once means there is no terminal to read.
+    if [ "$rc" != 0 ]; then
+      [ $((SECONDS - started)) -gt 0 ] || return 0
+      continue
+    fi
+    case "$key" in
+      d|D) choice=Done ;;
+      n|N) choice="I have no device for now" ;;
+      *) continue ;;
+    esac
     case "$choice" in
       Done) return 0 ;;
       "I have no device for now")
@@ -79,8 +150,6 @@ if [ -z "$app_json" ]; then
   warn "sideload does not answer yet (the configuration not applied?): run bootstrap-macos.sh sideload-devices later."
   return 0
 fi
-app_error="$("$JQ" -r '.error // empty' <<< "$app_json" 2>/dev/null || true)"
-[ -z "$app_error" ] || warn "devicectl: $app_error"
 if [ "$(app_paired "$app_json")" -gt 0 ] && keep "Apps can be sideloaded on: $(app_names "$app_json")"; then
   :
 elif [ "$(app_paired "$app_json")" = 0 ] && as_agent test -e "$app_skipped" && keep "No device to sideload on for now"; then
