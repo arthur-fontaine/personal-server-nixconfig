@@ -74,8 +74,16 @@ class Questions:
         self.summaries: dict[str, str] = {}
         self.last_summary: tuple[str, float] | None = None
 
-    def add_summary(self, command: str, summary: str) -> None:
+    def add_summary(self, command: str, summary: str | None) -> None:
+        """The summary of the approval about to be asked for ``command``; None
+        for one without, so it cannot inherit an earlier card's: every card
+        guard escalates has the same command, Hermes' "<terminal> (plugin
+        approval rule)" label."""
         with self.lock:
+            if not summary:
+                self.summaries.pop(command.strip(), None)
+                self.last_summary = None
+                return
             self.summaries[command.strip()] = summary
             self.last_summary = (summary, time.time())
             while len(self.summaries) > 50:
@@ -83,7 +91,7 @@ class Questions:
 
     def _summary_for(self, command: str | None) -> str | None:
         if command and command.strip() in self.summaries:
-            return self.summaries[command.strip()]
+            return self.summaries.pop(command.strip())
         # The card cuts and masks a long command: the summary reported for the
         # approval asked a moment ago is this card's.
         if self.last_summary and time.time() - self.last_summary[1] < 15:

@@ -67,6 +67,10 @@ def test_speech() -> None:
     assert speech.spoken("[fichier: https://gofile.io/d/abc]").startswith("a file from gofile.io")
     assert len(speech.body("word " * 200)) <= speech.BODY_MAX
     assert speech.spoken("Use file_a and file_b, *really*.") == "Use file_a and file_b, really."
+    assert speech.question_spoken("approval", "rm -rf build", "Deletes the build folder", []) \
+        == "Hermes wants to run a command that deletes the build folder. Allow?"
+    assert speech.question_spoken("approval", "<terminal> (plugin approval rule)", None, []) \
+        == "Hermes asks to use terminal. Allow?"
     q = speech.question_spoken("clarify", "Which day?", None, ["Monday", "Tuesday", "Other"])
     assert q == "Hermes asks: Which day? Options: Monday, Tuesday."
 
@@ -140,11 +144,11 @@ def test_questions() -> None:
 
     changes = []
     qs = questions.Questions(lambda: changes.append(1))
-    qs.add_summary("rm -rf ~/tmp/x", "Delete a temp folder")
+    qs.add_summary("rm -rf ~/tmp/x", "Deletes a temp folder")
     card = M([[B("Once", callback_data="ea:once:7"), B("Deny", callback_data="ea:deny:7")]])
     item = qs.from_card(chat=0, message_id=10, text_html="⚠️ <b>Dangerous</b>\n<pre>rm -rf ~/tmp/x</pre>", markup=card)
     assert item["id"] == "ea:7" and item["kind"] == "approval" and item["command"] == "rm -rf ~/tmp/x"
-    assert item["summary"] == "Delete a temp folder" and item["spoken"].endswith("Allow?")
+    assert item["summary"] == "Deletes a temp folder" and item["spoken"].endswith("Allow?")
     assert base64.b64decode(item["options"][0]["data_b64"]).decode() == "ea:once:7"
     clar = M([[B("1", callback_data="cl:ab:0")], [B("2", callback_data="cl:ab:1")], [B("✏️ Other", callback_data="cl:ab:other")]])
     item = qs.from_card(chat=5, message_id=11, text_html="❓ Which?\n\n1. Monday\n2. Tuesday", markup=clar)

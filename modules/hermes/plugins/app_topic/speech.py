@@ -134,9 +134,17 @@ def spoken_full(text: str) -> str:
 
 def question_spoken(kind: str, text: str, summary: str | None, options: list[str]) -> str:
     if kind == "approval":
-        what = summary or spoken(text)
-        return _cut(f"Hermes asks to {what[0].lower() + what[1:] if what else 'run a command'}"
-                    .rstrip(".") + ". Allow?", SPOKEN_MAX)
+        # guard's titles name the command in the third person ("Deletes the
+        # build folder": guard/titles.py, after the Pi extension bash-titles).
+        if summary:
+            what = f"wants to run a command that {summary[0].lower() + summary[1:]}"
+        else:
+            # A card guard escalated shows Hermes' label for it, not a command.
+            tool = re.fullmatch(r"<(\w+)> \(plugin approval rule\)", (text or "").strip())
+            said = spoken(text) if text and not tool else ""
+            what = (f"asks to use {tool.group(1).replace('_', ' ')}" if tool
+                    else f"asks to run {said}" if said else "asks to run a command")
+        return _cut(f"Hermes {what}".rstrip(".") + ". Allow?", SPOKEN_MAX)
     head = spoken(text).rstrip(".?!")
     choices = [spoken(o).rstrip(".") for o in options if o and o.lower() != "other"][:4]
     tail = (" Options: " + ", ".join(choices) + ".") if choices else ""
