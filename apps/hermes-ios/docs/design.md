@@ -92,7 +92,7 @@ a "+" circle and a glass field).
    each, and only in HermesUI's `Chrome/` (DesignCheck enforces it). The
    approval card and everything that scrolls are content: system fills, bordered
    and prominent buttons. Native components over drawn ones: system rows and
-   their selection, `Gauge` for needs and level, `.badge` for unread counts.
+   their selection, `.badge` for unread counts.
 5. **Fast and honest.** Cold start shows the last messages from TDLib's DB
    before the network is up; a thin status line says "Connecting…" rather than
    a blocking spinner.
