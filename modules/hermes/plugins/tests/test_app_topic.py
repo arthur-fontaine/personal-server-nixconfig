@@ -256,6 +256,21 @@ def test_subchats() -> None:
         sys.__dict__.pop("_hermes_unii_state", None)
 
 
+def test_notify_title() -> None:
+    subs = [{"topic_id": 455, "name": "Taxes", "encrypted": True},
+            {"topic_id": 456, "name": "Lisbon trip", "encrypted": False},
+            {"topic_id": 457, "name": None, "encrypted": False}]
+    # A private sub-chat's name never reaches a notification.
+    title, private = app_mod.notify_title(subs, 455)
+    assert title == "Hermes" and private, title
+    assert "Taxes" not in title
+    assert app_mod.notify_title(subs, 456) == ("Hermes · Lisbon trip", False)
+    assert app_mod.notify_title(subs, 457) == ("Hermes", False)
+    assert app_mod.notify_title(subs, 0) == ("Hermes", False)
+    assert app_mod.notify_title(subs, None) == ("Hermes", False)
+    assert app_mod.notify_title([], 455) == ("Hermes", False)
+
+
 def test_gofile_token() -> None:
     a = bigfiles.Gofile.website_token("tok", now=0)
     assert a == bigfiles.Gofile.website_token("tok", now=14399) != bigfiles.Gofile.website_token("tok", now=14400)
