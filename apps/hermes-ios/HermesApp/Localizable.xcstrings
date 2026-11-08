@@ -2072,6 +2072,16 @@
         }
       }
     },
+    "Select Text": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionner le texte"
+          }
+        }
+      }
+    },
     "Send": {
       "localizations": {
         "fr": {
