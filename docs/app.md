@@ -27,7 +27,7 @@ It needs BotFather's Threaded Mode, as the sub-chats do.
 | State | four messages the bot edits: `state` (what Hermes is doing, the questions waiting for the owner, the pet, the sub-chats), `stats`, `devices`, `controls` (native commands and their current values) | `app.py`, `status.py`, `questions.py` |
 | Notifications | for each message that may notify, a `notify` with a short spoken version for Siri | `speech.py` |
 | Stats | model usage per provider and model, fallbacks apart, over 24 h / 7 d / 30 d; CPU, memory, storage, power, battery, uptime | `usage.py`, `machine.py` |
-| Pets | the pet's needs and level, `pet_generate`, its files for the app's build | `pet.py` |
+| Pets | the pet's mood (what Hermes is doing), `pet_generate`, its files for the app's build | `pet.py` |
 | Big files | `[fichier: <url>]` links: `bigfile_fetch`, `bigfile_send` | `bigfiles.py` |
 | Call turns | a message starting with 🎙 is answered as on the phone | `__init__.py` (`call_turn`) |
 | Pushes | APNs, with a paid Apple Developer team | `push.py` |
@@ -106,11 +106,13 @@ API by its address and key (Hermes' `openai` image plugin pointed there:
 `image_gen.openai.base_url` and `key_env`). The model must take reference
 images (`/images/edits`).
 
-The plugin keeps what Hermes does not, the tamagotchi
-(`~/.hermes/app/pet-state.json`, rules in app-protocol.md §5): hunger,
-energy and happiness drift with time, faster while Hermes works; feeding,
-playing and sleep move them; finished turns and answered questions give xp,
-and levels follow. The sprite plays the row matching what Hermes does.
+The pet is a companion, not a tamagotchi: it has no needs or levels and
+asks for nothing. It mirrors Hermes (app-protocol.md §5): working while
+Hermes works, waiting while a question is open, a short happy beat when a
+turn finishes and a confused one when it fails, idle otherwise; the sprite
+plays the matching row. The plugin keeps only which pet is current and its
+version (`~/.hermes/app/pet-state.json`). Caresses and the pet's small
+reactions to questions happen in the app alone.
 
 For the app's build ([Delivery](#delivery)), the current pet is mirrored to
 `~/.hermes/app/pet/`: `spritesheet.webp`, `icon.png` (the first idle frame

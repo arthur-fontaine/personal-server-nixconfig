@@ -1,4 +1,4 @@
-# Hermes app ⇄ Hermes protocol, version 2
+# Hermes app ⇄ Hermes protocol, version 3
 
 Owner: `app-backend` (plugin `app_topic`, `modules/hermes/plugins/app_topic`).
 `ios-app` builds against it and asks `app-backend` (hc send) for changes
@@ -29,7 +29,7 @@ and the Bot API (https://core.telegram.org/bots/api).
     entity, not characters). Always `disable_notification=true`.
   - App → bot: the JSON as the message's plain text. A surrounding
     ```` ```json … ``` ```` fence (as characters) is tolerated and stripped.
-  - Required keys: `"v": 2`, `"type": <string>`. Unknown `type`: the bot
+  - Required keys: `"v": 3`, `"type": <string>`. Unknown `type`: the bot
     replies `error` `unknown_type`; the app ignores unknown types.
 - **Size.** Telegram caps a message at 4096 UTF-16 code units once entities
   are parsed. The bot keeps each message under that: long strings are cut
@@ -75,7 +75,7 @@ be deleted.
 
 ```json
 {
-  "v": 2, "type": "state", "updated_at": "2026-11-07T21:40:03Z",
+  "v": 3, "type": "state", "updated_at": "2026-11-07T21:40:03Z",
   "slots": {"stats": 812, "devices": 813, "sprite": 790},
   "agent": {
     "status": "working", "chat": 0, "task": "Running: nix build …",
@@ -103,10 +103,7 @@ be deleted.
     "manifest": {"id": "pip", "displayName": "Pip", "description": "…",
                  "spritesheetPath": "spritesheet.webp", "version": 3},
     "sprite_message_id": 790,
-    "animation": "run",
-    "mood": "focused", "hunger": 35, "energy": 70, "happiness": 82,
-    "xp": 1240, "level": 6, "xp_next": 1500, "asleep": false,
-    "updated_at": "2026-11-07T21:39:51Z"
+    "mood": "working", "animation": "run", "mood_until": null
   },
   "subchats": [
     {"topic_id": 455, "name": "Taxes", "preset": "secret", "encrypted": true,
@@ -147,10 +144,8 @@ be deleted.
 - `pet`: see §5. `manifest` is the Codex `pet.json` (plus `version`).
   `sprite_message_id`: a message in the App topic whose document is the
   spritesheet (`spritesheet.webp`, 8 columns × 9 rows of 192×208 frames);
-  download it with TDLib, cache it by `version`. `animation`: the sprite row
-  to play (`idle`, `run`, `review`, `waiting`, `wave`, `jump`, `failed`;
-  Codex row names `running`/`waving`/`jumping` are aliases). `null` when no
-  pet has been hatched yet.
+  download it with TDLib, cache it by `version`. `mood`, `animation`,
+  `mood_until`: §5. `pet` is `null` when no pet has been hatched yet.
 - `subchats`: the DM's sub-chat topics (not groups): `preset` as named in
   `/sub` (`null` when custom), `encrypted`, `unlocked` (its key is in memory
   now), `ttl` as `/sub` shows it (`"30m"`, `"session"`, `null`), `expires_at`
@@ -161,7 +156,7 @@ be deleted.
 
 ```json
 {
-  "v": 2, "type": "stats", "updated_at": "2026-11-07T21:40:00Z",
+  "v": 3, "type": "stats", "updated_at": "2026-11-07T21:40:00Z",
   "machine": {
     "cpu_pct": 12.5, "load": [1.2, 1.4, 1.6], "cores": 10,
     "ram_used": 17179869184, "ram_total": 34359738368,
@@ -203,7 +198,7 @@ be deleted.
 service's status of its app `hermes` (`modules/sideload`, `app_status`):
 
 ```json
-{"v": 2, "type": "devices", "updated_at": "…", "delivery": {
+{"v": 3, "type": "devices", "updated_at": "…", "delivery": {
   "v": 1, "updated": "…", "team": {"id": "ABCDE12345", "paid": false},
   "running": null, "next_refresh": "…",
   "devices": [{"id": "<udid>", "name": "iPhone", "model": "iPhone17,1", "os": "26.1",
@@ -221,7 +216,7 @@ the pet's `version` it was built with; `running`: an install in progress.
 ### 2.4 `controls`: native commands
 
 ```json
-{"v": 2, "type": "controls", "updated_at": "…",
+{"v": 3, "type": "controls", "updated_at": "…",
  "permission_mode": {"value": "auto", "set": "/mode {value}",
                      "options": [{"id": "auto", "label": "Auto", "description": "…"},
                                  {"id": "ask", "label": "Ask", "description": "…"}]},
@@ -309,7 +304,7 @@ the App topic once the message has settled (no edit for 2.5 s; at once for a
 stream's final edit, and for a question):
 
 ```json
-{"v": 2, "type": "notify", "chat": 0, "message_id": 1187,
+{"v": 3, "type": "notify", "chat": 0, "message_id": 1187,
  "kind": "message", "interruption": "active",
  "title": "Hermes", "body": "The build passed. 3 warnings in the …",
  "spoken": "The build passed, with three warnings."}
@@ -337,17 +332,16 @@ A request is a JSON message in the App topic; `re` in the reply is the
 request's message id. The bot deletes the request when it has answered.
 
 ```json
-{"v": 2, "type": "pet.feed"}
-{"v": 2, "type": "reply", "re": 1302, "ok": true, "data": {"hunger": 5}}
-{"v": 2, "type": "reply", "re": 1303, "ok": false,
+{"v": 3, "type": "stats.refresh"}
+{"v": 3, "type": "reply", "re": 1302, "ok": true, "data": {}}
+{"v": 3, "type": "reply", "re": 1303, "ok": false,
  "error": {"code": "busy", "message": "A pet is already being generated"}}
 ```
 
 | `type` | Fields | Reply `data` |
 | --- | --- | --- |
-| `hello` | `app_version`, `build`, `device` (name), `device_id` (UDID if known), `pet_version` (bundled) | `{"server_version", "protocol": 2}`; the bot also re-posts any missing slot |
+| `hello` | `app_version`, `build`, `device` (name), `device_id` (UDID if known), `pet_version` (bundled) | `{"server_version", "protocol": 3}`; the bot also re-posts any missing slot |
 | `stats.refresh` | — | `{}` (the `stats` slot is edited) |
-| `pet.feed` / `pet.play` / `pet.sleep` / `pet.wake` | — | the pet's new needs (`hunger`, `energy`, `happiness`, `xp`, `level`, `asleep`) |
 | `pet.generate` | `prompt` (what it should look like), `name` (optional) | `{"started": true}` at once; the `state.pet` changes when done (minutes), and a `notify` says so |
 | `app.reinstall` | `devices` (UDIDs, optional: where it is installed, else every paired device) | the JSON printed by `hermes-app install`, i.e. `sideload install hermes` (`{"started": true, "request": "…"}`); the `devices` slot follows; `unavailable` without delivery |
 | `call.state` | `active` (bool): a call starts or ends (§6) | `{"active": <bool>}` |
@@ -379,27 +373,34 @@ a key, tokens are stored and `apns: false`.
 - **Generation**: the `pet_generate` tool (Hermes) or `pet.generate`
   (app): Hermes' hatch pipeline (`agent/pet/generate`: one base look, then
   one animation row per state, packed into the Codex 8×9 atlas) through the
-  image provider chosen in the bootstrap. The new pet starts at level 1 with
-  full needs; `version` increments. Hermes then decides whether to rebuild
-  and reinstall the app (`sideload_install` with app `hermes`), since the
-  icon changed.
-- **Needs** (0–100, integers): `hunger` rises 4/h (8/h while Hermes works);
-  `energy` falls 3/h awake and 6/h while working, rises 12/h asleep;
-  `happiness` falls 2/h, faster (5/h) when hunger > 70 or energy < 20.
-- **Actions**: `feed` hunger −40 (refused at < 10: "not hungry"), happiness +5,
-  xp +5; `play` happiness +25, energy −15, hunger +10, xp +15 (refused asleep
-  or at energy < 15); `sleep` asleep until energy 100 or `wake`; `wake`.
-  Asleep while Hermes works: the pet wakes.
-- **XP**: +2 per finished turn, +5 per answered question, +10 per day with
-  every need above 30. Level n needs `100·n·(n+1)/2` total xp
-  (`xp_next`).
-- **Mood** (first that matches): `asleep`, `hungry` (hunger > 70), `tired`
-  (energy < 20), `sad` (happiness < 30), `focused` (Hermes working), `happy`
-  (happiness > 70), `content`.
-- **Animation**: from `agent.status` as Hermes' own mapping does
-  (`agent/pet/state.py`): working → `run`, thinking → `review`, waiting_user
-  → `waiting`, error → `failed`, a turn just finished → `wave` (10 s), level
-  up → `jump` (10 s), else `idle`.
+  image provider chosen in the bootstrap; `version` increments. Hermes then
+  decides whether to rebuild and reinstall the app (`sideload_install` with
+  app `hermes`), since the icon changed.
+- **A companion, not a tamagotchi.** The pet mirrors Hermes and nothing
+  else: no needs, levels or actions, nothing that asks for care or degrades
+  when ignored. The plugin keeps only which pet is current and its version
+  (`~/.hermes/app/pet-state.json`).
+- **Mood**, from `agent.status` and the end of turns:
+
+  | `mood` | When | `animation` |
+  | --- | --- | --- |
+  | `working` | `thinking` or `working` | `review` (thinking), `run` (a tool) |
+  | `waiting` | `waiting_user` | `waiting` |
+  | `happy` | for 10 s after a turn finished | `jump` |
+  | `confused` | for 10 s after a turn failed | `failed` |
+  | `idle` | otherwise | `idle` |
+
+  Hermes' status wins over a beat; of several turns ending together, the
+  last sets the beat; a stopped turn (`/stop`, interrupted) gets none. A
+  beat is a reaction, not a state: `agent.status` stays `error` for
+  10 min, the pet is `confused` for 10 s. `mood_until` (ISO) is when a
+  `happy`/`confused` beat ends, `null` otherwise, so the app need not wait
+  for the next edit. `animation` is the sprite row (Hermes' own mapping,
+  `agent/pet/state.py`; Codex row names `running`/`waving`/`jumping` are
+  aliases).
+- **In the app only**: caresses (a stroke or long press on the pet: a happy
+  row, a haptic, a heart), a wave toward a question as it arrives, a nod
+  when it is answered. None of them is sent to Hermes.
 
 ## 6. Call mode
 
@@ -422,7 +423,7 @@ recognition and synthesis), and the call is ordinary messages of the chat:
   links, code or emoji, numbers and symbols in words, and a sentence before
   a long step. A long task still goes to a background subagent (its result
   is a later message, which the app may read too).
-- **`call.state`** (optional): the app posts `{"v": 2, "type": "call.state",
+- **`call.state`** (optional): the app posts `{"v": 3, "type": "call.state",
   "active": true}` when a call starts and `false` when it ends. While a call
   is on, every turn of the owner's in Telegram gets the spoken style, even a
   follow-up typed without 🎙. A call left on (the app killed mid-call) ends by
@@ -449,6 +450,15 @@ recognition and synthesis), and the call is ordinary messages of the chat:
   over 2 GB).
 
 ## Changelog
+
+- v3 (2026-11-08, Arthur's change: the pet is a companion, not a
+  tamagotchi). Removed: the requests `pet.feed`, `pet.play`, `pet.sleep`,
+  `pet.wake` (they now answer `unknown_type`); `state.pet`'s `hunger`,
+  `energy`, `happiness`, `xp`, `level`, `xp_next`, `asleep`, `updated_at`.
+  Changed: `pet.mood` is now `idle` | `working` | `waiting` | `happy` |
+  `confused` (§5), `pet.animation` plays `jump` for the happy beat (no more
+  `wave` after a turn or `jump` on a level up). Added: `pet.mood_until`.
+  The bot accepts requests whatever their `v`.
 
 - v2, additive (2026-11-07, Arthur's addition): the `controls` slot (§2.4),
   native commands and the values they set; `state.slots.controls`.
