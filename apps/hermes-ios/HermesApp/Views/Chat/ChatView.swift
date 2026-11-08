@@ -42,6 +42,13 @@ struct ChatScreen: View {
                 heart = false
             }
         }
+        // The bar's pet is a still image, not a PetSpriteView (which clears reactions itself): a
+        // reaction shows for the time its row would play, then the pet returns to Hermes' state.
+        .task(id: store.petReaction) {
+            guard let reaction = store.petReaction else { return }
+            try? await Task.sleep(for: .seconds(reaction.frameDuration * Double(reaction.frameCount) * 2))
+            if store.petReaction == reaction { store.petReaction = nil }
+        }
         .task(id: topic) {
             if store.messages(in: topic).isEmpty { await store.loadHistory(topic) }
             store.markRead(topic)
@@ -61,6 +68,7 @@ struct ChatScreen: View {
             }
             .contextMenu {
                 Button { model.showNewPet = true } label: { Label("New Pet…", systemImage: "sparkles") }
+                    .barMonochrome()
             }
             .sensoryFeedback(.impact(flexibility: .soft), trigger: store.caressedAt)
             .accessibilityHint(Text("Caresses the pet"))
