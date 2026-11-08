@@ -67,17 +67,21 @@ struct AppShell: View {
             if sizeClass == .regular {
                 SplitShell()
             } else {
-                NavigationStack {
+                NavigationStack(path: $model.path) {
                     ChatScreen(topic: model.selectedTopic ?? .main, compact: true)
                         .id(model.selectedTopic ?? .main)
+                        .navigationDestination(for: AppSection.self) { section in
+                            switch section {
+                            case .dashboard: DashboardView()
+                            case .settings: SettingsView()
+                            case .chat: EmptyView()
+                            }
+                        }
                 }
             }
         }
-        .sheet(isPresented: $model.showPet) {
-            PetSheet()
-                .petAccent(model.accent)
-        }
         .sheet(isPresented: $model.showNewSubchat) { NewSubchatSheet() }
+        .sheet(isPresented: $model.showNewPet) { NewPetSheet() }
     }
 }
 
@@ -92,7 +96,7 @@ struct SplitShell: View {
         } detail: {
             NavigationStack {
                 switch model.section {
-                case .chat, .pet:
+                case .chat:
                     ChatScreen(topic: model.selectedTopic ?? .main, compact: false)
                         .id(model.selectedTopic ?? .main)
                 case .dashboard: DashboardView()

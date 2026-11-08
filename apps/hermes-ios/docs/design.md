@@ -69,7 +69,7 @@ fails a test.
 | **DesignCheck** (build phase of HermesUI) | A SwiftSyntax checker failing the build on: styling modifiers in a screen (`.padding`, `.font`, `.foregroundStyle`, `.background`, `.tint`, `.buttonStyle`…), layout numbers outside `Tokens.swift`, raw colours and font sizes, shapes drawn by a screen, strokes/borders/shadows anywhere, Liquid Glass outside `Chrome/`, numbers or colours in HermesUI's public API. One fixture per rule (`swift test` in `Tools/DesignCheck`). Screens not migrated yet are listed in `Tools/DesignCheck/phase2-screens.txt`, which only shrinks | `Tools/DesignCheck`, `scripts/design-check.sh` |
 | **Unit tests** | The accent reads at ≥ 4.5:1 (7:1 on the background with Increase Contrast) on every system background, light and dark, for 75 pet colours, with a ≥ 4.5:1 label; `ActionRow` refuses a destructive or second primary; spacing on the grid; concentric radii; the rhythm | `HermesUI/Tests` |
 | **Geometric UI tests** | On the running app (iPhone 17 Pro, iPad Pro 13"): one leading x for text, code, card and composer (16 pt on iPhone); the readable column; every gap on the scale and by relation; the approval's buttons one height ≥ 44, primary trailing; measured concentric corners; hit targets; stacked answers at AX5; round controls with \|w − h\| ≤ ½ pt; no private sub-chat name on screen | `HermesUITests/GeometryTests.swift` |
-| **Review rounds** | `scripts/review-shots.sh` renders the chat, chats menu, pet sheet and the component catalogue (`-catalog <page>`) in light, dark, AX5, French and with another pet; a separate reviewer inspects zoomed crops | `HermesUITests/ReviewShots.swift` |
+| **Review rounds** | `scripts/review-shots.sh` renders the chat, chats menu, the bar pet (caress, menu) and the component catalogue (`-catalog <page>`) in light, dark, AX5, French and with another pet; a separate reviewer inspects zoomed crops | `HermesUITests/ReviewShots.swift` |
 
 The yardstick for margins, bars, rows and fills is Apple's own apps measured on the same simulator
 (16-pt margins, 44-pt Back items, 36-pt trailing items, 26-pt grouped sections, Messages' composer:
@@ -103,10 +103,10 @@ No tab bar: the chat is the app (Arthur: « une navbar en bas … ultra has been
 
 ```
 Main chat (root)
-├── toolbar leading: the pet → its sheet: mood, needs, Feed/Play/Nap, level,
-│                                       then Dashboard and Settings (pushed in the sheet)
+├── toolbar leading: the pet — tap: a caress (happy row, soft haptic, a tiny heart);
+│                     long press: New Pet…; its animation shows Hermes' state
 ├── title "Main chat ⌄" → the chats (main, sub-chats; a private one is "Private chat" + lock),
-│                          New Sub-chat
+│                          New Sub-chat…, ──, Dashboard, Settings (pushed on the chat)
 └── toolbar trailing: Call
 Overlays: Call (full screen) · Login (first run) · New sub-chat (sheet)
 Hidden: the "App" topic (machine traffic)
@@ -115,8 +115,9 @@ Hidden: the "App" topic (machine traffic)
 ### iPhone (compact width)
 
 - One `NavigationStack` whose root is the open chat; picking a chat in the title menu replaces it.
-- The system toolbar: the pet (a still frame of its sprite as the image of the bar's own circular
-  item), the chat's name as title (`toolbarTitleMenu`) with Hermes' state as `navigationSubtitle`,
+- The system toolbar: the pet (a still frame of the row Hermes' state picks, drawn as the image
+  of the bar's own circular item; a caress redraws it with the reaction and a heart for a second),
+  the chat's name as title (`toolbarTitleMenu`) with Hermes' state as `navigationSubtitle`,
   Call. Never the app's name as a title (HIG Toolbars): the main chat is "Main chat".
 - The composer is pinned with `safeAreaBar(edge: .bottom)`, so the scroll edge effect runs under
   it; Stop replaces Send while Hermes writes. The transcript follows its bottom as it grows until
@@ -124,9 +125,9 @@ Hidden: the "App" topic (machine traffic)
 
 ### iPad and wide windows (regular width)
 
-- `NavigationSplitView`: the sidebar lists the pet (its sheet), the chats (system rows, badges),
-  New Sub-chat, Dashboard, Settings; the detail is the chat in a 672-pt readable column, Call
-  trailing. A narrow window (Slide Over, Stage Manager) gets the iPhone layout by size class.
+- `NavigationSplitView`: the sidebar lists the chats (system rows, badges), New Sub-chat…, then
+  Dashboard and Settings at its foot; the detail is the chat in a 672-pt readable column with the
+  pet leading and Call trailing. A narrow window (Slide Over, Stage Manager) gets the iPhone layout by size class.
 - Keyboard: ⌘↩ sends, ⌘N new sub-chat, ⌘⇧C call.
 
 ## User flows
@@ -189,7 +190,7 @@ Hidden: the "App" topic (machine traffic)
   pickers; commands that need words (side question, standing goal) prefill
   the composer; destructive ones confirm. Setting anything sends the slash
   command in that chat, so Telegram and the app stay one path.
-- **Glance**: Home Screen widget (pet + status + needs), Lock Screen widget
+- **Glance**: Home Screen widget (pet + what Hermes is doing), Lock Screen widget
   (pet + status), Live Activity while it works.
 
 ## Screens
@@ -200,7 +201,7 @@ Hidden: the "App" topic (machine traffic)
 | Chat | stack, composer pinned, the question as the last item | split view detail, readable column |
 | Sub-chats | the title menu | sidebar section |
 | New sub-chat | sheet (medium detent) | form sheet |
-| Pet | sheet from the pet in the bar (medium/large) | the same sheet, from the sidebar |
+| Pet | the bar's leading item: tap to caress, hold for New Pet… (no sheet) | the same, in the detail's bar |
 | Dashboard | scroll of cards | adaptive grid of cards |
 | Settings | inset grouped list | same in the detail column |
 | Call | full screen cover | full screen cover |
@@ -225,7 +226,8 @@ Hidden: the "App" topic (machine traffic)
 - Springs everywhere (`.smooth`, `.snappy`); nothing linear except progress.
 - Sending: the bubble rises from the composer (matched geometry).
 - Pet: sprite frames at the atlas' own rhythm (≈ 4–9 fps), never
-  interpolated; a reaction (feed/play) plays the one-shot row then returns.
+  interpolated; a reaction (a caress, a question arriving, an answer) plays its one-shot row
+  then returns to the row Hermes' state picks.
 - Reduce Motion: the pet shows its first idle frame; streaming fades are off.
 
 ## Typography
@@ -277,7 +279,7 @@ narrow currency form ("0,48 $").
 ## Accessibility
 
 - VoiceOver: each message is one element ("Hermes: …" / "You: …"); the pet
-  has a label with its mood and needs ("Pip, level 6, content; hunger 35 %…").
+  reads "Pip, <what Hermes is doing>", with the actions Caress and New Pet.
 - Live Activity and widgets: no information conveyed by colour alone (status
   has a word and an SF Symbol).
 - Hit targets ≥ 44 pt; question buttons ≥ 50 pt tall on iPhone.

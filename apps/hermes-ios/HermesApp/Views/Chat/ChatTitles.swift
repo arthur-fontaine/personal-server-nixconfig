@@ -33,8 +33,8 @@ enum ChatTitle {
     }
 }
 
-/// The chats, as the title menu lists them (iPhone): a picker, so the open chat has the system's
-/// checkmark, then New Sub-chat.
+/// The title menu (iPhone): the chats as a picker (the system's checkmark on the open one), New
+/// Sub-chat…, then Dashboard and Settings.
 struct ChatsMenu: View {
     @Environment(HermesStore.self) private var store
     @Environment(AppModel.self) private var model
@@ -51,7 +51,13 @@ struct ChatsMenu: View {
         }
         .pickerStyle(.inline)
         .barMonochrome()
-        Button { model.showNewSubchat = true } label: { Label("New Sub-chat", systemImage: "plus") }
+        Button { model.showNewSubchat = true } label: { Label("New Sub-chat…", systemImage: "plus") }
+            .barMonochrome()
+        Divider()
+        // Dashboard and Settings live here, after the chats (design-rules 11.4).
+        Button { model.show(.dashboard) } label: { Label(AppSection.dashboard.title, systemImage: AppSection.dashboard.symbol) }
+            .barMonochrome()
+        Button { model.show(.settings) } label: { Label(AppSection.settings.title, systemImage: AppSection.settings.symbol) }
             .barMonochrome()
     }
 }

@@ -28,28 +28,28 @@
         }
       }
     },
+    "%@, %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@, %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@"
+          }
+        }
+      }
+    },
     "%@, last 24 hours": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "%@, dernières 24 heures"
-          }
-        }
-      }
-    },
-    "%@, level %lld, %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$@, level %2$lld, %3$@"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@, niveau %lld, %@"
           }
         }
       }
@@ -66,22 +66,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@, via %2$@"
-          }
-        }
-      }
-    },
-    "%lld XP, %lld to the next level": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$lld XP, %2$lld to the next level"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld XP, encore %2$lld pour le niveau suivant"
           }
         }
       }
@@ -152,16 +136,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Compte"
-          }
-        }
-      }
-    },
-    "Action": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Action"
           }
         }
       }
@@ -387,12 +361,22 @@
         }
       }
     },
-    "Care for your pet": {
+    "Caress": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "S’occuper de ton compagnon"
+            "value": "Caresser"
+          }
+        }
+      }
+    },
+    "Caresses the pet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Caresse le compagnon"
           }
         }
       }
@@ -698,16 +682,6 @@
         }
       }
     },
-    "Energy": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Énergie"
-          }
-        }
-      }
-    },
     "Enter the code": {
       "localizations": {
         "fr": {
@@ -825,16 +799,6 @@
         }
       }
     },
-    "Fullness": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Satiété"
-          }
-        }
-      }
-    },
     "HERMES_TG_API_ID and HERMES_TG_API_HASH aren't set in this build.": {
       "localizations": {
         "fr": {
@@ -845,42 +809,12 @@
         }
       }
     },
-    "Happiness": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bonheur"
-          }
-        }
-      }
-    },
     "Hatch": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Faire éclore"
-          }
-        }
-      }
-    },
-    "Hatch a New Pet…": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Faire éclore un nouveau compagnon…"
-          }
-        }
-      }
-    },
-    "Hatch a Pet": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Faire éclore un compagnon"
           }
         }
       }
@@ -905,12 +839,12 @@
         }
       }
     },
-    "Hermes draws it in a few minutes, then rebuilds the app so its icon is your new pet. Your current pet's level is kept in its history.": {
+    "Hermes draws it in a few minutes, then rebuilds the app so its icon is your new pet.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hermes le dessine en quelques minutes, puis recompile l’app pour que son icône soit ton nouveau compagnon. Le niveau de ton compagnon actuel reste dans son historique."
+            "value": "Hermes le dessine en quelques minutes, puis recompile l’app pour que son icône soit ton nouveau compagnon."
           }
         }
       }
@@ -1127,26 +1061,6 @@
         }
       }
     },
-    "Level": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Niveau"
-          }
-        }
-      }
-    },
-    "Level %lld": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Niveau %lld"
-          }
-        }
-      }
-    },
     "Listening": {
       "localizations": {
         "fr": {
@@ -1333,16 +1247,6 @@
         }
       }
     },
-    "More": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Plus"
-          }
-        }
-      }
-    },
     "More Answers": {
       "localizations": {
         "fr": {
@@ -1383,12 +1287,22 @@
         }
       }
     },
-    "Needs": {
+    "New Pet": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Besoins"
+            "value": "Nouveau compagnon"
+          }
+        }
+      }
+    },
+    "New Pet…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouveau compagnon…"
           }
         }
       }
@@ -1399,6 +1313,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nouvelle sous-discussion"
+          }
+        }
+      }
+    },
+    "New Sub-chat…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouvelle sous-discussion…"
           }
         }
       }
@@ -1732,16 +1656,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Discussion privée"
-          }
-        }
-      }
-    },
-    "Private sub-chat": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sous-discussion privée"
           }
         }
       }

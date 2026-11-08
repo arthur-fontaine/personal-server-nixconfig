@@ -34,7 +34,10 @@ public extension PetAvatar where Sprite == EmptyView {
     /// The pet for a toolbar item: a still frame drawn into a square image, the sprite scaled
     /// uniformly with no interpolation. An `Image` is what the bar draws inside its own circular
     /// glass item (design-rules 10.3); a custom view would get a capsule.
-    static func toolbarImage(_ frame: CGImage) -> Image {
+    ///
+    /// `heart`: after a caress (design-rules 11.3), a tiny heart in the pet's colour at its
+    /// top-trailing corner, drawn into the same image so the item stays the bar's circle.
+    static func toolbarImage(_ frame: CGImage, heart accent: PetAccent? = nil) -> Image {
         let side = PetSize.toolbar.width
         let scale = UITraitCollection.current.displayScale
         let format = UIGraphicsImageRendererFormat()
@@ -46,6 +49,15 @@ public extension PetAvatar where Sprite == EmptyView {
             ctx.cgContext.translateBy(x: 0, y: side)
             ctx.cgContext.scaleBy(x: 1, y: -1)
             ctx.cgContext.draw(frame, in: CGRect(x: (side - w) / 2, y: 0, width: w, height: h))
+            if let accent {
+                ctx.cgContext.scaleBy(x: 1, y: -1)
+                ctx.cgContext.translateBy(x: 0, y: -side)
+                let colour = accent.shades[PetAccent.Appearance(UITraitCollection.current)]!.accent.uiColor
+                let config = UIImage.SymbolConfiguration(pointSize: HeartBadge.pointSize, weight: .bold)
+                if let heart = UIImage(systemName: "heart.fill", withConfiguration: config)?.withTintColor(colour, renderingMode: .alwaysOriginal) {
+                    heart.draw(at: CGPoint(x: side - heart.size.width, y: 0))
+                }
+            }
         }
         return Image(uiImage: image).renderingMode(.original)
     }

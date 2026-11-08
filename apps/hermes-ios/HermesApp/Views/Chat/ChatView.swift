@@ -11,10 +11,13 @@ struct ChatScreen: View {
     @Environment(AppModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
     let topic: TopicID
-    /// iPhone: the pet and the chats menu are in the bar; iPad has them in the sidebar.
+    /// iPhone: the chats are in the title's menu; iPad has them in the sidebar.
     let compact: Bool
     @State private var atBottom = true
     @State private var following = true
+    /// The heart a caress leaves on the bar's pet, for a second; none with Reduce Motion.
+    @State private var heart = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var composerFocused: Bool
 
     var body: some View {
@@ -31,6 +34,14 @@ struct ChatScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .modifier(ChatsTitleMenu(enabled: compact))
         .toolbar { toolbar }
+        .onChange(of: store.caressedAt) {
+            guard !reduceMotion else { return }
+            heart = true
+            Task {
+                try? await Task.sleep(for: CaressTiming.heart)
+                heart = false
+            }
+        }
         .task(id: topic) {
             if store.messages(in: topic).isEmpty { await store.loadHistory(topic) }
             store.markRead(topic)
@@ -38,22 +49,24 @@ struct ChatScreen: View {
     }
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
-        if compact {
-            ToolbarItem(placement: .topBarLeading) {
-                BarButton(Text(store.pet?.name ?? String(localized: "Pet")), action: { model.showPet = true }) {
-                    // The row Hermes' state (or a reaction) picks, as a still: the bar stays calm.
-                    if let frame = PetSpriteView.sheet(store: store)?.frame(store.petAnimation, 0) {
-                        PetAvatar.toolbarImage(frame)
-                    } else {
-                        Image(systemName: "pawprint")
-                    }
+        // The pet (design-rules 11.3–11.4): a tap caresses it, a long press offers New Pet…; it
+        // shows Hermes' state through its animation row.
+        ToolbarItem(placement: .topBarLeading) {
+            BarButton(Text(petLabel), action: { store.caress() }) {
+                if let frame = PetSpriteView.sheet(store: store)?.frame(store.petAnimation, 0) {
+                    PetAvatar.toolbarImage(frame, heart: heart ? model.accent : nil)
+                } else {
+                    Image(systemName: "pawprint")
                 }
-                // Hold the pet to caress it; a tap opens its sheet (design-rules 11.3).
-                .simultaneousGesture(LongPressGesture().onEnded { _ in store.caress() })
-                .sensoryFeedback(.impact(flexibility: .soft), trigger: store.caressedAt)
-                .accessibilityAction(named: Text("Caress")) { store.caress() }
-                .accessibilityIdentifier("toolbar.pet")
             }
+            .contextMenu {
+                Button { model.showNewPet = true } label: { Label("New Pet…", systemImage: "sparkles") }
+            }
+            .sensoryFeedback(.impact(flexibility: .soft), trigger: store.caressedAt)
+            .accessibilityHint(Text("Caresses the pet"))
+            .accessibilityAction(named: Text("Caress")) { store.caress() }
+            .accessibilityAction(named: Text("New Pet")) { model.showNewPet = true }
+            .accessibilityIdentifier("toolbar.pet")
         }
         if topic == .main {
             ToolbarItem(placement: .topBarTrailing) {
@@ -61,6 +74,12 @@ struct ChatScreen: View {
                     .accessibilityIdentifier("toolbar.call")
             }
         }
+    }
+
+    /// "Pip, waiting for your approval": the pet and what Hermes is doing.
+    private var petLabel: String {
+        let doing = store.agent.status != .idle ? (store.agent.task ?? store.petMood.caption) : store.petMood.caption
+        return "\(store.pet?.name ?? String(localized: "Pet")), \(doing)"
     }
 
     /// Hermes' state in this chat, or the connection's, in words (secondary, as Apple's subtitles).

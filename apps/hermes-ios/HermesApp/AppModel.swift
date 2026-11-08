@@ -7,13 +7,12 @@ import UserNotifications
 import WidgetKit
 
 enum AppSection: String, CaseIterable, Hashable, Identifiable {
-    case chat, pet, dashboard, settings
+    case chat, dashboard, settings
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .chat: String(localized: "Chat")
-        case .pet: String(localized: "Pet")
         case .dashboard: String(localized: "Dashboard")
         case .settings: String(localized: "Settings")
         }
@@ -22,7 +21,6 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
     var symbol: String {
         switch self {
         case .chat: "bubble.left.and.text.bubble.right"
-        case .pet: "pawprint"
         case .dashboard: "gauge.with.dots.needle.33percent"
         case .settings: "gearshape"
         }
@@ -40,11 +38,11 @@ final class AppModel {
     let store: HermesStore
     var section: AppSection = .chat
     var selectedTopic: TopicID? = .main
-    /// The pet's sheet (the pet, what Hermes does, New Pet…, Dashboard, Settings), from the pet in
-    /// the toolbar.
-    var showPet = false
-    /// A section pushed inside the pet sheet on iPhone (`-section dashboard`, `hermes://dashboard`).
-    var petPath: [AppSection] = []
+    /// Dashboard or Settings pushed on the chat's stack on iPhone (from the title menu,
+    /// `-section dashboard`, `hermes://dashboard`); the iPad shows them in its detail column.
+    var path: [AppSection] = []
+    /// "New Pet…", from the bar pet's menu.
+    var showNewPet = false
     /// The app's one colour, read from the pet's sprite (design-rules 4.2).
     var accent: PetAccent = .fallback
     /// `-catalog <page>`: HermesUI's component catalogue instead of the app (design reviews).
@@ -92,20 +90,16 @@ final class AppModel {
 
     func select(_ section: AppSection) { show(section) }
 
-    /// Pet, Dashboard and Settings live in the pet's sheet on iPhone, in the detail column on iPad;
-    /// both shells read `section` and `petPath`.
+    /// Dashboard and Settings are pushed on the chat on iPhone and fill the detail column on iPad;
+    /// both shells read `section` and `path`.
     func show(_ section: AppSection) {
-        switch section {
-        case .chat: self.section = .chat
-        case .pet: showPet = true
-        case .dashboard, .settings:
-            self.section = section
-            petPath = [section]
-        }
+        self.section = section
+        path = section == .chat ? [] : [section]
     }
 
     func open(topic: TopicID) {
         section = .chat
+        path = []
         selectedTopic = topic
     }
 
@@ -114,7 +108,7 @@ final class AppModel {
         guard url.scheme == "hermes" else { return }
         switch url.host() {
         case "chat": open(topic: TopicID(url.lastPathComponent) ?? .main)
-        case "pet": showPet = true
+        case "pet": open(topic: .main)
         case "dashboard": show(.dashboard)
         case "call": startCall()
         default: break
@@ -223,7 +217,6 @@ final class AppModel {
             return args[i + 1]
         }
         if let s = value("-section").flatMap(AppSection.init(rawValue:)) { show(s) }
-        if args.contains("-pet") { showPet = true }
         if let t = value("-topic").flatMap(TopicID.init) { selectedTopic = t }
         if args.contains("-unlocked"), let t = selectedTopic { unlockedTopics.insert(t) }
         if args.contains("-newSubchat") { showNewSubchat = true }

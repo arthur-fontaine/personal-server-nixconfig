@@ -135,3 +135,16 @@ public enum IconSize: Sendable {
         }
     }
 }
+
+/// The heart a caress leaves on the bar's pet (design-rules 11.3).
+enum HeartBadge {
+    /// A third of the pet's toolbar size: visible, not covering its face.
+    static let pointSize: CGFloat = PetSize.toolbar.width / 3
+    /// How long it stays.
+    static let seconds = 1.0
+}
+
+/// How long the heart a caress leaves stays, for the app's timing.
+public enum CaressTiming {
+    public static var heart: Duration { .seconds(HeartBadge.seconds) }
+}
