@@ -2,41 +2,38 @@ import HermesCore
 import HermesUI
 import SwiftUI
 
-/// Welcome → phone → code → password (only with 2FA). Each step is one field and one button.
+/// Welcome → phone → code → password (only with 2FA). Each step is one field and one button, on
+/// HermesUI's `OnboardingPage` (Apple's welcome-screen layout): the pet in the state of the step.
 struct LoginFlow: View {
     @Environment(HermesStore.self) private var store
     @State private var started = false
 
     var body: some View {
-        ZStack {
-            LinearGradient(colors: [Color.accentColor.opacity(0.22), Color(.systemBackground)], startPoint: .top, endPoint: .center)
-                .ignoresSafeArea()
-            ScrollView {
-                VStack(spacing: 28) {
-                    PetSpriteView(animation: petAnimation, size: .hero)
-                        .padding(.top, 48)
-                    Group {
-                        switch store.auth {
-                        case .waitPhoneNumber where !started: WelcomeStep { withAnimation(.smooth) { started = true } }
-                        case .waitPhoneNumber: PhoneStep()
-                        case .waitCode(let phone, let via, let length, let next): CodeStep(phone: phone, via: via, length: length, nextVia: next)
-                        case .waitPassword(let hint): PasswordStep(hint: hint)
-                        case .waitRegistration:
-                            StepHeader(title: String(localized: "No Telegram account"), subtitle: String(localized: "Create one in the Telegram app first, then come back."))
-                        default:
-                            ProgressView()
-                        }
-                    }
-                    .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
-                                            removal: .move(edge: .leading).combined(with: .opacity)))
+        Group {
+            switch store.auth {
+            case .waitPhoneNumber where !started: WelcomeStep(pet: pet) { withAnimation(.smooth) { started = true } }
+            case .waitPhoneNumber: PhoneStep(pet: pet)
+            case .waitCode(let phone, let via, let length, let next): CodeStep(pet: pet, phone: phone, via: via, length: length, nextVia: next)
+            case .waitPassword(let hint): PasswordStep(pet: pet, hint: hint)
+            case .waitRegistration:
+                OnboardingPage(title: Text("No Telegram account"), message: Text("Create one in the Telegram app first, then come back.")) {
+                    pet
+                } fields: {
+                    EmptyView()
+                } actions: {
+                    EmptyView()
                 }
-                .padding(.horizontal, 28)
-                .frame(maxWidth: 440)
-                .frame(maxWidth: .infinity)
+            default:
+                ProgressView()
             }
-            .scrollBounceBehavior(.basedOnSize)
         }
+        .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal: .move(edge: .leading).combined(with: .opacity)))
         .animation(.smooth, value: store.auth)
+    }
+
+    private var pet: some View {
+        PetSpriteView(animation: petAnimation, size: .hero)
     }
 
     private var petAnimation: PetAnimation {
@@ -48,60 +45,45 @@ struct LoginFlow: View {
     }
 }
 
-struct StepHeader: View {
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Text(title).font(.largeTitle.weight(.bold)).multilineTextAlignment(.center)
-            Text(subtitle).font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
-        }
-    }
-}
-
-struct WelcomeStep: View {
+struct WelcomeStep<Pet: View>: View {
+    let pet: Pet
     let next: () -> Void
 
     var body: some View {
-        VStack(spacing: 28) {
-            StepHeader(title: String(localized: "Hermes, in your pocket"),
-                       subtitle: String(localized: "Talk to your agent, answer its questions and see what it's up to. Everything goes through your Telegram account."))
-            Button(action: next) {
-                Text("Continue with Telegram").font(.headline).frame(maxWidth: .infinity, minHeight: 34)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+        OnboardingPage(title: Text("Hermes, in your pocket"),
+                       message: Text("Talk to your agent, answer its questions and see what it's up to. Everything goes through your Telegram account.")) {
+            pet
+        } fields: {
+            EmptyView()
+        } actions: {
+            PrimaryButton("Continue with Telegram", fullWidth: true, action: next)
         }
     }
 }
 
-struct PhoneStep: View {
+struct PhoneStep<Pet: View>: View {
     @Environment(HermesStore.self) private var store
+    let pet: Pet
     @State private var phone = ""
     @State private var error: String?
     @State private var busy = false
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(spacing: 24) {
-            StepHeader(title: String(localized: "Your phone number"), subtitle: String(localized: "The one of your Telegram account. Telegram sends you a code."))
+        OnboardingPage(title: Text("Your phone number"), message: Text("The one of your Telegram account. Telegram sends you a code.")) {
+            pet
+        } fields: {
             TextField("+33 6 12 34 56 78", text: $phone)
                 .textContentType(.telephoneNumber)
                 .keyboardType(.phonePad)
-                .font(.title2.monospacedDigit())
                 .multilineTextAlignment(.center)
-                .padding(.vertical, 14)
-                .background(.fill.tertiary, in: .rect(cornerRadius: 18))
+                .inputField()
                 .focused($focused)
                 .onSubmit(submit)
-            if let error { Text(error).font(.footnote).foregroundStyle(.red) }
-            Button(action: submit) {
-                HStack { if busy { ProgressView() }; Text("Next").font(.headline) }.frame(maxWidth: .infinity, minHeight: 34)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(busy || phone.filter(\.isNumber).count < 6)
+            if let error { Text(error).textRole(.footnote).tone(.destructive) }
+        } actions: {
+            PrimaryButton("Next", isBusy: busy, fullWidth: true, action: submit)
+                .disabled(phone.filter(\.isNumber).count < 6)
         }
         .onAppear { focused = true }
     }
@@ -116,8 +98,9 @@ struct PhoneStep: View {
     }
 }
 
-struct CodeStep: View {
+struct CodeStep<Pet: View>: View {
     @Environment(HermesStore.self) private var store
+    let pet: Pet
     let phone: String
     let via: String
     let length: Int
@@ -129,21 +112,19 @@ struct CodeStep: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(spacing: 24) {
-            StepHeader(title: String(localized: "Enter the code"), subtitle: via == "Telegram"
-                       ? String(localized: "Sent to your Telegram app on another device, for \(phone).")
-                       : String(localized: "Sent by \(via) to \(phone)."))
+        OnboardingPage(title: Text("Enter the code"), message: via == "Telegram"
+                       ? Text("Sent to your Telegram app on another device, for \(phone).")
+                       : Text("Sent by \(via) to \(phone).")) {
+            pet
+        } fields: {
             TextField(String(repeating: "–", count: length), text: $code)
                 .textContentType(.oneTimeCode)
                 .keyboardType(.numberPad)
-                .font(.system(size: 34, weight: .semibold, design: .monospaced))
+                .monospacedDigit()
                 .multilineTextAlignment(.center)
-                .padding(.vertical, 12)
-                .background(.fill.tertiary, in: .rect(cornerRadius: 18))
+                .inputField()
                 .focused($focused)
-                .keyframeAnimator(initialValue: 0.0, trigger: shake) { view, x in view.offset(x: x) } keyframes: { _ in
-                    KeyframeTrack { SpringKeyframe(12, duration: 0.08); SpringKeyframe(-10, duration: 0.08); SpringKeyframe(6, duration: 0.08); SpringKeyframe(0, duration: 0.1) }
-                }
+                .shake(on: shake)
                 .onChange(of: code) { _, new in
                     // Typing (or AutoFill pasting) the last digit submits.
                     let digits = new.filter(\.isNumber)
@@ -151,16 +132,13 @@ struct CodeStep: View {
                     if digits.count == length { submit() }
                 }
             if busy { ProgressView() }
-            if let error { Text(error).font(.footnote).foregroundStyle(.red) }
-            HStack(spacing: 12) {
-                if via == "Telegram", let tg = URL(string: "tg://") {
-                    Link(destination: tg) { Label("Open Telegram", systemImage: "paperplane") }
-                        .buttonStyle(.bordered)
-                }
-                if let nextVia {
-                    Button("Send by \(nextVia)") { Task { try? await store.resendCode() } }
-                        .buttonStyle(.bordered)
-                }
+            if let error { Text(error).textRole(.footnote).tone(.destructive) }
+        } actions: {
+            if via == "Telegram", let tg = URL(string: "tg://") {
+                Link(destination: tg) { Label("Open Telegram", systemImage: "paperplane") }
+            }
+            if let nextVia {
+                Button("Send by \(nextVia)") { Task { try? await store.resendCode() } }
             }
         }
         .onAppear { focused = true }
@@ -184,8 +162,9 @@ struct CodeStep: View {
     }
 }
 
-struct PasswordStep: View {
+struct PasswordStep<Pet: View>: View {
     @Environment(HermesStore.self) private var store
+    let pet: Pet
     let hint: String
     @State private var password = ""
     @State private var error: String?
@@ -193,25 +172,20 @@ struct PasswordStep: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(spacing: 24) {
-            StepHeader(title: String(localized: "Two-step verification"),
-                       subtitle: hint.isEmpty ? String(localized: "Your account has a password.") : String(localized: "Your password's hint: \(hint)"))
+        OnboardingPage(title: Text("Two-step verification"),
+                       message: hint.isEmpty ? Text("Your account has a password.") : Text("Your password's hint: \(hint)")) {
+            pet
+        } fields: {
             SecureField("Password", text: $password)
                 .textContentType(.password)
-                .font(.title3)
-                .padding(14)
-                .background(.fill.tertiary, in: .rect(cornerRadius: 18))
+                .inputField()
                 .focused($focused)
                 .onSubmit(submit)
-            if let error { Text(error).font(.footnote).foregroundStyle(.red) }
-            Button(action: submit) {
-                HStack { if busy { ProgressView() }; Text("Sign In").font(.headline) }.frame(maxWidth: .infinity, minHeight: 34)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(busy || password.isEmpty)
+            if let error { Text(error).textRole(.footnote).tone(.destructive) }
+        } actions: {
+            PrimaryButton("Sign In", isBusy: busy, fullWidth: true, action: submit)
+                .disabled(password.isEmpty)
             Link("Forgot your password?", destination: URL(string: "https://telegram.org/faq#q-i-forgot-my-password")!)
-                .font(.footnote)
         }
         .onAppear { focused = true }
     }

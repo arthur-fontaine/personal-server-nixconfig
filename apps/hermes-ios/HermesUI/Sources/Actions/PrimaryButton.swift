@@ -7,12 +7,17 @@ public struct PrimaryButton: View {
     let title: Text
     let systemImage: String?
     let isBusy: Bool
+    let fullWidth: Bool
     let action: () -> Void
 
-    public init(_ title: LocalizedStringKey, systemImage: String? = nil, isBusy: Bool = false, action: @escaping () -> Void) {
+    /// `fullWidth`: a screen's main action at its foot (HIG Buttons: "Prefer buttons that span the
+    /// width of the screen for primary actions").
+    public init(_ title: LocalizedStringKey, systemImage: String? = nil, isBusy: Bool = false, fullWidth: Bool = false,
+                action: @escaping () -> Void) {
         self.title = Text(title)
         self.systemImage = systemImage
         self.isBusy = isBusy
+        self.fullWidth = fullWidth
         self.action = action
     }
 
@@ -26,6 +31,7 @@ public struct PrimaryButton: View {
                 }
                 title
             }
+            .frame(maxWidth: fullWidth ? .infinity : nil)
             .foregroundStyle(OnAccentStyle())
         }
         .buttonStyle(.borderedProminent)

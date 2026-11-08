@@ -2,10 +2,12 @@ import SwiftUI
 
 /// Dynamic Type text styles only (design-rules 3.1): no size, no weight but the style's own.
 public enum TextRole: CaseIterable, Sendable {
-    case body, headline, subheadline, footnote, caption, code
+    /// `title`: a first-run step's title — Apple's welcome screens set it in bold `.title`.
+    case title, body, headline, subheadline, footnote, caption, code
 
     var font: Font {
         switch self {
+        case .title: .title.bold()
         case .body: .body
         case .headline: .headline
         case .subheadline: .subheadline

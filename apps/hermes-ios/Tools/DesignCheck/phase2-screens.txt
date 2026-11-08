@@ -1,6 +1,4 @@
 # Screens still styled by hand, waiting for phase 2 of the redesign (paths relative to this
 # file). DesignCheck skips them; the list only shrinks, and a stale entry fails the build.
 ../../HermesApp/Call/CallView.swift
-../../HermesApp/Views/Login/LoginFlow.swift
-../../HermesApp/Views/Onboarding/Onboarding.swift
 ../../HermesWidgets/HermesWidgetBundle.swift
