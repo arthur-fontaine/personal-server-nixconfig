@@ -54,10 +54,15 @@ enum Metric {
     static let sendButton: CGFloat = composerControl - 2 * Spacing.xxs.points
     /// Readable measure on wide screens: ≈ 75 characters of `.body` (HIG Layout, design-rules 2.2).
     static let readableWidth: CGFloat = 672
-    /// The owner's bubble leaves at least this on its leading side (≈ 80 % of an iPhone column).
-    static let bubbleLeadingRoom: CGFloat = 64
-    /// `.body`'s line height at the default size (17/22): a one-line bubble is a capsule.
-    static let bodyLine: CGFloat = 22
+    /// The owner's bubble leaves at least this on its leading side: 370 − 72 = 298 pt, ≈ 80 % of
+    /// an iPhone column (design-rules 12.4).
+    static let bubbleLeadingRoom: CGFloat = 72
+    /// One rendered line of `.body` at the default size (measured: 20.33 pt; the 22 of "17/22" is
+    /// the leading between lines). Used where a view must be as tall as a line of text.
+    static let bodyLine: CGFloat = 20
+    /// The owner's one-line bubble (design-rules 12.1: 46–48): its minimum height, the text centred
+    /// in it; its corner is half of it, so one line is a capsule.
+    static let oneLineBubble: CGFloat = 48
     /// The approval card's height cap at accessibility sizes; beyond it the card scrolls, as
     /// system alerts do, so the conversation keeps room.
     static let cardMaxHeightAX: CGFloat = 360
@@ -81,6 +86,10 @@ enum Metric {
     /// File card's leading symbol box.
     static let fileSymbol: CGFloat = 40
     static let fileCardMaxWidth: CGFloat = 360
+    /// A sidebar row's icon column, measured on the iPad sidebar's own rows (label ink at 77.5 pt,
+    /// icon centred at 53.75): from the row's 12-pt inset, 30 wide then 8 puts the label exactly on
+    /// the list's and the icon within ¾ pt of its centre.
+    static let sidebarIconColumn: CGFloat = 30
     /// Sidebar column width on iPad.
     static let sidebarMin: CGFloat = 280
     static let sidebarIdeal: CGFloat = 320
@@ -95,9 +104,9 @@ enum Radius {
         inset.points + innerControlHeight / 2
     }
 
-    /// The owner's bubble: a capsule at one line (`.body` line + 2 × vertical padding), the same
-    /// corner as it grows (Messages, reference/metrics.md).
-    static let bubble: CGFloat = (Metric.bodyLine + 2 * Bubble.vertical.points) / 2
+    /// The owner's bubble: a capsule at one line (half the one-line height), the same corner as it
+    /// grows (Messages, reference/metrics.md).
+    static let bubble: CGFloat = Metric.oneLineBubble / 2
 
     /// A free-standing block in the conversation (code): the corner a concentric block falls back
     /// to when no container gives it one — its own padding, so the text sits in the corner's
@@ -146,6 +155,8 @@ public enum PetSize: Hashable, Sendable {
     }
 
     static let aspect: CGFloat = 208.0 / 192.0
+    /// Width over height of a sprite cell, for `aspectRatio` (uniform scaling, design-rules 10.2).
+    static let spriteRatio: CGFloat = 192.0 / 208.0
 }
 
 /// Icon-only buttons' sizes (design-rules 10.1): a square, so the circle is a circle.

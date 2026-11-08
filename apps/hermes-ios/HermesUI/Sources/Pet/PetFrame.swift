@@ -14,12 +14,14 @@ public struct PetAvatar<Sprite: View>: View {
 
     public var body: some View {
         sprite
-            .aspectRatio(1 / PetSize.aspect, contentMode: .fit)
+            .aspectRatio(PetSize.spriteRatio, contentMode: .fit)
             .frame(width: size.width, height: size.width)
             .clipShape(Circle())
             .contentShape(Circle())
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("Pet"))
             .accessibilityAddTraits(.isImage)
+            .accessibilityIdentifier("pet.avatar")
     }
 }
 

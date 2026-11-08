@@ -48,6 +48,8 @@ final class ReviewShots: XCTestCase {
         XCTAssertTrue(card.waitForExistence(timeout: 10))
         settle(card)
         try shot("chat")
+        // What VoiceOver gets: the accessibility tree of the bar and the card (7.2).
+        try app.debugDescription.write(to: dir.appending(path: "\(device)-chat-\(tag)-a11y.txt"), atomically: true, encoding: .utf8)
         // The raw command, disclosed.
         let disclosure = app.descendants(matching: .any)["approval.command"]
         if disclosure.exists {
@@ -57,6 +59,16 @@ final class ReviewShots: XCTestCase {
             settle(card)
             try shot("chat-command")
         }
+    }
+
+    func testChatLandscape() throws {
+        let app = launch(["-scene", "review"])
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let card = app.descendants(matching: .any)["chat.approval"]
+        XCTAssertTrue(card.waitForExistence(timeout: 10))
+        settle(card)
+        try shot("chat-landscape")
+        XCUIDevice.shared.orientation = .portrait
     }
 
     func testChatsMenu() throws {
@@ -70,12 +82,12 @@ final class ReviewShots: XCTestCase {
 
     /// The bar's pet: a tap caresses it (the heart for a second), a long press offers New Pet….
     func testPet() throws {
-        let app = launch(["-scene", "review"])
-        let pet = app.descendants(matching: .any).matching(identifier: "toolbar.pet").firstMatch
+        let app = launch(["-scene", "review", "-heartHold"])
+        let pet = app.buttons.matching(identifier: "toolbar.pet").firstMatch
         XCTAssertTrue(pet.waitForExistence(timeout: 10))
         Thread.sleep(forTimeInterval: 2)
-        // The heart lasts a second: shoot straight after the tap.
-        pet.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        // The heart lasts a second: shoot as soon as the item reports the caress.
+        pet.tap()
         try shot("pet-caress")
         Thread.sleep(forTimeInterval: 1.5)
         pet.press(forDuration: 0.8)

@@ -20,10 +20,14 @@ public struct IconButton: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .foregroundStyle(.primary)
+                // A fixed circle: the glyph keeps its size, the Large Content Viewer shows it big.
+                .dynamicTypeSize(...DynamicTypeSize.large)
                 .frame(width: size.points, height: size.points)
                 .surface(.fill, in: Circle())
         }
         .buttonStyle(PressFade())
         .accessibilityLabel(title)
+        .accessibilityShowsLargeContentViewer()
+        .accessibilityIdentifier("round.icon")
     }
 }

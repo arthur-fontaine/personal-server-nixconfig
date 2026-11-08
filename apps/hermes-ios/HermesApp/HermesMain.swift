@@ -11,6 +11,7 @@ struct HermesMain: App {
             RootView()
                 .environment(model)
                 .environment(model.store)
+                .modifier(CompactWidthHook())
                 .onOpenURL { model.open($0) }
         }
         .commands { HermesCommands(model: model) }
@@ -49,5 +50,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Task { @MainActor in AppModel.shared.didRegisterForPush(token: deviceToken) }
+    }
+}
+
+/// `-compactWidth`: the compact size class on an iPad, standing in for a narrow multitasking
+/// window in design reviews (the simulator can't resize iPadOS windows from a script).
+struct CompactWidthHook: ViewModifier {
+    static let on = ProcessInfo.processInfo.arguments.contains("-compactWidth")
+    func body(content: Content) -> some View {
+        if Self.on { content.environment(\.horizontalSizeClass, .compact) } else { content }
     }
 }

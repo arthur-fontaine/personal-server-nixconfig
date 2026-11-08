@@ -14,7 +14,6 @@ struct PetSpriteView: View {
     var body: some View {
         PetAvatar(size) { sprite }
             .accessibilityLabel(accessibilityText)
-            .accessibilityIdentifier("pet.avatar")
     }
 
     @ViewBuilder private var sprite: some View {

@@ -11,6 +11,6 @@ scratch="${HOME}/Library/Caches/hermes-ios/DesignCheck"
   xcrun --sdk macosx swift build -c release --product design-check \
   --package-path "$root/Tools/DesignCheck" --scratch-path "$scratch" -q
 "$scratch/release/design-check" \
-  --screens "$root/HermesApp/Views" "$root/HermesApp/Call/CallView.swift" \
+  --screens "$root/HermesApp/Views" "$root/HermesApp/Call/CallView.swift" "$root/HermesWidgets" \
   --ui "$root/HermesUI/Sources" \
   --legacy "$root/Tools/DesignCheck/phase2-screens.txt"

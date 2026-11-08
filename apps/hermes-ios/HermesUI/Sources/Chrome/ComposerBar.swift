@@ -140,6 +140,8 @@ public struct FloatingButton: View {
         Button(action: action) { Label(title, systemImage: symbol).textRole(.subheadline) }
             .buttonStyle(.glass)
             .controlSize(.large)
+            // Not a primary action: monochrome, as the bar's controls (HIG Color, Liquid Glass color).
+            .tint(.primary)
     }
 }
 
@@ -158,12 +160,20 @@ public struct AttachmentChip: View {
     }
 
     public var body: some View {
-        HStack(spacing: Spacing.xs.points) {
+        // A capsule at its usual size, the composer's corner once it grows (a capsule taller than
+        // a line pinches its text: 5.1); the name is an identifier, so it truncates in the middle
+        // rather than wrapping or hyphenating.
+        let shape = RoundedRectangle(cornerRadius: Radius.composerField, style: .continuous)
+        HStack(alignment: .top, spacing: Spacing.xs.points) {
             Image(systemName: symbol).tone(.secondary)
+                .dynamicTypeSize(...DynamicTypeSize.large)
+                .frame(minHeight: Metric.hitTarget)
             VStack(alignment: .leading, spacing: 0) {
                 Text(verbatim: name).textRole(.caption).fontWeight(.semibold)
+                    .lineLimit(1).truncationMode(.middle)
                 Text(verbatim: detail).textRole(.caption).tone(.secondary)
             }
+            .inset(.vertical, .xs)
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill").tone(.secondary)
                     .frame(width: Metric.hitTarget, height: Metric.hitTarget)
@@ -173,25 +183,26 @@ public struct AttachmentChip: View {
             .accessibilityLabel(Text("Remove \(name)"))
         }
         .inset(.leading, .s)
-        .glassEffect(.regular, in: Capsule())
+        .glassEffect(.regular, in: shape)
     }
 }
 
-/// An upload in progress, above the composer.
+/// An upload in progress, above the composer. Takes a Foundation `Progress`, not a number
+/// (design-rules 9.2).
 public struct UploadBar: View {
     let title: Text
-    let fraction: Double
+    let progress: Progress
 
-    public init(title: Text, fraction: Double) {
+    public init(title: Text, progress: Progress) {
         self.title = title
-        self.fraction = fraction
+        self.progress = progress
     }
 
     public var body: some View {
         let shape = RoundedRectangle(cornerRadius: Radius.composerField, style: .continuous)
         VStack(alignment: .leading, spacing: Spacing.xxs.points) {
             title.textRole(.caption)
-            ProgressView(value: fraction)
+            ProgressView(progress)
         }
         .inset(.horizontal, .m)
         .inset(.vertical, .xs)
@@ -226,29 +237,6 @@ public extension View {
     /// Bars and their menus stay monochrome (HIG Toolbars): for a sheet's toolbar items and a
     /// title menu's content, whose system controls otherwise take the app's accent.
     func barMonochrome() -> some View { tint(.primary) }
-}
-
-/// A toolbar item whose tap does one thing and whose long press opens a menu
-/// (`Menu(primaryAction:)`, the system's pattern; a context menu on a bar item is a cramped
-/// preview). Monochrome, labelled for VoiceOver, the icon alone in the bar's circle.
-public struct BarMenuButton<Icon: View, Items: View>: View {
-    let title: Text
-    let primaryAction: () -> Void
-    let icon: Icon
-    let items: Items
-
-    public init(_ title: Text, primaryAction: @escaping () -> Void, @ViewBuilder icon: () -> Icon, @ViewBuilder menu: () -> Items) {
-        self.title = title
-        self.primaryAction = primaryAction
-        self.icon = icon()
-        items = menu()
-    }
-
-    public var body: some View {
-        Menu(content: { items }, label: { icon }, primaryAction: primaryAction)
-            .accessibilityLabel(title)
-            .tint(.primary)
-    }
 }
 
 public extension BarButton where Icon == Image {

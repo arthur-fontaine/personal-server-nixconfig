@@ -68,7 +68,9 @@ final class GeometryTests: XCTestCase {
         let surfaces = [one(app, "chat.code").frame, one(app, "chat.approval").frame, one(app, "composer").frame]
         let trailing = surfaces[0].maxX
         for f in surfaces { XCTAssertEqual(f.maxX, trailing, accuracy: tolerance, "trailing edge \(f)") }
-        for b in all(app, "chat.bubble") { XCTAssertEqual(b.frame.maxX, trailing, accuracy: tolerance, "bubble's trailing edge") }
+        let bubbles = (all(app, "chat.bubble") + all(app, "chat.owner")).filter { probe($0) != nil }
+        XCTAssertFalse(bubbles.isEmpty, "no bubble")
+        for b in bubbles { XCTAssertEqual(b.frame.maxX, trailing, accuracy: tolerance, "bubble's trailing edge") }
         // iPhone: the system's 16-pt layout margin (reference/metrics.md).
         if UIDevice.current.userInterfaceIdiom == .phone { XCTAssertEqual(x, 16, accuracy: tolerance) }
         // iPad: a readable column, at most 672 pt (2.2).
@@ -113,26 +115,28 @@ final class GeometryTests: XCTestCase {
 
     /// 5.1: inner radius = outer radius − inset, measured: the card's declared corner and inset,
     /// the buttons' real distance from its edges and their real height (capsules).
-    func testConcentricCorners() {
+    func testConcentricCorners() throws {
         let app = launch()
         let cardElement = one(app, "chat.approval")
-        guard let card = probe(cardElement) else { return XCTFail("no geometry probe on the card") }
+        let card = try XCTUnwrap(probe(cardElement), "no geometry probe on the card")
         let c = cardElement.frame
         let first = one(app, "action.more").frame, last = one(app, "action.once").frame
         XCTAssertEqual(first.minX - c.minX, card.inset, accuracy: tolerance, "leading inset")
         XCTAssertEqual(c.maxX - last.maxX, card.inset, accuracy: tolerance, "trailing inset")
         XCTAssertEqual(c.maxY - last.maxY, card.inset, accuracy: tolerance, "bottom inset")
         XCTAssertEqual(last.height / 2, card.radius - card.inset, accuracy: tolerance, "capsule radius = card radius − inset")
-        // A one-line bubble is a capsule.
-        if let bubble = all(app, "chat.bubble").first(where: { $0.label.contains("go ahead") || $0.label.contains("vas-y") }),
-           let p = probe(bubble) {
-            XCTAssertEqual(bubble.frame.height / 2, p.radius, accuracy: tolerance, "one-line bubble is a capsule")
-        }
+        // A one-line bubble, as rendered: 46–48 pt and a capsule (12.1).
+        // The bubble is the owner's row's one element (it carries the probe).
+        let bubbles = (all(app, "chat.bubble") + all(app, "chat.owner")).filter { probe($0) != nil }
+        let bubble = try XCTUnwrap(bubbles.min(by: { $0.frame.height < $1.frame.height }), "no bubble")
+        let bp = try XCTUnwrap(probe(bubble), "no probe on the bubble")
+        XCTAssertGreaterThanOrEqual(bubble.frame.height, 46 - tolerance, "one-line bubble \(bubble.frame.height)")
+        XCTAssertLessThanOrEqual(bubble.frame.height, 48 + tolerance, "one-line bubble \(bubble.frame.height)")
+        XCTAssertEqual(bubble.frame.height / 2, bp.radius, accuracy: tolerance, "one-line bubble is a capsule")
         // Code outside a card: the block minimum, its own 16-pt padding (12.2).
-        if let code = probe(one(app, "chat.code")) {
-            XCTAssertEqual(code.radius, 16, accuracy: tolerance)
-            XCTAssertGreaterThanOrEqual(code.inset, 16)
-        }
+        let code = try XCTUnwrap(probe(one(app, "chat.code")), "no probe on the code block")
+        XCTAssertEqual(code.radius, 16, accuracy: tolerance)
+        XCTAssertGreaterThanOrEqual(code.inset, 16)
         XCTAssertGreaterThanOrEqual(card.inset, 20, "the approval card breathes (12.2)")
     }
 
@@ -186,6 +190,45 @@ final class GeometryTests: XCTestCase {
             }
             app.terminate()
         }
+    }
+
+    /// 10.4: HermesUI's round components, from the catalogue: IconButton, PetAvatar at every size,
+    /// the file card's symbol badge — at the default size and at AX5.
+    func testCatalogueCircles() {
+        for ax in [false, true] {
+            for (page, ids) in [("actions", ["round.icon"]), ("chat", ["pet.avatar"]), ("files", ["round.filesymbol"])] {
+                let app = XCUIApplication()
+                app.launchArguments = ["-demo", "-catalog", page]
+                    + (ax ? ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] : [])
+                app.launch()
+                for id in ids {
+                    let els = all(app, id)
+                    XCTAssertFalse(els.isEmpty, "\(id) missing on \(page)")
+                    for e in els {
+                        XCTAssertEqual(e.frame.width, e.frame.height, accuracy: 0.5, "\(id) is an oval: \(e.frame.size)\(ax ? " at AX5" : "")")
+                    }
+                }
+                app.terminate()
+            }
+        }
+    }
+
+    /// 5.3: a busy button keeps its row's height.
+    func testBusyRowKeepsItsHeight() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-catalog", "actions"]
+        app.launch()
+        let busy = one(app, "action.busy.allow").frame, deny = one(app, "action.busy.deny").frame
+        XCTAssertEqual(busy.height, deny.height, accuracy: tolerance, "busy \(busy.height) vs \(deny.height)")
+    }
+
+    /// 11.3: a tap on the bar's pet caresses it — the item reports it for the heart's second.
+    func testCaress() {
+        let app = launch()
+        let pet = app.buttons.matching(identifier: "toolbar.pet").firstMatch
+        XCTAssertTrue(pet.exists)
+        pet.tap()
+        XCTAssertEqual(pet.value as? String, "caressed", "no caress")
     }
 
     /// 1.4: a private sub-chat's name never reaches the screen outside the chat itself.

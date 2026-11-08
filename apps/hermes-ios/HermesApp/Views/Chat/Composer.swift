@@ -21,7 +21,7 @@ struct Composer: View {
     var body: some View {
         VGroup(spacing: .xs) {
             ForEach(store.uploads.values.sorted { $0.name < $1.name }, id: \.name) { u in
-                UploadBar(title: Text("Uploading \(u.name) to \(u.service)"), fraction: u.fraction)
+                UploadBar(title: Text("Uploading \(u.name) to \(u.service)"), progress: Self.progress(u.fraction))
             }
             if !files.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -69,6 +69,12 @@ struct Composer: View {
                 photos = []
             }
         }
+    }
+
+    private static func progress(_ fraction: Double) -> Progress {
+        let p = Progress(totalUnitCount: 1000)
+        p.completedUnitCount = Int64(fraction * 1000)
+        return p
     }
 
     /// Stop replaces Send while Hermes writes here and the draft can be stopped.

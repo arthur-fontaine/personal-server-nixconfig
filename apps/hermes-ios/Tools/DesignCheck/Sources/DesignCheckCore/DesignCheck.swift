@@ -51,7 +51,7 @@ public enum DesignCheck {
         "buttonStyle", "buttonBorderShape", "controlSize", "tint", "lineSpacing", "kerning", "tracking",
         "listRowBackground", "listRowInsets", "scenePadding", "contentMargins", "safeAreaPadding",
         "containerShape", "glassEffect", "opacity", "blur", "brightness", "saturation", "colorMultiply",
-        "shadow", "stroke", "strokeBorder", "border",
+        "shadow", "stroke", "strokeBorder", "border", "textCase",
     ]
     /// Arguments that are layout numbers wherever they appear.
     static let layoutLabels: Set<String> = [
@@ -59,10 +59,11 @@ public enum DesignCheck {
         "minHeight", "maxHeight", "idealWidth", "idealHeight", "cornerRadius", "radius", "minLength",
         "lineWidth", "min", "ideal", "max",
     ]
-    /// Calls whose unlabelled arguments are layout numbers.
+    /// Calls whose every argument — labelled, unlabelled or a trailing closure — is layout.
     static let layoutCalls: Set<String> = [
         "padding", "frame", "offset", "position", "scaleEffect", "lineSpacing", "kerning", "tracking",
-        "contentMargins", "safeAreaPadding", "inset", "cornerRadius",
+        "contentMargins", "safeAreaPadding", "inset", "cornerRadius", "aspectRatio",
+        "containerRelativeFrame", "rotationEffect",
     ]
     static let shapes: Set<String> = [
         "RoundedRectangle", "Circle", "Capsule", "Rectangle", "Ellipse", "ConcentricRectangle",
@@ -70,6 +71,7 @@ public enum DesignCheck {
     ]
     static let untypedAPITypes: Set<String> = [
         "CGFloat", "Color", "UIColor", "Font", "ShapeStyle", "AnyShapeStyle", "EdgeInsets", "CGSize", "CGPoint",
+        "Double", "Float", "Int", "CGRect",
     ]
 
     public static func check(source: String, file: String, kind: FileKind) -> [Finding] {
@@ -142,18 +144,26 @@ final class Visitor: SyntaxVisitor {
     }
 
     private func checkLayoutLiterals(_ node: FunctionCallExprSyntax, name: String?) {
-        let unlabelledAreLayout = name.map(DesignCheck.layoutCalls.contains) ?? false
+        let layoutCall = name.map(DesignCheck.layoutCalls.contains) ?? false
+        var exprs: [Syntax] = []
         for arg in node.arguments {
-            let label = arg.label?.text
-            let isLayout = label.map(DesignCheck.layoutLabels.contains) ?? unlabelledAreLayout
-            if isLayout, let literal = nonZeroLiteral(in: arg.expression) {
+            let isLayout = layoutCall || (arg.label.map { DesignCheck.layoutLabels.contains($0.text) } ?? false)
+            if isLayout { exprs.append(Syntax(arg.expression)) }
+        }
+        // `containerRelativeFrame(.horizontal) { w, _ in w * 0.5 }`: the closure computes layout.
+        if layoutCall {
+            if let c = node.trailingClosure { exprs.append(Syntax(c)) }
+            for c in node.additionalTrailingClosures { exprs.append(Syntax(c.closure)) }
+        }
+        for e in exprs {
+            if let literal = nonZeroLiteral(in: e) {
                 add(.layoutLiteral, literal, "layout number `\(literal.trimmedDescription)` — use a token (Spacing, PetSize, a component) (design-rules 2.3)")
             }
         }
     }
 
     /// A numeric literal other than 0 inside an argument (0 is no distance, not a magic number).
-    private func nonZeroLiteral(in expr: ExprSyntax) -> Syntax? {
+    private func nonZeroLiteral(in expr: some SyntaxProtocol) -> Syntax? {
         for token in expr.tokens(viewMode: .sourceAccurate) {
             switch token.tokenKind {
             case .integerLiteral(let t), .floatLiteral(let t):
@@ -200,13 +210,27 @@ final class Visitor: SyntaxVisitor {
         if isHermesUI, exposed(node.modifiers) {
             checkParameters(node.signature.parameterClause.parameters, in: node.name.text)
             if let ret = node.signature.returnClause?.type { checkType(ret, in: node.name.text) }
+            checkGenerics(node.genericParameterClause, node.genericWhereClause, in: node.name.text)
         }
         return .visitChildren
     }
 
     override func visit(_ node: InitializerDeclSyntax) -> SyntaxVisitorContinueKind {
-        if isHermesUI, exposed(node.modifiers) { checkParameters(node.signature.parameterClause.parameters, in: "init") }
+        if isHermesUI, exposed(node.modifiers) {
+            checkParameters(node.signature.parameterClause.parameters, in: "init")
+            checkGenerics(node.genericParameterClause, node.genericWhereClause, in: "init")
+        }
         return .visitChildren
+    }
+
+    /// `init<S: ShapeStyle>(fill: S)`: a colour by another name.
+    private func checkGenerics(_ params: GenericParameterClauseSyntax?, _ whereClause: GenericWhereClauseSyntax?, in name: String) {
+        for clause in [params.map(Syntax.init), whereClause.map(Syntax.init)].compactMap({ $0 }) {
+            for token in clause.tokens(viewMode: .sourceAccurate) where DesignCheck.untypedAPITypes.contains(token.text) {
+                add(.publicAPI, clause, "`\(name)` is generic over `\(token.text)` — HermesUI's public API takes tokens, never numbers or colours (design-rules 9.2)")
+                return
+            }
+        }
     }
 
     override func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {

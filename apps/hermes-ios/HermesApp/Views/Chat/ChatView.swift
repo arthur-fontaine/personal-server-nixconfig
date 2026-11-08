@@ -38,7 +38,8 @@ struct ChatScreen: View {
             guard !reduceMotion else { return }
             heart = true
             Task {
-                try? await Task.sleep(for: CaressTiming.heart)
+                // `-heartHold`: design reviews keep the heart long enough to be photographed.
+                try? await Task.sleep(for: Self.heartHold ? .seconds(5) : CaressTiming.heart)
                 heart = false
             }
         }
@@ -59,19 +60,27 @@ struct ChatScreen: View {
         // The pet (design-rules 11.3–11.4): a tap caresses it, a long press offers New Pet…; it
         // shows Hermes' state through its animation row.
         ToolbarItem(placement: .topBarLeading) {
-            BarMenuButton(Text(petLabel), primaryAction: { store.caress() }) {
+            BarButton(Text(petLabel), action: { store.caress() }) {
                 if let frame = PetSpriteView.sheet(store: store)?.frame(store.petAnimation, 0) {
                     PetAvatar.toolbarImage(frame, heart: heart ? model.accent : nil)
                 } else {
                     Image(systemName: "pawprint")
                 }
-            } menu: {
-                Button { model.showNewPet = true } label: { Label("New Pet…", systemImage: "sparkles") }
+            }
+            .contextMenu {
+                // The pet and what Hermes does as the menu's header: context, and room for the
+                // item's title.
+                Section(petLabel) {
+                    Button { model.showNewPet = true } label: { Label("New Pet…", systemImage: "sparkles") }
+                        .barMonochrome()
+                }
             }
             .sensoryFeedback(.impact(flexibility: .soft), trigger: store.caressedAt)
             .accessibilityHint(Text("Caresses the pet"))
             .accessibilityAction(named: Text("Caress")) { store.caress() }
             .accessibilityAction(named: Text("New Pet")) { model.showNewPet = true }
+            // Under -geometryProbe, "caressed" once a caress registered: what UI tests read (11.3).
+            .accessibilityValue(Self.probing && store.caressedAt != nil ? Text(verbatim: "caressed") : Text(verbatim: ""))
             .accessibilityIdentifier("toolbar.pet")
         }
         if topic == .main {
@@ -141,6 +150,10 @@ struct ChatScreen: View {
                 }
             }
             .defaultScrollAnchor(.bottom)
+            // A chat rests on text: the bar's title and subtitle need a calm backdrop (HIG,
+            // Adopting Liquid Glass: "Optimize for legibility when content scrolls beneath
+            // controls"); the hard edge effect gives them one.
+            .scrollEdgeEffectStyle(.hard, for: .top)
             .scrollDismissesKeyboard(.interactively)
             .onScrollGeometryChange(for: Bool.self) { geo in
                 geo.visibleRect.maxY >= geo.contentSize.height - 80
@@ -177,13 +190,14 @@ struct ChatScreen: View {
                         Composer(topic: topic, focused: $composerFocused)
                     }
                 }
-                .inset(.bottom, .xs)
                 .animation(.snappy, value: atBottom)
             }
         }
     }
 
     static let bottomID = "bottom"
+    static let probing = ProcessInfo.processInfo.arguments.contains("-geometryProbe")
+    static let heartHold = ProcessInfo.processInfo.arguments.contains("-heartHold")
 
     static func speaker(_ m: ChatMessage) -> Speaker { m.isOutgoing ? .owner : .hermes }
 }
