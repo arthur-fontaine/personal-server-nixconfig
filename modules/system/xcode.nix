@@ -94,15 +94,36 @@ in
             echo "Xcode $latest_xcode: no Apple Account to download it (bootstrap-macos.sh xcode); skipped" >&2
           fi
         fi
+        xcode_path=""
         if [ -n "$latest_xcode" ]; then
           xcode_path=$(run_xcodes installed 2>/dev/null </dev/null | awk -F'\t' -v v="$latest_xcode" 'index($1, v " (") == 1 { print $NF }')
-          if [ -n "$xcode_path" ] && [ "$(xcode-select -p 2>/dev/null)" != "$xcode_path/Contents/Developer" ]; then
-            echo "selecting $xcode_path..." >&2
-            xcode-select -s "$xcode_path" \
-              && xcodebuild -license accept \
-              && xcodebuild -runFirstLaunch \
-              || echo "warning: could not select $xcode_path" >&2
-          fi
+        fi
+        # Without the latest version (no Apple session to look it up, or its
+        # install failed), an Xcode already installed is still better than the
+        # Command Line Tools alone: sideload and xcodebuild need one selected.
+        if [ -z "$xcode_path" ]; then
+          case "$(xcode-select -p 2>/dev/null)" in
+            */Xcode*.app/Contents/Developer) ;;
+            *)
+              xcode_path=$(
+                {
+                  run_xcodes installed 2>/dev/null </dev/null | awk -F'\t' '{ split($1, v, " "); print v[1] "\t" $NF }'
+                  for app in /Applications/Xcode*.app; do
+                    [ -d "$app" ] || continue
+                    printf '%s\t%s\n' "$(/usr/bin/defaults read "$app/Contents/Info" CFBundleShortVersionString 2>/dev/null || echo 0)" "$app"
+                  done
+                } | sort -V -k1,1 | tail -n 1 | cut -f 2
+              )
+              [ -n "$xcode_path" ] || echo "warning: no Xcode installed to select; the Command Line Tools stay selected" >&2
+              ;;
+          esac
+        fi
+        if [ -n "$xcode_path" ] && [ "$(xcode-select -p 2>/dev/null)" != "$xcode_path/Contents/Developer" ]; then
+          echo "selecting $xcode_path..." >&2
+          xcode-select -s "$xcode_path" \
+            && xcodebuild -license accept \
+            && xcodebuild -runFirstLaunch \
+            || echo "warning: could not select $xcode_path; run: sudo xcode-select -s $xcode_path" >&2
         fi
       ''}
       )
