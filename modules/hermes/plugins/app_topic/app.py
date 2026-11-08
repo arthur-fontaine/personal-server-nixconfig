@@ -22,7 +22,7 @@ from typing import Any
 
 from . import protocol, speech
 from .machine import Machine
-from .pet import PetState, animation, mirror
+from .pet import PetState, animation, mirror, mood
 from .questions import Questions
 from .status import Status
 from .usage import Ledger, estimate_cost
@@ -346,16 +346,10 @@ class App:
     def pet_public(self, status: str) -> dict | None:
         now = time.time()
         with self.pet.lock:
-            needs = self.pet.needs
-            needs.advance(now, self.status.take_working_seconds())
-            for _, failed in self.status.take_finished():
-                if not failed:
-                    needs.gain(2, now)
-                    if needs.burst != "jump":
-                        needs.set_burst("wave", now)
-            if needs.asleep and status in ("working", "thinking"):
-                needs.asleep = False
-            self.pet.save()
+            outcomes = [outcome for _, outcome in self.status.take_finished() if outcome != "interrupted"]
+            if outcomes:
+                # The last turn to end sets the beat; a stopped one gets none.
+                self.pet.react("happy" if outcomes[-1] == "done" else "confused", now)
             slug = self.pet.data["slug"]
             if not slug:
                 return None
@@ -365,10 +359,12 @@ class App:
             except (OSError, ValueError):
                 manifest = None
             name = (manifest or {}).get("displayName") or slug
+            beat = (self.pet.beat, self.pet.beat_until, now)
+            current = mood(status, *beat)
             return {"id": slug, "name": name, "version": self.pet.data["version"], "manifest": manifest,
                     "sprite_message_id": self.saved["sprite"].get("id"),
-                    "animation": animation(needs, status, now), "mood": needs.mood(status in ("working", "thinking")),
-                    **needs.public(), "updated_at": protocol.now_iso(needs.updated)}
+                    "mood": current, "animation": animation(status, *beat),
+                    "mood_until": protocol.now_iso(self.pet.beat_until) if current in ("happy", "confused") else None}
 
     def subchats(self) -> list[dict]:
         state = sys.__dict__.get("_hermes_unii_state") or {}
@@ -690,9 +686,7 @@ class App:
         query = getattr(update, "callback_query", None)
         data = str(getattr(query, "data", None) or "")
         if data and getattr(getattr(query, "from_user", None), "id", None) == owner_id():
-            if self.questions.resolve_callback(data):
-                with self.pet.lock:
-                    self.pet.needs.gain(5, time.time())
+            self.questions.resolve_callback(data)
 
     def human_input_resolved(self, kind: str = "", session_key: str = "", outcome: str = "", **_) -> None:
         if kind not in ("approval", "clarify"):
@@ -764,19 +758,6 @@ class App:
             self.last_stats = min(self.last_stats, due - STATS_EVERY)
             self.dirty.set()
             return {}
-        if kind in ("pet.feed", "pet.play", "pet.sleep", "pet.wake"):
-            with self.pet.lock:
-                if not self.pet.data["slug"]:
-                    raise RequestError("unavailable", "no pet yet: ask Hermes for one, or send pet.generate")
-                now = time.time()
-                self.pet.needs.advance(now, self.status.take_working_seconds())
-                refused = self.pet.needs.act(kind.split(".", 1)[1], now)
-                self.pet.save()
-                if refused:
-                    raise RequestError("bad_request", refused)
-                data = self.pet.needs.public()
-            self.dirty.set()
-            return data
         if kind == "pet.generate":
             prompt = str(request.get("prompt") or "").strip()
             if not prompt:

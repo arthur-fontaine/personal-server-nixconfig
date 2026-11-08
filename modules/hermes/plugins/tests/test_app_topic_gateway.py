@@ -137,15 +137,15 @@ def run(tmp: Path) -> None:
             assert not any("no_home_channel" in n["body"] or "nohomechannel" in n["body"] for n in topic("notify")), topic("notify")
             assert note["chat"] == 0 and note["kind"] == "message", note
             # A request in the App topic: answered there, deleted, and never a turn.
-            push(json.dumps({"v": 1, "type": "pet.feed"}), thread=THREAD)
+            push(json.dumps({"v": 3, "type": "pet.generate"}), thread=THREAD)
             wait_for(lambda: topic("reply"), diagnostic)
             reply = topic("reply")[-1]
-            assert reply["ok"] is False and reply["error"]["code"] == "unavailable", reply
+            assert reply["ok"] is False and reply["error"]["code"] == "bad_request", reply
             wait_for(lambda: reply["re"] in bot.deleted, diagnostic)
             push(json.dumps({"v": 1, "type": "stats.refresh"}), thread=THREAD)
             wait_for(lambda: len(topic("reply")) == 2, diagnostic)
             time.sleep(1)
-            assert not any("pet.feed" in a or "stats.refresh" in a for a in asked()), asked()
+            assert not any("pet.generate" in a or "stats.refresh" in a for a in asked()), asked()
             # The model's calls are in the usage stats.
             wait_for(lambda: any(m["model"] == "loopback" for m in topic("stats")[-1]["models"]), diagnostic)
         log = (home / "logs" / "agent.log").read_text(errors="replace")

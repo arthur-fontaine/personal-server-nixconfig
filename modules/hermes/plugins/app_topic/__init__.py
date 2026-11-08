@@ -4,7 +4,7 @@ The app is a Telegram client of the owner's DM with the bot. Machine traffic
 goes through a hidden forum topic "App" of that DM: the state the app shows
 (agent status, open questions, the pet, sub-chats, machine and model stats,
 devices), the notifications' spoken text, and the app's requests. This
-plugin keeps that topic, counts model usage, keeps the pet's needs, makes
+plugin keeps that topic, counts model usage, keeps the pet's mood, makes
 call turns speakable, and gives Hermes the tools for pets and big files.
 
 Other plugins may report an approval's plain-language summary before the card

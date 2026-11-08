@@ -23,7 +23,7 @@ os.makedirs(os.environ["HERMES_HOME"], exist_ok=True)
 
 from app_topic import app as app_mod  # noqa: E402
 from app_topic import bigfiles, machine, protocol, questions, speech, usage  # noqa: E402
-from app_topic.pet import Needs, level_for, xp_for_level  # noqa: E402
+from app_topic.pet import BEAT, PetState, animation, mood  # noqa: E402
 from app_topic.status import Status, tool_label  # noqa: E402
 
 OWNER = 4242
@@ -43,7 +43,7 @@ def wait_for(predicate, what: str, timeout: float = 10) -> None:
 # ── pure parts ───────────────────────────────────────────────────────────
 
 def test_protocol() -> None:
-    assert protocol.parse('{"v":1,"type":"pet.feed"}') == {"v": 1, "type": "pet.feed"}
+    assert protocol.parse('{"v":1,"type":"stats.refresh"}') == {"v": 1, "type": "stats.refresh"}
     assert protocol.parse('```json\n{"v":1,"type":"hello"}\n```')["type"] == "hello"
     assert protocol.parse("hello there") is None and protocol.parse('{"no":"type"}') is None
     html = protocol.render_html({"a": "<b>&"})
@@ -75,24 +75,26 @@ def test_speech() -> None:
     assert q == "Hermes asks: Which day? Options: Monday, Tuesday."
 
 
-def test_pet_needs() -> None:
-    n = Needs(updated=0.0)
-    n.advance(3600.0, working_seconds=0)
-    assert round(n.hunger) == 4 and round(n.energy) == 97 and round(n.happiness) == 98
-    n.advance(7200.0, working_seconds=3600)
-    assert round(n.hunger) == 12 and round(n.energy) == 91
-    assert n.act("feed", 7200.0) is None and round(n.hunger) == 0
-    assert n.act("feed", 7200.0) == "not hungry"
-    n.energy = 10
-    assert n.act("play", 7200.0) == "too tired"
-    assert n.act("sleep", 7200.0) is None and n.asleep and n.mood(False) == "asleep"
-    n.advance(7200.0 + 8 * 3600, 0)
-    assert not n.asleep and n.energy == 100  # woke up rested
-    assert xp_for_level(1) == 100 and level_for(99) == 1 and level_for(100) == 2 and level_for(300) == 3
-    n.xp = 95
-    assert n.gain(10, 1.0) and n.burst == "jump"
-    n2 = Needs(hunger=80)
-    assert n2.mood(True) == "hungry"
+def test_pet_mood() -> None:
+    # The pet only mirrors Hermes: what it does, then a short beat when a turn ends.
+    assert mood("idle", "", 0.0, 100.0) == "idle" and animation("idle", "", 0.0, 100.0) == "idle"
+    assert mood("thinking", "", 0.0, 0.0) == "working" and animation("thinking", "", 0.0, 0.0) == "review"
+    assert mood("working", "", 0.0, 0.0) == "working" and animation("working", "", 0.0, 0.0) == "run"
+    assert mood("waiting_user", "happy", 10.0, 1.0) == "waiting" and animation("waiting_user", "", 0.0, 1.0) == "waiting"
+    assert mood("idle", "happy", 10.0, 1.0) == "happy" and animation("idle", "happy", 10.0, 1.0) == "jump"
+    assert mood("error", "confused", 10.0, 1.0) == "confused" and animation("error", "confused", 10.0, 1.0) == "failed"
+    # A beat is a reaction: once over, an error still on agent.status leaves the pet idle.
+    assert mood("error", "confused", 10.0, 11.0) == "idle" and animation("error", "confused", 10.0, 11.0) == "idle"
+    assert mood("working", "happy", 10.0, 1.0) == "working"
+    # The old tamagotchi state on disk is read without its needs, and the pet keeps its version.
+    d = Path(TMP) / "pet-v2"
+    d.mkdir()
+    (d / "pet-state.json").write_text(json.dumps({"slug": "pip", "version": 4, "needs": {"hunger": 90, "xp": 1}}))
+    pet = PetState(d)
+    assert pet.data == {"slug": "pip", "version": 4} and pet.adopt("pip") == 4 and pet.adopt("kiwi") == 5
+    assert json.loads((d / "pet-state.json").read_text()) == {"slug": "kiwi", "version": 5}
+    pet.react("happy", 0.0)
+    assert pet.beat_until == BEAT
 
 
 def test_usage() -> None:
@@ -191,7 +193,10 @@ def test_status() -> None:
     assert s.snapshot(False)["status"] == "error"
     s.pre_api_request(session_id="b")
     s.end(session_id="b")
-    assert s.snapshot(False)["status"] == "idle" and len(s.take_finished()) == 2
+    assert s.snapshot(False)["status"] == "idle" and s.take_finished() == [("a", "failed"), ("b", "done")]
+    s.pre_api_request(session_id="c")
+    s.end(session_id="c", failed=True, interrupted=True)
+    assert s.take_finished() == [("c", "interrupted")]
 
 
 def test_call_turn() -> None:
@@ -419,10 +424,10 @@ def test_plugin() -> None:
         return types.SimpleNamespace(source=src, text=text, message_id=mid)
 
     assert plugin.dispatch(event("hi", thread=None)) is None
-    assert plugin.dispatch(event('{"v":1,"type":"pet.play"}'))["action"] == "skip"
+    assert plugin.dispatch(event('{"v":3,"type":"hello","app_version":"1.0"}'))["action"] == "skip"
     wait_for(lambda: bot.in_topic("reply"), "a reply")
     reply = bot.in_topic("reply")[-1][1]
-    assert reply["re"] == 555 and reply["ok"] and reply["data"]["happiness"] == 100
+    assert reply["re"] == 555 and reply["ok"] and reply["data"]["protocol"] == 3 and reply["v"] == 3
     assert ("delete_message", {"chat_id": OWNER, "message_id": 555}) in bot.calls
     plugin.dispatch(event('{"v":2,"type":"call.state","active":true}', mid="560"))
     wait_for(lambda: any(r[1]["re"] == 560 for r in bot.in_topic("reply")), "call.state's reply")
@@ -439,11 +444,17 @@ def test_plugin() -> None:
     plugin.dispatch(event('{"v":1,"type":"call.start"}', mid="558"))
     wait_for(lambda: any(r[1]["re"] == 558 for r in bot.in_topic("reply")), "call.start's reply")
     assert bot.in_topic("reply")[-1][1]["error"]["code"] == "unknown_type"  # protocol v2: no call.start
+    for n, kind in enumerate(("pet.feed", "pet.play", "pet.sleep", "pet.wake")):  # protocol v3: no tamagotchi
+        plugin.dispatch(event(json.dumps({"v": 2, "type": kind}), mid=str(570 + n)))
+        wait_for(lambda: any(r[1]["re"] == 570 + n for r in bot.in_topic("reply")), f"{kind}'s reply")
+        assert bot.in_topic("reply")[-1][1]["error"]["code"] == "unknown_type"
 
     # Status: a tool call shows in the state.
     plugin.status.pre_tool_call(tool_name="terminal", args={"command": "make"}, session_id="s1")
     wait_for(lambda: bot.in_topic("state")[-1][1]["agent"]["status"] == "working", "working")
-    assert bot.in_topic("state")[-1][1]["pet"]["animation"] == "run"
+    pet = bot.in_topic("state")[-1][1]["pet"]
+    assert pet["animation"] == "run" and pet["mood"] == "working" and pet["mood_until"] is None
+    assert not {"hunger", "energy", "happiness", "xp", "level", "xp_next", "asleep"} & set(pet)
 
     # Hermes' reply in the main chat: a notify with its spoken text, once.
     async def reply_send():
@@ -492,6 +503,10 @@ def test_plugin() -> None:
     bot.messages.pop(state_id)
     plugin.status.end(session_id="s1")
     wait_for(lambda: plugin.saved["slots"]["state"]["id"] != state_id, "a new state message")
+    # The turn finished: a happy beat, with when it ends.
+    wait_for(lambda: bot.in_topic("state")[-1][1]["pet"]["mood"] == "happy", "the happy beat")
+    pet = bot.in_topic("state")[-1][1]["pet"]
+    assert pet["animation"] == "jump" and pet["mood_until"]
 
     # A topic gone: a new one.
     plugin._topic_gone(RuntimeError("Bad Request: message thread not found"))

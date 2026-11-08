@@ -1,9 +1,8 @@
-"""The pet's needs and level (docs/app-protocol.md §5), and its files for the app's build.
+"""The pet's mood (docs/app-protocol.md §5), and its files for the app's build.
 
 The pet itself is Hermes' active pet (agent/pet: ~/.hermes/pets/<slug>/,
-pet.json + a Codex 8x9 spritesheet). This keeps what Hermes does not: the
-tamagotchi state, in ~/.hermes/app/pet-state.json, advanced lazily from the
-time elapsed (no ticker needed).
+pet.json + a Codex 8x9 spritesheet). This keeps which one is current and its
+version (~/.hermes/app/pet-state.json); its mood follows Hermes' status.
 """
 
 from __future__ import annotations
@@ -13,169 +12,67 @@ import os
 import shutil
 import tempfile
 import threading
-import time
-from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-HOUR = 3600.0
-BURST = 10.0  # seconds a "wave"/"jump" animation lasts
+BEAT = 10.0  # seconds a happy or confused reaction lasts
+
+# The pet mirrors Hermes and nothing else (docs/app-protocol.md §5): no needs,
+# no levels, nothing that asks for care or degrades when ignored.
+WORKING = {"working": "working", "thinking": "working", "waiting_user": "waiting"}
+# Sprite rows, as Hermes' own mapping (agent/pet/state.py) plus the beats.
+ANIMATIONS = {"working": "run", "thinking": "review", "waiting_user": "waiting",
+              "happy": "jump", "confused": "failed"}
 
 
-def clamp(value: float) -> float:
-    return max(0.0, min(100.0, value))
-
-
-def xp_for_level(level: int) -> int:
-    """Total xp needed to reach `level` + 1."""
-    return 100 * level * (level + 1) // 2
-
-
-def level_for(xp: int) -> int:
-    level = 1
-    while xp >= xp_for_level(level):
-        level += 1
-    return level
-
-
-@dataclass
-class Needs:
-    hunger: float = 0.0
-    energy: float = 100.0
-    happiness: float = 100.0
-    xp: int = 0
-    asleep: bool = False
-    updated: float = field(default_factory=time.time)
-    last_good_day: str = ""
-    burst: str = ""
-    burst_until: float = 0.0
-
-    @property
-    def level(self) -> int:
-        return level_for(self.xp)
-
-    def advance(self, now: float, working_seconds: float = 0.0) -> None:
-        """Let time pass; `working_seconds` of it Hermes was working."""
-        elapsed = max(0.0, now - self.updated)
-        working = min(elapsed, max(0.0, working_seconds))
-        idle = elapsed - working
-        hours, work_h, idle_h = elapsed / HOUR, working / HOUR, idle / HOUR
-        self.hunger = clamp(self.hunger + 4 * idle_h + 8 * work_h)
-        if self.asleep:
-            self.energy = clamp(self.energy + 12 * hours)
-            if self.energy >= 100:
-                self.asleep = False
-        else:
-            self.energy = clamp(self.energy - 3 * idle_h - 6 * work_h)
-        rate = 5 if (self.hunger > 70 or self.energy < 20) else 2
-        self.happiness = clamp(self.happiness - rate * hours)
-        self.updated = now
-        day = time.strftime("%Y-%m-%d", time.localtime(now))
-        if day != self.last_good_day and min(100 - self.hunger, self.energy, self.happiness) > 30 and elapsed < 2 * HOUR:
-            # One bonus per day the pet was looked after (checked as it lives, not backfilled).
-            if self.last_good_day:
-                self.gain(10, now)
-            self.last_good_day = day
-
-    def gain(self, xp: int, now: float) -> bool:
-        before = self.level
-        self.xp += max(0, int(xp))
-        if self.level > before:
-            self.set_burst("jump", now)
-            return True
-        return False
-
-    def set_burst(self, animation: str, now: float) -> None:
-        self.burst, self.burst_until = animation, now + BURST
-
-    def act(self, action: str, now: float) -> str | None:
-        """Apply an action; an error message when refused."""
-        if action == "feed":
-            if self.hunger < 10:
-                return "not hungry"
-            self.hunger = clamp(self.hunger - 40)
-            self.happiness = clamp(self.happiness + 5)
-            self.gain(5, now)
-        elif action == "play":
-            if self.asleep:
-                return "asleep"
-            if self.energy < 15:
-                return "too tired"
-            self.happiness = clamp(self.happiness + 25)
-            self.energy = clamp(self.energy - 15)
-            self.hunger = clamp(self.hunger + 10)
-            self.gain(15, now)
-        elif action == "sleep":
-            self.asleep = True
-        elif action == "wake":
-            self.asleep = False
-        else:
-            return f"unknown action {action!r}"
-        return None
-
-    def mood(self, working: bool) -> str:
-        if self.asleep:
-            return "asleep"
-        if self.hunger > 70:
-            return "hungry"
-        if self.energy < 20:
-            return "tired"
-        if self.happiness < 30:
-            return "sad"
-        if working:
-            return "focused"
-        if self.happiness > 70:
-            return "happy"
-        return "content"
-
-    def public(self) -> dict:
-        return {"hunger": round(self.hunger), "energy": round(self.energy), "happiness": round(self.happiness),
-                "xp": self.xp, "level": self.level, "xp_next": xp_for_level(self.level), "asleep": self.asleep}
-
-
-ANIMATIONS = {"working": "run", "thinking": "review", "waiting_user": "waiting", "error": "failed"}
-
-
-def animation(needs: Needs, status: str, now: float) -> str:
-    if needs.burst and now < needs.burst_until:
-        return needs.burst
-    if status in ANIMATIONS:
-        return ANIMATIONS[status]
+def mood(status: str, beat: str, beat_until: float, now: float) -> str:
+    """idle, working, waiting (a question is open), or for BEAT seconds after a
+    turn ends: happy (it finished) or confused (it failed). A beat is a
+    reaction, not a state: an error left on agent.status does not keep it."""
+    if status in WORKING:
+        return WORKING[status]
+    if beat and now < beat_until:
+        return beat
     return "idle"
 
 
+def animation(status: str, beat: str, beat_until: float, now: float) -> str:
+    current = mood(status, beat, beat_until, now)
+    return ANIMATIONS.get(status if current in ("working", "waiting") else current, "idle")
+
+
 class PetState:
-    """The needs on disk, and the mirror of the active pet for the app's build."""
+    """Which pet is current and its version, on disk; the mirror of the active
+    pet for the app's build."""
 
     def __init__(self, app_dir: Path):
         self.app_dir = Path(app_dir)
         self.path = self.app_dir / "pet-state.json"
         self.lock = threading.RLock()
         self.data = self._load()
+        self.beat, self.beat_until = "", 0.0
 
     def _load(self) -> dict:
         try:
             raw = json.loads(self.path.read_text())
         except (OSError, ValueError):
             raw = {}
-        needs = raw.get("needs") or {}
-        known = {k: v for k, v in needs.items() if k in Needs.__dataclass_fields__}
-        return {"slug": raw.get("slug", ""), "version": int(raw.get("version", 0)), "needs": Needs(**known)}
+        # A file from protocol v2 also has "needs": ignored, and dropped at the next save.
+        return {"slug": raw.get("slug", ""), "version": int(raw.get("version", 0))}
 
     def save(self) -> None:
         with self.lock:
-            payload = {"slug": self.data["slug"], "version": self.data["version"], "needs": asdict(self.data["needs"])}
+            payload = {"slug": self.data["slug"], "version": self.data["version"]}
             atomic_write(self.path, json.dumps(payload, indent=1).encode())
 
-    @property
-    def needs(self) -> Needs:
-        return self.data["needs"]
+    def react(self, beat: str, now: float) -> None:
+        self.beat, self.beat_until = beat, now + BEAT
 
     def adopt(self, slug: str) -> int:
-        """A new active pet: a fresh tamagotchi, a new version."""
+        """A new active pet: a new version."""
         with self.lock:
             if slug == self.data["slug"]:
                 return self.data["version"]
-            self.data.update(slug=slug, version=self.data["version"] + 1, needs=Needs())
+            self.data.update(slug=slug, version=self.data["version"] + 1)
             self.save()
             return self.data["version"]
 
