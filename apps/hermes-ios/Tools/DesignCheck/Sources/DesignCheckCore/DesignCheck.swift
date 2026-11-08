@@ -41,6 +41,8 @@ public enum Rule: String, Sendable, CaseIterable {
     case glass = "glass-in-content"
     /// A HermesUI public API taking or exposing a number or a colour (9.2).
     case publicAPI = "untyped-public-api"
+    /// `.tint(…)` set to the tint itself: SwiftUI resolves it forever and crashes.
+    case recursiveTint = "recursive-tint"
 }
 
 public enum DesignCheck {
@@ -117,6 +119,11 @@ final class Visitor: SyntaxVisitor {
             }
             if member == "glassEffect", kind != .chrome {
                 add(.glass, node, "`.glassEffect` outside HermesUI/Chrome — Liquid Glass is for the functional layer (HIG Materials, design-rules 5.5)")
+            }
+            if member == "tint", node.arguments.contains(where: { arg in
+                arg.expression.tokens(viewMode: .sourceAccurate).contains { $0.tokenKind == .identifier("tint") }
+            }) {
+                add(.recursiveTint, node, "`.tint(…)` set from `.tint` — the style reads itself and SwiftUI recurses until it crashes; pass a colour")
             }
             if member == "minimumScaleFactor" {
                 add(.rawFont, node, "`.minimumScaleFactor` shrinks text below its Dynamic Type size — let it wrap (design-rules 3.4)")

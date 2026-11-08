@@ -42,10 +42,11 @@ public struct Sparkline: View {
     }
 }
 
-/// How full something is (storage): the system's bar in the accent, red past 90 %.
+/// How full something is (storage): the system's bar in the pet's fill, red past 90 %.
 public struct UsageBar: View {
     let value: Double
     let label: Text
+    @Environment(\.accentFill) private var fill
 
     public init(_ progress: Progress, label: Text) {
         value = progress.fractionCompleted
@@ -54,7 +55,9 @@ public struct UsageBar: View {
 
     public var body: some View {
         ProgressView(value: value)
-            .tint(value > Metric.criticalUsage ? AnyShapeStyle(.red) : AnyShapeStyle(.tint))
+            // A colour, never `.tint` itself: a tint that reads the tint recursed until SwiftUI
+            // crashed (round 5's dashboard).
+            .tint(value > Metric.criticalUsage ? .red : fill)
             .accessibilityLabel(label)
     }
 }
