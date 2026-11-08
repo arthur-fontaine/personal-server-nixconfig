@@ -57,6 +57,24 @@ turns; body at the Dynamic Type `.body` size with about 6 pt of extra leading; o
 bold title style per screen; capsule controls 44–52 pt tall; one colour, used for
 one job.
 
+## Rules audit (every screen is checked against this list)
+
+Arthur chose: simple, by Apple's rules, the accent is the pet's colour, navigation from the
+chat (no tab bar). Each screenshot is audited item by item; a fail is fixed before it ships.
+
+| # | Rule | How it's checked |
+| --- | --- | --- |
+| R1 | Every spacing, padding, size and radius comes from `HermesApp/Design/Tokens.swift` (4-pt grid: 4, 8, 12, 16, 20, 24, 32); margins are the system's (`.scenePadding`, readable width on iPad) | `scripts/lint-design.sh` fails on `.padding(<n>)`, `spacing: <n>`, `.system(size:`, `cornerRadius: <n>`, `lineSpacing(<n>)`, `.frame(… <n>)` outside the token file |
+| R2 | SF Pro only, Dynamic Type text styles only (`.body`, `.headline`, `.subheadline`, `.footnote`, `.caption`); regular/semibold; monospaced only for code; works at AX5 | lint (`.system(size:`, `design: .serif/.rounded`, `.width(`); a screenshot at the largest accessibility size |
+| R3 | Semantic system colours only; one accent = the pet's colour as the app's `.tint`, ≥ 4.5:1 against every background it sits on (light: white, `#F2F2F7`; dark: black, `#1C1C1E`, `#2C2C2E`), its label black or white whichever is ≥ 4.5:1; destructive = `.red`; status dots `.green/.orange/.blue` only | contrast computed by `PetColor` (unit-tested), lint (`Color(red:` outside the colour code) |
+| R4 | Corners concentric: a card's radius = its padding + the radius of the capsules inside it; buttons and the composer are capsules; any other radius is a named token | tokens; screenshot |
+| R5 | Native components first: `NavigationStack` + `.toolbar` placements, `toolbarTitleMenu`, `navigationSubtitle`, `List`, `Menu`, sheets with detents, bordered/prominent buttons at `.controlSize(.large)`, `safeAreaInset` for the composer, the system's scroll edge effect; glass only on the bars and floating controls; no custom shadow or blur | code review; screenshot (content under the bars fades) |
+| R6 | Hit targets ≥ 44×44 pt; one leading edge for all chat content (text, code, card, composer) | screenshot measured |
+| R7 | Chat: Hermes' text without bubble at `.body`; the owner's bubble in the accent fill with its contrast label; approval card: `.headline` sentence, *Show command* disclosure, `.large` buttons | screenshot |
+| R8 | Navigation A: the pet (leading toolbar item) opens its sheet (needs, actions, then Dashboard, Settings); the title "Hermes ⌄" opens the chat list; **private sub-chats never show their name** (chat list, sidebar, title before Face ID, notifications, Live Activity, widgets, app switcher snapshot): "Private chat" + lock | screenshot of the title menu and the sidebar |
+| H1 | Text never truncated where it matters, no clipped labels in French or at AX sizes | screenshots fr/en, AX5 |
+| H2 | Light and dark both checked; Reduce Transparency/Increase Contrast left to the system | screenshots |
+
 ## Principles
 
 1. **One conversation, full width.** Hermes' messages are not bubbles: they
