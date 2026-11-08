@@ -40,9 +40,8 @@ class Status:
         self.error_chat = 0
         self.last_status = "idle"
         self.since = time.time()
-        self.working_seconds = 0.0  # accumulated, read and reset by the pet
-        self._working_mark: float | None = None
-        self.finished: list[tuple[str, bool]] = []  # (session, failed), drained by the plugin
+        # (session, "done" | "failed" | "interrupted"), drained by the pet
+        self.finished: list[tuple[str, str]] = []
 
     def chat_for(self, session_id: str) -> int:
         """The chat a session runs in: 0 for the main chat (and anything not a
@@ -107,7 +106,8 @@ class Status:
             elif turn is not None:
                 self.error_until = 0.0
             if turn is not None:
-                self.finished.append((session_id, bool(failed)))
+                outcome = "interrupted" if interrupted else "failed" if failed else "done"
+                self.finished.append((session_id, outcome))
         self.on_change()
 
     def snapshot(self, questions_open: bool) -> dict:
@@ -127,12 +127,6 @@ class Status:
             else:
                 status = "idle"
             latest = turns[-1] if turns else None
-            working = status in ("working", "thinking", "waiting_user")
-            if working and self._working_mark is None:
-                self._working_mark = now
-            elif not working and self._working_mark is not None:
-                self.working_seconds += now - self._working_mark
-                self._working_mark = None
             if status != self.last_status:
                 self.last_status, self.since = status, now
             chat = latest["chat"] if latest else (self.error_chat if status == "error" else 0)
@@ -143,17 +137,7 @@ class Status:
             return {"status": status, "chat": chat, "task": task, "progress": progress,
                     "since": now_iso(self.since), "busy_chats": sorted({t["chat"] for t in turns})}
 
-    def take_working_seconds(self) -> float:
-        now = time.time()
-        with self.lock:
-            total = self.working_seconds
-            if self._working_mark is not None:
-                total += now - self._working_mark
-                self._working_mark = now
-            self.working_seconds = 0.0
-            return total
-
-    def take_finished(self) -> list[tuple[str, bool]]:
+    def take_finished(self) -> list[tuple[str, str]]:
         with self.lock:
             out, self.finished = self.finished, []
             return out
