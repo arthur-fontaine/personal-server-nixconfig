@@ -2,14 +2,13 @@ import HermesCore
 import HermesUI
 import SwiftUI
 
-/// The pet's sheet, from the pet in the chat's toolbar (navigation A, design-rules 1.2): the pet
-/// and its mood, its needs, the three actions, its level, then Dashboard and Settings. A system
-/// inset-grouped list (6.3), detents and the system grabber (1.5).
+/// The pet's sheet, from the pet in the bar (design-rules 11.4): the pet large — stroke or hold
+/// it to caress it —, what Hermes is doing in one sentence, New Pet…, then Dashboard and
+/// Settings. A companion, not a Tamagotchi: no needs, no stats, nothing to do.
 struct PetSheet: View {
     @Environment(HermesStore.self) private var store
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @State private var busy: PetAction?
     @State private var showGenerate = false
 
     var body: some View {
@@ -17,52 +16,19 @@ struct PetSheet: View {
         NavigationStack(path: $model.petPath) {
             List {
                 Section {
-                    VGroup(alignment: .center, spacing: .xs) {
-                        PetSpriteView(animation: nil, size: .hero)
-                            .onTapGesture {
-                                store.petReaction = .waving
-                                UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-                            }
-                        Text(store.petMood.caption).textRole(.headline)
-                        if let task = store.agent.task, store.agent.status != .idle {
-                            Text(task).textRole(.subheadline).tone(.secondary)
-                        }
+                    VGroup(alignment: .center, spacing: .s) {
+                        PetSpriteView(animation: nil, size: .stage)
+                            .caressable(trigger: store.caressedAt) { store.caress() }
+                        Text(sentence)
+                            .textRole(.body)
+                            .tone(.secondary)
+                            .multilineTextAlignment(.center)
+                            .accessibilityIdentifier("pet.sentence")
                     }
                     .frame(maxWidth: .infinity)
                 }
-                Section("Needs") {
-                    need("Fullness", symbol: "fork.knife", value: 1 - (store.pet?.hunger ?? 0.3))
-                    need("Energy", symbol: "bolt.fill", value: store.pet?.energy ?? 0.8)
-                    need("Happiness", symbol: "heart.fill", value: store.pet?.happiness ?? 0.7)
-                }
                 Section {
-                    ForEach(store.pet.map(PetAction.available(for:)) ?? [.feed, .play, .sleep]) { action in
-                        Button { perform(action) } label: {
-                            HGroup(spacing: .s) {
-                                Label(action.title, systemImage: action.symbol)
-                                    .accessibilityIdentifier("pet.action.\(action.id)")
-                                Spacer()
-                                if busy == action { ProgressView() }
-                            }
-                        }
-                        .disabled(busy != nil || store.pet == nil)
-                    }
-                }
-                Section {
-                    VGroup(spacing: .xs) {
-                        HGroup(spacing: .s) {
-                            Text("Level \(store.pet?.level ?? 1)")
-                            Spacer()
-                            if let pet = store.pet {
-                                Text("\(pet.xp) XP, \((pet.xpForNextLevel ?? PetState.totalXP(forLevel: pet.level)) - pet.xp) to the next level")
-                                    .textRole(.subheadline).tone(.secondary).monospacedDigit()
-                            }
-                        }
-                        ProgressView(value: store.pet?.levelProgress ?? 0)
-                            .accessibilityHidden(true)
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("pet.level")
+                    Button { showGenerate = true } label: { Label("New Pet…", systemImage: "sparkles") }
                 }
                 Section {
                     NavigationLink(value: AppSection.dashboard) { Label(AppSection.dashboard.title, systemImage: AppSection.dashboard.symbol) }
@@ -74,12 +40,6 @@ struct PetSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(role: .close) { dismiss() }.barMonochrome() }
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button { showGenerate = true } label: { Label("Hatch a New Pet…", systemImage: "sparkles") }
-                    } label: { Label("More", systemImage: "ellipsis") }
-                    .barMonochrome()
-                }
             }
             .navigationDestination(for: AppSection.self) { section in
                 switch section {
@@ -93,28 +53,10 @@ struct PetSheet: View {
         .sheet(isPresented: $showGenerate) { GeneratePetSheet() }
     }
 
-    /// A need: its name and value on one line, the bar below (the accent: the pet's status).
-    private func need(_ title: LocalizedStringKey, symbol: String, value: Double) -> some View {
-        VGroup(spacing: .xs) {
-            HGroup(spacing: .s) {
-                Label { Text(title) } icon: { Image(systemName: symbol).tone(.secondary) }
-                Spacer()
-                Text(value, format: .percent.precision(.fractionLength(0))).tone(.secondary).monospacedDigit()
-            }
-            ProgressView(value: value)
-                .accessibilityHidden(true)
-        }
-        .accessibilityElement(children: .combine)
-        .animation(.smooth, value: value)
-    }
-
-    private func perform(_ action: PetAction) {
-        busy = action
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        Task {
-            defer { busy = nil }
-            do { try await store.perform(action) } catch { model.showToast(error.localizedDescription) }
-        }
+    /// What Hermes is doing, in one sentence: its task while it works, else the pet's mood.
+    private var sentence: String {
+        if store.agent.status != .idle, let task = store.agent.task { return task }
+        return store.petMood.caption
     }
 }
 
@@ -132,10 +74,10 @@ struct GeneratePetSheet: View {
                     TextField("A tiny owl with a messenger bag", text: $prompt, axis: .vertical).lineLimit(3...6)
                     TextField("Name (optional)", text: $name)
                 } footer: {
-                    Text("Hermes draws it in a few minutes, then rebuilds the app so its icon is your new pet. Your current pet's level is kept in its history.")
+                    Text("Hermes draws it in a few minutes, then rebuilds the app so its icon is your new pet.")
                 }
             }
-            .navigationTitle("Hatch a Pet")
+            .navigationTitle("New Pet")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(role: .cancel) { dismiss() } }

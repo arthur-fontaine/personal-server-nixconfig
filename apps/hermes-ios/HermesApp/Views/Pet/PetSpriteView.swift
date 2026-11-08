@@ -19,11 +19,10 @@ struct PetSpriteView: View {
 
     @ViewBuilder private var sprite: some View {
         let sheet = Self.sheet(store: store)
-        let mood = store?.petMood ?? .content
-        let base = animation ?? store?.pet?.animation ?? mood.animation
+        // The store picks the row: a one-shot reaction, else what Hermes is doing (11.2).
+        let row = animation ?? store?.petAnimation ?? .idle
         let reaction = animation == nil ? store?.petReaction : nil
-        let row = reaction ?? base
-        let speed = animation == nil ? mood.speed : 1
+        let speed = 1.0
         Group {
             if let sheet {
                 if still || reduceMotion {
@@ -62,7 +61,7 @@ struct PetSpriteView: View {
 
     private var accessibilityText: String {
         guard let pet = store?.pet else { return String(localized: "Pet") }
-        return String(localized: "\(pet.name), level \(pet.level), \(store?.petMood.caption ?? "")")
+        return String(localized: "\(pet.name), \(store?.petMood.caption ?? "")")
     }
 
     static func sheet(store: HermesStore?) -> SpriteSheet? {
@@ -72,28 +71,7 @@ struct PetSpriteView: View {
     }
 }
 
-extension PetMood {
-    var tint: Color {
-        switch self {
-        case .idle, .happy: .accentColor
-        case .working: .blue
-        case .waiting: .orange
-        case .confused: .red
-        }
-    }
-}
-
 extension AgentStatus {
-    var tint: Color {
-        switch self {
-        case .idle: .secondary
-        case .thinking: .indigo
-        case .working: .blue
-        case .waitingUser: .accentColor
-        case .error: .red
-        }
-    }
-
     var symbol: String {
         switch self {
         case .idle: "moon.zzz"

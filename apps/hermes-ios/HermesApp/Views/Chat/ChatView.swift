@@ -41,12 +41,17 @@ struct ChatScreen: View {
         if compact {
             ToolbarItem(placement: .topBarLeading) {
                 BarButton(Text(store.pet?.name ?? String(localized: "Pet")), action: { model.showPet = true }) {
-                    if let frame = PetSpriteView.sheet(store: store)?.frame(store.pet?.animation ?? store.petMood.animation, 0) {
+                    // The row Hermes' state (or a reaction) picks, as a still: the bar stays calm.
+                    if let frame = PetSpriteView.sheet(store: store)?.frame(store.petAnimation, 0) {
                         PetAvatar.toolbarImage(frame)
                     } else {
                         Image(systemName: "pawprint")
                     }
                 }
+                // Hold the pet to caress it; a tap opens its sheet (design-rules 11.3).
+                .simultaneousGesture(LongPressGesture().onEnded { _ in store.caress() })
+                .sensoryFeedback(.impact(flexibility: .soft), trigger: store.caressedAt)
+                .accessibilityAction(named: Text("Caress")) { store.caress() }
                 .accessibilityIdentifier("toolbar.pet")
             }
         }
