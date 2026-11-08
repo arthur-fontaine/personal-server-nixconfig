@@ -56,8 +56,8 @@ struct PetSpriteView: View {
     }
 
     private var accessibilityText: String {
-        guard let pet = store?.pet else { return "Pet" }
-        return "\(pet.name), level \(pet.level), \(store?.petMood.caption ?? "")"
+        guard let pet = store?.pet else { return String(localized: "Pet") }
+        return String(localized: "\(pet.name), level \(pet.level), \(store?.petMood.caption ?? "")")
     }
 
     static func sheet(store: HermesStore?) -> SpriteSheet? {

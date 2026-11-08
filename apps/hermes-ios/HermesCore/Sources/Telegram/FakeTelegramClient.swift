@@ -32,7 +32,7 @@ public final class FakeTelegramClient: TelegramClient {
             var main = store[.main] ?? []
             if let i = main.firstIndex(where: { $0.id == 1005 }) {
                 main[i].buttons = []
-                main[i].text = FormattedText(main[i].text.text + "\n\n✅ Allowed once")
+                main[i].text = FormattedText(main[i].text.text + "\n\n✅ " + L("Allowed once"))
             }
             store[.main] = main
         }
@@ -60,7 +60,7 @@ public final class FakeTelegramClient: TelegramClient {
     public func checkCode(_ code: String) async throws {
         try await Task.sleep(for: .milliseconds(400))
         guard code.count == 5 else { throw TelegramError.server(code: 400, message: "PHONE_CODE_INVALID") }
-        emit(.auth(.waitPassword(hint: "the usual one")))
+        emit(.auth(.waitPassword(hint: L("the usual one"))))
     }
 
     public func resendCode() async throws {
@@ -139,13 +139,13 @@ public final class FakeTelegramClient: TelegramClient {
     public func pressButton(chat: ChatID, message: MessageID, data: Data) async throws -> String? {
         let answer = String(decoding: data, as: UTF8.self)
         appState.questions.removeAll { $0.messageID == message }
-        appState.agent = AgentState(status: .working, task: "Running: restic backup --retry", since: .now, chat: .main)
+        appState.agent = AgentState(status: .working, task: L("Running: restic backup --retry"), since: .now, chat: .main)
         pushState()
         for (topic, list) in store {
             if let i = list.firstIndex(where: { $0.id == message }) {
                 var m = list[i]
                 m.buttons = []
-                m.text = FormattedText(m.text.text + "\n\n✅ " + (answer.contains("deny") ? "Denied" : "Allowed"))
+                m.text = FormattedText(m.text.text + "\n\n✅ " + (answer.contains("deny") ? L("Denied") : L("Allowed")))
                 store[topic]?[i] = m
                 emit(.messageChanged(chat, m))
             }
@@ -186,7 +186,7 @@ public final class FakeTelegramClient: TelegramClient {
         let answer = Fixtures.answer(to: text)
         let draftID = Int64.random(in: 1...Int64.max)
         var shown = ""
-        appState.agent = AgentState(status: .working, task: "Writing the answer", since: .now, chat: topic)
+        appState.agent = AgentState(status: .working, task: L("Writing the answer"), since: .now, chat: topic)
         pushState()
         for word in answer.split(separator: " ", omittingEmptySubsequences: false) {
             if stopped.contains(draftID) { break }
@@ -248,7 +248,7 @@ public final class FakeTelegramClient: TelegramClient {
         store[.main, default: []].append(m)
         emit(.newMessage(chat, m))
         appState.questions = [Fixtures.approvalQuestion(messageID: m.id)]
-        appState.agent = AgentState(status: .waitingUser, task: "Waiting for your approval", since: .now, chat: .main)
+        appState.agent = AgentState(status: .waitingUser, task: L("Waiting for your approval"), since: .now, chat: .main)
         pushState()
     }
 }

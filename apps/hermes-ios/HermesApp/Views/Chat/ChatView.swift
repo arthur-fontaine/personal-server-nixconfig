@@ -36,7 +36,7 @@ struct ChatView: View {
     }
 
     private var title: String {
-        topic == .main ? (store.bot?.title ?? "Hermes") : (store.thread(topic)?.name ?? "Sub-chat")
+        topic == .main ? (store.bot?.title ?? "Hermes") : (store.thread(topic)?.name ?? String(localized: "Sub-chat"))
     }
 
     private var conversation: some View {
@@ -120,12 +120,12 @@ struct ChatView: View {
                     Text(title).font(.headline)
                 }
                 if store.connection != .ready {
-                    Text(store.connection == .waitingForNetwork ? "Waiting for network…" : "Connecting…")
+                    Text(store.connection == .waitingForNetwork ? String(localized: "Waiting for network…") : String(localized: "Connecting…"))
                         .font(.caption).foregroundStyle(.secondary)
                 } else if isWorkingHere {
                     AgentStatusLabel(agent: store.agent, compact: true)
                 } else if let preset = store.subchat(topic)?.preset {
-                    Text(preset.capitalized).font(.caption).foregroundStyle(.secondary)
+                    Text(PresetNames.name(preset)).font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
@@ -173,7 +173,7 @@ struct ChatInspector: View {
                     ForEach(store.questions) { q in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(q.summary ?? q.text).font(.subheadline).lineLimit(3)
-                            Text(q.chat == .main ? "Main chat" : store.thread(q.chat)?.name ?? "Sub-chat")
+                            Text(q.chat == .main ? String(localized: "Main chat") : store.thread(q.chat)?.name ?? String(localized: "Sub-chat"))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -181,9 +181,10 @@ struct ChatInspector: View {
             }
             if let sub = store.subchat(topic) {
                 Section("Sub-chat") {
-                    LabeledContent("Preset", value: sub.preset?.capitalized ?? "Custom")
-                    LabeledContent("Encrypted", value: sub.encrypted ? (sub.unlocked ? "Unlocked" : "Locked") : "No")
-                    if let ttl = sub.ttl { LabeledContent("Expires", value: ttl) }
+                    LabeledContent("Preset", value: sub.preset.map(PresetNames.name) ?? String(localized: "Custom"))
+                    LabeledContent("Encrypted", value: sub.encrypted
+                                   ? (sub.unlocked ? String(localized: "Unlocked") : String(localized: "Locked")) : String(localized: "No"))
+                    if let ttl = sub.ttl { LabeledContent("Expires", value: PresetNames.ttl(ttl)) }
                     if let at = sub.expiresAt { LabeledContent("At", value: at.formatted(date: .abbreviated, time: .shortened)) }
                 }
             }

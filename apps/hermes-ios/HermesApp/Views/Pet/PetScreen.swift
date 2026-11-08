@@ -27,7 +27,7 @@ struct PetScreen: View {
             .frame(maxWidth: 1000)
             .frame(maxWidth: .infinity)
         }
-        .navigationTitle(store.pet?.name ?? "Pet")
+        .navigationTitle(store.pet?.name ?? String(localized: "Pet"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
@@ -125,7 +125,7 @@ struct PetScreen: View {
 }
 
 struct NeedBar: View {
-    let title: String
+    let title: LocalizedStringKey
     let symbol: String
     let value: Double
     let color: Color

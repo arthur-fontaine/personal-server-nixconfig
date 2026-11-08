@@ -54,14 +54,14 @@ final class CallSession {
 
     func start() async {
         guard await AVAudioApplication.requestRecordPermission() else {
-            phase = .ended("Hermes needs the microphone for calls. Allow it in Settings.")
+            phase = .ended(String(localized: "Hermes needs the microphone for calls. Allow it in Settings."))
             return
         }
         if let lfm = await LFMEngineHolder.shared.load() {
             engine = lfm
         } else {
             guard await AppleVoiceEngine.requestAuthorization() else {
-                phase = .ended("Speech recognition is off. Allow it in Settings, or download the voice model.")
+                phase = .ended(String(localized: "Speech recognition is off. Allow it in Settings, or download the voice model."))
                 return
             }
             engine = AppleVoiceEngine()
@@ -70,7 +70,7 @@ final class CallSession {
         do {
             try configureAudio()
         } catch {
-            phase = .ended("Couldn't start audio: \(error.localizedDescription)")
+            phase = .ended(String(localized: "Couldn't start audio: \(error.localizedDescription)"))
             return
         }
         await store.setCallActive(true)
@@ -93,7 +93,7 @@ final class CallSession {
         try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP])
         try session.setActive(true)
         // Touching inputNode without an input aborts inside AudioToolbox: check first.
-        guard session.isInputAvailable else { throw VoiceEngineError.unavailable("No microphone is available.") }
+        guard session.isInputAvailable else { throw VoiceEngineError.unavailable(String(localized: "No microphone is available.")) }
         let input = audio.inputNode
         // The system's echo cancellation: without it Hermes' own voice would trigger barge-in.
         try input.setVoiceProcessingEnabled(true)

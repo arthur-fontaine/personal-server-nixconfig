@@ -126,7 +126,7 @@ final class TDLibTelegramClient: TelegramClient {
 
     private func setParameters() async {
         guard let apiID = config.apiID, let apiHash = config.apiHash else {
-            emit(.auth(.missingConfiguration("HERMES_TG_API_ID and HERMES_TG_API_HASH aren't set in this build.")))
+            emit(.auth(.missingConfiguration(String(localized: "HERMES_TG_API_ID and HERMES_TG_API_HASH aren't set in this build."))))
             return
         }
         let dir = URL.applicationSupportDirectory.appending(path: "tdlib", directoryHint: .isDirectory)
@@ -331,7 +331,7 @@ final class TDLibTelegramClient: TelegramClient {
         switch type {
         case .authenticationCodeTypeTelegramMessage: "Telegram"
         case .authenticationCodeTypeSms, .authenticationCodeTypeSmsWord, .authenticationCodeTypeSmsPhrase: "SMS"
-        case .authenticationCodeTypeCall, .authenticationCodeTypeFlashCall, .authenticationCodeTypeMissedCall: "a phone call"
+        case .authenticationCodeTypeCall, .authenticationCodeTypeFlashCall, .authenticationCodeTypeMissedCall: String(localized: "a phone call")
         case .authenticationCodeTypeFragment: "Fragment"
         default: "Telegram"
         }
@@ -385,19 +385,19 @@ final class TDLibTelegramClient: TelegramClient {
         case .messagePhoto(let p):
             text = convert(p.caption)
             if let best = p.photo.sizes.last {
-                attachment = file(.photo, best.photo, name: "Photo.jpg", mime: "image/jpeg", width: best.width, height: best.height)
+                attachment = file(.photo, best.photo, name: String(localized: "Photo") + ".jpg", mime: "image/jpeg", width: best.width, height: best.height)
             }
         case .messageVideo(let v):
             text = convert(v.caption)
-            attachment = file(.video, v.video.video, name: v.video.fileName.isEmpty ? "Video.mp4" : v.video.fileName, mime: v.video.mimeType)
+            attachment = file(.video, v.video.video, name: v.video.fileName.isEmpty ? String(localized: "Video") + ".mp4" : v.video.fileName, mime: v.video.mimeType)
         case .messageAudio(let a):
             text = convert(a.caption)
             attachment = file(.audio, a.audio.audio, name: a.audio.fileName, mime: a.audio.mimeType)
         case .messageVoiceNote(let v):
             text = convert(v.caption)
-            attachment = file(.voice, v.voiceNote.voice, name: "Voice message.ogg", mime: v.voiceNote.mimeType)
+            attachment = file(.voice, v.voiceNote.voice, name: String(localized: "Voice message") + ".ogg", mime: v.voiceNote.mimeType)
         default:
-            text = HermesCore.FormattedText("Unsupported message")
+            text = HermesCore.FormattedText(String(localized: "Unsupported message"))
         }
         var buttons: [HermesCore.InlineButton] = []
         if case .replyMarkupInlineKeyboard(let kb)? = m.replyMarkup {

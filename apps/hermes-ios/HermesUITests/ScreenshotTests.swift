@@ -52,11 +52,12 @@ final class ScreenshotTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-demo", "-noQuestion"]
         app.launch()
-        let field = app.textFields["Message Hermes"]
+        // Identifiers, not labels: the tour also runs in French.
+        let field = app.textFields["composer.field"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         field.typeText("How's the server doing?")
-        app.buttons["Send"].tap()
+        app.buttons["composer.send"].tap()
         Thread.sleep(forTimeInterval: 1.6)
         try XCUIScreen.main.screenshot().pngRepresentation.write(to: dir.appending(path: "\(device)-port-streaming.png"))
         Thread.sleep(forTimeInterval: 4)

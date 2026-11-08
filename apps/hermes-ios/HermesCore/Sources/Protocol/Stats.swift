@@ -113,6 +113,15 @@ public struct MachineStats: Sendable, Codable, Equatable {
 public enum UsageWindow: String, Sendable, Codable, CaseIterable, Identifiable {
     case day = "24h", week = "7d", month = "30d"
     public var id: String { rawValue }
+
+    /// The picker's label (the raw value is the protocol's key).
+    public var title: String {
+        switch self {
+        case .day: L("24 h")
+        case .week: L("7 d")
+        case .month: L("30 d")
+        }
+    }
 }
 
 public struct UsageFigures: Sendable, Codable, Equatable {

@@ -21,7 +21,7 @@ struct LoginFlow: View {
                         case .waitCode(let phone, let via, let length, let next): CodeStep(phone: phone, via: via, length: length, nextVia: next)
                         case .waitPassword(let hint): PasswordStep(hint: hint)
                         case .waitRegistration:
-                            StepHeader(title: "No Telegram account", subtitle: "Create one in the Telegram app first, then come back.")
+                            StepHeader(title: String(localized: "No Telegram account"), subtitle: String(localized: "Create one in the Telegram app first, then come back."))
                         default:
                             ProgressView()
                         }
@@ -64,7 +64,8 @@ struct WelcomeStep: View {
 
     var body: some View {
         VStack(spacing: 28) {
-            StepHeader(title: "Hermes, in your pocket", subtitle: "Talk to your agent, answer its questions and see what it's up to. Everything goes through your Telegram account.")
+            StepHeader(title: String(localized: "Hermes, in your pocket"),
+                       subtitle: String(localized: "Talk to your agent, answer its questions and see what it's up to. Everything goes through your Telegram account."))
             Button(action: next) {
                 Text("Continue with Telegram").font(.headline).frame(maxWidth: .infinity, minHeight: 34)
             }
@@ -83,7 +84,7 @@ struct PhoneStep: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            StepHeader(title: "Your phone number", subtitle: "The one of your Telegram account. Telegram sends you a code.")
+            StepHeader(title: String(localized: "Your phone number"), subtitle: String(localized: "The one of your Telegram account. Telegram sends you a code."))
             TextField("+33 6 12 34 56 78", text: $phone)
                 .textContentType(.telephoneNumber)
                 .keyboardType(.phonePad)
@@ -128,9 +129,9 @@ struct CodeStep: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            StepHeader(title: "Enter the code", subtitle: via == "Telegram"
-                       ? "Sent to your Telegram app on another device, for \(phone)."
-                       : "Sent by \(via) to \(phone).")
+            StepHeader(title: String(localized: "Enter the code"), subtitle: via == "Telegram"
+                       ? String(localized: "Sent to your Telegram app on another device, for \(phone).")
+                       : String(localized: "Sent by \(via) to \(phone)."))
             TextField(String(repeating: "–", count: length), text: $code)
                 .textContentType(.oneTimeCode)
                 .keyboardType(.numberPad)
@@ -192,7 +193,8 @@ struct PasswordStep: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            StepHeader(title: "Two-step verification", subtitle: hint.isEmpty ? "Your account has a password." : "Your password's hint: \(hint)")
+            StepHeader(title: String(localized: "Two-step verification"),
+                       subtitle: hint.isEmpty ? String(localized: "Your account has a password.") : String(localized: "Your password's hint: \(hint)"))
             SecureField("Password", text: $password)
                 .textContentType(.password)
                 .font(.title3)

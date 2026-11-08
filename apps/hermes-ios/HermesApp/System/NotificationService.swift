@@ -22,8 +22,9 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func registerCategories() {
-        let reply = UNTextInputNotificationAction(identifier: "reply", title: "Reply", options: [],
-                                                  textInputButtonTitle: "Send", textInputPlaceholder: "Message Hermes")
+        let reply = UNTextInputNotificationAction(identifier: "reply", title: String(localized: "Reply"), options: [],
+                                                  textInputButtonTitle: String(localized: "Send"),
+                                                  textInputPlaceholder: String(localized: "Message Hermes"))
         let message = UNNotificationCategory(identifier: "hermes.message", actions: [reply], intentIdentifiers: [INSendMessageIntentIdentifier],
                                              options: [.allowAnnouncement])
         let question = UNNotificationCategory(identifier: Self.questionCategory, actions: [], intentIdentifiers: [],

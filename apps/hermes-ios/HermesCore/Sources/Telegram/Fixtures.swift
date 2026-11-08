@@ -3,10 +3,10 @@ import Foundation
 /// The demo's content: a plausible week with Hermes. Used by the fake client and the tests.
 public enum Fixtures {
     public static let threads: [ChatThread] = [
-        ChatThread(id: 12, name: "Home server", iconColor: 0x8EEE98, iconEmoji: "🛠️", order: 3),
-        ChatThread(id: 31, name: "Taxes 2026", iconColor: 0xFF93B2, iconEmoji: "🔐", order: 2),
-        ChatThread(id: 44, name: "Lisbon trip", iconColor: 0xFFD67E, iconEmoji: "✈️", order: 1),
-        ChatThread(id: 57, name: "Reading list", iconColor: 0xCB86DB, iconEmoji: "📚", order: 0),
+        ChatThread(id: 12, name: L("Home server"), iconColor: 0x8EEE98, iconEmoji: "🛠️", order: 3),
+        ChatThread(id: 31, name: L("Taxes 2026"), iconColor: 0xFF93B2, iconEmoji: "🔐", order: 2),
+        ChatThread(id: 44, name: L("Lisbon trip"), iconColor: 0xFFD67E, iconEmoji: "✈️", order: 1),
+        ChatThread(id: 57, name: L("Reading list"), iconColor: 0xCB86DB, iconEmoji: "📚", order: 0),
         ChatThread(id: FakeTelegramClient.appTopic, name: AppProtocol.topicName),
     ]
 
@@ -20,40 +20,40 @@ public enum Fixtures {
         }
         return [
             .main: [
-                bot(1001, 0, "Good morning! Three things overnight: the **nightly backup failed** at 03:12, Léa replied about Saturday, and your Lisbon flight is now boarding at gate 34 on Thursday.", 600),
-                me(1002, 0, "What happened with the backup?", 590),
-                bot(1003, 0, "The external disk was full, so restic stopped before pruning:\n```\nFatal: unable to save snapshot: no space left on device\n```\nPruning snapshots older than 90 days would free about **212 GB**. Want me to do it?", 588),
-                me(1004, 0, "Yes, go ahead", 585),
+                bot(1001, 0, L("Good morning! Three things overnight: the **nightly backup failed** at 03:12, Léa replied about Saturday, and your Lisbon flight is now boarding at gate 34 on Thursday."), 600),
+                me(1002, 0, L("What happened with the backup?"), 590),
+                bot(1003, 0, L("The external disk was full, so restic stopped before pruning:\n```\nFatal: unable to save snapshot: no space left on device\n```\nPruning snapshots older than 90 days would free about **212 GB**. Want me to do it?"), 588),
+                me(1004, 0, L("Yes, go ahead"), 585),
                 approvalMessage(id: 1005, now: t(584)),
-                me(1006, 0, "Here's the video from Saturday for Léa", 120),
+                me(1006, 0, L("Here's the video from Saturday for Léa"), 120),
                 ChatMessage(id: 1007, topic: 0, date: t(119), isOutgoing: true,
-                            text: FormattedText("Too big for Telegram, so it went through Gofile.\n[fichier: https://gofile.io/d/Qp9w8eR7]")),
-                bot(1008, 0, "Got it, I sent Léa the link with a note that it expires in 10 days.", 118),
-                me(1009, 0, "Remind me to call mum tonight", 30),
-                bot(1010, 0, "Done: a reminder at 19:30 today, in Reminders on your iPhone.", 29),
+                            text: FormattedText(L("Too big for Telegram, so it went through Gofile.") + "\n[fichier: https://gofile.io/d/Qp9w8eR7]")),
+                bot(1008, 0, L("Got it, I sent Léa the link with a note that it expires in 10 days."), 118),
+                me(1009, 0, L("Remind me to call mum tonight"), 30),
+                bot(1010, 0, L("Done: a reminder at 19:30 today, in Reminders on your iPhone."), 29),
             ],
             12: [
-                me(2001, 12, "Can you check why the Hermes gateway restarted twice yesterday?", 1500),
-                bot(2002, 12, "Both restarts were launchd bringing it back after a crash in the Telegram adapter, at 14:02 and 17:45. The second log line says `RetryAfter: 29`; it hit a flood limit while editing a long draft. I've opened a fix on a branch: `fix/telegram-flood-wait`.", 1495),
+                me(2001, 12, L("Can you check why the Hermes gateway restarted twice yesterday?"), 1500),
+                bot(2002, 12, L("Both restarts were launchd bringing it back after a crash in the Telegram adapter, at 14:02 and 17:45. The second log line says `RetryAfter: 29`; it hit a flood limit while editing a long draft. I've opened a fix on a branch: `fix/telegram-flood-wait`."), 1495),
             ],
             31: [
-                bot(3001, 31, "This sub-chat is encrypted. Your 2025 statements are in the vault; I've filled in the first two sections of the form.", 3000),
+                bot(3001, 31, L("This sub-chat is encrypted. Your 2025 statements are in the vault; I've filled in the first two sections of the form."), 3000),
             ],
             44: [
-                me(4001, 44, "Find a quiet place to stay near Alfama, 3 nights from the 14th", 4000),
-                bot(4002, 44, "Three options under €160 a night, all with good reviews for quiet:\n1. **Casa do Largo**: €142, terrace, 4 min from the tram\n2. **Alfama Patio**: €155, breakfast included\n3. **Memmo Alfama**: €159, pool, the most central\nShall I hold one?", 3990),
+                me(4001, 44, L("Find a quiet place to stay near Alfama, 3 nights from the 14th"), 4000),
+                bot(4002, 44, L("Three options under €160 a night, all with good reviews for quiet:\n1. **Casa do Largo**: €142, terrace, 4 min from the tram\n2. **Alfama Patio**: €155, breakfast included\n3. **Memmo Alfama**: €159, pool, the most central\nShall I hold one?"), 3990),
             ],
             57: [
-                bot(5001, 57, "Saved: “The Pragmatic Programmer”, 20th anniversary edition.", 9000),
+                bot(5001, 57, L("Saved: “The Pragmatic Programmer”, 20th anniversary edition."), 9000),
             ],
         ]
     }
 
     public static func approvalMessage(id: MessageID, now: Date) -> ChatMessage {
-        let options = [("Once", "ea:once:7"), ("Session", "ea:session:7"), ("Always", "ea:always:7"), ("Deny", "ea:deny:7")]
+        let options = [(L("Once"), "ea:once:7"), (L("Session"), "ea:session:7"), (L("Always"), "ea:always:7"), (L("Deny"), "ea:deny:7")]
         return ChatMessage(
             id: id, topic: 0, date: now, isOutgoing: false,
-            text: FormattedText("⚠️ Dangerous command: restic forget --keep-within 90d --prune"),
+            text: FormattedText("⚠️ " + L("Dangerous command: restic forget --keep-within 90d --prune")),
             buttons: options.enumerated().map { i, o in
                 InlineButton(row: i < 3 ? 0 : 1, column: i < 3 ? i : 0, label: o.0, action: .callback(Data(o.1.utf8)))
             })
@@ -62,31 +62,31 @@ public enum Fixtures {
     public static func approvalQuestion(messageID: MessageID) -> PendingQuestion {
         PendingQuestion(
             id: "ea:7", kind: .approval, chat: .main, messageID: messageID,
-            text: "Dangerous command: restic forget --keep-within 90d --prune",
-            spoken: "Hermes asks to delete backups older than ninety days. Allow?",
-            summary: "Delete backup snapshots older than 90 days to free about 212 GB on the external disk",
+            text: L("Dangerous command: restic forget --keep-within 90d --prune"),
+            spoken: L("Hermes asks to delete backups older than ninety days. Allow?"),
+            summary: L("Delete backup snapshots older than 90 days to free about 212 GB on the external disk"),
             command: "restic -r /Volumes/Backup/restic forget --keep-within 90d --prune",
             options: [
-                QuestionOption(id: "once", label: "Once", data: Data("ea:once:7".utf8)),
-                QuestionOption(id: "session", label: "Session", data: Data("ea:session:7".utf8)),
-                QuestionOption(id: "always", label: "Always", data: Data("ea:always:7".utf8)),
-                QuestionOption(id: "deny", label: "Deny", data: Data("ea:deny:7".utf8)),
+                QuestionOption(id: "once", label: L("Once"), data: Data("ea:once:7".utf8)),
+                QuestionOption(id: "session", label: L("Session"), data: Data("ea:session:7".utf8)),
+                QuestionOption(id: "always", label: L("Always"), data: Data("ea:always:7".utf8)),
+                QuestionOption(id: "deny", label: L("Deny"), data: Data("ea:deny:7".utf8)),
             ], askedAt: .now)
     }
 
     public static func state(now: Date) -> AppState {
         AppState(
-            agent: AgentState(status: .waitingUser, task: "Waiting for your approval", since: now.addingTimeInterval(-90), chat: .main),
+            agent: AgentState(status: .waitingUser, task: L("Waiting for your approval"), since: now.addingTimeInterval(-90), chat: .main),
             questions: [approvalQuestion(messageID: 1005)],
             pet: PetState(id: "pip", name: "Pip", version: 3,
                           spriteMessageID: 790,
-                          manifest: PetManifest(id: "pip", displayName: "Pip", description: "A small winged messenger."), mood: "content", hunger: 0.35, energy: 0.7, happiness: 0.82,
+                          manifest: PetManifest(id: "pip", displayName: "Pip", description: L("A small winged messenger.")), mood: "content", hunger: 0.35, energy: 0.7, happiness: 0.82,
                           xp: 2240, level: 6, xpForNextLevel: 2800),
             subchats: [
-                SubchatInfo(topicID: 31, name: "Taxes 2026", preset: "secret", encrypted: true, unlocked: false),
-                SubchatInfo(topicID: 12, name: "Home server", preset: "project"),
-                SubchatInfo(topicID: 44, name: "Lisbon trip", preset: "aside", ttl: "session"),
-                SubchatInfo(topicID: 57, name: "Reading list", preset: "project"),
+                SubchatInfo(topicID: 31, name: L("Taxes 2026"), preset: "secret", encrypted: true, unlocked: false),
+                SubchatInfo(topicID: 12, name: L("Home server"), preset: "project"),
+                SubchatInfo(topicID: 44, name: L("Lisbon trip"), preset: "aside", ttl: "session"),
+                SubchatInfo(topicID: 57, name: L("Reading list"), preset: "project"),
             ],
             slots: ["stats": 802, "devices": 801, "sprite": 790])
     }
@@ -168,8 +168,8 @@ public enum Fixtures {
         """
         {"v":2,"type":"controls","updated_at":"2026-11-07T21:40:00Z",
          "permission_mode":{"value":"\(mode)","set":"/mode {value}","options":[
-           {"id":"auto","label":"Auto","description":"Safe actions run; a reviewer judges the rest and blocks risky ones."},
-           {"id":"ask","label":"Ask","description":"Every action but reads waits for your yes."}]},
+           {"id":"auto","label":"\(L("Auto"))","description":"\(L("Safe actions run; a reviewer judges the rest and blocks risky ones."))"},
+           {"id":"ask","label":"\(L("Ask"))","description":"\(L("Every action but reads waits for your yes."))"}]},
          "model":{"chain":[{"provider":"opencode-go","model":"deepseek-v4.1-flash","role":"main"},
                            {"provider":"openai-codex","model":"gpt-5.5","role":"fallback"},
                            {"provider":"uzu","model":"qwen3.5-9b","role":"local"}],
@@ -182,7 +182,7 @@ public enum Fixtures {
                     {"name":"secret","memoryRead":false,"memoryWrite":false,"ttl":null,"encrypted":true,"model":"uzu:local"},
                     {"name":"temp","memoryRead":false,"memoryWrite":false,"ttl":"1h","encrypted":false,"model":"uzu:local"}],
          "commands":[{"id":"stop","send":"/stop","where":"any"},{"id":"retry","send":"/retry","where":"any"},
-           {"id":"undo","send":"/undo","where":"any","confirm":"Undo Hermes' last turn?"},{"id":"btw","insert":"/btw ","where":"any"},
+           {"id":"undo","send":"/undo","where":"any","confirm":"\(L("Undo Hermes’ last turn?"))"},{"id":"btw","insert":"/btw ","where":"any"},
            {"id":"bg","insert":"/bg ","where":"any"},{"id":"goal","insert":"/goal ","where":"any"},
            {"id":"agents","send":"/agents","where":"any"},{"id":"status","send":"/status","where":"any"},
            {"id":"usage","send":"/usage","where":"any"},
@@ -190,22 +190,22 @@ public enum Fixtures {
            {"id":"model","control":"model","where":"any"},{"id":"permissions","control":"permission_mode","where":"any"},
            {"id":"sub.new","control":"subchat_form","where":"main"},{"id":"sub.show","send":"/sub","where":"subchat"},
            {"id":"sub.set","insert":"/sub set ","where":"subchat"},{"id":"sub.lock","send":"/sub lock","where":"encrypted"},
-           {"id":"sub.end","send":"/sub end","where":"subchat","confirm":"End this sub-chat? Its topic and memory are deleted."},
-           {"id":"pause","send":"/pause","where":"any","confirm":"Stop all new work until you resume?"},
+           {"id":"sub.end","send":"/sub end","where":"subchat","confirm":"\(L("End this sub-chat? Its topic and memory are deleted."))"},
+           {"id":"pause","send":"/pause","where":"any","confirm":"\(L("Stop all new work until you resume?"))"},
            {"id":"resume","send":"/pause off","where":"any"}]}
         """
     }
 
     static func answer(to text: String) -> String {
         let l = text.lowercased()
-        if l.hasPrefix("/mode ") { return "Permission mode: **\(text.dropFirst(6))**." }
-        if l.hasPrefix("/model ") { return "This chat now answers with **\(text.split(separator: " ")[1])**." }
+        if l.hasPrefix("/mode ") { return L("Permission mode: **\(String(text.dropFirst(6)))**.") }
+        if l.hasPrefix("/model ") { return L("This chat now answers with **\(String(text.split(separator: " ")[1]))**.") }
         if l.hasPrefix("/sub new") {
-            return "Opened a new sub-chat. You'll find it in the sidebar."
+            return L("Opened a new sub-chat. You’ll find it in the sidebar.")
         }
         if l.contains("weather") || l.contains("météo") {
-            return "Lisbon on Thursday: **21°C** and sunny, a light breeze off the river in the evening. Pack a thin jacket."
+            return L("Lisbon on Thursday: **21°C** and sunny, a light breeze off the river in the evening. Pack a thin jacket.")
         }
-        return "On it. I checked the server: CPU is at **12%**, memory at 50%, and the backup disk now has 212 GB free after last night's prune. Nothing else needs you right now; I'll ping you if the nightly run fails again."
+        return L("On it. I checked the server: CPU is at **12%**, memory at 50%, and the backup disk now has 212 GB free after last night’s prune. Nothing else needs you right now; I’ll ping you if the nightly run fails again.")
     }
 }

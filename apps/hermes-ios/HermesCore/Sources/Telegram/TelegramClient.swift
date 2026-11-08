@@ -57,23 +57,23 @@ public enum TelegramError: LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .botNotFound(let u): "Couldn't find @\(u) on Telegram."
-        case .notReady: "Telegram isn't connected yet."
+        case .botNotFound(let u): L("Couldn't find @\(u) on Telegram.")
+        case .notReady: L("Telegram isn't connected yet.")
         case .server(_, let message): Self.humanize(message)
-        case .fileTooBig: "This file is too big for Telegram."
+        case .fileTooBig: L("This file is too big for Telegram.")
         }
     }
 
     static func humanize(_ message: String) -> String {
         switch message {
-        case "PHONE_CODE_INVALID": "That code isn't right. Check it and try again."
-        case "PHONE_CODE_EXPIRED": "That code expired. Ask for a new one."
-        case "PHONE_NUMBER_INVALID": "That phone number doesn't look right."
-        case "PASSWORD_HASH_INVALID": "Wrong password."
-        case "PHONE_NUMBER_BANNED": "This number is banned from Telegram."
+        case "PHONE_CODE_INVALID": L("That code isn't right. Check it and try again.")
+        case "PHONE_CODE_EXPIRED": L("That code expired. Ask for a new one.")
+        case "PHONE_NUMBER_INVALID": L("That phone number doesn't look right.")
+        case "PASSWORD_HASH_INVALID": L("Wrong password.")
+        case "PHONE_NUMBER_BANNED": L("This number is banned from Telegram.")
         default:
             if message.hasPrefix("Too Many Requests") || message.hasPrefix("FLOOD_WAIT") {
-                "Too many attempts. Wait a little and try again."
+                L("Too many attempts. Wait a little and try again.")
             } else { message }
         }
     }

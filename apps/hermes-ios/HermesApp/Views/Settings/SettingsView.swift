@@ -48,9 +48,11 @@ struct SettingsView: View {
             } header: {
                 Text("Notifications")
             } footer: {
-                Text(store.config.paidTeam
-                     ? "Hermes pushes notifications and Live Activity updates even when the app is closed. With AirPods, Siri reads them out (Announce Notifications)."
-                     : "This build is signed with a free Apple team: notifications arrive while the app runs or refreshes in the background, not when it's closed. A paid team enables push and Siri announcements.")
+                if store.config.paidTeam {
+                    Text("Hermes pushes notifications and Live Activity updates even when the app is closed. With AirPods, Siri reads them out (Announce Notifications).")
+                } else {
+                    Text("This build is signed with a free Apple team: notifications arrive while the app runs or refreshes in the background, not when it's closed. A paid team enables push and Siri announcements.")
+                }
             }
 
             Section {
@@ -102,7 +104,7 @@ struct SettingsView: View {
 
             Section {
                 LabeledContent("Version", value: "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))")
-                LabeledContent("Apple team", value: store.config.paidTeam ? "Paid" : "Free personal")
+                LabeledContent("Apple team", value: store.config.paidTeam ? String(localized: "Paid") : String(localized: "Free personal"))
             }
         }
         // A readable column in a wide window, as Settings does on iPad.
@@ -118,18 +120,18 @@ struct SettingsView: View {
 
     private var connectionLabel: String {
         switch store.connection {
-        case .ready: "Connected"
-        case .updating: "Updating"
-        case .connecting: "Connecting"
-        case .waitingForNetwork: "Waiting for network"
+        case .ready: String(localized: "Connected")
+        case .updating: String(localized: "Updating")
+        case .connecting: String(localized: "Connecting")
+        case .waitingForNetwork: String(localized: "Waiting for network")
         }
     }
 
     private var notificationLabel: String {
         switch notifications {
-        case .authorized, .provisional, .ephemeral: "On"
-        case .denied: "Off"
-        default: "Not set"
+        case .authorized, .provisional, .ephemeral: String(localized: "On")
+        case .denied: String(localized: "Off")
+        default: String(localized: "Not set")
         }
     }
 

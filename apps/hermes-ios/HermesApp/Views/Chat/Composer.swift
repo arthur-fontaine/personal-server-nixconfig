@@ -43,11 +43,13 @@ struct Composer: View {
                     .buttonStyle(.glass)
                     .buttonBorderShape(.circle)
                     .accessibilityLabel("Attach")
+                    .accessibilityIdentifier("composer.attach")
 
                     HStack(alignment: .bottom) {
                         TextField(placeholder, text: $text, axis: .vertical)
                             .lineLimit(1...8)
                             .focused(focused)
+                            .accessibilityIdentifier("composer.field")
                             .padding(.vertical, 11)
                             .padding(.leading, 16)
                             .onChange(of: text) { old, new in
@@ -68,6 +70,7 @@ struct Composer: View {
                         .keyboardShortcut(.return, modifiers: .command)
                         .padding(5)
                         .accessibilityLabel("Send")
+                        .accessibilityIdentifier("composer.send")
                     }
                     .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 22))
                 }
@@ -93,7 +96,7 @@ struct Composer: View {
         }
     }
 
-    private var placeholder: String { topic == .main ? "Message Hermes" : "Message" }
+    private var placeholder: String { topic == .main ? String(localized: "Message Hermes") : String(localized: "Message") }
 
     private var canSend: Bool {
         !sending && (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !files.isEmpty)
@@ -104,9 +107,8 @@ struct Composer: View {
             Image(systemName: FileKind.symbol(for: f.url.lastPathComponent))
             VStack(alignment: .leading, spacing: 0) {
                 Text(f.url.lastPathComponent).font(.caption.weight(.semibold)).lineLimit(1).truncationMode(.middle)
-                Text(f.size > store.client.uploadLimit
-                     ? "\(ByteCountFormatter.string(fromByteCount: f.size, countStyle: .file)) · via \(store.uploader.serviceName)"
-                     : ByteCountFormatter.string(fromByteCount: f.size, countStyle: .file))
+                let size = ByteCountFormatter.string(fromByteCount: f.size, countStyle: .file)
+                Text(f.size > store.client.uploadLimit ? String(localized: "\(size) · via \(store.uploader.serviceName)") : size)
                     .font(.caption2).foregroundStyle(.secondary)
             }
             Button { files.removeAll { $0.id == f.id } } label: { Image(systemName: "xmark.circle.fill") }

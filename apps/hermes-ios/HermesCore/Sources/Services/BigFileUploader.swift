@@ -22,8 +22,8 @@ public enum UploadError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .service(let s): "Upload failed: \(s)"
-        case .badResponse: "Upload failed: unexpected answer from the service."
+        case .service(let s): L("Upload failed: \(s)")
+        case .badResponse: L("Upload failed: unexpected answer from the service.")
         }
     }
 }

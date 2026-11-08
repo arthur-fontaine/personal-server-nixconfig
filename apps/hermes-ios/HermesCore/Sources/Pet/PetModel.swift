@@ -165,15 +165,15 @@ public enum PetMood: String, Sendable, Codable, CaseIterable {
 
     public var caption: String {
         switch self {
-        case .content: "Content"
-        case .happy: "Happy"
-        case .focused: "Thinking it over"
-        case .busy: "Hard at work"
-        case .attentive: "Waiting for you"
-        case .sad: "Something went wrong"
-        case .hungry: "Hungry"
-        case .sleepy: "Sleepy"
-        case .asleep: "Asleep"
+        case .content: L("Content")
+        case .happy: L("Happy")
+        case .focused: L("Thinking it over")
+        case .busy: L("Hard at work")
+        case .attentive: L("Waiting for you")
+        case .sad: L("Something went wrong")
+        case .hungry: L("Hungry")
+        case .sleepy: L("Sleepy")
+        case .asleep: L("Asleep")
         }
     }
 
@@ -208,10 +208,10 @@ public enum PetAction: String, Sendable, CaseIterable, Identifiable {
 
     public var title: String {
         switch self {
-        case .feed: "Feed"
-        case .play: "Play"
-        case .sleep: "Sleep"
-        case .wake: "Wake"
+        case .feed: L("Feed")
+        case .play: L("Play")
+        case .sleep: L("Sleep")
+        case .wake: L("Wake")
         }
     }
 

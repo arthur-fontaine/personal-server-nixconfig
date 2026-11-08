@@ -19,7 +19,8 @@ struct QuestionTray: View {
             }
             if let other = elsewhere.first {
                 Button { model.open(topic: other.chat) } label: {
-                    Label("Hermes is waiting in \(other.chat == .main ? "the main chat" : store.thread(other.chat)?.name ?? "a sub-chat")",
+                    Label(other.chat == .main ? String(localized: "Hermes is waiting in the main chat")
+                          : String(localized: "Hermes is waiting in \(store.thread(other.chat)?.name ?? String(localized: "a sub-chat"))"),
                           systemImage: "hand.raised.fill")
                         .font(.footnote.weight(.semibold))
                 }
@@ -62,7 +63,7 @@ struct QuestionCard: View {
                     }
                     .background(.fill.tertiary, in: .rect(cornerRadius: 10))
                 } label: {
-                    Text(showCommand ? "Hide command" : "Show command").font(.footnote.weight(.medium))
+                    Text(showCommand ? String(localized: "Hide command") : String(localized: "Show command")).font(.footnote.weight(.medium))
                 }
                 .tint(.secondary)
             }
@@ -75,24 +76,38 @@ struct QuestionCard: View {
 
     @ViewBuilder private var options: some View {
         let opts = question.options
-        let layout = opts.count <= 4 && opts.allSatisfy { $0.label.count <= 12 }
-            ? AnyLayout(HStackLayout(spacing: 8)) : AnyLayout(VStackLayout(spacing: 8))
-        // The card is glass: its buttons are filled, never glass on glass (as in system alerts).
-        layout {
-            ForEach(opts) { option in
-                Button { answer(option) } label: {
-                    HStack(spacing: 6) {
-                        if pressing == option.id { ProgressView().controlSize(.small) }
-                        Text(option.label).font(.subheadline.weight(.semibold)).lineLimit(2)
+        // One row when every label fits on one line, else two columns, else one: measured, not
+        // guessed from the label's length ("Toujours" and "Une fois" don't fit four abreast).
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) { ForEach(opts) { optionButton($0, lines: 1) } }
+            if opts.count > 2 {
+                Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+                    ForEach(Array(stride(from: 0, to: opts.count, by: 2)), id: \.self) { i in
+                        GridRow {
+                            optionButton(opts[i], lines: 1)
+                            if i + 1 < opts.count { optionButton(opts[i + 1], lines: 1) }
+                        }
                     }
-                    .frame(maxWidth: .infinity, minHeight: 36)
                 }
-                .buttonStyle(option.isDestructive || option.id != opts.first?.id ? AnyButtonStyle(.bordered) : AnyButtonStyle(.borderedProminent))
-                .buttonBorderShape(.capsule)
-                .tint(option.isDestructive ? .red : nil)
-                .disabled(pressing != nil)
             }
+            VStack(spacing: 8) { ForEach(opts) { optionButton($0, lines: 2) } }
         }
+    }
+
+    /// The card is glass: its buttons are filled, never glass on glass (as in system alerts).
+    private func optionButton(_ option: QuestionOption, lines: Int) -> some View {
+        Button { answer(option) } label: {
+            HStack(spacing: 6) {
+                if pressing == option.id { ProgressView().controlSize(.small) }
+                Text(option.label).font(.subheadline.weight(.semibold)).lineLimit(lines)
+                    .fixedSize(horizontal: lines == 1, vertical: false)
+            }
+            .frame(maxWidth: .infinity, minHeight: 36)
+        }
+        .buttonStyle(option.isDestructive || option.id != question.options.first?.id ? AnyButtonStyle(.bordered) : AnyButtonStyle(.borderedProminent))
+        .buttonBorderShape(.capsule)
+        .tint(option.isDestructive ? .red : nil)
+        .disabled(pressing != nil)
     }
 
     private var icon: String {
@@ -105,9 +120,9 @@ struct QuestionCard: View {
 
     private var heading: String {
         switch question.kind {
-        case .approval: "Approval needed"
-        case .clarify, .question: "Hermes asks"
-        case .proposal: "Proposal"
+        case .approval: String(localized: "Approval needed")
+        case .clarify, .question: String(localized: "Hermes asks")
+        case .proposal: String(localized: "Proposal")
         }
     }
 

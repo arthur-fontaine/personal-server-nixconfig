@@ -227,3 +227,19 @@ struct ActivityTests {
         #expect(approval.options.last?.destructive == true)
     }
 }
+
+@Suite("localization")
+struct LocalizationTests {
+    /// HermesCore's strings come from its own catalog, French included (not the app's bundle).
+    @Test func coreShipsFrench() throws {
+        let core = Bundle(for: HermesStore.self)
+        let path = try #require(core.path(forResource: "fr", ofType: "lproj"))
+        let fr = try #require(Bundle(path: path))
+        #expect(fr.localizedString(forKey: "Idle", value: nil, table: nil) == "Au repos")
+        #expect(fr.localizedString(forKey: "Needs you", value: nil, table: nil) == "A besoin de toi")
+        #expect(fr.localizedString(forKey: "End sub-chat", value: nil, table: nil) == "Terminer la sous-discussion")
+        #expect(fr.localizedString(forKey: "Upload failed: %@", value: nil, table: nil) == "Échec de l’envoi\u{a0}: %@")
+        // In the test's (English) locale, the development language.
+        #expect(AgentStatus.waitingUser.label == "Needs you")
+    }
+}

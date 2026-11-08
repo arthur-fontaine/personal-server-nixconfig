@@ -28,7 +28,7 @@ enum VoiceEngineError: LocalizedError {
 /// Apple's on-device speech: the fallback when the LFM model isn't downloaded, can't load (an
 /// older device, low memory) or the build has no llama.cpp (the simulator).
 nonisolated final class AppleVoiceEngine: VoiceEngine, @unchecked Sendable {
-    let name = "Apple speech"
+    let name = String(localized: "Apple speech")
     let outputSampleRate: Double = 24_000
     private let synthesizer = AVSpeechSynthesizer()
 
@@ -40,7 +40,7 @@ nonisolated final class AppleVoiceEngine: VoiceEngine, @unchecked Sendable {
 
     func transcribe(_ samples: [Float], language: String) async throws -> String {
         guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: language)) ?? SFSpeechRecognizer(),
-              recognizer.isAvailable else { throw VoiceEngineError.unavailable("Speech recognition isn't available.") }
+              recognizer.isAvailable else { throw VoiceEngineError.unavailable(String(localized: "Speech recognition isn't available.")) }
         let request = SFSpeechAudioBufferRecognitionRequest()
         // Stays on the device when the language's model is installed.
         request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
@@ -48,7 +48,7 @@ nonisolated final class AppleVoiceEngine: VoiceEngine, @unchecked Sendable {
         request.addsPunctuation = true
         guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false),
               let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else {
-            throw VoiceEngineError.failed("Audio buffer")
+            throw VoiceEngineError.failed(String(localized: "The audio couldn't be prepared."))
         }
         buffer.frameLength = AVAudioFrameCount(samples.count)
         samples.withUnsafeBufferPointer { buffer.floatChannelData![0].update(from: $0.baseAddress!, count: samples.count) }

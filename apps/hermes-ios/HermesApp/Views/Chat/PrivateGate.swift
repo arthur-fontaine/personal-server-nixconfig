@@ -21,12 +21,12 @@ struct PrivateGate: View {
                 .foregroundStyle(.tint)
                 .frame(width: 96, height: 96)
                 .background(.tint.opacity(0.12), in: .circle)
-            Text(store.thread(topic)?.name ?? "Private sub-chat").font(.title2.weight(.semibold))
+            Text(store.thread(topic)?.name ?? String(localized: "Private sub-chat")).font(.title2.weight(.semibold))
             Text("This sub-chat is encrypted. Unlock it with \(PrivateVault.biometryName) to read it.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             Button(action: unlock) {
-                Label(working ? "Unlocking…" : "Unlock", systemImage: "faceid").frame(minWidth: 180)
+                Label(working ? String(localized: "Unlocking…") : String(localized: "Unlock"), systemImage: "faceid").frame(minWidth: 180)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -49,14 +49,14 @@ struct PrivateGate: View {
             do {
                 if PrivateVault.hasPassphrase(topic: topic) {
                     // Reading the Keychain item is the Face ID check.
-                    guard let pw = try await PrivateVault.passphrase(topic: topic, reason: "Open your private sub-chat") else { return }
+                    guard let pw = try await PrivateVault.passphrase(topic: topic, reason: String(localized: "Open your private sub-chat")) else { return }
                     if serverLocked { try await store.unlockSubchat(topic, passphrase: pw) }
                     open()
-                } else if await PrivateVault.authenticate(reason: "Open your private sub-chat") {
+                } else if await PrivateVault.authenticate(reason: String(localized: "Open your private sub-chat")) {
                     if serverLocked { askPassphrase = true } else { open() }
                 }
             } catch {
-                self.error = "Couldn't unlock: \(error.localizedDescription)"
+                self.error = String(localized: "Couldn't unlock: \(error.localizedDescription)")
             }
         }
     }
@@ -103,6 +103,43 @@ struct PrivateGate: View {
     }
 }
 
+/// Display names for Hermes' presets and expiries (the protocol sends the raw names: `aside`,
+/// `1h`…); unknown ones are shown as sent.
+enum PresetNames {
+    static func name(_ preset: String) -> String {
+        switch preset {
+        // Keys of their own: "Temp" is also the dashboard's temperature.
+        case "aside": String(localized: "preset.aside", defaultValue: "Aside", comment: "Sub-chat preset: a side question")
+        case "project": String(localized: "preset.project", defaultValue: "Project", comment: "Sub-chat preset")
+        case "secret": String(localized: "preset.secret", defaultValue: "Secret", comment: "Sub-chat preset: encrypted")
+        case "temp": String(localized: "preset.temp", defaultValue: "Temp", comment: "Sub-chat preset: temporary")
+        default: preset.capitalized
+        }
+    }
+
+    static func ttl(_ ttl: String) -> String {
+        if ttl == "session" { return String(localized: "When the session ends") }
+        // "1h", "30m", "2d": a duration in the device's language.
+        guard let unit = ttl.last, let n = Int(ttl.dropLast()) else { return ttl }
+        let seconds: Int? = switch unit { case "m": n * 60; case "h": n * 3600; case "d": n * 86400; default: nil }
+        guard let seconds else { return ttl }
+        return String(localized: "\(Duration.seconds(seconds).formatted(.units(allowed: [.days, .hours, .minutes], width: .wide))) after the last message")
+    }
+
+    /// Option values of picker commands (reasoning effort).
+    static func option(_ value: String) -> String {
+        switch value {
+        case "none": String(localized: "None", comment: "Reasoning effort")
+        case "minimal": String(localized: "Minimal", comment: "Reasoning effort")
+        case "low": String(localized: "Low", comment: "Reasoning effort")
+        case "medium": String(localized: "Medium", comment: "Reasoning effort")
+        case "high": String(localized: "High", comment: "Reasoning effort")
+        case "xhigh": String(localized: "Very high", comment: "Reasoning effort")
+        default: value.capitalized
+        }
+    }
+}
+
 struct NewSubchatSheet: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -142,7 +179,7 @@ struct NewSubchatFields: View {
                         HStack(spacing: 12) {
                             Image(systemName: Self.symbol(p)).frame(width: 28).foregroundStyle(.tint)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(p.name.capitalized).font(.body.weight(.medium))
+                                Text(PresetNames.name(p.name)).font(.body.weight(.medium))
                                 Text(Self.blurb(p)).font(.footnote).foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -167,7 +204,8 @@ struct NewSubchatFields: View {
                         defer { creating = false }
                         do {
                             try await store.createSubchat(name: name, preset: chosen)
-                            model.showToast("Hermes is opening “\(name.isEmpty ? chosen.capitalized : name)”")
+                            let shown = name.isEmpty ? PresetNames.name(chosen) : name
+                            model.showToast("Hermes is opening “\(shown)”")
                             onCreated()
                         } catch { model.showToast(error.localizedDescription) }
                     }
@@ -190,10 +228,10 @@ struct NewSubchatFields: View {
     // From docs/hermes.md, "Sub-chats"; other presets describe themselves from their rules.
     static func blurb(_ p: PresetInfo) -> String {
         switch p.name {
-        case "aside": "A side question that knows everything but leaves no trace once its session ends."
-        case "project": "Long-running work in the shared projects memory, apart from daily life."
-        case "secret": "Encrypted vault, no main memory, the local model, files and terminal only."
-        case "temp": "A throwaway chat on the local model, no tools, gone an hour after its last message."
+        case "aside": String(localized: "A side question that knows everything but leaves no trace once its session ends.")
+        case "project": String(localized: "Long-running work in the shared projects memory, apart from daily life.")
+        case "secret": String(localized: "Encrypted vault, no main memory, the local model, files and terminal only.")
+        case "temp": String(localized: "A throwaway chat on the local model, no tools, gone an hour after its last message.")
         default: p.summary
         }
     }

@@ -87,7 +87,7 @@ public enum PrivateVault {
         case .faceID: return "Face ID"
         case .touchID: return "Touch ID"
         case .opticID: return "Optic ID"
-        default: return "your passcode"
+        default: return L("your passcode")
         }
     }
 }
