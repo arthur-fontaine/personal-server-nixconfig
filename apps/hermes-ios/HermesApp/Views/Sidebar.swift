@@ -14,7 +14,9 @@ struct Sidebar: View {
             Section("Chats") {
                 row(.main, unread: store.mainThread.unreadCount)
                 ForEach(store.threads) { thread in row(thread.id, unread: thread.unreadCount) }
-                Button { model.showNewSubchat = true } label: { Label("New Sub-chat…", systemImage: "plus") }
+                Button { model.showNewSubchat = true } label: {
+                    Label { Text("New Sub-chat…") } icon: { Image(systemName: "plus").accessibilityHidden(true) }
+                }
             }
         }
         .listStyle(.sidebar)
@@ -31,8 +33,13 @@ struct Sidebar: View {
 
     /// The tag outermost: the list's selection reads it from the row itself.
     private func row(_ topic: TopicID, unread: Int) -> some View {
-        Label(ChatTitle.name(topic, store: store), systemImage: ChatTitle.symbol(topic, store: store))
-            .badge(unread)
+        // The symbol is decoration: VoiceOver reads the chat's name, not "Move" or "Conversation".
+        Label {
+            Text(ChatTitle.name(topic, store: store))
+        } icon: {
+            Image(systemName: ChatTitle.symbol(topic, store: store)).accessibilityHidden(true)
+        }
+        .badge(unread)
             .accessibilityIdentifier("sidebar.chat.\(topic)")
             .tag(SidebarItem.topic(topic))
     }
