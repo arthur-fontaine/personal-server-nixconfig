@@ -89,8 +89,11 @@ struct TokenTests {
         #expect(Metric.composerControl >= Metric.hitTarget)
     }
 
+    /// The corner is half the one-line height (a capsule), and that height holds a padded line.
+    /// The rendered height is checked by GeometryTests (46–48).
     @Test func oneLineBubbleIsACapsule() {
-        #expect(Radius.bubble * 2 == Metric.bodyLine + 2 * Bubble.vertical.points)
+        #expect(Radius.bubble * 2 == Metric.oneLineBubble)
+        #expect(Metric.oneLineBubble >= Metric.bodyLine + 2 * Bubble.vertical.points)
     }
 
     /// 2.4, 12.3: 24 between turns, 8 between the owner's bubbles, 16 between a reply's blocks.
