@@ -260,6 +260,16 @@ final class TDLibTelegramClient: TelegramClient {
         return Self.convert(m)
     }
 
+    func message(chat: ChatID, id: MessageID) async throws -> ChatMessage? {
+        do {
+            let m = try await wrap { try await self.client.getMessage(chatId: chat, messageId: id) }
+            return Self.convert(m)
+        } catch TelegramError.server(let code, _) where code == 404 || code == 400 {
+            // "Message not found": deleted, or never visible to this account.
+            return nil
+        }
+    }
+
     func delete(messages: [MessageID], chat: ChatID) async throws {
         try await run { _ = try await self.client.deleteMessages(chatId: chat, messageIds: messages, revoke: true) }
     }

@@ -270,7 +270,50 @@ public final class HermesStore {
         Task { await client.markRead(chat: bot.chatID, topic: topic, messages: [last.id]) }
     }
 
-    public func send(_ text: String, in topic: TopicID, files: [URL] = []) async throws {
+    // MARK: - Replies (design-rules 16)
+
+    /// Originals fetched for a reply, outside the loaded history; ids found gone.
+    private var originals: [MessageID: ChatMessage] = [:]
+    private var goneOriginals: Set<MessageID> = []
+    private var fetchingOriginals: Set<MessageID> = []
+
+    /// What `m` shows above itself when it replies to another message: from the loaded history,
+    /// else fetched once (`.loading` until then), `.deleted` when the original is gone.
+    public func replyPreview(for m: ChatMessage) -> ReplyPreview? {
+        guard let id = m.replyTo else { return nil }
+        if let o = messages[m.topic]?.first(where: { $0.id == id }) ?? originals[id] { return ReplyPreview(original: o) }
+        if goneOriginals.contains(id) { return ReplyPreview(originalID: id, content: .deleted) }
+        Task { await fetchOriginal(id) }
+        return ReplyPreview(originalID: id, content: .loading)
+    }
+
+    func fetchOriginal(_ id: MessageID) async {
+        guard let bot, !fetchingOriginals.contains(id), originals[id] == nil, !goneOriginals.contains(id) else { return }
+        fetchingOriginals.insert(id)
+        defer { fetchingOriginals.remove(id) }
+        do {
+            if let o = try await client.message(chat: bot.chatID, id: id) { originals[id] = o } else { goneOriginals.insert(id) }
+        } catch {}
+    }
+
+    /// Loads older pages of `topic` until `id` is in the history, so the transcript can scroll to
+    /// it without a gap. False when the original is gone (or too far back to page to).
+    public func loadAround(_ id: MessageID, in topic: TopicID) async -> Bool {
+        func loaded() -> Bool { messages[topic]?.contains { $0.id == id } ?? false }
+        if loaded() { return true }
+        if goneOriginals.contains(id) { return false }
+        for _ in 0..<Self.maxPagesToOriginal where !loaded() && !reachedStart.contains(topic) {
+            let before = messages[topic]?.count ?? 0
+            await loadOlder(topic)
+            if (messages[topic]?.count ?? 0) == before { break }
+        }
+        if !loaded() { await fetchOriginal(id) }
+        return loaded()
+    }
+
+    static let maxPagesToOriginal = 20
+
+    public func send(_ text: String, in topic: TopicID, files: [URL] = [], replyTo: MessageID? = nil) async throws {
         guard let bot else { throw TelegramError.notReady }
         let limit = client.uploadLimit
         var links: [FileLink] = []
@@ -286,7 +329,7 @@ public final class HermesStore {
             insert(try await client.sendFile(at: file, caption: caption, chat: bot.chatID, topic: topic))
         }
         if telegramFiles.isEmpty, !body.isEmpty {
-            insert(try await client.send(text: body, chat: bot.chatID, topic: topic, replyTo: nil))
+            insert(try await client.send(text: body, chat: bot.chatID, topic: topic, replyTo: replyTo))
         }
     }
 

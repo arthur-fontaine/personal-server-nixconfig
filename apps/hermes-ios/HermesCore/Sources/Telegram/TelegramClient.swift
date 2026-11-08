@@ -100,6 +100,8 @@ public protocol TelegramClient: AnyObject {
     /// Newest first, from `fromMessageID` (0: the newest) backwards.
     func history(chat: ChatID, topic: TopicID, from fromMessageID: MessageID, limit: Int) async throws -> [ChatMessage]
     func send(text: String, chat: ChatID, topic: TopicID, replyTo: MessageID?) async throws -> ChatMessage
+    /// One message by id (a reply's original not in the loaded history); nil when it is gone.
+    func message(chat: ChatID, id: MessageID) async throws -> ChatMessage?
     func sendFile(at url: URL, caption: String, chat: ChatID, topic: TopicID) async throws -> ChatMessage
     func delete(messages: [MessageID], chat: ChatID) async throws
     /// Presses an inline button, as a tap in Telegram does. Returns the bot's toast, if any.

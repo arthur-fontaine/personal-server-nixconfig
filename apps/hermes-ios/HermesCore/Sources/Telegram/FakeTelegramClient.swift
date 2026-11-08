@@ -20,6 +20,7 @@ public final class FakeTelegramClient: TelegramClient {
     private var mode = "auto"
     private var model = "deepseek-v4.1-flash"
     private var sentLog: [String] = []
+    private var replyLog: [MessageID] = []
 
     /// `review`: the main chat ends on the backup question, Hermes' reply still streaming and its
     /// approval pending — one screen with prose, code, a draft and a question (design reviews).
@@ -48,6 +49,8 @@ public final class FakeTelegramClient: TelegramClient {
 
     /// What the app sent, for tests.
     public var sent: [String] { sentLog }
+    /// The originals of the replies sent, in order.
+    public var repliedTo: [MessageID] { replyLog }
 
     public func start() {
         emit(.auth(startsLoggedIn ? .ready : .waitPhoneNumber))
@@ -119,10 +122,15 @@ public final class FakeTelegramClient: TelegramClient {
 
     private func encodeState() -> String { Fixtures.stateJSON(appState) }
 
+    public func message(chat: ChatID, id: MessageID) async throws -> ChatMessage? {
+        store.values.lazy.flatMap { $0 }.first { $0.id == id }
+    }
+
     public func send(text: String, chat: ChatID, topic: TopicID, replyTo: MessageID?) async throws -> ChatMessage {
         sentLog.append(text)
+        if let replyTo { replyLog.append(replyTo) }
         nextID += 1
-        var local = ChatMessage(id: nextID, topic: topic, date: .now, isOutgoing: true, text: FormattedText(text))
+        var local = ChatMessage(id: nextID, topic: topic, date: .now, isOutgoing: true, text: FormattedText(text), replyTo: replyTo)
         if topic == Self.appTopic {
             // As TDLib: a sent message is pending until the server gives it its real id.
             local.sendState = .pending

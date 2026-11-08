@@ -12,29 +12,31 @@ public enum Fixtures {
 
     public static func messages(now: Date) -> [TopicID: [ChatMessage]] {
         func t(_ minutesAgo: Double) -> Date { now.addingTimeInterval(-minutesAgo * 60) }
-        func me(_ id: MessageID, _ topic: TopicID, _ text: String, _ ago: Double) -> ChatMessage {
-            ChatMessage(id: id, topic: topic, date: t(ago), isOutgoing: true, text: FormattedText(text))
+        // Replies in both directions (design-rules 16.5), one to a deleted message.
+        func me(_ id: MessageID, _ topic: TopicID, _ text: String, _ ago: Double, replyTo: MessageID? = nil) -> ChatMessage {
+            ChatMessage(id: id, topic: topic, date: t(ago), isOutgoing: true, text: FormattedText(text), replyTo: replyTo)
         }
-        func bot(_ id: MessageID, _ topic: TopicID, _ text: String, _ ago: Double) -> ChatMessage {
-            ChatMessage(id: id, topic: topic, date: t(ago), isOutgoing: false, text: Markdownish.parse(text))
+        func bot(_ id: MessageID, _ topic: TopicID, _ text: String, _ ago: Double, replyTo: MessageID? = nil) -> ChatMessage {
+            ChatMessage(id: id, topic: topic, date: t(ago), isOutgoing: false, text: Markdownish.parse(text), replyTo: replyTo)
         }
         return [
             .main: [
                 bot(1001, 0, L("Good morning! Three things overnight: the **nightly backup failed** at 03:12, Léa replied about Saturday, and your Lisbon flight is now boarding at gate 34 on Thursday."), 600),
                 me(1002, 0, L("What happened with the backup?"), 590),
                 bot(1003, 0, L("The external disk was full, so restic stopped before pruning:\n```\nFatal: unable to save snapshot: no space left on device\n```\nPruning snapshots older than 90 days would free about **212 GB**. Want me to do it?"), 588),
-                me(1004, 0, L("Yes, go ahead"), 585),
+                me(1004, 0, L("Yes, go ahead"), 585, replyTo: 1003),
                 approvalMessage(id: 1005, now: t(584)),
-                me(1006, 0, L("Here's the video from Saturday for Léa"), 120),
+                me(1006, 0, L("Here's the video from Saturday for Léa"), 120, replyTo: 1001),
                 ChatMessage(id: 1007, topic: 0, date: t(119), isOutgoing: true,
                             text: FormattedText(L("Too big for Telegram, so it went through Gofile.") + "\n[fichier: https://gofile.io/d/Qp9w8eR7]")),
                 bot(1008, 0, L("Got it, I sent Léa the link with a note that it expires in 10 days."), 118),
                 me(1009, 0, L("Remind me to call mum tonight"), 30),
-                bot(1010, 0, L("Done: a reminder at 19:30 today, in Reminders on your iPhone."), 29),
+                bot(1010, 0, L("Done: a reminder at 19:30 today, in Reminders on your iPhone."), 29, replyTo: 1009),
             ],
             12: [
                 me(2001, 12, L("Can you check why the Hermes gateway restarted twice yesterday?"), 1500),
                 bot(2002, 12, L("Both restarts were launchd bringing it back after a crash in the Telegram adapter, at 14:02 and 17:45. The second log line says `RetryAfter: 29`; it hit a flood limit while editing a long draft. I've opened a fix on a branch: `fix/telegram-flood-wait`."), 1495),
+                bot(2003, 12, L("Merged: the fix is on main, and the gateway hasn't restarted since."), 600, replyTo: 1999),
             ],
             31: [
                 bot(3001, 31, L("This sub-chat is encrypted. Your 2025 statements are in the vault; I've filled in the first two sections of the form."), 3000),
