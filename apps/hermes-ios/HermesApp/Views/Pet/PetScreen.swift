@@ -72,34 +72,34 @@ struct PetScreen: View {
 
     private var actions: some View {
         let available = store.pet.map(PetAction.available(for:)) ?? [.feed, .play, .sleep]
-        return GlassEffectContainer(spacing: 12) {
-            HStack(spacing: 12) {
-                ForEach(available) { action in
-                    Button { perform(action) } label: {
-                        VStack(spacing: 6) {
-                            if busy == action { ProgressView() } else { Image(systemName: action.symbol).font(.title2) }
-                            Text(action.title).font(.subheadline.weight(.semibold))
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 64)
+        // In the scrolling content: bordered buttons; glass stays on the bars above it.
+        return HStack(spacing: 12) {
+            ForEach(available) { action in
+                Button { perform(action) } label: {
+                    VStack(spacing: 6) {
+                        if busy == action { ProgressView() } else { Image(systemName: action.symbol).font(.title2) }
+                        Text(action.title).font(.subheadline.weight(.semibold))
                     }
-                    .buttonStyle(.glass)
-                    .disabled(busy != nil || store.pet == nil)
+                    .frame(maxWidth: .infinity, minHeight: 64)
                 }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.roundedRectangle(radius: 18))
+                .disabled(busy != nil || store.pet == nil)
             }
         }
     }
 
     private var level: some View {
         HStack(spacing: 16) {
-            ZStack {
-                Circle().stroke(.quaternary, lineWidth: 8)
-                Circle().trim(from: 0, to: store.pet?.levelProgress ?? 0)
-                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                Text("\(store.pet?.level ?? 1)").font(.title2.weight(.bold)).fontDesign(.rounded)
+            Gauge(value: store.pet?.levelProgress ?? 0) {
+                EmptyView()
+            } currentValueLabel: {
+                Text(store.pet?.level ?? 1, format: .number).fontWeight(.bold).fontDesign(.rounded)
             }
-            .frame(width: 64, height: 64)
+            .gaugeStyle(.accessoryCircularCapacity)
+            .tint(.accentColor)
             .animation(.smooth, value: store.pet?.levelProgress)
+            .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Level \(store.pet?.level ?? 1)").font(.headline).fontDesign(.rounded)
                 if let pet = store.pet {
@@ -137,14 +137,10 @@ struct NeedBar: View {
                 Spacer()
                 Text(value, format: .percent.precision(.fractionLength(0))).font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
             }
-            GeometryReader { geo in
-                Capsule().fill(.quaternary)
-                    .overlay(alignment: .leading) {
-                        Capsule().fill(value < 0.25 ? Color.red.gradient : color.gradient).frame(width: geo.size.width * value)
-                    }
-            }
-            .frame(height: 10)
-            .animation(.smooth, value: value)
+            Gauge(value: value) { EmptyView() }
+                .gaugeStyle(.linearCapacity)
+                .tint(value < 0.25 ? Color.red : color)
+                .animation(.smooth, value: value)
         }
         .accessibilityElement(children: .combine)
     }
@@ -170,7 +166,7 @@ struct GeneratePetSheet: View {
             .navigationTitle("Hatch a Pet")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(role: .cancel) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Hatch") {
                         var req = AppRequest.petGenerate(prompt: prompt)

@@ -68,7 +68,7 @@ struct WelcomeStep: View {
             Button(action: next) {
                 Text("Continue with Telegram").font(.headline).frame(maxWidth: .infinity, minHeight: 34)
             }
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.borderedProminent)
             .controlSize(.large)
         }
     }
@@ -90,14 +90,14 @@ struct PhoneStep: View {
                 .font(.title2.monospacedDigit())
                 .multilineTextAlignment(.center)
                 .padding(.vertical, 14)
-                .glassEffect(in: .rect(cornerRadius: 18))
+                .background(.fill.tertiary, in: .rect(cornerRadius: 18))
                 .focused($focused)
                 .onSubmit(submit)
             if let error { Text(error).font(.footnote).foregroundStyle(.red) }
             Button(action: submit) {
                 HStack { if busy { ProgressView() }; Text("Next").font(.headline) }.frame(maxWidth: .infinity, minHeight: 34)
             }
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(busy || phone.filter(\.isNumber).count < 6)
         }
@@ -137,7 +137,7 @@ struct CodeStep: View {
                 .font(.system(size: 34, weight: .semibold, design: .monospaced))
                 .multilineTextAlignment(.center)
                 .padding(.vertical, 12)
-                .glassEffect(in: .rect(cornerRadius: 18))
+                .background(.fill.tertiary, in: .rect(cornerRadius: 18))
                 .focused($focused)
                 .keyframeAnimator(initialValue: 0.0, trigger: shake) { view, x in view.offset(x: x) } keyframes: { _ in
                     KeyframeTrack { SpringKeyframe(12, duration: 0.08); SpringKeyframe(-10, duration: 0.08); SpringKeyframe(6, duration: 0.08); SpringKeyframe(0, duration: 0.1) }
@@ -153,11 +153,11 @@ struct CodeStep: View {
             HStack(spacing: 12) {
                 if via == "Telegram", let tg = URL(string: "tg://") {
                     Link(destination: tg) { Label("Open Telegram", systemImage: "paperplane") }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.bordered)
                 }
                 if let nextVia {
                     Button("Send by \(nextVia)") { Task { try? await store.resendCode() } }
-                        .buttonStyle(.glass)
+                        .buttonStyle(.bordered)
                 }
             }
         }
@@ -197,14 +197,14 @@ struct PasswordStep: View {
                 .textContentType(.password)
                 .font(.title3)
                 .padding(14)
-                .glassEffect(in: .rect(cornerRadius: 18))
+                .background(.fill.tertiary, in: .rect(cornerRadius: 18))
                 .focused($focused)
                 .onSubmit(submit)
             if let error { Text(error).font(.footnote).foregroundStyle(.red) }
             Button(action: submit) {
                 HStack { if busy { ProgressView() }; Text("Sign In").font(.headline) }.frame(maxWidth: .infinity, minHeight: 34)
             }
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(busy || password.isEmpty)
             Link("Forgot your password?", destination: URL(string: "https://telegram.org/faq#q-i-forgot-my-password")!)

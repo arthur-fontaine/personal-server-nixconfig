@@ -6,6 +6,7 @@ import SwiftUI
 struct CallView: View {
     @Environment(HermesStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorSchemeContrast) private var contrast
     @State private var session: CallSession?
     @State private var started = Date()
 
@@ -23,7 +24,7 @@ struct CallView: View {
                         .animation(.smooth(duration: 0.15), value: session?.level)
                     PetSpriteView(animation: animation, size: 200)
                 }
-                Text(phaseLabel).font(.title3.weight(.medium)).foregroundStyle(.white.opacity(0.85))
+                Text(phaseLabel).font(.title3.weight(.medium)).foregroundStyle(.white.opacity(dim(0.85)))
                     .contentTransition(.opacity)
                 captions
                 Spacer()
@@ -49,10 +50,10 @@ struct CallView: View {
             Text(store.pet?.name ?? "Hermes").font(.title.weight(.semibold)).fontDesign(.rounded).foregroundStyle(.white)
             TimelineView(.periodic(from: started, by: 1)) { ctx in
                 Text(Duration.seconds(ctx.date.timeIntervalSince(started)).formatted(.time(pattern: .minuteSecond)))
-                    .font(.subheadline.monospacedDigit()).foregroundStyle(.white.opacity(0.7))
+                    .font(.subheadline.monospacedDigit()).foregroundStyle(.white.opacity(dim(0.7)))
             }
             if let name = session?.engineName, !name.isEmpty {
-                Text(name).font(.caption).foregroundStyle(.white.opacity(0.5))
+                Text(name).font(.caption).foregroundStyle(.white.opacity(dim(0.5)))
             }
         }
     }
@@ -64,7 +65,7 @@ struct CallView: View {
                     ForEach(session?.lines.suffix(6) ?? []) { line in
                         Text(line.text)
                             .font(line.fromUser ? .callout : .body)
-                            .foregroundStyle(line.fromUser ? .white.opacity(0.6) : .white)
+                            .foregroundStyle(line.fromUser ? .white.opacity(dim(0.6)) : .white)
                             .frame(maxWidth: .infinity, alignment: line.fromUser ? .trailing : .leading)
                             .id(line.id)
                     }
@@ -101,6 +102,9 @@ struct CallView: View {
         .glassEffect(active ? .regular.tint(.white).interactive() : .regular.interactive(), in: .circle)
         .accessibilityLabel(label)
     }
+
+    /// Increase Contrast: secondary text on the dark gradient gets nearer to white.
+    private func dim(_ opacity: Double) -> Double { contrast == .increased ? min(1, opacity + 0.3) : opacity }
 
     private var animation: PetAnimation {
         switch session?.phase {

@@ -129,11 +129,15 @@ struct ChatView: View {
                 }
             }
         }
-        ToolbarItemGroup(placement: .primaryAction) {
-            if topic == .main {
+        if topic == .main {
+            ToolbarItem(placement: .primaryAction) {
                 Button { model.startCall() } label: { Label("Call", systemImage: "phone") }
             }
-            if sizeClass == .regular {
+        }
+        if sizeClass == .regular {
+            // Calling and the inspector are unrelated: two glass groups, not one.
+            if topic == .main { ToolbarSpacer(.fixed, placement: .primaryAction) }
+            ToolbarItem(placement: .primaryAction) {
                 Button { showInspector.toggle() } label: { Label("Details", systemImage: "sidebar.trailing") }
             }
         }

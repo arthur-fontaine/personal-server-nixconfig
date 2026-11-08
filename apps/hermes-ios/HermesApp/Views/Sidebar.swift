@@ -9,19 +9,15 @@ struct Sidebar: View {
     var body: some View {
         List(selection: selectionBinding) {
             Section {
-                // A button, not a selectable row: the card is its own highlight.
-                Button { model.section = .pet } label: {
-                    PetCard(selected: model.section == .pet)
-                }
-                .buttonStyle(.plain)
-                .listRowInsets(EdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4))
-                .listRowBackground(Color.clear)
+                // A selectable row like the others: the list draws its selection.
+                PetCard().tag(SidebarItem.section(.pet))
             }
             Section("Chats") {
                 ThreadRow(thread: store.mainThread)
+                    .badge(store.mainThread.unreadCount)
                     .tag(SidebarItem.topic(.main))
                 ForEach(store.threads) { thread in
-                    ThreadRow(thread: thread).tag(SidebarItem.topic(thread.id))
+                    ThreadRow(thread: thread).badge(thread.unreadCount).tag(SidebarItem.topic(thread.id))
                 }
                 Button { model.showNewSubchat = true } label: {
                     Label("New Sub-chat", systemImage: "plus.bubble")
@@ -61,10 +57,9 @@ struct Sidebar: View {
     }
 }
 
-/// The pet at a glance: mood and needs; a tap opens the Pet section.
+/// The pet at a glance: mood and needs; selecting it opens the Pet section.
 struct PetCard: View {
     @Environment(HermesStore.self) private var store
-    var selected = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -86,10 +81,8 @@ struct PetCard: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(10)
-        .background(selected ? AnyShapeStyle(Color.accentColor.opacity(0.18)) : AnyShapeStyle(.fill.quinary), in: .rect(cornerRadius: 18))
+        .padding(.vertical, 6)
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
@@ -99,13 +92,12 @@ struct NeedPip: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            Image(systemName: symbol).font(.system(size: 9, weight: .bold))
-            Capsule().fill(.quaternary).frame(width: 22, height: 4)
-                .overlay(alignment: .leading) {
-                    Capsule().fill(value < 0.25 ? Color.red : .accentColor).frame(width: 22 * value, height: 4)
-                }
+            Image(systemName: symbol).font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
+            // ProgressView, not Gauge: at this size the capacity gauge draws a knob.
+            ProgressView(value: value)
+                .tint(value < 0.25 ? Color.red : .accentColor)
+                .frame(width: 22)
         }
-        .foregroundStyle(.secondary)
     }
 }
 
@@ -119,10 +111,12 @@ struct ThreadList: View {
         List {
             Section {
                 Button { selection = .main } label: { ThreadRow(thread: store.mainThread) }
+                    .badge(store.mainThread.unreadCount)
             }
             Section("Sub-chats") {
                 ForEach(store.threads) { thread in
                     Button { selection = thread.id } label: { ThreadRow(thread: thread) }
+                        .badge(thread.unreadCount)
                 }
                 Button { model.showNewSubchat = true } label: {
                     Label("New Sub-chat", systemImage: "plus.bubble")
@@ -155,10 +149,6 @@ struct ThreadRow: View {
                     }
                 }
                 Text(preview).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-            }
-            if thread.unreadCount > 0 {
-                Text("\(thread.unreadCount)").font(.caption2.weight(.bold)).foregroundStyle(.white)
-                    .padding(.horizontal, 6).padding(.vertical, 2).background(Capsule().fill(Color.accentColor))
             }
         }
         .contentShape(.rect)

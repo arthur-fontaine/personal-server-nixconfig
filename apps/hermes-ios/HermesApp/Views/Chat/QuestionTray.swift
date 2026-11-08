@@ -77,20 +77,20 @@ struct QuestionCard: View {
         let opts = question.options
         let layout = opts.count <= 4 && opts.allSatisfy { $0.label.count <= 12 }
             ? AnyLayout(HStackLayout(spacing: 8)) : AnyLayout(VStackLayout(spacing: 8))
-        GlassEffectContainer(spacing: 8) {
-            layout {
-                ForEach(opts) { option in
-                    Button { answer(option) } label: {
-                        HStack(spacing: 6) {
-                            if pressing == option.id { ProgressView().controlSize(.small) }
-                            Text(option.label).font(.subheadline.weight(.semibold)).lineLimit(2)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 36)
+        // The card is glass: its buttons are filled, never glass on glass (as in system alerts).
+        layout {
+            ForEach(opts) { option in
+                Button { answer(option) } label: {
+                    HStack(spacing: 6) {
+                        if pressing == option.id { ProgressView().controlSize(.small) }
+                        Text(option.label).font(.subheadline.weight(.semibold)).lineLimit(2)
                     }
-                    .buttonStyle(option.isDestructive || option.id != opts.first?.id ? AnyButtonStyle(.glass) : AnyButtonStyle(.glassProminent))
-                    .tint(option.isDestructive ? .red : nil)
-                    .disabled(pressing != nil)
+                    .frame(maxWidth: .infinity, minHeight: 36)
                 }
+                .buttonStyle(option.isDestructive || option.id != opts.first?.id ? AnyButtonStyle(.bordered) : AnyButtonStyle(.borderedProminent))
+                .buttonBorderShape(.capsule)
+                .tint(option.isDestructive ? .red : nil)
+                .disabled(pressing != nil)
             }
         }
     }
@@ -127,7 +127,7 @@ struct QuestionCard: View {
     }
 }
 
-/// Picks a glass style at runtime (the first option is the prominent one).
+/// Picks a button style at runtime (the first option is the prominent one).
 struct AnyButtonStyle: PrimitiveButtonStyle {
     private let make: (Configuration) -> AnyView
 

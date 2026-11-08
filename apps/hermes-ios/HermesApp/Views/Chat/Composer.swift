@@ -38,9 +38,10 @@ struct Composer: View {
                             Label("Photos & Videos", systemImage: "photo.on.rectangle")
                         }
                     } label: {
-                        Image(systemName: "plus").font(.title3.weight(.medium)).frame(width: 44, height: 44)
+                        Image(systemName: "plus").font(.title3.weight(.medium)).frame(width: 32, height: 32)
                     }
-                    .glassEffect(.regular.interactive(), in: .circle)
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
                     .accessibilityLabel("Attach")
 
                     HStack(alignment: .bottom) {
@@ -54,14 +55,15 @@ struct Composer: View {
                                 if old.isEmpty, new == "/" { text = ""; model.showCommands = true }
                                 typingPing()
                             }
+                        // Inside the glass field: filled, as Messages' send button (never glass on glass).
                         Button(action: send) {
                             Image(systemName: sending ? "ellipsis" : "arrow.up")
                                 .font(.body.weight(.bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 34, height: 34)
-                                .background(Circle().fill(canSend ? Color.accentColor : Color.gray.opacity(0.4)))
+                                .frame(width: 22, height: 22)
                                 .contentTransition(.symbolEffect(.replace))
                         }
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.circle)
                         .disabled(!canSend)
                         .keyboardShortcut(.return, modifiers: .command)
                         .padding(5)

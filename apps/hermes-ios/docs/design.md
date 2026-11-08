@@ -14,7 +14,7 @@ Hermes** (is it working, is the server fine, how's the pet).
 | Telegram | Speed: instant cold start from a local DB, sticky composer, topics as a list | TDLib's local database for cold start; topics → sub-chats | Bubbles with tails and timestamps on every message, the chat list (we have one chat) |
 | Codex app | Approvals that show *what* will happen in plain words, raw command on demand; the pet reacting to the agent's state | Approval card (summary first, command collapsible), pet as the agent's mood | IDE-ish panes |
 | Things 3 | Calm surfaces, one accent colour, delight in small motion (the checkbox) | Restraint: one accent, white space, spring on completion | — |
-| Apple HIG, iOS 26 | Liquid Glass for the control layer only, content edge to edge; `NavigationSplitView` that collapses to a stack; standard bars pick up the material themselves | Standard bars/sheets/toolbars, glass only on our floating controls (composer, question tray, pet actions) | Custom bar backgrounds (they fight the scroll-edge effect) |
+| Apple HIG, iOS 26 | Liquid Glass for the control layer only, content edge to edge; `NavigationSplitView` that collapses to a stack; standard bars pick up the material themselves | Standard bars/sheets/toolbars, glass only on our floating controls (composer, question tray, call controls) | Custom bar backgrounds (they fight the scroll-edge effect) |
 
 ## Principles
 
@@ -29,8 +29,14 @@ Hermes** (is it working, is the server fine, how's the pet).
    everywhere: the chat header, the call screen, the widget, the Live
    Activity, the app icon. No spinners where the pet can say it.
 4. **Glass for controls, never for content.** System bars as they come; our
-   floating controls (composer, question tray, call controls, pet actions) in
-   one `GlassEffectContainer` each.
+   floating controls (composer, question tray, call controls) in one
+   `GlassEffectContainer` each. Buttons that scroll with the content (inline
+   keyboards, pet actions, the login steps) are bordered, and buttons inside a
+   glass surface are filled, never glass on glass (as in system alerts). Native
+   components over drawn ones: the sidebar's own selection, `Gauge` and
+   `ProgressView` for needs and level, `.badge` for unread counts and pending
+   questions, the tab bar's bottom accessory for Hermes' status away from the
+   chat.
 5. **Fast and honest.** Cold start shows the last messages from TDLib's DB
    before the network is up; a thin status line says "Connecting…" rather than
    a blocking spinner.
@@ -54,7 +60,9 @@ Hidden: the "App" topic (machine traffic)
 
 - `TabView` with four tabs: **Chat**, **Pet**, **Dashboard**, **Settings**,
   with iOS 26's tab bar that minimizes on scroll. The call button sits in the
-  chat's toolbar.
+  chat's toolbar. The Chat tab's badge counts Hermes' open questions; on the
+  other tabs, while Hermes works or waits, the tab bar's bottom accessory shows
+  its status (or its question) and opens that chat (iOS 26.1+).
 - Chat tab = `NavigationStack`: root is the **main chat** (the daily case: one
   tap fewer). The title menu (`Hermes ▾`) opens the sub-chat list as a sheet
   with detents; picking one pushes it.
@@ -166,7 +174,7 @@ Hidden: the "App" topic (machine traffic)
   width.
 - Time stamps are not on every message: a centred day/time separator when the
   gap is > 20 min (Messages-style).
-- Inline keyboards: a row of glass buttons under the message; once Hermes
+- Inline keyboards: a row of bordered buttons under the message; once Hermes
   edits the card (answered), the buttons go.
 - `[fichier: url]`: a file card (icon by extension, name, service, *Open*),
   on both sides; the marker itself is hidden from the text.
