@@ -3,7 +3,7 @@ import Foundation
 /// The machine-readable traffic in the hidden "App" topic (hermes-app-work/app-protocol.md).
 /// Each message is one JSON object in a ```json block, with `v` and `type`.
 public enum AppProtocol {
-    public static let version = 2
+    public static let version = 3
     public static let topicName = "App"
 
     /// Pulls the JSON object out of a message: the content of the first ```json fence, else the
@@ -73,10 +73,6 @@ public struct AppRequest: Sendable, Equatable {
     }
 
     public static let statsRefresh = AppRequest(type: "stats.refresh")
-    public static let petFeed = AppRequest(type: "pet.feed")
-    public static let petPlay = AppRequest(type: "pet.play")
-    public static let petSleep = AppRequest(type: "pet.sleep")
-    public static let petWake = AppRequest(type: "pet.wake")
     public static let appReinstall = AppRequest(type: "app.reinstall")
     /// While on, Hermes answers every owner turn in its spoken style (protocol §6).
     public static func callState(active: Bool) -> AppRequest {
@@ -322,6 +318,8 @@ public struct PendingQuestion: Sendable, Codable, Equatable, Identifiable {
     }
 }
 
+/// The pet in the state slot (protocol v3, §5): who it is and what it shows. Fields of
+/// protocol v2's tamagotchi (needs, xp, level, asleep) are ignored if an older server sends them.
 public struct PetState: Sendable, Codable, Equatable {
     public var id: String
     public var name: String
@@ -330,22 +328,17 @@ public struct PetState: Sendable, Codable, Equatable {
     public var spriteFileID: String?
     public var spriteMessageID: MessageID?
     public var manifest: PetManifest?
-    public var mood: String?
+    /// The backend's mood; `HermesStore.petMood` combines it with the live status.
+    public var mood: PetMood?
+    /// When a `happy`/`confused` beat ends; `nil` otherwise.
+    public var moodUntil: Date?
     /// The sprite row the backend wants played (Hermes' own status mapping).
     public var animation: PetAnimation?
-    public var hunger: Double
-    public var energy: Double
-    public var happiness: Double
-    public var xp: Int
-    public var level: Int
-    public var xpForNextLevel: Int?
-    public var asleep: Bool
     public var updatedAt: Date?
 
     public init(id: String, name: String, version: Int = 1, spriteURL: URL? = nil, spriteFileID: String? = nil,
-                spriteMessageID: MessageID? = nil, manifest: PetManifest? = nil, mood: String? = nil,
-                hunger: Double = 0.3, energy: Double = 0.8, happiness: Double = 0.7, xp: Int = 0, level: Int = 1,
-                xpForNextLevel: Int? = nil, asleep: Bool = false, updatedAt: Date? = nil) {
+                spriteMessageID: MessageID? = nil, manifest: PetManifest? = nil, mood: PetMood? = nil,
+                moodUntil: Date? = nil, animation: PetAnimation? = nil, updatedAt: Date? = nil) {
         self.id = id
         self.name = name
         self.version = version
@@ -354,20 +347,14 @@ public struct PetState: Sendable, Codable, Equatable {
         self.spriteMessageID = spriteMessageID
         self.manifest = manifest
         self.mood = mood
-        self.animation = nil
-        self.hunger = hunger
-        self.energy = energy
-        self.happiness = happiness
-        self.xp = xp
-        self.level = level
-        self.xpForNextLevel = xpForNextLevel
-        self.asleep = asleep
+        self.moodUntil = moodUntil
+        self.animation = animation
         self.updatedAt = updatedAt
     }
 
     enum CodingKeys: String, CodingKey {
         case id, name, version, spriteURL = "sprite_url", spriteFileID = "file_id", spriteMessageID = "sprite_message_id",
-             manifest, mood, animation, hunger, energy, happiness, xp, level, xpForNextLevel = "xp_next", asleep, updatedAt = "updated_at"
+             manifest, mood, moodUntil = "mood_until", animation, updatedAt = "updated_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -379,28 +366,10 @@ public struct PetState: Sendable, Codable, Equatable {
         spriteFileID = (try? c.decodeIfPresent(String.self, forKey: .spriteFileID)) ?? c.decodeInt64(.spriteFileID).map(String.init)
         spriteMessageID = c.decodeInt64(.spriteMessageID)
         manifest = try? c.decodeIfPresent(PetManifest.self, forKey: .manifest)
-        mood = try? c.decodeIfPresent(String.self, forKey: .mood)
+        mood = (try? c.decodeIfPresent(String.self, forKey: .mood)).map(PetMood.init(reported:))
+        moodUntil = c.decodeFlexibleDate(.moodUntil)
         animation = (try? c.decodeIfPresent(String.self, forKey: .animation)).flatMap(PetAnimation.init(alias:))
-        // Gauges are 0…1; a backend sending 0…100 is scaled.
-        hunger = c.decodeGauge(.hunger) ?? 0.3
-        energy = c.decodeGauge(.energy) ?? 0.8
-        happiness = c.decodeGauge(.happiness) ?? 0.7
-        xp = c.decodeInt64(.xp).map(Int.init) ?? 0
-        level = c.decodeInt64(.level).map(Int.init) ?? 1
-        xpForNextLevel = c.decodeInt64(.xpForNextLevel).map(Int.init)
-        asleep = (try? c.decode(Bool.self, forKey: .asleep)) ?? false
         updatedAt = c.decodeFlexibleDate(.updatedAt)
-    }
-
-    /// Total xp needed to reach `level` (protocol §5: level n needs 100·n·(n+1)/2).
-    public static func totalXP(forLevel level: Int) -> Int { 100 * level * (level + 1) / 2 }
-
-    /// Progress within the current level, 0…1.
-    public var levelProgress: Double {
-        let start = Double(level > 1 ? Self.totalXP(forLevel: level - 1) : 0)
-        let next = Double(xpForNextLevel ?? Self.totalXP(forLevel: level))
-        guard next > start else { return 0 }
-        return min(max((Double(xp) - start) / (next - start), 0), 1)
     }
 }
 

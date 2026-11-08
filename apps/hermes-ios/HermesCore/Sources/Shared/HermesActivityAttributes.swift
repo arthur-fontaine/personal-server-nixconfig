@@ -23,6 +23,22 @@ public struct HermesActivityAttributes: ActivityAttributes {
             self.question = question
             self.petMood = petMood
         }
+
+        enum CodingKeys: String, CodingKey { case status, task, chat, chatName, since, question, petMood }
+
+        /// A backend push (protocol §4) carries only `status`, `task`, `chat`, `question`: the
+        /// rest gets defaults, the pet's mood from the status.
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            status = (try? c.decode(AgentStatus.self, forKey: .status)) ?? .idle
+            task = try? c.decodeIfPresent(String.self, forKey: .task)
+            chat = (try? c.decodeIfPresent(TopicID.self, forKey: .chat)) ?? .main
+            chatName = try? c.decodeIfPresent(String.self, forKey: .chatName)
+            since = (try? c.decodeIfPresent(Date.self, forKey: .since)) ?? .now
+            question = try? c.decodeIfPresent(ActivityQuestion.self, forKey: .question)
+            petMood = (try? c.decodeIfPresent(PetMood.self, forKey: .petMood))
+                ?? PetMood(agent: status, reported: nil, until: nil)
+        }
     }
 
     public var petName: String
@@ -74,4 +90,3 @@ public struct ActivityQuestion: Codable, Hashable, Sendable {
     }
 }
 
-extension PetMood: Hashable {}
