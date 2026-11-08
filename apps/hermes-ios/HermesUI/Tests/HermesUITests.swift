@@ -113,3 +113,14 @@ struct TokenTests {
         #expect(Block.card.points >= 20)
     }
 }
+
+struct FileNameBreakTests {
+    @Test func breaksAtSeparatorsAndDigitsFirst() {
+        let z = "\u{200B}"
+        #expect(FileCard.breakableAnywhere("Statements-2025.pdf") == "Statements-\(z)2025.\(z)pdf")
+        #expect(FileCard.breakableAnywhere("Saturday.mov") == "Saturday.\(z)mov")
+        #expect(FileCard.breakableAnywhere("photoBackup") == "photo\(z)Backup")
+        // A segment longer than a line at AX5 may break anywhere.
+        #expect(FileCard.breakableAnywhere("Supercalifragilistic.txt").hasPrefix("S\(z)u\(z)p"))
+    }
+}

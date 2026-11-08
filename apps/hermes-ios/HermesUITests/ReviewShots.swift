@@ -61,17 +61,14 @@ final class ReviewShots: XCTestCase {
         }
     }
 
+    /// iPhone landscape as ruled for design-rules 7.2: the real root view hosted at 874 × 402 pt
+    /// with compact height (`-hostedLandscape`); the script turns the capture upright.
     func testChatLandscape() throws {
-        // Rotated before the launch (launch() would put an iPhone back in portrait).
-        XCUIDevice.shared.orientation = .landscapeLeft
-        let app = XCUIApplication()
-        app.launchArguments = ["-demo", "-scene", "review"] + extra
-        app.launch()
+        let app = launch(["-scene", "review", "-hostedLandscape"])
         let card = app.descendants(matching: .any)["chat.approval"]
         XCTAssertTrue(card.waitForExistence(timeout: 10))
         settle(card)
         try shot("chat-landscape")
-        XCUIDevice.shared.orientation = .portrait
     }
 
     func testChatsMenu() throws {

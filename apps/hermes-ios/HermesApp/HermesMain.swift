@@ -12,6 +12,7 @@ struct HermesMain: App {
                 .environment(model)
                 .environment(model.store)
                 .modifier(CompactWidthHook())
+                .modifier(HostedLandscapeHook())
                 .onOpenURL { model.open($0) }
         }
         .commands { HermesCommands(model: model) }
@@ -59,5 +60,31 @@ struct CompactWidthHook: ViewModifier {
     static let on = ProcessInfo.processInfo.arguments.contains("-compactWidth")
     func body(content: Content) -> some View {
         if Self.on { content.environment(\.horizontalSizeClass, .compact) } else { content }
+    }
+}
+
+/// `-hostedLandscape`: the real root view hosted at an iPhone 17 Pro's landscape size (874 × 402 pt,
+/// compact width and height, its landscape safe areas, no status bar), rotated into the portrait
+/// screen so a review capture shows it (design-rules 7.2: the simulator here doesn't rotate apps;
+/// a real-device check comes later). Review-only; numbers are the device's, not design tokens.
+struct HostedLandscapeHook: ViewModifier {
+    static let on = ProcessInfo.processInfo.arguments.contains("-hostedLandscape")
+
+    func body(content: Content) -> some View {
+        if Self.on {
+            GeometryReader { geo in
+                content
+                    .environment(\.verticalSizeClass, .compact)
+                    .environment(\.horizontalSizeClass, .compact)
+                    .padding(EdgeInsets(top: 0, leading: 62, bottom: 21, trailing: 62))
+                    .frame(width: 874, height: 402)
+                    .rotationEffect(.degrees(90))
+                    .frame(width: geo.size.width, height: geo.size.height)
+            }
+            .ignoresSafeArea()
+            .statusBarHidden()
+        } else {
+            content
+        }
     }
 }

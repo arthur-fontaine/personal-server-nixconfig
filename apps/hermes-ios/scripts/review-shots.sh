@@ -34,6 +34,7 @@ run "$pad" dark dark "" testChat
 run "$pad" light compact "-compactWidth" testChat
 run "$phone" light light "" testChatLandscape
 run "$phone" dark dark "" testChatLandscape
+run "$phone" light ax5 "$AX" testChatLandscape
 # Accessibility settings (design-rules 7.1): Increase Contrast through simctl, Reduce
 # Transparency and Reduce Motion through the simulator's accessibility defaults.
 xcrun simctl ui "$phone" increase_contrast enabled
@@ -54,6 +55,10 @@ python3 -I - "$out" <<'PY'
 import sys, glob
 from PIL import Image
 for f in glob.glob(sys.argv[1] + "/ipad-*.png"):
+    im = Image.open(f)
+    if im.height > im.width: im.rotate(90, expand=True).save(f)
+# The hosted iPhone landscape is drawn rotated a quarter turn clockwise: turn it upright.
+for f in glob.glob(sys.argv[1] + "/iphone-chat-landscape-*.png"):
     im = Image.open(f)
     if im.height > im.width: im.rotate(90, expand=True).save(f)
 PY

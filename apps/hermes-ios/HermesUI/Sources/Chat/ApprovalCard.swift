@@ -136,8 +136,29 @@ public struct FileCard: View {
         }
     }
 
-    /// Zero-width spaces between characters: line breaks without hyphenation.
+    /// Where a file name may break, without hyphens (zero-width spaces): after a separator
+    /// (`-`, `_`, `.`, space) and where letters meet digits or a capital follows a lower case —
+    /// "Statements-" / "2025.pdf"; inside a segment longer than `longSegment`, anywhere.
     static func breakableAnywhere(_ s: String) -> String {
-        s.map(String.init).joined(separator: "\u{200B}")
+        let zwsp = "\u{200B}"
+        var segments: [String] = [], current = ""
+        var previous: Character?
+        for c in s {
+            if let p = previous {
+                let boundary = "-_. ".contains(p)
+                    || (p.isLetter && c.isNumber) || (p.isNumber && c.isLetter)
+                    || (p.isLowercase && c.isUppercase)
+                if boundary { segments.append(current); current = "" }
+            }
+            current.append(c)
+            previous = c
+        }
+        segments.append(current)
+        return segments.map { seg in
+            seg.count > longSegment ? seg.map(String.init).joined(separator: zwsp) : seg
+        }.joined(separator: zwsp)
     }
+
+    /// A segment this long may not fit a line at accessibility sizes: it breaks anywhere.
+    static let longSegment = 14
 }
