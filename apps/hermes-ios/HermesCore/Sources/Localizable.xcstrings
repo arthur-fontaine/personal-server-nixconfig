@@ -1,0 +1,1216 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "24 h": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "24 h"
+          }
+        }
+      }
+    },
+    "30 d": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 j"
+          }
+        }
+      }
+    },
+    "7 d": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 j"
+          }
+        }
+      }
+    },
+    "A prompt in a separate background session": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une requête dans une session à part, en arrière-plan"
+          }
+        }
+      }
+    },
+    "A small winged messenger.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un petit messager ailé."
+          }
+        }
+      }
+    },
+    "A topic with its own memory and rules": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un sujet avec sa propre mémoire et ses règles"
+          }
+        }
+      }
+    },
+    "Allowed": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisé"
+          }
+        }
+      }
+    },
+    "Allowed once": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisé une fois"
+          }
+        }
+      }
+    },
+    "Always": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toujours"
+          }
+        }
+      }
+    },
+    "Ask": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demander"
+          }
+        }
+      }
+    },
+    "Ask without interrupting the turn": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demande sans interrompre le tour en cours"
+          }
+        }
+      }
+    },
+    "Asleep": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endormi"
+          }
+        }
+      }
+    },
+    "Auto": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto"
+          }
+        }
+      }
+    },
+    "Back up one turn": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revient un tour en arrière"
+          }
+        }
+      }
+    },
+    "Both restarts were launchd bringing it back after a crash in the Telegram adapter, at 14:02 and 17:45. The second log line says `RetryAfter: 29`; it hit a flood limit while editing a long draft. I've opened a fix on a branch: `fix/telegram-flood-wait`.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les deux redémarrages, à 14:02 et 17:45, viennent de launchd qui l’a relancée après un plantage de l’adaptateur Telegram. La deuxième ligne du journal dit `RetryAfter: 29` : elle a atteint une limite de débit en modifiant un long brouillon. J’ai ouvert un correctif sur une branche : `fix/telegram-flood-wait`."
+          }
+        }
+      }
+    },
+    "Can you check why the Hermes gateway restarted twice yesterday?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu peux regarder pourquoi la passerelle Hermes a redémarré deux fois hier ?"
+          }
+        }
+      }
+    },
+    "Change a rule": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier une règle"
+          }
+        }
+      }
+    },
+    "Content": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content"
+          }
+        }
+      }
+    },
+    "Couldn't find @%@ on Telegram.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de trouver @%@ sur Telegram."
+          }
+        }
+      }
+    },
+    "Dangerous command: restic forget --keep-within 90d --prune": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commande dangereuse : restic forget --keep-within 90d --prune"
+          }
+        }
+      }
+    },
+    "Delete backup snapshots older than 90 days to free about 212 GB on the external disk": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer les instantanés de sauvegarde de plus de 90 jours pour libérer environ 212 Go sur le disque externe"
+          }
+        }
+      }
+    },
+    "Delete the topic and its memory": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprime le sujet et sa mémoire"
+          }
+        }
+      }
+    },
+    "Denied": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refusé"
+          }
+        }
+      }
+    },
+    "Deny": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refuser"
+          }
+        }
+      }
+    },
+    "Done: a reminder at 19:30 today, in Reminders on your iPhone.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "C’est fait : un rappel à 19:30 aujourd’hui, dans Rappels sur ton iPhone."
+          }
+        }
+      }
+    },
+    "Emergency stop": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêt d’urgence"
+          }
+        }
+      }
+    },
+    "End sub-chat": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminer la sous-discussion"
+          }
+        }
+      }
+    },
+    "End this sub-chat? Its topic and memory are deleted.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminer cette sous-discussion ? Son sujet et sa mémoire seront supprimés."
+          }
+        }
+      }
+    },
+    "Error": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erreur"
+          }
+        }
+      }
+    },
+    "Every action but reads waits for your yes.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toute action autre qu’une lecture attend ton accord."
+          }
+        }
+      }
+    },
+    "Feed": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nourrir"
+          }
+        }
+      }
+    },
+    "Find a quiet place to stay near Alfama, 3 nights from the 14th": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trouve un logement calme près d’Alfama, 3 nuits à partir du 14"
+          }
+        }
+      }
+    },
+    "Forget this sub-chat's key until unlocked": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oublie la clé de cette sous-discussion jusqu’au prochain déverrouillage"
+          }
+        }
+      }
+    },
+    "Good morning! Three things overnight: the **nightly backup failed** at 03:12, Léa replied about Saturday, and your Lisbon flight is now boarding at gate 34 on Thursday.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bonjour ! Trois choses cette nuit : la **sauvegarde nocturne a échoué** à 03:12, Léa a répondu pour samedi, et ton vol pour Lisbonne embarque désormais porte 34 jeudi."
+          }
+        }
+      }
+    },
+    "Got it, I sent Léa the link with a note that it expires in 10 days.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bien reçu, j’ai envoyé le lien à Léa en précisant qu’il expire dans 10 jours."
+          }
+        }
+      }
+    },
+    "Happy": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heureux"
+          }
+        }
+      }
+    },
+    "Hard at work": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En plein travail"
+          }
+        }
+      }
+    },
+    "Here's the video from Saturday for Léa": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voici la vidéo de samedi pour Léa"
+          }
+        }
+      }
+    },
+    "Hermes asks to delete backups older than ninety days. Allow?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes demande à supprimer les sauvegardes de plus de quatre-vingt-dix jours. Tu autorises ?"
+          }
+        }
+      }
+    },
+    "Hermes didn't answer in time.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes n’a pas répondu à temps."
+          }
+        }
+      }
+    },
+    "Hermes works on it across turns until reached": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes y travaille de tour en tour jusqu’à l’atteindre"
+          }
+        }
+      }
+    },
+    "Home server": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serveur maison"
+          }
+        }
+      }
+    },
+    "How hard the model thinks": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’effort de réflexion du modèle"
+          }
+        }
+      }
+    },
+    "Hungry": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Affamé"
+          }
+        }
+      }
+    },
+    "Idle": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Au repos"
+          }
+        }
+      }
+    },
+    "Kill the background processes": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrête les processus en arrière-plan"
+          }
+        }
+      }
+    },
+    "Lift the emergency stop": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lève l’arrêt d’urgence"
+          }
+        }
+      }
+    },
+    "Lisbon on Thursday: **21°C** and sunny, a light breeze off the river in the evening. Pack a thin jacket.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lisbonne jeudi : **21 °C** et du soleil, une légère brise du fleuve le soir. Prends une veste légère."
+          }
+        }
+      }
+    },
+    "Lisbon trip": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voyage à Lisbonne"
+          }
+        }
+      }
+    },
+    "Lock": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verrouiller"
+          }
+        }
+      }
+    },
+    "Memory, tools, expiry, model…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mémoire, outils, expiration, modèle…"
+          }
+        }
+      }
+    },
+    "Model": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle"
+          }
+        }
+      }
+    },
+    "Model, tokens and context": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle, jetons et contexte"
+          }
+        }
+      }
+    },
+    "Needs you": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A besoin de toi"
+          }
+        }
+      }
+    },
+    "New sub-chat": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouvelle sous-discussion"
+          }
+        }
+      }
+    },
+    "No new work until resumed": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus aucun nouveau travail jusqu’à la reprise"
+          }
+        }
+      }
+    },
+    "On it. I checked the server: CPU is at **12%**, memory at 50%, and the backup disk now has 212 GB free after last night’s prune. Nothing else needs you right now; I’ll ping you if the nightly run fails again.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Je m’en occupe. J’ai vérifié le serveur : le processeur est à **12 %**, la mémoire à 50 %, et le disque de sauvegarde a maintenant 212 Go libres après le nettoyage de cette nuit. Rien d’autre ne requiert ton attention pour l’instant ; je te préviens si la sauvegarde nocturne échoue encore."
+          }
+        }
+      }
+    },
+    "Once": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une fois"
+          }
+        }
+      }
+    },
+    "Opened a new sub-chat. You’ll find it in the sidebar.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouvelle sous-discussion ouverte. Tu la trouveras dans la barre latérale."
+          }
+        }
+      }
+    },
+    "Permission mode": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode d’autorisation"
+          }
+        }
+      }
+    },
+    "Permission mode: **%@**.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode d’autorisation : **%@**."
+          }
+        }
+      }
+    },
+    "Play": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jouer"
+          }
+        }
+      }
+    },
+    "Reading list": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À lire"
+          }
+        }
+      }
+    },
+    "Reasoning effort": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effort de réflexion"
+          }
+        }
+      }
+    },
+    "Remind me to call mum tonight": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rappelle-moi d’appeler maman ce soir"
+          }
+        }
+      }
+    },
+    "Resume work": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprendre le travail"
+          }
+        }
+      }
+    },
+    "Retry": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer"
+          }
+        }
+      }
+    },
+    "Run in background": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lancer en arrière-plan"
+          }
+        }
+      }
+    },
+    "Running tasks": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tâches en cours"
+          }
+        }
+      }
+    },
+    "Running: restic backup --retry": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En cours : restic backup --retry"
+          }
+        }
+      }
+    },
+    "Safe actions run; a reviewer judges the rest and blocks risky ones.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les actions sûres s’exécutent ; un relecteur juge le reste et bloque ce qui est risqué."
+          }
+        }
+      }
+    },
+    "Saved: “The Pragmatic Programmer”, 20th anniversary edition.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistré : « The Pragmatic Programmer », édition du 20e anniversaire."
+          }
+        }
+      }
+    },
+    "Send your last message again": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renvoie ton dernier message"
+          }
+        }
+      }
+    },
+    "Session": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session"
+          }
+        }
+      }
+    },
+    "Session status": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "État de la session"
+          }
+        }
+      }
+    },
+    "Side question": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Question en aparté"
+          }
+        }
+      }
+    },
+    "Sleep": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dormir"
+          }
+        }
+      }
+    },
+    "Sleepy": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fatigué"
+          }
+        }
+      }
+    },
+    "Something went wrong": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un problème est survenu"
+          }
+        }
+      }
+    },
+    "Standing goal": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Objectif permanent"
+          }
+        }
+      }
+    },
+    "Stop all new work until you resume?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêter tout nouveau travail jusqu’à la reprise ?"
+          }
+        }
+      }
+    },
+    "Stop background work": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêter le travail en arrière-plan"
+          }
+        }
+      }
+    },
+    "Sub-chat rules": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Règles de la sous-discussion"
+          }
+        }
+      }
+    },
+    "Taxes 2026": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impôts 2026"
+          }
+        }
+      }
+    },
+    "Telegram isn't connected yet.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telegram n’est pas encore connecté."
+          }
+        }
+      }
+    },
+    "That code expired. Ask for a new one.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce code a expiré. Demandes-en un nouveau."
+          }
+        }
+      }
+    },
+    "That code isn't right. Check it and try again.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce code n’est pas le bon. Vérifie-le et réessaie."
+          }
+        }
+      }
+    },
+    "That phone number doesn't look right.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce numéro de téléphone ne semble pas correct."
+          }
+        }
+      }
+    },
+    "The agents and tasks running now": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les agents et les tâches en cours"
+          }
+        }
+      }
+    },
+    "The external disk was full, so restic stopped before pruning:\n```\nFatal: unable to save snapshot: no space left on device\n```\nPruning snapshots older than 90 days would free about **212 GB**. Want me to do it?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le disque externe était plein, donc restic s’est arrêté avant le nettoyage :\n```\nFatal: unable to save snapshot: no space left on device\n```\nSupprimer les instantanés de plus de 90 jours libérerait environ **212 Go**. Je le fais ?"
+          }
+        }
+      }
+    },
+    "Thinking": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réfléchit"
+          }
+        }
+      }
+    },
+    "Thinking it over": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réfléchit"
+          }
+        }
+      }
+    },
+    "This button can't be pressed from here.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce bouton ne peut pas être utilisé d’ici."
+          }
+        }
+      }
+    },
+    "This chat now answers with **%@**.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette discussion répond désormais avec **%@**."
+          }
+        }
+      }
+    },
+    "This file is too big for Telegram.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce fichier est trop volumineux pour Telegram."
+          }
+        }
+      }
+    },
+    "This number is banned from Telegram.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce numéro est banni de Telegram."
+          }
+        }
+      }
+    },
+    "This question has no message.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette question n’a pas de message."
+          }
+        }
+      }
+    },
+    "This sub-chat is encrypted. Your 2025 statements are in the vault; I've filled in the first two sections of the form.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette sous-discussion est chiffrée. Tes relevés 2025 sont dans le coffre ; j’ai rempli les deux premières sections du formulaire."
+          }
+        }
+      }
+    },
+    "This sub-chat's policy": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La politique de cette sous-discussion"
+          }
+        }
+      }
+    },
+    "Three options under €160 a night, all with good reviews for quiet:\n1. **Casa do Largo**: €142, terrace, 4 min from the tram\n2. **Alfama Patio**: €155, breakfast included\n3. **Memmo Alfama**: €159, pool, the most central\nShall I hold one?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trois options à moins de 160 € la nuit, toutes bien notées pour le calme :\n1. **Casa do Largo** : 142 €, terrasse, à 4 min du tram\n2. **Alfama Patio** : 155 €, petit-déjeuner compris\n3. **Memmo Alfama** : 159 €, piscine, la plus centrale\nJ’en réserve une ?"
+          }
+        }
+      }
+    },
+    "Token usage and rate limits": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consommation de jetons et limites de débit"
+          }
+        }
+      }
+    },
+    "Too big for Telegram, so it went through Gofile.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trop gros pour Telegram, donc c’est passé par Gofile."
+          }
+        }
+      }
+    },
+    "Too many attempts. Wait a little and try again.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trop de tentatives. Patiente un peu et réessaie."
+          }
+        }
+      }
+    },
+    "Undo Hermes’ last turn?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler le dernier tour d’Hermes ?"
+          }
+        }
+      }
+    },
+    "Undo last turn": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler le dernier tour"
+          }
+        }
+      }
+    },
+    "Upload failed: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec de l’envoi : %@"
+          }
+        }
+      }
+    },
+    "Upload failed: unexpected answer from the service.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec de l’envoi : réponse inattendue du service."
+          }
+        }
+      }
+    },
+    "Usage and limits": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consommation et limites"
+          }
+        }
+      }
+    },
+    "Waiting for you": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En attente"
+          }
+        }
+      }
+    },
+    "Waiting for your approval": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attend ton accord"
+          }
+        }
+      }
+    },
+    "Wake": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réveiller"
+          }
+        }
+      }
+    },
+    "What Hermes may do without asking": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce qu’Hermes peut faire sans demander"
+          }
+        }
+      }
+    },
+    "What happened with the backup?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qu’est-il arrivé à la sauvegarde ?"
+          }
+        }
+      }
+    },
+    "Which model answers in this chat": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle qui répond dans cette discussion"
+          }
+        }
+      }
+    },
+    "Working": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Au travail"
+          }
+        }
+      }
+    },
+    "Writing the answer": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rédige la réponse"
+          }
+        }
+      }
+    },
+    "Wrong password.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mot de passe incorrect."
+          }
+        }
+      }
+    },
+    "Yes, go ahead": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oui, vas-y"
+          }
+        }
+      }
+    },
+    "Your pet doesn't want to.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ton compagnon n’en a pas envie."
+          }
+        }
+      }
+    },
+    "the usual one": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "l’habituel"
+          }
+        }
+      }
+    },
+    "your passcode": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ton code"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

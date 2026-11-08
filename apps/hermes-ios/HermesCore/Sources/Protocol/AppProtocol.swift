@@ -197,11 +197,11 @@ public enum AgentStatus: String, Sendable, Codable, CaseIterable {
 
     public var label: String {
         switch self {
-        case .idle: "Idle"
-        case .thinking: "Thinking"
-        case .working: "Working"
-        case .waitingUser: "Needs you"
-        case .error: "Error"
+        case .idle: L("Idle")
+        case .thinking: L("Thinking")
+        case .working: L("Working")
+        case .waitingUser: L("Needs you")
+        case .error: L("Error")
         }
     }
 }

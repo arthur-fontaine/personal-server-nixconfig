@@ -190,7 +190,7 @@ struct HermesLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.center) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Label(st.question != nil ? "Hermes needs you" : st.status.label, systemImage: st.status.widgetSymbol)
+                        Label(st.question != nil ? String(localized: "Hermes needs you") : st.status.label, systemImage: st.status.widgetSymbol)
                             .font(.subheadline.weight(.semibold)).foregroundStyle(st.status.widgetTint)
                         Text(st.question?.title ?? st.task ?? "").font(.caption).lineLimit(2)
                     }
@@ -221,9 +221,9 @@ struct LockScreenActivity: View {
             HStack(spacing: 12) {
                 PetFrame(file: context.attributes.spritesheetFile, animation: st.petMood.animation).frame(width: 48, height: 52)
                 VStack(alignment: .leading, spacing: 2) {
-                    Label(st.question != nil ? "Hermes needs you" : st.status.label, systemImage: st.status.widgetSymbol)
+                    Label(st.question != nil ? String(localized: "Hermes needs you") : st.status.label, systemImage: st.status.widgetSymbol)
                         .font(.headline).foregroundStyle(st.status.widgetTint)
-                    Text(st.question?.title ?? st.task ?? (st.status == .idle ? "Done" : ""))
+                    Text(st.question?.title ?? st.task ?? (st.status == .idle ? String(localized: "Done") : ""))
                         .font(.subheadline).lineLimit(2)
                     if let name = st.chatName { Text(name).font(.caption).foregroundStyle(.secondary) }
                 }

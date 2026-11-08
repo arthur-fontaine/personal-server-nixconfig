@@ -79,9 +79,9 @@ struct CallView: View {
     private var controls: some View {
         GlassEffectContainer(spacing: 24) {
             HStack(spacing: 24) {
-                control(session?.muted == true ? "mic.slash.fill" : "mic.fill", label: session?.muted == true ? "Unmute" : "Mute",
+                control(session?.muted == true ? "mic.slash.fill" : "mic.fill", label: session?.muted == true ? String(localized: "Unmute") : String(localized: "Mute"),
                         active: session?.muted == true) { session?.muted.toggle() }
-                control(session?.speaker == true ? "speaker.wave.3.fill" : "speaker.fill", label: "Speaker",
+                control(session?.speaker == true ? "speaker.wave.3.fill" : "speaker.fill", label: String(localized: "Speaker"),
                         active: session?.speaker == true) { session?.speaker.toggle() }
                 Button { session?.hangUp(); dismiss() } label: {
                     Image(systemName: "phone.down.fill").font(.title2).foregroundStyle(.white)
@@ -118,13 +118,13 @@ struct CallView: View {
 
     private var phaseLabel: String {
         switch session?.phase {
-        case .starting?, nil: "Connecting…"
-        case .listening?: "Listening"
-        case .hearing?: "Listening…"
+        case .starting?, nil: String(localized: "Connecting…")
+        case .listening?: String(localized: "Listening")
+        case .hearing?: String(localized: "Listening…")
         case .transcribing?: "…"
-        case .waiting?: "Thinking"
-        case .speaking?: "Speaking"
-        case .ended(let e)?: e ?? "Call ended"
+        case .waiting?: String(localized: "Thinking")
+        case .speaking?: String(localized: "Speaking")
+        case .ended(let e)?: e ?? String(localized: "Call ended")
         }
     }
 
@@ -175,11 +175,11 @@ struct VoiceModelRow: View {
 
     private var status: String {
         switch models.state {
-        case .absent: "Not downloaded"
+        case .absent: String(localized: "Not downloaded")
         case .downloading(let p): p.formatted(.percent.precision(.fractionLength(0)))
-        case .waitingForWiFi: "Paused"
+        case .waitingForWiFi: String(localized: "Paused")
         case .ready: ByteCountFormatter.string(fromByteCount: models.onDiskBytes, countStyle: .file)
-        case .failed: "Failed"
+        case .failed: String(localized: "Failed")
         }
     }
 }

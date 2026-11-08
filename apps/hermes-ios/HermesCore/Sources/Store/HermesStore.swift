@@ -351,13 +351,13 @@ public final class HermesStore {
     /// button with the same label in the question's message.
     public func answer(_ question: PendingQuestion, with option: QuestionOption) async throws -> String? {
         guard let bot else { throw TelegramError.notReady }
-        guard let messageID = question.messageID else { throw TelegramError.server(code: 400, message: "This question has no message.") }
+        guard let messageID = question.messageID else { throw TelegramError.server(code: 400, message: L("This question has no message.")) }
         var data = option.data
         if data == nil {
             let message = messages[question.chat]?.first { $0.id == messageID }
             if case .callback(let d)? = message?.buttons.first(where: { $0.label == option.label })?.action { data = d }
         }
-        guard let data else { throw TelegramError.server(code: 400, message: "This button can't be pressed from here.") }
+        guard let data else { throw TelegramError.server(code: 400, message: L("This button can't be pressed from here.")) }
         let toast = try await client.pressButton(chat: bot.chatID, message: messageID, data: data)
         state.questions.removeAll { $0.id == question.id }
         hooks.stateChanged(state)
@@ -461,7 +461,7 @@ public final class HermesStore {
         let timer = Task { [weak self] in
             try await Task.sleep(for: timeout)
             self?.pendingReplies.removeValue(forKey: serverID)?
-                .resume(throwing: TelegramError.server(code: 408, message: "Hermes didn't answer in time."))
+                .resume(throwing: TelegramError.server(code: 408, message: L("Hermes didn't answer in time.")))
         }
         defer { timer.cancel() }
         return try await withCheckedThrowingContinuation { c in pendingReplies[serverID] = c }
@@ -497,7 +497,7 @@ public final class HermesStore {
         let reply = try await sendRequest(action.request)
         if let reply, !reply.ok {
             optimisticPet = nil
-            throw TelegramError.server(code: 400, message: reply.errorMessage ?? "Your pet doesn't want to.")
+            throw TelegramError.server(code: 400, message: reply.errorMessage ?? L("Your pet doesn't want to."))
         }
     }
 

@@ -57,6 +57,27 @@ place (`-derivedDataPath ~/Library/Caches/hermes-ios/DerivedData`). If your
 git config rewrites GitHub's HTTPS URLs to SSH and SwiftPM can't clone, run
 xcodebuild with `GIT_CONFIG_GLOBAL=/dev/null` (only for that command).
 
+## Languages
+
+English (the development language) and French, with String Catalogs: one per
+target, since each bundle looks up its own (`HermesApp/Localizable.xcstrings`
+and `InfoPlist.xcstrings` for the permission prompts,
+`HermesCore/Sources/Localizable.xcstrings` read through `L(_:)`, and
+`HermesWidgets/Localizable.xcstrings`; `Shared/`'s App Intents land in both the
+app's and the widgets'). SwiftUI literals are keys already; any other text goes
+through `String(localized:)` (or `L` in the core), and numbers, sizes, dates and
+units through their format styles. Xcode adds new strings to the catalogs when it
+builds; from the command line, after a simulator *and* a device build (the voice
+engine only compiles for devices):
+
+```sh
+xcrun xcstringstool sync HermesApp/Localizable.xcstrings \
+  $(for f in ~/Library/Caches/hermes-ios/DerivedData/Build/Intermediates.noindex/Hermes.build/Debug-iphone*/HermesApp.build/Objects-normal/arm64/*.stringsdata; do printf -- '--stringsdata %s ' "$f"; done)
+```
+
+The French uses *tu* and Apple's own terms (Réglages, Annuler, Plus tard).
+`scripts/screenshots.sh` takes `LANGUAGE=fr` to tour the app in French.
+
 ## Configuration (build settings)
 
 All of them can be set in `Config/Local.xcconfig` or passed to xcodebuild as

@@ -25,7 +25,7 @@ struct CommandPalette: View {
         NavigationStack(path: $path) {
             List {
                 if query.isEmpty { current }
-                Section(query.isEmpty ? "Commands" : "Results") {
+                Section(query.isEmpty ? String(localized: "Commands") : String(localized: "Results")) {
                     // Model and permission mode already sit in "In this chat" with their values.
                     ForEach(filtered.filter { !query.isEmpty || !shownAbove.contains($0.id) }) { cmd in row(cmd) }
                 }
@@ -51,7 +51,7 @@ struct CommandPalette: View {
         .onAppear { query = filter }
         .confirmationDialog(confirming?.0.confirm ?? "", isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }),
                             titleVisibility: .visible) {
-            Button(confirming?.0.label ?? "Run", role: .destructive) {
+            Button(confirming?.0.label ?? String(localized: "Run"), role: .destructive) {
                 if let (_, text) = confirming { send(text) }
             }
         }
@@ -147,7 +147,7 @@ struct CommandPalette: View {
 
 struct CurrentRow: View {
     let symbol: String
-    let title: String
+    let title: LocalizedStringKey
     let value: String
 
     var body: some View {
@@ -192,7 +192,7 @@ struct ModelMenu: View {
                     if let last = control?.last[topic], last != control?.selected(in: topic) {
                         Text("The last answer came from \(last.model) (a fallback).")
                     }
-                    Text(topic == .main ? "Applies to the main chat until you change it." : "Pinned in this sub-chat's rules.")
+                    Text(topic == .main ? String(localized: "Applies to the main chat until you change it.") : String(localized: "Pinned in this sub-chat's rules."))
                 }
             }
         }
@@ -201,9 +201,9 @@ struct ModelMenu: View {
 
     private func roleLabel(_ r: String?) -> String? {
         switch r {
-        case "main": "default"
-        case "fallback": "fallback"
-        case "local": "on the server"
+        case "main": String(localized: "default", comment: "Model role")
+        case "fallback": String(localized: "fallback", comment: "Model role")
+        case "local": String(localized: "on the server", comment: "Model role")
         default: r
         }
     }
@@ -261,7 +261,7 @@ struct OptionPicker: View {
                 guard let text = command.text(["value": option]) else { return }
                 Task { do { try await store.run(command: text, in: topic) } catch { model.showToast(error.localizedDescription) } }
             } label: {
-                Text(option.capitalized).foregroundStyle(.primary).frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
+                Text(PresetNames.option(option)).foregroundStyle(.primary).frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
             }
             .buttonStyle(.plain)
         }

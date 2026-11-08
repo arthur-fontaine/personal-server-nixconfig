@@ -24,7 +24,7 @@ nonisolated final class LFMEngineHolder: @unchecked Sendable {
             return nil
         }
         #else
-        lastError = "This build has no llama.cpp (the simulator)."
+        lastError = String(localized: "This build has no llama.cpp (the simulator).")
         return nil
         #endif
     }
@@ -42,7 +42,7 @@ import llama
 /// (tools/mtmd/mtmd.h and mtmd-helper.h at the pinned build). One model serves both; calls
 /// into it are serialized by an actor-like lock since a llama context isn't re-entrant.
 nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
-    let name = "LFM3-Omni-2B (on device)"
+    let name = String(localized: "LFM3-Omni-2B (on device)")
     let outputSampleRate: Double = 24_000
 
     private let model: OpaquePointer
@@ -57,7 +57,7 @@ nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
         llama_backend_init()
         var mp = llama_model_default_params()
         mp.n_gpu_layers = 99
-        guard let model = llama_model_load_from_file(modelPath, mp) else { throw VoiceEngineError.failed("The voice model didn't load.") }
+        guard let model = llama_model_load_from_file(modelPath, mp) else { throw VoiceEngineError.failed(String(localized: "The voice model didn't load.")) }
         var cp = llama_context_default_params()
         cp.n_ctx = 4096
         cp.n_batch = UInt32(nBatch)
@@ -67,18 +67,18 @@ nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
         cp.embeddings = true
         guard let ctx = llama_init_from_model(model, cp) else {
             llama_model_free(model)
-            throw VoiceEngineError.failed("Not enough memory for the voice model.")
+            throw VoiceEngineError.failed(String(localized: "Not enough memory for the voice model."))
         }
         var mtp = mtmd_context_params_default()
         mtp.use_gpu = true
         guard let mctx = mtmd_init_from_file(projectorPath, model, mtp) else {
             llama_free(ctx); llama_model_free(model)
-            throw VoiceEngineError.failed("The voice projector didn't load.")
+            throw VoiceEngineError.failed(String(localized: "The voice projector didn't load."))
         }
         guard mtmd_support_audio(mctx), mtmd_gen_audio_get_info(mctx).type == MTMD_GEN_AUDIO_TYPE_LFM3A,
               let gen = mtmd_helper_gen_audio_init(ctx, mctx) else {
             mtmd_free(mctx); llama_free(ctx); llama_model_free(model)
-            throw VoiceEngineError.failed("This llama.cpp build can't run LFM3 speech.")
+            throw VoiceEngineError.failed(String(localized: "This llama.cpp build can't run LFM3 speech."))
         }
         self.model = model
         self.ctx = ctx
@@ -107,7 +107,7 @@ nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
         let marker = String(cString: mtmd_default_marker())
         let prompt = LFMPrompt.asr(language: language, marker: marker)
         guard let bitmap = samples.withUnsafeBufferPointer({ mtmd_bitmap_init_from_audio($0.count, $0.baseAddress) }) else {
-            throw VoiceEngineError.failed("Audio input")
+            throw VoiceEngineError.failed(String(localized: "The audio couldn't be prepared."))
         }
         defer { mtmd_bitmap_free(bitmap) }
         let chunks = mtmd_input_chunks_init()
@@ -117,10 +117,10 @@ nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
             var bitmaps: [OpaquePointer?] = [bitmap]
             return bitmaps.withUnsafeMutableBufferPointer { mtmd_tokenize(mctx, chunks, &text, $0.baseAddress, 1) }
         }
-        guard rc == 0 else { throw VoiceEngineError.failed("Tokenizing the audio failed (\(rc)).") }
+        guard rc == 0 else { throw VoiceEngineError.failed(String(localized: "The voice model couldn't read the audio (\(rc)).")) }
         var nPast: llama_pos = 0
         guard mtmd_helper_eval_chunks(mctx, ctx, chunks, 0, 0, nBatch, true, &nPast) == 0 else {
-            throw VoiceEngineError.failed("Listening failed.")
+            throw VoiceEngineError.failed(String(localized: "Listening failed."))
         }
         // Greedy decoding for text (model card).
         let sampler = llama_sampler_chain_init(llama_sampler_chain_default_params())!
@@ -172,11 +172,11 @@ nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
             inp.prompt = cstr
             inp.prompt_len = strlen(cstr)
             inp.out_type = MTMD_HELPER_GEN_AUDIO_OUTTYPE_PCM
-            guard mtmd_helper_gen_audio_set_input(gen, &inp) == 0 else { throw VoiceEngineError.failed("Speech prompt") }
+            guard mtmd_helper_gen_audio_set_input(gen, &inp) == 0 else { throw VoiceEngineError.failed(String(localized: "Speaking failed.")) }
         }
         while true {
             let left = mtmd_helper_gen_audio_step_prompt(gen, nBatch)
-            if left < 0 { throw VoiceEngineError.failed("Speech prompt decode") }
+            if left < 0 { throw VoiceEngineError.failed(String(localized: "Speaking failed.")) }
             if left == 0 { break }
         }
         let sampler = llama_sampler_chain_init(llama_sampler_chain_default_params())!
@@ -190,7 +190,7 @@ nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
             if mtmd_helper_gen_audio_next_is_text(gen) { token = llama_sampler_sample(sampler, ctx, -1) }
             var next: UnsafePointer<Float>?
             var stop = false
-            guard mtmd_helper_gen_audio_step_gen(gen, token, h, &next, &stop) == 0 else { throw VoiceEngineError.failed("Speech step") }
+            guard mtmd_helper_gen_audio_step_gen(gen, token, h, &next, &stop) == 0 else { throw VoiceEngineError.failed(String(localized: "Speaking failed.")) }
             drain(emit)
             if stop || next == nil { break }
             h = UnsafeMutablePointer(mutating: next)

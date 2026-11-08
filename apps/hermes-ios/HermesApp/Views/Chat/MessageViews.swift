@@ -102,14 +102,14 @@ struct CodeBlock: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text(language ?? "code").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                Text(language ?? String(localized: "code")).font(.caption.weight(.medium)).foregroundStyle(.secondary)
                 Spacer()
                 Button {
                     UIPasteboard.general.string = code
                     copied = true
                     Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
                 } label: {
-                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                    Label(copied ? String(localized: "Copied") : String(localized: "Copy"), systemImage: copied ? "checkmark" : "doc.on.doc")
                         .font(.caption.weight(.medium))
                         .contentTransition(.symbolEffect(.replace))
                 }
@@ -235,7 +235,7 @@ struct LinkFileCard: View {
     var body: some View {
         Button { openURL(link.url) } label: {
             FileCardLabel(symbol: FileKind.symbol(for: link.displayName), title: link.displayName,
-                          subtitle: "Big file · \(link.service)", trailing: "arrow.up.right")
+                          subtitle: String(localized: "Big file · \(link.service)"), trailing: "arrow.up.right")
         }
         .buttonStyle(.plain)
         .accessibilityLabel("File on \(link.service): \(link.displayName)")

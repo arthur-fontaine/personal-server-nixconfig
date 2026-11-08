@@ -259,6 +259,14 @@ portrait and landscape. What it showed and what the layouts do:
 - Narrow iPad windows (Slide Over, Stage Manager) fall back to the iPhone
   layout through the size class.
 
+## Languages
+
+English and French, following the device. French uses *tu*, Apple's French
+terms and French typography (no-break spaces before `:`, `?`, `!`, guillemets).
+Layouts are measured rather than sized for English: the question tray's answers
+go from one row to two columns when the labels don't fit (`ViewThatFits`), and
+costs use the narrow currency form ("0,48 $").
+
 ## Accessibility
 
 - VoiceOver: each message is one element ("Hermes: …" / "You: …"); the pet

@@ -156,12 +156,14 @@ struct ThreadRow: View {
     }
 
     private var preview: String {
-        if store.isPrivate(thread.id) { return store.subchat(thread.id)?.unlocked == true ? "Unlocked" : "Private" }
-        if let preset = store.subchat(thread.id)?.preset, thread.lastMessage == nil { return preset.capitalized }
-        guard let m = thread.lastMessage else { return thread.isMain ? "Your main chat" : "" }
-        let text = m.displayText.replacingOccurrences(of: "\n", with: " ")
-        if text.isEmpty, !m.fileLinks.isEmpty || m.attachment != nil { return (m.isOutgoing ? "You: " : "") + "File" }
-        return (m.isOutgoing ? "You: " : "") + text
+        if store.isPrivate(thread.id) {
+            return store.subchat(thread.id)?.unlocked == true ? String(localized: "Unlocked") : String(localized: "Private")
+        }
+        if let preset = store.subchat(thread.id)?.preset, thread.lastMessage == nil { return PresetNames.name(preset) }
+        guard let m = thread.lastMessage else { return thread.isMain ? String(localized: "Your main chat") : "" }
+        var text = m.displayText.replacingOccurrences(of: "\n", with: " ")
+        if text.isEmpty, !m.fileLinks.isEmpty || m.attachment != nil { text = String(localized: "File") }
+        return m.isOutgoing ? String(localized: "You: \(text)") : text
     }
 }
 

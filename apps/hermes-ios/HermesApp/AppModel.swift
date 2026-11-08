@@ -10,10 +10,10 @@ enum AppSection: String, CaseIterable, Hashable, Identifiable {
 
     var title: String {
         switch self {
-        case .chat: "Chat"
-        case .pet: "Pet"
-        case .dashboard: "Dashboard"
-        case .settings: "Settings"
+        case .chat: String(localized: "Chat")
+        case .pet: String(localized: "Pet")
+        case .dashboard: String(localized: "Dashboard")
+        case .settings: String(localized: "Settings")
         }
     }
 
@@ -100,6 +100,10 @@ final class AppModel {
 
     func startCall() { callPresented = true }
 
+    /// A message of the app's own (literals are localized); errors' texts go through the `String` one.
+    func showToast(_ resource: LocalizedStringResource) { showToast(String(localized: resource)) }
+
+    @_disfavoredOverload
     func showToast(_ text: String) {
         toast = text
         Task {
@@ -149,7 +153,7 @@ final class AppModel {
         }
         guard let q = store.questions.first(where: { $0.id == questionID }),
               let option = q.options.first(where: { $0.id == optionID }) else {
-            throw TelegramError.server(code: 410, message: "This question was already answered.")
+            throw TelegramError.server(code: 410, message: String(localized: "This question was already answered."))
         }
         _ = try await store.answer(q, with: option)
     }

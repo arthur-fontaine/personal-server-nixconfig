@@ -14,7 +14,7 @@ struct DashboardView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     section("Models") {
                         Picker("Window", selection: $window) {
-                            ForEach(UsageWindow.allCases) { Text($0.rawValue).tag($0) }
+                            ForEach(UsageWindow.allCases) { Text($0.title).tag($0) }
                         }
                         .pickerStyle(.segmented)
                         .frame(maxWidth: 320)
@@ -28,12 +28,12 @@ struct DashboardView: View {
                     if let machine = stats.machine {
                         section("Server") { EmptyView() }
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 16)], spacing: 16) {
-                            MetricCard(title: "CPU", symbol: "cpu", value: machine.cpuPercent.map { $0 / 100 },
-                                       detail: machine.cpuPercent.map { String(format: "%.0f %%", $0) } ?? "–",
+                            MetricCard(title: String(localized: "CPU"), symbol: "cpu", value: machine.cpuPercent.map { $0 / 100 },
+                                       detail: machine.cpuPercent.map { ($0 / 100).formatted(.percent.precision(.fractionLength(0))) } ?? "–",
                                        history: machine.cpuHistory, color: .blue)
-                            MetricCard(title: "Memory", symbol: "memorychip", value: machine.ramFraction,
+                            MetricCard(title: String(localized: "Memory"), symbol: "memorychip", value: machine.ramFraction,
                                        detail: bytesPair(machine.ramUsed, machine.ramTotal), history: machine.ramHistory, color: .purple)
-                            MetricCard(title: "Storage", symbol: "internaldrive", value: machine.diskFraction,
+                            MetricCard(title: String(localized: "Storage"), symbol: "internaldrive", value: machine.diskFraction,
                                        detail: bytesPair(machine.diskUsed, machine.diskTotal), history: [], color: .teal)
                             PowerCard(machine: machine)
                         }
@@ -69,7 +69,7 @@ struct DashboardView: View {
         }
     }
 
-    private func section<T: View>(_ title: String, @ViewBuilder trailing: () -> T) -> some View {
+    private func section<T: View>(_ title: LocalizedStringKey, @ViewBuilder trailing: () -> T) -> some View {
         HStack {
             Text(title).font(.title2.weight(.semibold))
             Spacer()
@@ -79,12 +79,17 @@ struct DashboardView: View {
 
     private func bytesPair(_ used: Int64?, _ total: Int64?) -> String {
         guard let used, let total else { return "–" }
-        return "\(ByteCountFormatter.string(fromByteCount: used, countStyle: .memory)) of \(ByteCountFormatter.string(fromByteCount: total, countStyle: .memory))"
+        let u = ByteCountFormatter.string(fromByteCount: used, countStyle: .memory)
+        let t = ByteCountFormatter.string(fromByteCount: total, countStyle: .memory)
+        return String(localized: "\(u) of \(t)", comment: "Memory or storage: used of total")
     }
 }
 
 extension DashboardView {
-    static func dollars(_ v: Double) -> String { "$" + v.formatted(.number.precision(.fractionLength(2))) }
+    /// Costs are in US dollars whatever the region, in the narrow form that fits a card: "$1.62", "1,62 $".
+    static func dollars(_ v: Double) -> String {
+        v.formatted(.currency(code: "USD").presentation(.narrow).precision(.fractionLength(2)))
+    }
 }
 
 struct UsageSummary: View {
@@ -105,7 +110,7 @@ struct UsageSummary: View {
         }
     }
 
-    private func stat(_ title: String, _ value: String, alert: Bool = false) -> some View {
+    private func stat(_ title: LocalizedStringKey, _ value: String, alert: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.caption).foregroundStyle(.secondary)
             Text(value).font(.title3.weight(.semibold)).monospacedDigit().foregroundStyle(alert ? .red : .primary)
@@ -157,12 +162,12 @@ struct ModelCard: View {
 
     private var roleLabel: String {
         switch model.role {
-        case .main: "Main"
-        case .fallback: "Fallback"
-        case .background: "Background"
-        case .local: "Local"
-        case .decision: "Decision"
-        case .other: "Other"
+        case .main: String(localized: "Main", comment: "Model role")
+        case .fallback: String(localized: "Fallback", comment: "Model role")
+        case .background: String(localized: "Background", comment: "Model role")
+        case .local: String(localized: "Local", comment: "Model role")
+        case .decision: String(localized: "Decision", comment: "Model role")
+        case .other: String(localized: "Other", comment: "Model role")
         }
     }
 
@@ -176,7 +181,7 @@ struct ModelCard: View {
         }
     }
 
-    private func figure(_ title: String, _ value: String, alert: Bool = false) -> some View {
+    private func figure(_ title: LocalizedStringKey, _ value: String, alert: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(title).font(.caption2).foregroundStyle(.secondary)
             Text(value).font(.subheadline.weight(.medium)).monospacedDigit().foregroundStyle(alert ? .red : .primary)
@@ -201,17 +206,17 @@ struct MetricCard: View {
             }
             if !history.isEmpty {
                 Chart(Array(history.enumerated()), id: \.offset) { i, v in
-                    AreaMark(x: .value("Hour", i), y: .value(title, v))
+                    AreaMark(x: .value(String(localized: "Hour"), i), y: .value(title, v))
                         .foregroundStyle(color.opacity(0.2).gradient)
                         .interpolationMethod(.catmullRom)
-                    LineMark(x: .value("Hour", i), y: .value(title, v))
+                    LineMark(x: .value(String(localized: "Hour"), i), y: .value(title, v))
                         .foregroundStyle(color)
                         .interpolationMethod(.catmullRom)
                 }
                 .chartXAxis(.hidden)
                 .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
                 .frame(height: 80)
-                .accessibilityLabel("\(title), last 24 hours")
+                .accessibilityLabel(String(localized: "\(title), last 24 hours"))
             } else if let value {
                 Gauge(value: value) { EmptyView() }
                     .gaugeStyle(.linearCapacity)
@@ -231,28 +236,38 @@ struct PowerCard: View {
             HStack {
                 Label("Power", systemImage: "bolt.fill").font(.headline)
                 Spacer()
-                if let w = machine.powerWatts { Text(String(format: "%.1f W", w)).font(.subheadline).monospacedDigit().foregroundStyle(.secondary) }
+                if let w = machine.powerWatts { Text(Measurement(value: w, unit: UnitPower.watts).formatted(Self.unit(1))).font(.subheadline).monospacedDigit().foregroundStyle(.secondary) }
             }
             if !machine.powerHistory.isEmpty {
                 Chart(Array(machine.powerHistory.enumerated()), id: \.offset) { i, v in
-                    BarMark(x: .value("Hour", i), y: .value("W", v)).foregroundStyle(.yellow.gradient)
+                    BarMark(x: .value(String(localized: "Hour"), i), y: .value(String(localized: "Power"), v)).foregroundStyle(.yellow.gradient)
                 }
                 .chartXAxis(.hidden)
                 .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
                 .frame(height: 64)
             }
             HStack(spacing: 16) {
-                if let kwh = machine.energyKWh24h { tag("24 h", String(format: "%.2f kWh", kwh)) }
-                if let b = machine.batteryPercent { tag(machine.charging == true ? "Charging" : "Battery", "\(Int(b)) %") }
+                if let kwh = machine.energyKWh24h { tag("24 h", Measurement(value: kwh, unit: UnitEnergy.kilowattHours).formatted(Self.unit(2))) }
+                if let b = machine.batteryPercent {
+                    tag(machine.charging == true ? "Charging" : "Battery", (b / 100).formatted(.percent.precision(.fractionLength(0))))
+                }
                 if let up = machine.uptime { tag("Up", Duration.seconds(up).formatted(.units(allowed: [.days, .hours], width: .narrow))) }
-                if let t = machine.temperatureC { tag("Temp", String(format: "%.0f °C", t)) }
+                if let t = machine.temperatureC {
+                    // The server's Celsius as it is: no conversion to the region's unit for a machine's temperature.
+                    tag("Temp", Measurement(value: t, unit: UnitTemperature.celsius)
+                        .formatted(.measurement(width: .abbreviated, usage: .asProvided, numberFormatStyle: .number.precision(.fractionLength(0)))))
+                }
             }
         }
         .padding(16)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 20))
     }
 
-    private func tag(_ title: String, _ value: String) -> some View {
+    private static func unit<U: Dimension>(_ digits: Int) -> Measurement<U>.FormatStyle {
+        .measurement(width: .abbreviated, usage: .asProvided, numberFormatStyle: .number.precision(.fractionLength(digits)))
+    }
+
+    private func tag(_ title: LocalizedStringKey, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(title).font(.caption2).foregroundStyle(.secondary)
             Text(value).font(.subheadline.weight(.medium)).monospacedDigit()
