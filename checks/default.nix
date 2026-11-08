@@ -83,6 +83,16 @@ in
     touch $out
   '';
 
+  # Hermes' local overlay: the checker (each forbidden area refused) and
+  # server-rebuild against stub git, darwin-rebuild, curl and sudo.
+  overrides = pkgs.runCommand "hermes-overrides-tests" { } ''
+    cp -R ${../modules/hermes/system/access/overrides} overrides
+    chmod -R u+w overrides
+    export HOME=$TMPDIR BASH_BIN=${pkgs.bash}/bin/bash
+    ${pkgs.python3}/bin/python3 -I overrides/test_overrides.py
+    touch $out
+  '';
+
   # What hermes-freeze picks; the chown and ACLs themselves need root.
   freeze = pkgs.runCommand "hermes-freeze-tests" { } ''
     cp ${../modules/hermes/system/access/freeze.py} freeze.py

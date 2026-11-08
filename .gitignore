@@ -1,6 +1,7 @@
 result
 result-*
 hosts/local.nix
+hosts/hermes-overrides.json
 __pycache__/
 .pytest_cache/
 node_modules/

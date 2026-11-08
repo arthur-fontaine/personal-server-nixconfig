@@ -18,5 +18,10 @@ lib.mkIf cfg.enable {
     else
       echo "warning: ${cfg.secretsFile} is missing; Hermes has no API keys (see MANUAL_SETUP.md)" >&2
     fi
+    # The local overlay's keys, which server-rebuild rewrites (./overrides).
+    local=${lib.escapeShellArg cfg.localOverrides.secretsFile}
+    [ -e "$local" ] || : > "$local"
+    chown ${cfg.user}:${cfg.user} "$local"
+    chmod 400 "$local"
   '';
 }
