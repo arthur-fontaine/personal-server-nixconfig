@@ -133,12 +133,12 @@
         }
       }
     },
-    "Your Hermes pet, its needs, and what Hermes is doing.": {
+    "Your Hermes pet and what Hermes is doing.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ton compagnon Hermes, ses besoins, et ce que fait Hermes."
+            "value": "Ton compagnon Hermes et ce que fait Hermes."
           }
         }
       }

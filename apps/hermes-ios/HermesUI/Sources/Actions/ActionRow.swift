@@ -112,29 +112,33 @@ public struct ActionRow: View {
 
     @ViewBuilder private func button(_ a: Action, lines: Int?) -> some View {
         let label = HStack(spacing: Spacing.xs.points) {
-            if a.isBusy { ProgressView().tint(a.emphasis == .primary ? AnyShapeStyle(OnAccentStyle()) : AnyShapeStyle(Color(uiColor: .label))) }
+            // Small, so the busy button keeps the row's height (5.3).
+            if a.isBusy { ProgressView().controlSize(.small).tint(a.emphasis == .primary ? AnyShapeStyle(OnAccentStyle()) : AnyShapeStyle(Color(uiColor: .label))) }
             a.title.lineLimit(lines).fixedSize(horizontal: lines == 1, vertical: lines == nil)
         }
         .frame(maxWidth: .infinity)
-        .accessibilityIdentifier("action.\(a.id)")
 
+        // The identifier on the button itself, so tests measure the button, never its label.
         switch a.emphasis {
         case .primary:
             Button(action: a.perform) { label.foregroundStyle(OnAccentStyle()) }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .accessibilityIdentifier("action.\(a.id)")
         case .secondary:
             // The label colour itself: `.primary` would resolve against the grey tint.
             Button(action: a.perform) { label.foregroundStyle(Color(uiColor: .label)) }
                 .buttonStyle(.bordered)
                 .tint(.gray)
                 .controlSize(.large)
+                .accessibilityIdentifier("action.\(a.id)")
         case .destructive:
             // HIG alert (reference/metrics.md): red label on the neutral fill, not a red wash.
             Button(role: .destructive, action: a.perform) { label.foregroundStyle(.red) }
                 .buttonStyle(.bordered)
                 .tint(.gray)
                 .controlSize(.large)
+                .accessibilityIdentifier("action.\(a.id)")
         }
     }
 

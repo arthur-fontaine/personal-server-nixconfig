@@ -150,6 +150,7 @@ public struct UserBubble: View {
     let text: String
     let state: State
     @ScaledMetric(relativeTo: .body) private var radius = Radius.bubble
+    @ScaledMetric(relativeTo: .body) private var minHeight = Metric.oneLineBubble
 
     public enum State: Sendable { case sent, pending, failed }
 
@@ -170,6 +171,7 @@ public struct UserBubble: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .inset(.horizontal, Bubble.horizontal)
                 .inset(.vertical, Bubble.vertical)
+                .frame(minHeight: minHeight)
                 .surface(.fill, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
                 .opacity(state == .pending ? Fade.pending : 1)
                 .geometryProbe(radius: radius, inset: Bubble.vertical.points)

@@ -31,6 +31,22 @@ run "$phone" light otherpet-light "-petHue 200" testChat testPet
 run "$phone" dark otherpet-dark "-petHue 200" testChat testPet
 run "$pad" light light "" testChat
 run "$pad" dark dark "" testChat
+run "$pad" light compact "-compactWidth" testChat
+run "$phone" light light "" testChatLandscape
+# Accessibility settings (design-rules 7.1): Increase Contrast through simctl, Reduce
+# Transparency and Reduce Motion through the simulator's accessibility defaults.
+xcrun simctl ui "$phone" increase_contrast enabled
+run "$phone" light contrast-light "" testChat testPet
+run "$phone" dark contrast-dark "" testChat
+xcrun simctl ui "$phone" increase_contrast disabled
+ax() { xcrun simctl spawn "$phone" defaults write com.apple.Accessibility "$1" -bool "$2"; }
+ax EnhancedBackgroundContrastEnabled true
+run "$phone" light reducetransparency-light "" testChat testChatsMenu
+run "$phone" dark reducetransparency-dark "" testChat
+ax EnhancedBackgroundContrastEnabled false
+ax ReduceMotionEnabled true
+run "$phone" light reducemotion "" testPet
+ax ReduceMotionEnabled false
 xcrun simctl ui "$phone" appearance light; xcrun simctl ui "$pad" appearance light
 # iPad shots come out in the portrait buffer: turn them to landscape.
 python3 -I - "$out" <<'PY'

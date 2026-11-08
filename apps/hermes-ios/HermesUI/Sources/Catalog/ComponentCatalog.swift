@@ -8,11 +8,16 @@ public enum CatalogPage: String, CaseIterable, Sendable {
 
 public struct ComponentCatalog: View {
     let page: CatalogPage
+    /// The pet's idle frame (the app passes the bundled sprite's), for `PetAvatar`.
+    let petFrame: CGImage?
     @State private var text = ""
     @State private var typed = "Can you also check the photos backup?"
     @FocusState private var focus: Bool
 
-    public init(page: CatalogPage) { self.page = page }
+    public init(page: CatalogPage, petFrame: CGImage? = nil) {
+        self.page = page
+        self.petFrame = petFrame
+    }
 
     public var body: some View {
         ScrollView {
@@ -69,8 +74,8 @@ public struct ComponentCatalog: View {
                 }
             }
             section("Busy") {
-                ActionRow(primary: Action(id: "p", "Allow Once", emphasis: .primary, isBusy: true) {},
-                          others: [Action(id: "d", "Deny", emphasis: .destructive) {}])
+                ActionRow(primary: Action(id: "busy.allow", "Allow Once", emphasis: .primary, isBusy: true) {},
+                          others: [Action(id: "busy.deny", "Deny", emphasis: .destructive) {}])
             }
             section("Long labels stack, primary first") {
                 ActionRow(primary: Action(id: "p", verbatim: "Autoriser pour toute la session", emphasis: .primary) {},
@@ -105,10 +110,19 @@ public struct ComponentCatalog: View {
                     QuoteBlock(AttributedString("Keep the last 90 days, prune the rest."))
                 }
             }
-            section("PetAvatar (every size): a square box clipped by a circle") {
-                HStack(alignment: .bottom, spacing: Spacing.m.points) {
-                    ForEach([PetSize.toolbar, .row, .hero], id: \.self) { size in
-                        PetAvatar(size) { Image(systemName: "bird.fill").resizable().scaledToFit().tone(.accent) }
+            section("PetAvatar at each size (the circle filled to show it), the bar's image without and with the heart") {
+                if let petFrame {
+                    HStack(alignment: .bottom, spacing: Spacing.m.points) {
+                        ForEach([PetSize.toolbar, .row, .hero], id: \.self) { size in
+                            PetAvatar(size) {
+                                Image(decorative: petFrame, scale: 1).resizable().interpolation(.none).scaledToFit()
+                            }
+                            .background(Surface.fill.style, in: Circle())
+                        }
+                    }
+                    HStack(spacing: Spacing.m.points) {
+                        PetAvatar<EmptyView>.toolbarImage(petFrame)
+                        PetAvatar<EmptyView>.toolbarImage(petFrame, heart: PetAccent(sprite: petFrame))
                     }
                 }
             }
@@ -127,7 +141,7 @@ public struct ComponentCatalog: View {
             section("Hermes writing (Stop)") { composer(.stop, text: $text) }
             section("AttachmentChip, UploadBar") {
                 AttachmentChip(symbol: "film", name: "Saturday.mov", detail: "6.2 GB, via Gofile") {}
-                UploadBar(title: Text(verbatim: "Uploading Saturday.mov to Gofile"), fraction: 0.42)
+                UploadBar(title: Text(verbatim: "Uploading Saturday.mov to Gofile"), progress: Self.sampleUpload)
             }
             section("FloatingButton, Toast") {
                 FloatingButton("Latest", systemImage: "arrow.down") {}
@@ -150,6 +164,12 @@ public struct ComponentCatalog: View {
             }
         }
     }
+
+    static let sampleUpload: Progress = {
+        let p = Progress(totalUnitCount: 100)
+        p.completedUnitCount = 42
+        return p
+    }()
 
     private func composer(_ action: ComposerAction, text: Binding<String>) -> some View {
         ComposerBar(text: text, placeholder: Text(verbatim: "Message Hermes"), action: action, focus: $focus, onSend: {}, onStop: {}) {

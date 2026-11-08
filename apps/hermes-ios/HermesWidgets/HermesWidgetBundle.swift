@@ -84,12 +84,12 @@ struct PetWidget: Widget {
         StaticConfiguration(kind: "HermesPet", provider: PetProvider()) { entry in
             PetWidgetView(entry: entry)
                 .containerBackground(for: .widget) {
-                    LinearGradient(colors: [Color.orange.opacity(0.25), Color(.systemBackground)], startPoint: .top, endPoint: .bottom)
+                    Color(uiColor: .systemBackground)
                 }
                 .widgetURL(URL(string: "hermes://pet"))
         }
         .configurationDisplayName("Pet")
-        .description("Your Hermes pet, its needs, and what Hermes is doing.")
+        .description("Your Hermes pet and what Hermes is doing.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }
@@ -229,7 +229,6 @@ struct QuestionButtons: View {
                             .tint(.red)
                     } else {
                         Button(intent: AnswerQuestionIntent(questionID: question.id, optionID: o.id)) { label(o) }
-                            .tint(.orange)
                     }
                 }
                 .buttonStyle(.bordered)

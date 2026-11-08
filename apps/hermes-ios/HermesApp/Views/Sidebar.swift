@@ -2,8 +2,8 @@ import HermesCore
 import HermesUI
 import SwiftUI
 
-/// iPad sidebar (regular width): the chats, then Dashboard and Settings at its foot (the pet is
-/// the detail's bar item, as on iPhone). System sidebar rows; names through `ChatTitle`, so a private
+/// iPad sidebar (regular width): the chats, and Dashboard and Settings pinned at its foot (the
+/// pet is the detail's bar item, as on iPhone). System sidebar rows; names through `ChatTitle`, so a private
 /// sub-chat is "Private chat" here too (design-rules 1.4).
 struct Sidebar: View {
     @Environment(AppModel.self) private var model
@@ -16,13 +16,17 @@ struct Sidebar: View {
                 ForEach(store.threads) { thread in row(thread.id, unread: thread.unreadCount) }
                 Button { model.showNewSubchat = true } label: { Label("New Sub-chat…", systemImage: "plus") }
             }
-            Section {
+        }
+        .listStyle(.sidebar)
+        // Pinned to the sidebar's foot (design-rules 11.4).
+        .safeAreaBar(edge: .bottom) {
+            SidebarFooter {
                 ForEach([AppSection.dashboard, .settings]) { s in
-                    Label(s.title, systemImage: s.symbol).tag(SidebarItem.section(s))
+                    SidebarFooterRow(Text(s.title), systemImage: s.symbol, selected: model.section == s) { model.show(s) }
+                        .accessibilityIdentifier("sidebar.\(s.rawValue)")
                 }
             }
         }
-        .listStyle(.sidebar)
     }
 
     /// The tag outermost: the list's selection reads it from the row itself.

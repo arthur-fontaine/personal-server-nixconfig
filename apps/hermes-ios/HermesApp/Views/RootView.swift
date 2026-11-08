@@ -11,7 +11,9 @@ struct RootView: View {
         @Bindable var model = model
         Group {
             if let page = model.catalogPage {
-                NavigationStack { ComponentCatalog(page: page) }
+                NavigationStack {
+                    ComponentCatalog(page: page, petFrame: BundledPet.load().flatMap { SpriteSheet.cached(url: $0.spritesheet)?.frame(.idle, 0) })
+                }
             } else {
                 content
             }

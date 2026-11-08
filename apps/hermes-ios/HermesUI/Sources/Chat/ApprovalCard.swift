@@ -22,7 +22,9 @@ public struct ApprovalCard: View {
 
     public var body: some View {
         CardSurface(surface: .grouped, inset: Block.card, innerControlHeight: controlHeight) {
-            VStack(alignment: .leading, spacing: Rhythm.blocks.spacing.points) {
+            // The disclosure row carries ≈ 12 pt of air on each side inside its 44-pt row: 8 more
+            // around it makes the visible gaps ≈ 20, the card's padding; without it, the padding.
+            VStack(alignment: .leading, spacing: (command == nil ? Block.card : Spacing.xs).points) {
                 Text(verbatim: question)
                     .textRole(.headline)
                     .fixedSize(horizontal: false, vertical: true)
@@ -32,6 +34,7 @@ public struct ApprovalCard: View {
                         CodeBlock(command, wrapping: true).padding(.top, Spacing.xs.points)
                     } label: {
                         Text("Show Command").textRole(.body)
+                            .multilineTextAlignment(.leading)
                             // The row is a control: at least the hit target tall, all of it tappable.
                             .frame(maxWidth: .infinity, minHeight: Metric.hitTarget, alignment: .leading)
                             .contentShape(Rectangle())
@@ -79,14 +82,18 @@ public struct FileCard: View {
             HStack(spacing: Spacing.s.points) {
                 Image(systemName: symbol)
                     .tone(.accent)
+                    // The badge is a fixed circle: its glyph keeps its size (10.1, 3.4).
+                    .dynamicTypeSize(...DynamicTypeSize.large)
                     .frame(width: Metric.fileSymbol, height: Metric.fileSymbol)
                     .surface(.elevated, in: Circle())
+                    .accessibilityHidden(true)
+                    .accessibilityIdentifier("round.filesymbol")
                 VStack(alignment: .leading, spacing: Spacing.xxs.points) {
                     Text(verbatim: title).textRole(.subheadline).fontWeight(.semibold)
                     detail.textRole(.caption).tone(.secondary)
                 }
                 Spacer(minLength: Spacing.xs.points)
-                if let trailingSymbol { Image(systemName: trailingSymbol).tone(.secondary) }
+                if let trailingSymbol { Image(systemName: trailingSymbol).tone(.secondary).accessibilityHidden(true) }
             }
         }
     }
