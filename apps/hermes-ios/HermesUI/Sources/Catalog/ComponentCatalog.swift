@@ -114,15 +114,13 @@ public struct ComponentCatalog: View {
                 if let petFrame {
                     HStack(alignment: .bottom, spacing: Spacing.m.points) {
                         ForEach([PetSize.toolbar, .row, .hero], id: \.self) { size in
-                            PetAvatar(size) {
-                                Image(decorative: petFrame, scale: 1).resizable().interpolation(.none).scaledToFit()
-                            }
+                            PetAvatar(size) { CenteredPet(frame: petFrame, centering: PetCentering(frames: [petFrame])) }
                             .background(Surface.fill.style, in: Circle())
                         }
                     }
                     HStack(spacing: Spacing.m.points) {
-                        PetAvatar<EmptyView>.toolbarImage(petFrame)
-                        PetAvatar<EmptyView>.toolbarImage(petFrame, heart: PetAccent(sprite: petFrame))
+                        PetAvatar<EmptyView>.toolbarImage(petFrame, centering: PetCentering(frames: [petFrame]))
+                        PetAvatar<EmptyView>.toolbarImage(petFrame, centering: PetCentering(frames: [petFrame]), heart: PetAccent(sprite: petFrame))
                     }
                 }
             }

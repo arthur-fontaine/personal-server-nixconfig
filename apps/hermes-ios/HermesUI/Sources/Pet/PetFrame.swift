@@ -39,26 +39,21 @@ public extension PetAvatar where Sprite == EmptyView {
     ///
     /// `heart`: after a caress (design-rules 11.3), a tiny heart in the pet's colour at its
     /// top-trailing corner, drawn into the same image so the item stays the bar's circle.
-    static func toolbarImage(_ frame: CGImage, heart accent: PetAccent? = nil) -> Image {
-        Image(uiImage: toolbarUIImage(frame, heart: accent)).renderingMode(.original)
+    static func toolbarImage(_ frame: CGImage, centering: PetCentering = .identity, heart accent: PetAccent? = nil) -> Image {
+        Image(uiImage: toolbarUIImage(frame, centering: centering, heart: accent)).renderingMode(.original)
     }
 
-    /// The same, for UIKit's bar button.
-    static func toolbarUIImage(_ frame: CGImage, heart accent: PetAccent? = nil) -> UIImage {
+    /// The same, for UIKit's bar button: the pet centred optically in the bar's 36-pt circle
+    /// (design-rules 14.2), drawn into the square image the bar centres in it.
+    static func toolbarUIImage(_ frame: CGImage, centering: PetCentering = .identity, heart accent: PetAccent? = nil) -> UIImage {
         let side = PetSize.toolbar.width
-        let scale = UITraitCollection.current.displayScale
         let format = UIGraphicsImageRendererFormat()
-        format.scale = scale
-        let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { ctx in
+        format.scale = UITraitCollection.current.displayScale
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { ctx in
             ctx.cgContext.interpolationQuality = .none
-            let h = side, w = side / PetSize.aspect
-            // Core Graphics draws bottom-up: flip so the sprite stands upright.
-            ctx.cgContext.translateBy(x: 0, y: side)
-            ctx.cgContext.scaleBy(x: 1, y: -1)
-            ctx.cgContext.draw(frame, in: CGRect(x: (side - w) / 2, y: 0, width: w, height: h))
+            let rect = centering.drawRect(cell: CGSize(width: frame.width, height: frame.height), canvas: side, circle: Metric.barItem)
+            UIImage(cgImage: frame).draw(in: rect)
             if let accent {
-                ctx.cgContext.scaleBy(x: 1, y: -1)
-                ctx.cgContext.translateBy(x: 0, y: -side)
                 let colour = accent.shades[PetAccent.Appearance(UITraitCollection.current)]!.accent.uiColor
                 let config = UIImage.SymbolConfiguration(pointSize: HeartBadge.pointSize, weight: .bold)
                 if let heart = UIImage(systemName: "heart.fill", withConfiguration: config)?.withTintColor(colour, renderingMode: .alwaysOriginal) {
@@ -66,6 +61,5 @@ public extension PetAvatar where Sprite == EmptyView {
                 }
             }
         }
-        return image
     }
 }

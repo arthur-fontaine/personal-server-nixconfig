@@ -84,7 +84,8 @@ struct ChatScreen: View {
         guard let frame = PetSpriteView.sheet(store: store)?.frame(store.petAnimation, 0) else {
             return UIImage(systemName: "pawprint") ?? UIImage()
         }
-        return PetAvatar.toolbarUIImage(frame, heart: heart ? model.accent : nil)
+        return PetAvatar.toolbarUIImage(frame, centering: PetSpriteView.centering(store: store, stills: true),
+                                        heart: heart ? model.accent : nil)
     }
 
     /// "Pip, waiting for your approval": the pet and what Hermes is doing.
