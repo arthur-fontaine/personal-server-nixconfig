@@ -2007,7 +2007,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Réponse à vous : %@"
+            "value": "Réponse à ton message : %@"
           }
         }
       }
@@ -2017,7 +2017,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Répondre à Hermes : %@"
+            "value": "Tu réponds à Hermes : %@"
           }
         }
       }
@@ -2027,7 +2027,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Répondre à vous : %@"
+            "value": "Tu réponds à ton message : %@"
           }
         }
       }
@@ -2728,7 +2728,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vous"
+            "value": "Toi"
           }
         }
       }

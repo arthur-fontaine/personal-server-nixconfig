@@ -17,8 +17,8 @@ public struct ReplyContext: View {
     let label: Text
     let action: () -> Void
 
-    /// `speaker`: who wrote the reply — above the owner's bubble the context keeps to the bubble's
-    /// side and width (its leading room, its corner's inset). `label`: what VoiceOver reads
+    /// `speaker`: who wrote the reply — above the owner's bubble, put the pair in `ReplyPair`,
+    /// which gives the context the bubble's width and edge. `label`: what VoiceOver reads
     /// ("Reply to Hermes: …", 16.4).
     public init(_ kind: Kind, above speaker: Speaker, accessibilityLabel label: Text, action: @escaping () -> Void) {
         self.kind = kind
@@ -50,7 +50,8 @@ public struct ReplyContext: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .modifier(BubbleSide(isOwner: speaker == .owner))
+        // Fills the width it is given: above a bubble, the bar sits on the bubble's edge.
+        .frame(maxWidth: speaker == .owner ? .infinity : nil, alignment: .leading)
         .disabled(isGone || isLoading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
@@ -73,16 +74,46 @@ public extension View {
     func swipeToReply(_ action: @escaping () -> Void) -> some View { modifier(SwipeToReply(action: action)) }
 }
 
-/// Above the owner's bubble: within its width (its leading room) and its text's inset, so the bar
-/// lines up with the bubble's text.
-struct BubbleSide: ViewModifier {
-    let isOwner: Bool
-    func body(content: Content) -> some View {
-        if isOwner {
-            content.inset(.horizontal, Bubble.horizontal).padding(.leading, Metric.bubbleLeadingRoom)
-        } else {
-            content
-        }
+/// A reply's context over the owner's bubble (16.1): the context takes the bubble's width — at
+/// least `Metric.replyMinWidth`, so a one-word bubble still shows a readable excerpt — and the two
+/// are trailing-aligned, so the bar starts where the bubble does. `UserBubble` keeps its leading
+/// room inside its frame; the pair leaves it out.
+public struct ReplyPair<Context: View, Bubble: View>: View {
+    let context: Context
+    let bubble: Bubble
+
+    public init(@ViewBuilder context: () -> Context, @ViewBuilder bubble: () -> Bubble) {
+        self.context = context()
+        self.bubble = bubble()
+    }
+
+    public var body: some View {
+        ReplyPairLayout { context; bubble }
+    }
+}
+
+struct ReplyPairLayout: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 2 else { return .zero }
+        let (context, bubble) = measure(proposal, subviews)
+        return CGSize(width: max(bubble.width, context.width + Metric.bubbleLeadingRoom),
+                      height: context.height + Spacing.s.points + bubble.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 2 else { return }
+        let (context, bubble) = measure(proposal, subviews)
+        subviews[0].place(at: CGPoint(x: bounds.maxX - context.width, y: bounds.minY), anchor: .topLeading,
+                          proposal: ProposedViewSize(context))
+        subviews[1].place(at: CGPoint(x: bounds.maxX - bubble.width, y: bounds.minY + context.height + Spacing.s.points),
+                          anchor: .topLeading, proposal: ProposedViewSize(bubble))
+    }
+
+    private func measure(_ proposal: ProposedViewSize, _ subviews: Subviews) -> (CGSize, CGSize) {
+        let bubble = subviews[1].sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        let width = max(bubble.width - Metric.bubbleLeadingRoom, Metric.replyMinWidth)
+        let context = CGSize(width: width, height: subviews[0].sizeThatFits(ProposedViewSize(width: width, height: nil)).height)
+        return (context, bubble)
     }
 }
 

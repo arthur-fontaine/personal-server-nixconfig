@@ -111,6 +111,8 @@ enum Metric {
     static let replyBar: CGFloat = quoteRule
     /// How far a message follows the finger before a swipe replies (Messages: about 60 pt).
     static let replySwipe: CGFloat = 64
+    /// A reply context's narrowest, over a short bubble: room for "Hermes" and a few words.
+    static let replyMinWidth: CGFloat = 160
     /// File card's leading symbol box.
     static let fileSymbol: CGFloat = 40
     static let fileCardMaxWidth: CGFloat = 360

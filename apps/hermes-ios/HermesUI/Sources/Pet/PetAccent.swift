@@ -122,8 +122,13 @@ public struct PetAccent: Equatable, Sendable {
     }
 
     /// A light tint of the pet's colour behind primary text (15.3: selection, the owner's bubble).
+    /// In dark mode, the neutral fill instead: a bright colour at 20 % over black turns to mud
+    /// (Pip's amber reads #31210C, brown — round 6's U1), as Messages' dark bubbles are neutral.
     var tintColor: Color {
-        Color(uiColor: UIColor { [fills] t in fills[Appearance(t)]!.accent.uiColor.withAlphaComponent(PetAccent.lightTint) })
+        Color(uiColor: UIColor { [fills] t in
+            t.userInterfaceStyle == .dark ? .secondarySystemFill
+                : fills[Appearance(t)]!.accent.uiColor.withAlphaComponent(PetAccent.lightTint)
+        })
     }
     static let lightTint = 0.2
 
@@ -252,8 +257,10 @@ public extension View {
 
 extension EnvironmentValues {
     @Entry var onAccent: Color = .white
-    @Entry var accentFill: Color = .accentColor
-    @Entry var accentText: Color = .accentColor
+    // Outside `petAccent(_:)` (previews, a view shown before the pet loads): the default pet's.
+    // Not `.accentColor`: the app's asset is the label colour (15.2).
+    @Entry var accentFill: Color = PetAccent.fallback.fillColor
+    @Entry var accentText: Color = PetAccent.fallback.color
     @Entry var accentTint: Color = .clear
 }
 
@@ -356,5 +363,40 @@ struct RGB: Equatable, Hashable, Sendable {
         if s == 0 { self.init(r: l, g: l, b: l); return }
         let q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q
         self.init(r: f(p, q, h + 1 / 3), g: f(p, q, h), b: f(p, q, h - 1 / 3))
+    }
+}
+
+/// Demo and tests: another pet from Pip's sprite — its colours moved so the dominant one becomes
+/// `hex` ("6B4CE6"). Linear in OKLab (hue turned, lightness and chroma scaled), so the dominant
+/// colour moves with them; outlines and whites barely move (low chroma, scaled lightness).
+public enum PetRecolour {
+    public static func image(_ image: CGImage, toHex hex: String) -> CGImage? {
+        guard let target = Int(hex, radix: 16).map(RGB.init(hex:)), let source = PetAccent.dominant(in: image) else { return nil }
+        let from = OKLCH(source), to = OKLCH(target)
+        let lScale = to.l / from.l, cScale = to.c / from.c, turn = (to.h - from.h) * .pi / 180
+        let w = image.width, h = image.height
+        var data = [UInt8](repeating: 0, count: w * h * 4)
+        guard let ctx = CGContext(data: &data, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var cache: [UInt32: (UInt8, UInt8, UInt8)] = [:]
+        for i in stride(from: 0, to: data.count, by: 4) where data[i + 3] > 0 {
+            let alpha = Double(data[i + 3]) / 255
+            let key = UInt32(data[i]) << 24 | UInt32(data[i + 1]) << 16 | UInt32(data[i + 2]) << 8 | UInt32(data[i + 3])
+            let out = cache[key] ?? {
+                let lab = OKLab(RGB(r: Double(data[i]) / 255 / alpha, g: Double(data[i + 1]) / 255 / alpha,
+                                    b: Double(data[i + 2]) / 255 / alpha).clamped())
+                let a = (lab.a * cos(turn) - lab.b * sin(turn)) * cScale
+                let b = (lab.a * sin(turn) + lab.b * cos(turn)) * cScale
+                let c = OKLab(l: min(lab.l * lScale, 1), a: a, b: b).rgb.clamped()
+                func byte(_ v: Double) -> UInt8 { UInt8(min(max(v * alpha * 255 + 0.5, 0), 255)) }
+                let v = (byte(c.r), byte(c.g), byte(c.b))
+                cache[key] = v
+                return v
+            }()
+            data[i] = out.0; data[i + 1] = out.1; data[i + 2] = out.2
+        }
+        return ctx.makeImage()
     }
 }

@@ -34,9 +34,14 @@ public struct CallButton: View {
             .glassEffect(glass, in: Circle())
             .accessibilityLabel(title)
             .accessibilityShowsLargeContentViewer()
+            // Capped where the longest word ("Raccrocher", "Haut-parleur") still fits its column, so a
+            // label never breaks inside a word; bigger sizes read it in the Large Content Viewer, as
+            // the bar's items (HIG Accessibility; round 6's S6). ≥ 8 pt between columns.
             title.textRole(.caption).tone(.secondary)
                 .multilineTextAlignment(.center)
+                .dynamicTypeSize(...DynamicTypeSize.xLarge)
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(width: Metric.callColumn - Spacing.xs.points)
                 .accessibilityHidden(true)
         }
         // One fixed column per button, as the Phone app's grid: centres stay 96 pt apart whatever

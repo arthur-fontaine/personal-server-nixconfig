@@ -71,6 +71,7 @@ final class AppModel {
         store.hooks.spriteAvailable = { [weak self] pet, url in self?.spriteChanged(pet: pet, url: url) }
         store.start()
         if let hue = Self.value("-petHue", in: arguments).flatMap(Double.init) { Self.recolourBundledPet(degrees: hue) }
+        if let hex = Self.value("-petColor", in: arguments) { Self.recolourBundledPet(toHex: hex) }
         refreshAccent()
         applyLaunchArguments(arguments)
         IntentBridge.shared.answer = { [weak self] questionID, optionID in
@@ -158,6 +159,14 @@ final class AppModel {
         filter.setValue(degrees * .pi / 180, forKey: kCIInputAngleKey)
         guard let out = filter.outputImage, let cg = CIContext().createCGImage(out, from: out.extent) else { return }
         SpriteSheet.register(SpriteSheet(image: cg), for: url)
+    }
+
+    /// Demo: the violet pet of the review tour (`-petColor 6B4CE6`): Pip with its dominant colour
+    /// moved to that one (HermesUI's `PetRecolour`, tested).
+    private static func recolourBundledPet(toHex hex: String) {
+        guard let url = BundledPet.load()?.spritesheet, let image = SpriteSheet.decode(url),
+              let out = PetRecolour.image(image, toHex: hex) else { return }
+        SpriteSheet.register(SpriteSheet(image: out), for: url)
     }
 
     static func value(_ flag: String, in args: [String]) -> String? {

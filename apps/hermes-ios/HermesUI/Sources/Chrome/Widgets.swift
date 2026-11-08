@@ -17,7 +17,8 @@ public extension View {
     /// the system red for a refusal (HIG Buttons, roles), the pet's fill otherwise.
     @ViewBuilder func answerButton(destructive: Bool) -> some View {
         if destructive {
-            buttonStyle(.bordered).tint(.red)
+            // The app's Deny: a red label on the neutral fill, not a red wash (HIG alert roles).
+            foregroundStyle(.red).buttonStyle(.bordered).tint(.gray)
         } else {
             // The pet's colour as a fill with its black or white label (15.1), as Allow Once in the app.
             foregroundStyle(OnAccentStyle()).buttonStyle(.borderedProminent).accentFillTint()

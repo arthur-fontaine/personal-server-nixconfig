@@ -181,6 +181,14 @@ struct ChatScreen: View {
             .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, _ in
                 if following { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }
+            // The composer bar growing (a reply chip, a file, a longer draft) while following:
+            // the last message stays above it, the rhythm's gap apart (16.3; round 6's S4).
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.bottom } action: { _, _ in
+                if following { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+            }
+            .onChange(of: replyingTo?.id) {
+                if following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
+            }
             .onChange(of: questions.map(\.id)) {
                 withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }
