@@ -172,7 +172,7 @@ public struct ComponentCatalog: View {
     }()
 
     private func composer(_ action: ComposerAction, text: Binding<String>) -> some View {
-        ComposerBar(text: text, placeholder: Text(verbatim: "Message Hermes"), action: action, focus: $focus, onSend: {}, onStop: {}) {
+        ComposerBar(text: text, placeholder: Text(verbatim: "Message"), action: action, focus: $focus, onSend: {}, onStop: {}) {
             Button("File") {}
         }
     }
