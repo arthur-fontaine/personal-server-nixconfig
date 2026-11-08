@@ -19,7 +19,9 @@ xcode_app() {
   done
   [ -n "$newest" ] && echo "$newest"
 }
-xcode_signing() { as_agent /usr/bin/defaults read com.apple.dt.Xcode 2>/dev/null | grep -q 'teamID ='; }
+# Done when sideload finds a team: Xcode 27 no longer lists it in its
+# preferences, so through sideload's own lookup (lib.sh: sideload_team).
+xcode_signing() { sideload_team >/dev/null; }
 if [ "$(setting server.sideload.enable)" = 1 ]; then
   step "Sideload: Xcode's Apple Account"
   if ! on_hermes_screen; then
@@ -34,8 +36,11 @@ if [ "$(setting server.sideload.enable)" = 1 ]; then
       note "On the Mac's screen, in Xcode: Xcode → Settings… → Accounts → + → Apple Account, and sign in"
       note "(a free account works: it becomes a Personal Team)."
       hermes_gui /usr/bin/open "$xcode_path" >/dev/null 2>&1 || warn "Could not open $xcode_path on Hermes' screen."
-      while ! xcode_signing; do
+      while :; do
         gum confirm --affirmative "Check again" --negative "Skip" "Signed in?" || break
+        team_check="$(sideload_team)" && break
+        # Signed in without a certificate, Xcode 27 says nothing: sideload's error does.
+        warn "Not yet: $team_check"
         # Brings it back if it was closed meanwhile.
         hermes_gui /usr/bin/open "$xcode_path" >/dev/null 2>&1 || true
       done

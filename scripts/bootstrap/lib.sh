@@ -92,6 +92,20 @@ EOF
   return "${code:-1}"
 }
 
+# The team sideload signs with (modules/sideload: sideload team, run where
+# Hermes' login keychain is unlocked): its JSON on stdout; false with its
+# error in plain words when there is none. The account step and the devices
+# step agree with the service this way.
+sideload_team() {
+  local out
+  if out="$(as_gateway "sideload team" 2>/dev/null)"; then
+    echo "$out"
+  else
+    "$JQ" -r '.error // empty' <<< "$out" 2>/dev/null | grep . || echo "sideload does not answer yet (the configuration not applied?)"
+    return 1
+  fi
+}
+
 # The launcher (the gateway, so Hermes) reads the system's TCC database only with Full Disk Access.
 full_disk_access() {
   gui_session && as_gateway "head -c 1 '/Library/Application Support/com.apple.TCC/TCC.db'" >/dev/null 2>&1

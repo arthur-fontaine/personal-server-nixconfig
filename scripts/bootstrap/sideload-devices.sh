@@ -162,11 +162,23 @@ elif needs "a device to sideload on" && gum confirm "Pair an iPhone or iPad now?
   app_json="$(app_devices)"
   if [ "$(app_paired "$app_json")" -gt 0 ]; then
     ok "Apps can be sideloaded on: $(app_names "$app_json")"
-    if [ "$(setting server.hermes.app.delivery.enable)" = 1 ] \
-      && ask "Install the Hermes app on them now (a few minutes, in the background)?"; then
-      as_gateway "sideload install hermes --reason 'first install'" >/dev/null 2>&1 \
-        && ok "Installing: its log is ~$agent/Library/Logs/sideload.log" \
-        || warn "Could not start the install: ask Hermes to install the app."
+    if [ "$(setting server.hermes.app.delivery.enable)" = 1 ]; then
+      if ! app_team="$(sideload_team)"; then
+        case "$app_team" in
+          "no Apple Account"*) warn "Xcode isn't signed in to an Apple Account yet: run bootstrap-macos.sh sideload-account first, then this step again." ;;
+          *) warn "No install yet: $app_team" ;;
+        esac
+      elif ask "Install the Hermes app on them now (a few minutes, in the background)?"; then
+        # Its answer is kept: a refusal (no team, unknown app) is the only
+        # word of why nothing installs.
+        if app_out="$(as_gateway "sideload install hermes --reason 'first install'" 2>&1)"; then
+          ok "Installing in the background: sideload status hermes shows where it is (log: ~$agent/Library/Logs/sideload.log)."
+          note "Once it is on the iPhone, trust its developer there before opening it:"
+          note "Settings › General › VPN & Device Management › your Apple Account › Trust."
+        else
+          warn "Could not start the install: $("$JQ" -r '.error // empty' <<< "$app_out" 2>/dev/null | grep . || echo "$app_out")"
+        fi
+      fi
     fi
   fi
 fi
