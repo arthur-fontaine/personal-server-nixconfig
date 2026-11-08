@@ -43,6 +43,9 @@ public struct ComposerBar<MenuItems: View>: View {
                     Image(systemName: "plus")
                         .textRole(.body).imageScale(.large)
                         .tone(.primary)
+                        // Bar glyphs keep their size and show in the Large Content Viewer instead,
+                        // as the system's bars do: the circle stays a 44-pt circle at AX sizes.
+                        .dynamicTypeSize(...DynamicTypeSize.large)
                         .frame(width: Metric.composerControl, height: Metric.composerControl)
                         .contentShape(Circle())
                 }
@@ -50,6 +53,7 @@ public struct ComposerBar<MenuItems: View>: View {
                 // Bar controls are monochrome (HIG Toolbars); the accent is Send's.
                 .tint(.primary)
                 .accessibilityLabel(Text("Attach"))
+                .accessibilityShowsLargeContentViewer()
                 .accessibilityIdentifier("composer.attach")
 
                 HStack(alignment: .bottom, spacing: 0) {
@@ -83,6 +87,7 @@ public struct ComposerBar<MenuItems: View>: View {
         Button(action: isStop ? onStop : onSend) {
             Image(systemName: isStop ? "stop.fill" : (action.isSending ? "ellipsis" : "arrow.up"))
                 .textRole(.body).fontWeight(.semibold)
+                .dynamicTypeSize(...DynamicTypeSize.large)
                 .foregroundStyle(enabled ? AnyShapeStyle(OnAccentStyle()) : AnyShapeStyle(.tertiary))
                 .frame(width: Metric.sendButton, height: Metric.sendButton)
                 .background(enabled ? AnyShapeStyle(.tint) : Surface.fill.style, in: Circle())
@@ -95,6 +100,7 @@ public struct ComposerBar<MenuItems: View>: View {
         .disabled(!enabled)
         .keyboardShortcut(.return, modifiers: .command)
         .accessibilityLabel(isStop ? Text("Stop") : Text("Send"))
+        .accessibilityShowsLargeContentViewer()
         .accessibilityIdentifier(isStop ? "composer.stop" : "composer.send")
     }
 }
@@ -214,6 +220,12 @@ public struct BarButton<Icon: View>: View {
             .accessibilityLabel(title)
             .tint(.primary)
     }
+}
+
+public extension View {
+    /// Bars and their menus stay monochrome (HIG Toolbars): for a sheet's toolbar items and a
+    /// title menu's content, whose system controls otherwise take the app's accent.
+    func barMonochrome() -> some View { tint(.primary) }
 }
 
 public extension BarButton where Icon == Image {

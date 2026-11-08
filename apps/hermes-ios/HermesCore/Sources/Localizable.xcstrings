@@ -201,12 +201,12 @@
         }
       }
     },
-    "Delete backup snapshots older than 90 days to free about 212 GB on the external disk": {
+    "Delete backup snapshots older than 90 days to free about 212 GB on the external disk?": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Supprimer les instantanés de sauvegarde de plus de 90 jours pour libérer environ 212 Go sur le disque externe"
+            "value": "Supprimer les instantanés de sauvegarde de plus de 90 jours pour libérer environ 212 Go sur le disque externe ?"
           }
         }
       }

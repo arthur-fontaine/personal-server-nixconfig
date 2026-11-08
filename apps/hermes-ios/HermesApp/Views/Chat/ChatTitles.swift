@@ -50,6 +50,22 @@ struct ChatsMenu: View {
             Text("Chats")
         }
         .pickerStyle(.inline)
+        .barMonochrome()
         Button { model.showNewSubchat = true } label: { Label("New Sub-chat", systemImage: "plus") }
+            .barMonochrome()
+    }
+}
+
+/// The chats in the title's menu on iPhone; none on iPad, where the sidebar lists them (an empty
+/// title menu still draws its chevron).
+struct ChatsTitleMenu: ViewModifier {
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.toolbarTitleMenu { ChatsMenu() }
+        } else {
+            content
+        }
     }
 }

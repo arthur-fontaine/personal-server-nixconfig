@@ -23,8 +23,10 @@ struct PetSheet: View {
                                 store.petReaction = .waving
                                 UIImpactFeedbackGenerator(style: .soft).impactOccurred()
                             }
-                        Label(store.petMood.caption, systemImage: store.petMood.symbol).textRole(.headline)
-                        AgentStatusLabel(agent: store.agent)
+                        Text(store.petMood.caption).textRole(.headline)
+                        if let task = store.agent.task, store.agent.status != .idle {
+                            Text(task).textRole(.subheadline).tone(.secondary)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -38,6 +40,7 @@ struct PetSheet: View {
                         Button { perform(action) } label: {
                             HGroup(spacing: .s) {
                                 Label(action.title, systemImage: action.symbol)
+                                    .accessibilityIdentifier("pet.action.\(action.id)")
                                 Spacer()
                                 if busy == action { ProgressView() }
                             }
@@ -45,15 +48,20 @@ struct PetSheet: View {
                         .disabled(busy != nil || store.pet == nil)
                     }
                 }
-                Section("Level") {
-                    Gauge(value: store.pet?.levelProgress ?? 0) {
-                        Text("Level \(store.pet?.level ?? 1)")
-                    } currentValueLabel: {
-                        if let pet = store.pet {
-                            Text("\(pet.xp) XP, \((pet.xpForNextLevel ?? PetState.totalXP(forLevel: pet.level)) - pet.xp) to the next level")
+                Section {
+                    VGroup(spacing: .xs) {
+                        HGroup(spacing: .s) {
+                            Text("Level \(store.pet?.level ?? 1)")
+                            Spacer()
+                            if let pet = store.pet {
+                                Text("\(pet.xp) XP, \((pet.xpForNextLevel ?? PetState.totalXP(forLevel: pet.level)) - pet.xp) to the next level")
+                                    .textRole(.subheadline).tone(.secondary).monospacedDigit()
+                            }
                         }
+                        ProgressView(value: store.pet?.levelProgress ?? 0)
+                            .accessibilityHidden(true)
                     }
-                    .gaugeStyle(.linearCapacity)
+                    .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("pet.level")
                 }
                 Section {
@@ -65,11 +73,12 @@ struct PetSheet: View {
             .navigationTitle(store.pet?.name ?? String(localized: "Pet"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button(role: .close) { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(role: .close) { dismiss() }.barMonochrome() }
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button { showGenerate = true } label: { Label("Hatch a New Pet…", systemImage: "sparkles") }
                     } label: { Label("More", systemImage: "ellipsis") }
+                    .barMonochrome()
                 }
             }
             .navigationDestination(for: AppSection.self) { section in
@@ -84,13 +93,18 @@ struct PetSheet: View {
         .sheet(isPresented: $showGenerate) { GeneratePetSheet() }
     }
 
+    /// A need: its name and value on one line, the bar below (the accent: the pet's status).
     private func need(_ title: LocalizedStringKey, symbol: String, value: Double) -> some View {
-        Gauge(value: value) {
-            Label(title, systemImage: symbol)
-        } currentValueLabel: {
-            Text(value, format: .percent.precision(.fractionLength(0)))
+        VGroup(spacing: .xs) {
+            HGroup(spacing: .s) {
+                Label { Text(title) } icon: { Image(systemName: symbol).tone(.secondary) }
+                Spacer()
+                Text(value, format: .percent.precision(.fractionLength(0))).tone(.secondary).monospacedDigit()
+            }
+            ProgressView(value: value)
+                .accessibilityHidden(true)
         }
-        .gaugeStyle(.linearCapacity)
+        .accessibilityElement(children: .combine)
         .animation(.smooth, value: value)
     }
 

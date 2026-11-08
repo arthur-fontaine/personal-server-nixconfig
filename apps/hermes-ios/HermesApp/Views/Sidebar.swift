@@ -25,8 +25,8 @@ struct Sidebar: View {
                 .accessibilityIdentifier("sidebar.pet")
             }
             Section("Chats") {
-                row(.main).badge(store.mainThread.unreadCount)
-                ForEach(store.threads) { thread in row(thread.id).badge(thread.unreadCount) }
+                row(.main, unread: store.mainThread.unreadCount)
+                ForEach(store.threads) { thread in row(thread.id, unread: thread.unreadCount) }
                 Button { model.showNewSubchat = true } label: { Label("New Sub-chat", systemImage: "plus") }
             }
             Section {
@@ -38,10 +38,12 @@ struct Sidebar: View {
         .listStyle(.sidebar)
     }
 
-    private func row(_ topic: TopicID) -> some View {
+    /// The tag outermost: the list's selection reads it from the row itself.
+    private func row(_ topic: TopicID, unread: Int) -> some View {
         Label(ChatTitle.name(topic, store: store), systemImage: ChatTitle.symbol(topic, store: store))
-            .tag(SidebarItem.topic(topic))
+            .badge(unread)
             .accessibilityIdentifier("sidebar.chat.\(topic)")
+            .tag(SidebarItem.topic(topic))
     }
 
     enum SidebarItem: Hashable {

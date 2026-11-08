@@ -67,7 +67,7 @@ public enum Fixtures {
             id: "ea:7", kind: .approval, chat: .main, messageID: messageID,
             text: L("Dangerous command: restic forget --keep-within 90d --prune"),
             spoken: L("Hermes asks to delete backups older than ninety days. Allow?"),
-            summary: L("Delete backup snapshots older than 90 days to free about 212 GB on the external disk"),
+            summary: L("Delete backup snapshots older than 90 days to free about 212 GB on the external disk?"),
             command: "restic -r /Volumes/Backup/restic forget --keep-within 90d --prune",
             options: [
                 QuestionOption(id: "once", label: L("Once"), data: Data("ea:once:7".utf8)),
