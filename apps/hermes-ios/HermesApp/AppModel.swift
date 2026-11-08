@@ -181,9 +181,13 @@ final class AppModel {
             spriteFile = SharedContainer.storeSpritesheet(url, petID: pet?.id ?? "pip", version: pet?.version ?? 0, group: config.appGroup)
             if let spriteFile { PetStills.ensure(sheet: spriteFile, source: url, group: config.appGroup) }
         }
-        let snap = SharedSnapshot(
+        let raw = SharedSnapshot(
             petName: pet?.name ?? "Pip", mood: store.petMood, agentStatus: store.agent.status, agentTask: store.agent.task,
             questionText: store.questions.first.map { $0.summary ?? $0.text }, spritesheetFile: spriteFile)
+        // A private sub-chat's task and question stay in the app (1.4b).
+        let snap = PrivateRedaction.snapshot(raw, agentPrivate: store.isPrivate(store.agent.chat ?? .main),
+                                             questionPrivate: store.questions.first.map { store.isPrivate($0.chat) } ?? false,
+                                             needsYou: String(localized: "Hermes needs you"))
         var comparable = snap
         comparable.updatedAt = lastSnapshot?.updatedAt ?? snap.updatedAt
         guard comparable != lastSnapshot else { return }

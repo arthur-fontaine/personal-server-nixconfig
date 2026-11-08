@@ -71,6 +71,22 @@
         }
       }
     },
+    "%@: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@: %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : %2$@"
+          }
+        }
+      }
+    },
     "%lld": {
       "shouldTranslate": false
     },
@@ -652,6 +668,16 @@
         }
       }
     },
+    "Delete 41 old snapshots?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer 41 anciens instantanés ?"
+          }
+        }
+      }
+    },
     "Delete Model": {
       "localizations": {
         "fr": {
@@ -712,12 +738,32 @@
         }
       }
     },
+    "Done": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminé"
+          }
+        }
+      }
+    },
     "Download (%@, Wi-Fi)": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Télécharger (%@, Wi-Fi)"
+          }
+        }
+      }
+    },
+    "Dynamic Island": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dynamic Island"
           }
         }
       }
@@ -1094,6 +1140,16 @@
         }
       }
     },
+    "Home Screen": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Écran d’accueil"
+          }
+        }
+      }
+    },
     "Hour": {
       "extractionState": "stale",
       "localizations": {
@@ -1219,6 +1275,16 @@
         }
       }
     },
+    "Live Activity": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activité en direct"
+          }
+        }
+      }
+    },
     "Local": {
       "comment": "Model role",
       "localizations": {
@@ -1226,6 +1292,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Local"
+          }
+        }
+      }
+    },
+    "Lock Screen": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Écran verrouillé"
           }
         }
       }
@@ -1461,6 +1537,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nouvelle sous-discussion…"
+          }
+        }
+      }
+    },
+    "New message": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouveau message"
           }
         }
       }
@@ -1817,6 +1903,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fournisseur"
+          }
+        }
+      }
+    },
+    "Pruning old backups": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nettoyage des anciennes sauvegardes"
           }
         }
       }
