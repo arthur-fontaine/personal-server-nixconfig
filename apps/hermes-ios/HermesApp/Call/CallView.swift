@@ -110,16 +110,15 @@ struct VoiceModelRow: View {
             LabeledContent { Text(status) } label: { Label("LFM3-Omni voice", systemImage: "waveform") }
             switch models.state {
             case .absent, .failed:
-                Button("Download (\(ByteCountFormatter.string(fromByteCount: VoiceModelStore.totalBytes, countStyle: .file)), Wi-Fi)") {
-                    models.download()
-                }
+                ListActionRow(Text("Download (\(ByteCountFormatter.string(fromByteCount: VoiceModelStore.totalBytes, countStyle: .file)), Wi-Fi)"),
+                              detail: nil, systemImage: "arrow.down.circle") { models.download() }
                 if case .failed(let e) = models.state { Text(e).textRole(.caption).tone(.destructive) }
             case .downloading(let p):
                 ProgressView(value: p)
-                Button("Cancel", role: .cancel) { models.cancel() }
+                ListActionRow(Text("Cancel"), detail: nil, systemImage: "xmark") { models.cancel() }
             case .waitingForWiFi:
                 Text("Waiting for Wi-Fi…").textRole(.caption).tone(.secondary)
-                Button("Cancel", role: .cancel) { models.cancel() }
+                ListActionRow(Text("Cancel"), detail: nil, systemImage: "xmark") { models.cancel() }
             case .ready:
                 Button("Delete Model", role: .destructive) { confirmDelete = true }
             }

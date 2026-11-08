@@ -21,7 +21,7 @@ struct NotificationsPrompt: View {
                     dismiss()
                 }
             }
-            Button("Not Now") { model.askNotifications = false; dismiss() }
+            SecondaryButton("Not Now", fullWidth: true) { model.askNotifications = false; dismiss() }
         }
         .presentationDetents([.large])
     }

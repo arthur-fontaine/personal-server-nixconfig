@@ -44,15 +44,26 @@ public struct PrimaryButton: View {
 /// A secondary action beside or under a primary one: `.bordered` on the neutral fill.
 public struct SecondaryButton: View {
     let title: Text
+    let systemImage: String?
+    let fullWidth: Bool
     let action: () -> Void
 
-    public init(_ title: LocalizedStringKey, action: @escaping () -> Void) {
+    public init(_ title: LocalizedStringKey, systemImage: String? = nil, fullWidth: Bool = false, action: @escaping () -> Void) {
         self.title = Text(title)
+        self.systemImage = systemImage
+        self.fullWidth = fullWidth
         self.action = action
     }
 
     public var body: some View {
-        Button(action: action) { title.foregroundStyle(Color(uiColor: .label)) }
+        Button(action: action) {
+            HStack(spacing: Spacing.xs.points) {
+                if let systemImage { Image(systemName: systemImage) }
+                title
+            }
+            .frame(maxWidth: fullWidth ? .infinity : nil)
+            .foregroundStyle(Color(uiColor: .label))
+        }
             .buttonStyle(.bordered)
             .tint(.gray)
             .controlSize(.large)

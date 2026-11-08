@@ -324,3 +324,26 @@ public extension BarButton where Icon == Image {
         self.init(Text(title), action: action) { Image(systemName: systemImage) }
     }
 }
+
+/// A sheet's confirming action in its toolbar (Create, Unlock…): the system's prominent glass, in
+/// the pet's colour with its black or white label (15.1) — not accent text.
+public struct ConfirmButton: View {
+    let title: Text
+    let action: () -> Void
+
+    public init(_ title: LocalizedStringKey, action: @escaping () -> Void) {
+        self.title = Text(title)
+        self.action = action
+    }
+
+    public var body: some View {
+        Button(action: action) { title.foregroundStyle(OnAccentStyle()) }
+            .buttonStyle(.glassProminent)
+            .accentFillTint()
+    }
+}
+
+public extension View {
+    /// A menu picker in a list row: its value in secondary, as Settings' (15.2: no accent text).
+    func valuePicker() -> some View { tint(.secondary) }
+}

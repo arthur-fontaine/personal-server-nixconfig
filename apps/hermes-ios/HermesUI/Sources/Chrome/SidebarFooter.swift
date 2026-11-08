@@ -38,14 +38,62 @@ public struct SidebarFooterRow: View {
                     .accessibilityHidden(true)
                 title
             }
-            .tone(selected ? .accent : .primary)
+            .tone(.primary)
             .textRole(.body)
             .frame(maxWidth: .infinity, minHeight: Metric.sidebarRow, alignment: .leading)
                 .inset(.horizontal, .s)
-                .background(selected ? Surface.fill.style : AnyShapeStyle(Color.clear), in: shape)
+                // Selected: a light tint of the pet's colour behind primary text (15.2–15.3).
+                .background(selected ? AnyShapeStyle(AccentTintStyle()) : AnyShapeStyle(Color.clear), in: shape)
                 .contentShape(shape)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+/// A sidebar row: the system row's metrics, selected with a light tint of the pet's colour behind
+/// primary text (15.2) — not accent text on a grey pill.
+public struct SidebarRow<Badge: View>: View {
+    let title: Text
+    let systemImage: String
+    let selected: Bool
+    let badge: Badge
+    let action: () -> Void
+
+    public init(_ title: Text, systemImage: String, selected: Bool, action: @escaping () -> Void, @ViewBuilder badge: () -> Badge) {
+        self.title = title
+        self.systemImage = systemImage
+        self.selected = selected
+        self.badge = badge()
+        self.action = action
+    }
+
+    public var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Radius.composerField, style: .continuous)
+        Button(action: action) {
+            HStack {
+                Label { title } icon: { Image(systemName: systemImage).accessibilityHidden(true) }
+                Spacer(minLength: Spacing.xs.points)
+                badge
+            }
+            .tone(.primary)
+            // The list's own row height and insets, as the system's sidebar rows.
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        // The row's own frame, as the system's selection pill.
+        .listRowBackground(selected ? shape.fill(AccentTintStyle()) : nil)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+/// An unread count, as the system's list badge.
+public struct UnreadBadge: View {
+    let count: Text?
+    /// A count, not a measure: nil or zero shows nothing.
+    public init(_ count: Text?) { self.count = count }
+    public var body: some View {
+        if let count { count.textRole(.subheadline).tone(.secondary).monospacedDigit() }
     }
 }

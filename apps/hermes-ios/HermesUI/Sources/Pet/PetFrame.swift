@@ -54,7 +54,8 @@ public extension PetAvatar where Sprite == EmptyView {
             let rect = centering.drawRect(cell: CGSize(width: frame.width, height: frame.height), canvas: side, circle: Metric.barItem)
             UIImage(cgImage: frame).draw(in: rect)
             if let accent {
-                let colour = accent.shades[PetAccent.Appearance(UITraitCollection.current)]!.accent.uiColor
+                // The pet's own colour (15.1): a heart, not text.
+                let colour = accent.fills[PetAccent.Appearance(UITraitCollection.current)]!.accent.uiColor
                 let config = UIImage.SymbolConfiguration(pointSize: HeartBadge.pointSize, weight: .bold)
                 if let heart = UIImage(systemName: "heart.fill", withConfiguration: config)?.withTintColor(colour, renderingMode: .alwaysOriginal) {
                     heart.draw(at: CGPoint(x: side - heart.size.width, y: 0))

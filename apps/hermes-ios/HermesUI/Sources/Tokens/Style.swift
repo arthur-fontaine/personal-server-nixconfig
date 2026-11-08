@@ -29,7 +29,7 @@ public enum Tone: CaseIterable, Sendable {
         case .primary: AnyShapeStyle(.primary)
         case .secondary: AnyShapeStyle(.secondary)
         case .tertiary: AnyShapeStyle(.tertiary)
-        case .accent: AnyShapeStyle(.tint)
+        case .accent: AnyShapeStyle(AccentTextStyle())
         case .destructive: AnyShapeStyle(.red)
         case .warning: AnyShapeStyle(.orange)
         }
