@@ -34,7 +34,7 @@ struct CommandPalette: View {
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search commands")
             .navigationTitle("Commands")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button(role: .close) { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { DismissButton(.close) { dismiss() } } }
             .navigationDestination(for: Destination.self) { d in
                 switch d {
                 case .model: ModelMenu(topic: topic) { dismiss() }
@@ -49,6 +49,7 @@ struct CommandPalette: View {
                 }
             }
         }
+        .groupedRows()
         .onAppear { query = filter }
         .confirmationDialog(confirming?.0.confirm ?? "", isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }),
                             titleVisibility: .visible) {
@@ -163,23 +164,12 @@ struct ModelMenu: View {
         let control = store.controls.model
         List {
             Section {
-                // The system's choice of one: picking sets the model and closes the palette.
-                Picker(selection: Binding(get: { control?.selected(in: topic)?.id }, set: { id in
-                    if let m = control?.chain.first(where: { $0.id == id }) { pick(m) }
-                })) {
-                    ForEach(control?.chain ?? []) { m in
-                        VGroup(spacing: .xxs) {
-                            Text(m.model)
-                            Text([m.provider, roleLabel(m.role)].compactMap { $0 }.joined(separator: ", "))
-                                .textRole(.footnote).tone(.secondary)
-                        }
-                        .tag(Optional(m.id))
-                    }
-                } label: {
-                    Text("Model")
+                // A choice of one: picking sets the model and closes the palette.
+                ForEach(control?.chain ?? []) { m in
+                    ChoiceRow(Text(m.model),
+                              detail: Text([m.provider, roleLabel(m.role)].compactMap { $0 }.joined(separator: ", ")),
+                              isSelected: control?.selected(in: topic)?.id == m.id) { pick(m) }
                 }
-                .pickerStyle(.inline)
-                .labelsHidden()
             } footer: {
                 VGroup(spacing: .xs) {
                     if let last = control?.last[topic], last != control?.selected(in: topic) {
@@ -217,27 +207,13 @@ struct PermissionPicker: View {
     var body: some View {
         let p = store.controls.permissionMode
         List {
-            Picker(selection: Binding(get: { p?.value }, set: { id in
-                guard let id else { return }
-                done()
-                Task { do { try await store.setPermissionMode(id) } catch { model.showToast(error.localizedDescription) } }
-            })) {
-                ForEach(p?.options ?? []) { o in
-                    Label {
-                        VGroup(spacing: .xxs) {
-                            Text(o.label)
-                            if let d = o.description { Text(d).textRole(.footnote).tone(.secondary) }
-                        }
-                    } icon: {
-                        Image(systemName: o.id == "auto" ? "wand.and.stars" : "hand.raised").accessibilityHidden(true)
-                    }
-                    .tag(Optional(o.id))
+            ForEach(p?.options ?? []) { o in
+                ChoiceRow(Text(o.label), detail: o.description.map { Text($0) },
+                          systemImage: o.id == "auto" ? "wand.and.stars" : "hand.raised", isSelected: p?.value == o.id) {
+                    done()
+                    Task { do { try await store.setPermissionMode(o.id) } catch { model.showToast(error.localizedDescription) } }
                 }
-            } label: {
-                Text("Permission Mode")
             }
-            .pickerStyle(.inline)
-            .labelsHidden()
         }
         .navigationTitle("Permission Mode")
     }
@@ -252,19 +228,13 @@ struct OptionPicker: View {
 
     var body: some View {
         List {
-            Picker(selection: Binding<String?>(get: { nil }, set: { option in
-                guard let option, let text = command.text(["value": option]) else { return }
-                done()
-                Task { do { try await store.run(command: text, in: topic) } catch { model.showToast(error.localizedDescription) } }
-            })) {
-                ForEach(command.options, id: \.self) { option in
-                    Text(PresetNames.option(option)).tag(Optional(option))
+            ForEach(command.options, id: \.self) { option in
+                ChoiceRow(Text(PresetNames.option(option)), isSelected: false) {
+                    guard let text = command.text(["value": option]) else { return }
+                    done()
+                    Task { do { try await store.run(command: text, in: topic) } catch { model.showToast(error.localizedDescription) } }
                 }
-            } label: {
-                Text(command.label)
             }
-            .pickerStyle(.inline)
-            .labelsHidden()
         }
         .navigationTitle(command.label)
     }

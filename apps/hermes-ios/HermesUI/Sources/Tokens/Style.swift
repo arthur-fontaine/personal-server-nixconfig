@@ -71,7 +71,8 @@ public extension View {
     /// A system grouped list (Form, inset-grouped List) in a readable column on wide screens, its
     /// grouped background running edge to edge (as Settings on iPad; design-rules 2.2, 6.3).
     func readableGroupedList() -> some View {
-        frame(maxWidth: Metric.readableWidth)
+        groupedRows()
+            .frame(maxWidth: Metric.readableWidth)
             .frame(maxWidth: .infinity)
             .background(Color(uiColor: .systemGroupedBackground))
     }

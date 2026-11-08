@@ -325,11 +325,14 @@ public extension BarButton where Icon == Image {
     }
 }
 
-/// A sheet's confirming action in its toolbar (Create, Unlock…): the system's prominent glass, in
-/// the pet's colour with its black or white label (15.1) — not accent text.
+/// A sheet's confirming action in its toolbar (Create, Unlock, Hatch): the system's confirm role,
+/// which the bar draws prominent (HIG Toolbars: "use the prominent style for key actions such as
+/// Done"), filled with the pet's colour and its black or white label (15.1).
 public struct ConfirmButton: View {
     let title: Text
     let action: () -> Void
+    @Environment(\.accentFill) private var fill
+    @Environment(\.onAccent) private var label
 
     public init(_ title: LocalizedStringKey, action: @escaping () -> Void) {
         self.title = Text(title)
@@ -337,9 +340,26 @@ public struct ConfirmButton: View {
     }
 
     public var body: some View {
-        Button(action: action) { title.foregroundStyle(OnAccentStyle()) }
+        Button(role: .confirm, action: action) { title.foregroundStyle(label) }
             .buttonStyle(.glassProminent)
-            .accentFillTint()
+            .tint(fill)
+    }
+}
+
+/// A sheet's dismissing action (× or Cancel): the system's role, monochrome (HIG Toolbars: prefer
+/// monochrome items; 15.2: no accent glyph).
+public struct DismissButton: View {
+    public enum Kind: Sendable { case close, cancel }
+    let kind: Kind
+    let action: () -> Void
+
+    public init(_ kind: Kind, action: @escaping () -> Void) {
+        self.kind = kind
+        self.action = action
+    }
+
+    public var body: some View {
+        Button(role: kind == .close ? .close : .cancel, action: action).barMonochrome()
     }
 }
 

@@ -25,7 +25,7 @@ struct NewPetSheet: View {
             .navigationTitle("New Pet")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button(role: .cancel) { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { DismissButton(.cancel) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     ConfirmButton("Hatch") {
                         var req = AppRequest.petGenerate(prompt: prompt)

@@ -36,7 +36,9 @@ public struct OnboardingPage<Hero: View, Fields: View, Actions: View>: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .safeAreaBar(edge: .bottom) {
+            // Its top inset keeps scrolled content ≥ 8 pt off the buttons (design-rules 2.4).
             VStack(spacing: Spacing.s.points) { actions }
+                .inset(.top, .s)
                 .inset(.bottom, .m)
                 .onboardingColumn()
         }
