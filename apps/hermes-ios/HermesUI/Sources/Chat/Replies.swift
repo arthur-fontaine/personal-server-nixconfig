@@ -117,9 +117,23 @@ struct ReplyPairLayout: Layout {
     }
 }
 
+public extension View {
+    /// Review only: behave as with Reduce Motion (the simulator's setting can't be scripted).
+    func reviewReducedMotion(_ on: Bool) -> some View { environment(\.reviewReducedMotion, on) }
+}
+
+public extension EnvironmentValues {
+    /// Reduce Motion, or the review's stand-in for it.
+    var reducesMotion: Bool { accessibilityReduceMotion || reviewReducedMotion }
+}
+
+extension EnvironmentValues {
+    @Entry var reviewReducedMotion = false
+}
+
 struct ReplyHighlight: ViewModifier {
     let isOn: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.reducesMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
@@ -159,6 +173,8 @@ struct SwipeToReply: ViewModifier {
                         .accessibilityHidden(true)
                 }
             }
+            // Leaving touches to what is inside: a reply's context and links are
+            // buttons that must still take a tap (round 6: the context's tap never fired).
             .gesture(ReplyPan(direction: direction) { dx in
                 offset = max(0, dx)
             } ended: { dx in
@@ -181,6 +197,7 @@ struct ReplyPan: UIGestureRecognizerRepresentable {
 
     func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
         let pan = UIPanGestureRecognizer()
+        pan.cancelsTouchesInView = false
         pan.delegate = context.coordinator
         return pan
     }

@@ -11,7 +11,9 @@ struct RootView: View {
         @Bindable var model = model
         Group {
             if model.widgetGallery {
-                WidgetGallery(sprite: model.writeWidgetStills())
+                // In a stack with an inline title: scrolled content goes under the bar's edge
+                // effect, not under the status bar (round 6's U2).
+                NavigationStack { WidgetGallery(sprite: model.writeWidgetStills()).navigationTitle(Text(verbatim: "Widgets")) }
             } else if let page = model.catalogPage {
                 NavigationStack {
                     ComponentCatalog(page: page, petFrame: BundledPet.load().flatMap { SpriteSheet.cached(url: $0.spritesheet)?.frame(.idle, 0) })
@@ -21,6 +23,7 @@ struct RootView: View {
             }
         }
         .petAccent(model.accent)
+        .reviewReducedMotion(model.reduceMotion)
         .animation(.smooth, value: store.auth)
         .animation(.smooth, value: store.bot)
         .fullScreenCover(isPresented: $model.callPresented) { CallView() }
