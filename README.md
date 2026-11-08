@@ -26,15 +26,24 @@ The layout follows [arthur-fontaine/nixconfig](https://github.com/arthur-fontain
 - **Apple's apps**: iMessage, Notes, Reminders, Find My, Calendar, Contacts,
   Mail, Maps, Music, Shortcuts… on your Apple Account (the Apple skills and
   [iMCP](https://github.com/mattt/iMCP)).
-- **An iPhone and iPad app**, optional: a Telegram client of that DM, fed by a
-  hidden topic (what Hermes is doing, its questions, stats, a pet), with spoken
-  notifications and calls ([`docs/app.md`](./docs/app.md)).
+- **Auto mode as the permission system**: Claude Code's auto mode, ported
+  (safe actions run, a review model blocks risky ones, you are asked after
+  repeated blocks), or ask mode; `/mode` switches. Approval cards name a long
+  command in plain words.
 - **Integrations, each optional**: WhatsApp, Instagram, Discord, Home
-  Assistant, HomeKit, 1Password, RunPod, GitHub notifications, TinyFish web
-  search.
-- **The Hermes app** on your iPhone and iPad, if you want it: built here,
-  signed with your Apple Account (a free one: re-signed every few days by
-  itself) and installed over Wi-Fi ([`docs/app.md`](./docs/app.md)).
+  Assistant, HomeKit, 1Password, RunPod, GitHub notifications, TinyFish (web
+  search, page reading and images).
+- **The Hermes app** on your iPhone and iPad, optional: a Telegram client of
+  that DM, fed by a hidden topic (what Hermes is doing, its questions, stats, a
+  pet), with spoken notifications and calls; built here with the current pet,
+  signed with your Apple Account and installed over Wi-Fi
+  ([`docs/app.md`](./docs/app.md)).
+- **A sideload service**, optional: Hermes installs any iOS app you ask for
+  (an `.ipa`, an Xcode project) on your devices, and this Mac keeps it signed
+  (a free Apple Account: re-signed every few days)
+  ([`docs/sideload.md`](./docs/sideload.md)).
+- **Prompt caches kept warm** between your messages, so a reply after a pause
+  does not pay for the whole conversation again.
 - **Tools**: computer use (Accessibility + Screen Recording), its own always-open
   Chrome, fsearch (files by name), DigUp (files by content), and any software
   through Nix.
@@ -88,6 +97,7 @@ integrations, ...) go under
 - [`docs/hermes.md`](./docs/hermes.md): the single chat, sub-chats, what Hermes may touch
 - [`docs/events.md`](./docs/events.md): Hermes writing first, when a message may call for you
 - [`docs/app.md`](./docs/app.md): the iOS app, what Hermes serves it ([`docs/app-protocol.md`](./docs/app-protocol.md)), and how this Mac builds and installs it
+- [`docs/sideload.md`](./docs/sideload.md): iOS apps installed on your devices and kept signed
 - [`docs/sandbox.md`](./docs/sandbox.md): coding tasks handed to Pi in a microVM, reviewed before anything runs
 - [`docs/repository-layout.md`](./docs/repository-layout.md): where things are, and the checks
 - [`docs/uninstall.md`](./docs/uninstall.md): disabling Hermes, removing it, or uninstalling everything (`scripts/uninstall-macos.sh`)

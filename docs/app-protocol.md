@@ -85,10 +85,10 @@ be deleted.
   "questions": [
     {
       "id": "ea:7", "kind": "approval", "chat": 0, "message_id": 1201,
-      "text": "Dangerous command: rm -rf ~/tmp/build",
-      "summary": "Delete the build folder in your temp directory",
-      "command": "rm -rf ~/tmp/build",
-      "spoken": "Hermes asks to delete the build folder in your temp directory. Allow?",
+      "text": "<terminal> (plugin approval rule)\n\nReason: Rebuilds the site from a clean state\n\nask mode: every action asks: terminal: cd ~/workspace/site && rm -rf build && npm ci && npm run build",
+      "summary": "Rebuilds the site from a clean state",
+      "command": "<terminal> (plugin approval rule)",
+      "spoken": "Hermes wants to run a command that rebuilds the site from a clean state. Allow?",
       "options": [
         {"id": "once", "label": "Once", "data_b64": "ZWE6b25jZTo3"},
         {"id": "session", "label": "Session", "data_b64": "ZWE6c2Vzc2lvbjo3"},
@@ -134,11 +134,13 @@ be deleted.
     exactly what a tap in Telegram does, so Hermes resolves it the same way
     and edits the card. The app may also read the keyboard from the message
     itself (same buttons).
-  - `summary`: the one-sentence plain-language summary the auto-review
-    (`guard`) writes above a command it sends to the owner; `null` for
-    Hermes' own pattern cards (their reason is a pattern name, in `text`)
-    and for a clarify. `command`: the raw command (or the tool and its arguments),
-    `null` for a clarify. `text`: the card's text without markup.
+  - `summary`: the title `guard` writes above a long or tangled shell command
+    it asks the owner about (3 to 8 words, third person: `guard/titles.py`);
+    `null` for other cards, Hermes' own pattern cards (their reason is a
+    pattern name, in `text`) and a clarify. `command`: what the card's code
+    box shows: the raw command on Hermes' pattern cards, Hermes' label
+    `<tool> (plugin approval rule)` on guard's (the action is then in
+    `text`), `null` for a clarify. `text`: the card's text without markup.
   - A clarify's `options` end with `{"id": "other", …}`: pressing it makes
     Hermes take the next text message in that chat as the answer.
   - A question leaves the list when answered, timed out or withdrawn.
@@ -197,17 +199,22 @@ be deleted.
 
 ### 2.3 `devices`
 
-`app-delivery`'s `~/.hermes/app/delivery.json`, as is, under `delivery`:
+`~/.hermes/app/delivery.json`, as is, under `delivery`: the sideload
+service's status of its app `hermes` (`modules/sideload`, `app_status`):
 
 ```json
 {"v": 2, "type": "devices", "updated_at": "…", "delivery": {
   "v": 1, "updated": "…", "team": {"id": "ABCDE12345", "paid": false},
   "running": null, "next_refresh": "…",
   "devices": [{"id": "<udid>", "name": "iPhone", "model": "iPhone17,1", "os": "26.1",
-               "reachable": true, "profile_expires": "…",
+               "reachable": true, "chosen": true, "profile_expires": "…",
                "last_install": {"at": "…", "ok": true, "error": null, "version": "1.0",
-                                "build": "42", "pet_version": 3}}]}}
+                                "build": "42", "bundle_id": "…", "input_version": 3,
+                                "reason": "new pet"}}]}}
 ```
+
+`chosen`: the app is installed there (and kept signed); `input_version`:
+the pet's `version` it was built with; `running`: an install in progress.
 
 `delivery` is `null` when app delivery is not set up.
 
@@ -342,7 +349,7 @@ request's message id. The bot deletes the request when it has answered.
 | `stats.refresh` | — | `{}` (the `stats` slot is edited) |
 | `pet.feed` / `pet.play` / `pet.sleep` / `pet.wake` | — | the pet's new needs (`hunger`, `energy`, `happiness`, `xp`, `level`, `asleep`) |
 | `pet.generate` | `prompt` (what it should look like), `name` (optional) | `{"started": true}` at once; the `state.pet` changes when done (minutes), and a `notify` says so |
-| `app.reinstall` | `devices` (UDIDs, optional: all reachable) | the JSON printed by `hermes-app install` (`{"started": true}`) |
+| `app.reinstall` | `devices` (UDIDs, optional: where it is installed, else every paired device) | the JSON printed by `hermes-app install`, i.e. `sideload install hermes` (`{"started": true, "request": "…"}`); the `devices` slot follows; `unavailable` without delivery |
 | `call.state` | `active` (bool): a call starts or ends (§6) | `{"active": <bool>}` |
 | `push.register` | `token_hex`, `kind` (`alert` \| `liveactivity` \| `pushtostart`), `sandbox`, `bundle_id`, `activity_id` (liveactivity) | `{"stored": true, "apns": <bool: the server can send>}` |
 | `push.unregister` | `token_hex` | `{}` |
@@ -374,7 +381,8 @@ a key, tokens are stored and `apns: false`.
   one animation row per state, packed into the Codex 8×9 atlas) through the
   image provider chosen in the bootstrap. The new pet starts at level 1 with
   full needs; `version` increments. Hermes then decides whether to rebuild
-  and reinstall the app (`app_install`), since the icon changed.
+  and reinstall the app (`sideload_install` with app `hermes`), since the
+  icon changed.
 - **Needs** (0–100, integers): `hunger` rises 4/h (8/h while Hermes works);
   `energy` falls 3/h awake and 6/h while working, rises 12/h asleep;
   `happiness` falls 2/h, faster (5/h) when hunger > 70 or energy < 20.

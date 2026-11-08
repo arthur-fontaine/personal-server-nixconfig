@@ -5,8 +5,9 @@ A SwiftUI client for one conversation: your Telegram DM with your Hermes bot
 everything goes through Telegram, call mode included: the voice model runs on
 the device and Hermes answers over Telegram. The design is in
 [`docs/design.md`](docs/design.md); the protocol with Hermes is
-`docs/app-protocol.md` (the `app-backend` branch); building and installing on
-devices from the server is in `docs/app.md` (the `app-delivery` branch).
+[`docs/app-protocol.md`](../../docs/app-protocol.md); what Hermes serves it,
+and building and installing it on devices from the server (the sideload
+service), is in [`docs/app.md`](../../docs/app.md).
 
 ## What's in it
 
@@ -76,7 +77,9 @@ of 10 App IDs per 7 days and 3 apps per device is not a problem.
 
 ## Build inputs the server provides
 
-`app-delivery` builds the app on the server when the pet changes and to
+The server's sideload service (its app `hermes`,
+`modules/hermes/system/sideload.nix`) builds the app when Hermes reinstalls it
+after a new pet, and to
 re-sign it before the 7-day profiles expire:
 
 1. **App icon**: one 1024×1024 PNG at

@@ -8,6 +8,12 @@ README](../apps/hermes-ios/README.md) and
 Hermes: [app-protocol.md](app-protocol.md). This page is the server's side:
 what Hermes serves the app, then how this Mac builds and installs it.
 
+Two switches, both asked by the bootstrap: `server.hermes.app.enable`, Hermes
+serving the app (without it the app is a plain Telegram client of the DM),
+and `server.hermes.app.delivery.enable`, this Mac building and installing it
+(without it, build it yourself from `apps/hermes-ios`). Turn on both for the
+whole loop: a new pet becomes the app's icon at its next reinstall.
+
 ## Hermes' side
 
 `server.hermes.app.enable` (the bootstrap's "App · Hermes' side" section,
@@ -36,6 +42,10 @@ The questions come from the cards themselves: every Hermes card with buttons
 `_send_control_message`, which the plugin wraps, and `owner_approval`
 reports its own. The app answers a question by pressing the card's button
 through Telegram, exactly as a tap would, so Hermes sees no difference.
+An approval guard escalates for a long command carries guard's title for it
+(`question.summary`, "Deletes the build folder"), read aloud as "Hermes wants
+to run a command that deletes the build folder"; Hermes' own pattern cards
+have none.
 
 ### Native commands
 
@@ -102,11 +112,12 @@ energy and happiness drift with time, faster while Hermes works; feeding,
 playing and sleep move them; finished turns and answered questions give xp,
 and levels follow. The sprite plays the row matching what Hermes does.
 
-For the app's build (app-delivery), the current pet is mirrored to
+For the app's build ([Delivery](#delivery)), the current pet is mirrored to
 `~/.hermes/app/pet/`: `spritesheet.webp`, `icon.png` (the first idle frame
 on a solid background, 1024 × 1024, opaque) and `pet.json` (the Codex
 manifest with an integer `version`), written last. A new pet does not
-reinstall the app by itself: Hermes decides when and where (`app_install`).
+reinstall the app by itself: Hermes decides when and where
+(`sideload_install` with app `hermes`).
 
 ### Big files
 
@@ -150,7 +161,8 @@ agent's state as Live Activity updates.
 Everything lives in `~/.hermes/app/` (a mutable path of the Hermes account):
 `topic.json` (the topic and its slot messages), `usage.db`, `machine.json`,
 `pet-state.json`, `pet/`, `push.json` (device tokens), `gofile.json` (the
-guest account), and `delivery.json`, written by app-delivery.
+guest account), and `delivery.json`, written by the sideload service
+([Delivery](#delivery)).
 
 ## Delivery
 
@@ -172,15 +184,16 @@ installed on your devices over Wi-Fi and re-signed before it expires.
    file's `TELEGRAM_API_ID` / `_HASH`) and `HERMES_BOT_USERNAME` (the bot's,
    from Telegram's `getMe`).
 3. Its devices are written to `~/.hermes/app/delivery.json` after every
-   change (the App topic's `devices` state, same shape as before), and
-   `hermes-app install|status|devices|run` stays the command the App topic
-   calls ("reinstall"), now a shim over `sideload … hermes`. An earlier
-   `delivery.json` is read once, so its devices carry over.
+   change, which the App topic posts as its `devices` slot; the app's
+   "reinstall" (`app.reinstall`) runs `hermes-app install`, a shim over
+   `sideload install hermes` (`hermes-app status|devices|run` likewise). An
+   earlier `delivery.json` is read once, so its devices carry over.
 
 A free team allows 3 sideloaded apps per device: the Hermes app is one, and
 takes two of the 10 App IDs a week (the app and its widgets). No push
-notifications on a free team (`HERMES_PAID_TEAM=0`): the app gets news
-through Telegram's own notifications.
+notifications on a free team (`HERMES_PAID_TEAM=0`): the app gets news while
+it runs and at background refreshes (a few a day); with a paid team, Hermes
+pushes them ([Pushes](#pushes)).
 
 Hermes decides when to reinstall: `sideload_install` with `app: "hermes"`
 after a new pet, when you ask, or after a failed install.

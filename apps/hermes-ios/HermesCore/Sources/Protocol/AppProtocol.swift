@@ -148,7 +148,7 @@ public struct AppState: Sendable, Equatable {
     public var question: PendingQuestion? { questions.first }
 }
 
-/// `devices` slot: app-delivery's delivery.json under `delivery`.
+/// `devices` slot: the sideload service's delivery.json for the app `hermes`, under `delivery`.
 public struct DeliveryState: Sendable, Equatable {
     public var teamPaid: Bool?
     public var devices: [DeviceInfo]

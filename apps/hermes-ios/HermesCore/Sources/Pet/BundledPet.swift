@@ -1,7 +1,7 @@
 import Foundation
 
 /// A pet on disk: `pet.json` + its spritesheet. The build bundles the server's current pet
-/// (`Pet/` in the app, written by app-delivery); the app caches newer ones in the App Group.
+/// (`Pet/` in the app, copied in by the server's sideload build); the app caches newer ones in the App Group.
 public struct PetPackage: Sendable, Equatable {
     public var manifest: PetManifest
     public var spritesheet: URL
