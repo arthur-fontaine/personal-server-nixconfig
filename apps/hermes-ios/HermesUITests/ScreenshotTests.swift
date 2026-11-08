@@ -5,28 +5,41 @@ import XCTest
 /// `scripts/screenshots.sh`; skipped without the variable.
 final class ScreenshotTests: XCTestCase {
     private var dir: URL?
+    /// `SCREENSHOT_LANGUAGE` (en, fr): also passed to the app, in case the simulator's own differs.
+    private var language = "en"
 
     override func setUp() {
         continueAfterFailure = true
-        dir = ProcessInfo.processInfo.environment["SCREENSHOT_DIR"].map { URL(filePath: $0) }
+        let env = ProcessInfo.processInfo.environment
+        dir = env["SCREENSHOT_DIR"].map { URL(filePath: $0) }
+        language = env["SCREENSHOT_LANGUAGE"].flatMap { $0.isEmpty ? nil : $0 } ?? "en"
+    }
+
+    private var languageArguments: [String] {
+        ["-AppleLanguages", "(\(language))", "-AppleLocale", language == "fr" ? "fr_FR" : "en_US"]
+    }
+
+    private func file(_ device: String, _ orientation: String, _ name: String) -> URL {
+        dir!.appending(path: "\(language)-\(device)-\(orientation)-\(name).png")
     }
 
     private func shoot(_ name: String, _ args: [String], orientation: UIDeviceOrientation, wait: TimeInterval = 3) throws {
-        guard let dir else { throw XCTSkip("SCREENSHOT_DIR not set") }
+        guard dir != nil else { throw XCTSkip("SCREENSHOT_DIR not set") }
         XCUIDevice.shared.orientation = orientation
         let app = XCUIApplication()
-        app.launchArguments = ["-demo"] + args
+        app.launchArguments = ["-demo"] + languageArguments + args
         app.launch()
         Thread.sleep(forTimeInterval: wait)
         // Permission prompts (microphone, speech) belong to SpringBoard: accept them for the tour.
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        for _ in 0..<2 where springboard.buttons["Allow"].waitForExistence(timeout: 1) {
-            springboard.buttons["Allow"].tap()
+        let allow = springboard.buttons.matching(NSPredicate(format: "label IN %@", ["Allow", "Autoriser"])).firstMatch
+        for _ in 0..<2 where allow.waitForExistence(timeout: 1) {
+            allow.tap()
             Thread.sleep(forTimeInterval: 1.5)
         }
         let device = UIDevice.current.userInterfaceIdiom == .pad ? "ipad" : "iphone"
         let o = orientation.isLandscape ? "land" : "port"
-        try XCUIScreen.main.screenshot().pngRepresentation.write(to: dir.appending(path: "\(device)-\(o)-\(name).png"))
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: file(device, o, name))
         app.terminate()
     }
 
@@ -41,35 +54,35 @@ final class ScreenshotTests: XCTestCase {
         ("dashboard", ["-noQuestion", "-section", "dashboard"]),
         ("settings", ["-noQuestion", "-section", "settings"]),
         ("login", ["-demoLogin"]),
-        ("call", ["-noQuestion", "-call"]),
+        ("call", ["-noQuestion", "-call", "-noAudio"]),
     ]
 
     /// A reply mid-stream, and the Live Activity (Dynamic Island) once the app is in the background.
     func testStreamingAndLiveActivity() throws {
-        guard let dir else { throw XCTSkip("SCREENSHOT_DIR not set") }
+        guard dir != nil else { throw XCTSkip("SCREENSHOT_DIR not set") }
         XCUIDevice.shared.orientation = .portrait
         let device = UIDevice.current.userInterfaceIdiom == .pad ? "ipad" : "iphone"
         let app = XCUIApplication()
-        app.launchArguments = ["-demo", "-noQuestion"]
+        app.launchArguments = ["-demo", "-noQuestion"] + languageArguments
         app.launch()
         // Identifiers, not labels: the tour also runs in French.
         let field = app.textFields["composer.field"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
-        field.typeText("How's the server doing?")
+        field.typeText(language == "fr" ? "Comment va le serveur ?" : "How's the server doing?")
         app.buttons["composer.send"].tap()
         Thread.sleep(forTimeInterval: 1.6)
-        try XCUIScreen.main.screenshot().pngRepresentation.write(to: dir.appending(path: "\(device)-port-streaming.png"))
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: file(device, "port", "streaming"))
         Thread.sleep(forTimeInterval: 4)
-        try XCUIScreen.main.screenshot().pngRepresentation.write(to: dir.appending(path: "\(device)-port-streamed.png"))
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: file(device, "port", "streamed"))
         app.terminate()
 
-        app.launchArguments = ["-demo"]
+        app.launchArguments = ["-demo"] + languageArguments
         app.launch()
         Thread.sleep(forTimeInterval: 3)
         XCUIDevice.shared.press(.home)
         Thread.sleep(forTimeInterval: 2)
-        try XCUIScreen.main.screenshot().pngRepresentation.write(to: dir.appending(path: "\(device)-port-liveactivity.png"))
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: file(device, "port", "liveactivity"))
     }
 
     func testPortrait() throws {
