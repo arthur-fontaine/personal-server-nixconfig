@@ -9,7 +9,6 @@ import HermesCore
 final class IntentBridge {
     static let shared = IntentBridge()
     var answer: (@MainActor @Sendable (_ questionID: String, _ optionID: String) async throws -> Void)?
-    var petAction: (@MainActor @Sendable (PetAction) async throws -> Void)?
 }
 
 /// A button of a question in the Live Activity / Dynamic Island: presses the same Telegram
@@ -59,19 +58,3 @@ struct DeclineQuestionIntent: LiveActivityIntent {
     }
 }
 
-/// Feeding or playing with the pet from the widget.
-struct PetActionIntent: LiveActivityIntent {
-    static let title: LocalizedStringResource = "Care for your pet"
-    static let isDiscoverable = false
-
-    @Parameter(title: "Action") var action: String
-
-    init() {}
-    init(action: PetAction) { self.action = action.rawValue }
-
-    @MainActor
-    func perform() async throws -> some IntentResult {
-        if let a = PetAction(rawValue: action) { try await IntentBridge.shared.petAction?(a) }
-        return .result()
-    }
-}

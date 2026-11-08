@@ -40,7 +40,8 @@ final class AppModel {
     let store: HermesStore
     var section: AppSection = .chat
     var selectedTopic: TopicID? = .main
-    /// The pet's sheet (needs, actions, then Dashboard and Settings), from the pet in the toolbar.
+    /// The pet's sheet (the pet, what Hermes does, New Pet…, Dashboard, Settings), from the pet in
+    /// the toolbar.
     var showPet = false
     /// A section pushed inside the pet sheet on iPhone (`-section dashboard`, `hermes://dashboard`).
     var petPath: [AppSection] = []
@@ -75,9 +76,6 @@ final class AppModel {
         applyLaunchArguments(arguments)
         IntentBridge.shared.answer = { [weak self] questionID, optionID in
             try await self?.answerFromIntent(questionID: questionID, optionID: optionID)
-        }
-        IntentBridge.shared.petAction = { [weak self] action in
-            try await self?.store.perform(action)
         }
         #if HERMES_PAID
         // Lets Hermes start the Live Activity itself when a turn starts while the app is closed.
@@ -179,9 +177,7 @@ final class AppModel {
             spriteFile = SharedContainer.storeSpritesheet(url, petID: pet?.id ?? "pip", version: pet?.version ?? 0, group: config.appGroup)
         }
         let snap = SharedSnapshot(
-            petName: pet?.name ?? "Pip", petLevel: pet?.level ?? 1, levelProgress: pet?.levelProgress ?? 0,
-            hunger: pet?.hunger ?? 0.3, energy: pet?.energy ?? 0.8, happiness: pet?.happiness ?? 0.7, asleep: pet?.asleep ?? false,
-            mood: store.petMood, agentStatus: store.agent.status, agentTask: store.agent.task,
+            petName: pet?.name ?? "Pip", mood: store.petMood, agentStatus: store.agent.status, agentTask: store.agent.task,
             questionText: store.questions.first.map { $0.summary ?? $0.text }, spritesheetFile: spriteFile)
         var comparable = snap
         comparable.updatedAt = lastSnapshot?.updatedAt ?? snap.updatedAt

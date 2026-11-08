@@ -114,57 +114,31 @@ struct PetWidgetView: View {
                     Text(s.petName).font(.headline).widgetAccentable()
                     Label(s.agentStatus.label, systemImage: s.agentStatus.widgetSymbol).font(.caption)
                     if let q = s.questionText { Text(q).font(.caption2).lineLimit(1) }
-                    else { Text("Lv \(s.petLevel) · \(s.mood.caption)").font(.caption2) }
+                    else { Text(s.mood.caption).font(.caption2) }
                 }
             }
         case .accessoryInline:
             Label("\(s.petName): \(s.agentStatus.label)", systemImage: s.agentStatus.widgetSymbol)
         case .systemMedium:
-            HStack(spacing: 14) {
-                VStack {
-                    PetFrame(file: s.spritesheetFile, animation: s.mood.animation).frame(width: 96, height: 104)
-                    Text("Lv \(s.petLevel)").font(.caption.weight(.bold)).fontDesign(.rounded)
+            // The pet in Hermes' state and what Hermes does: a companion, nothing to look after
+            // (design-rules 11.1–11.3).
+            HStack(spacing: 16) {
+                PetFrame(file: s.spritesheetFile, animation: s.mood.animation).frame(width: 96, height: 104)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(s.petName).font(.headline)
+                    Label(s.questionText ?? s.agentTask ?? s.mood.caption, systemImage: s.agentStatus.widgetSymbol)
+                        .font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(s.petName).font(.headline).fontDesign(.rounded)
-                    Label(s.questionText ?? s.agentTask ?? s.agentStatus.label, systemImage: s.agentStatus.widgetSymbol)
-                        .font(.caption).foregroundStyle(s.agentStatus.widgetTint).lineLimit(2)
-                    needs
-                    HStack(spacing: 6) {
-                        Button(intent: PetActionIntent(action: .feed)) { Image(systemName: "fork.knife") }
-                        Button(intent: PetActionIntent(action: s.asleep ? .wake : .play)) {
-                            Image(systemName: s.asleep ? "sun.max.fill" : "tennisball.fill")
-                        }
-                    }
-                    .font(.caption)
-                    .buttonStyle(.bordered)
-                    .tint(.orange)
-                }
+                Spacer(minLength: 0)
             }
         default:
             VStack(spacing: 4) {
                 PetFrame(file: s.spritesheetFile, animation: s.mood.animation).frame(height: 78)
-                Text(s.petName).font(.headline).fontDesign(.rounded).lineLimit(1)
+                Text(s.petName).font(.headline).lineLimit(1)
                 Label(s.agentStatus.label, systemImage: s.agentStatus.widgetSymbol)
                     .font(.caption2.weight(.medium)).foregroundStyle(s.agentStatus.widgetTint)
             }
         }
-    }
-
-    private var needs: some View {
-        VStack(spacing: 3) {
-            bar("fork.knife", 1 - s.hunger)
-            bar("bolt.fill", s.energy)
-            bar("heart.fill", s.happiness)
-        }
-    }
-
-    private func bar(_ symbol: String, _ v: Double) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: symbol).font(.system(size: 8, weight: .bold)).frame(width: 10)
-            Gauge(value: v) { EmptyView() }.gaugeStyle(.linearCapacity).tint(v < 0.25 ? .red : .orange)
-        }
-        .foregroundStyle(.secondary)
     }
 }
 

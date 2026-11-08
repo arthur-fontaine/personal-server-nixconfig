@@ -21,7 +21,7 @@ struct PrivateGate: View {
                 .foregroundStyle(.tint)
                 .frame(width: 96, height: 96)
                 .background(.tint.opacity(0.12), in: .circle)
-            Text(store.thread(topic)?.name ?? String(localized: "Private sub-chat")).font(.title2.weight(.semibold))
+            Text(ChatTitle.name(topic, store: store)).font(.title2.weight(.semibold))
             Text("This sub-chat is encrypted. Unlock it with \(PrivateVault.biometryName) to read it.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)

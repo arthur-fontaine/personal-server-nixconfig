@@ -70,12 +70,17 @@ final class ReviewShots: XCTestCase {
 
     func testPetSheet() throws {
         let app = launch(["-scene", "review", "-pet"])
-        let level = app.descendants(matching: .any)["pet.level"]
-        Thread.sleep(forTimeInterval: 2)
+        let avatar = app.descendants(matching: .any).matching(identifier: "pet.avatar").firstMatch
+        XCTAssertTrue(avatar.waitForExistence(timeout: 10))
+        settle(avatar)
         try shot("pet")
-        // The large detent: drag the grabber up.
+        // A caress: hold the pet; the heart rises for a second.
+        avatar.press(forDuration: 0.6)
+        Thread.sleep(forTimeInterval: 0.25)
+        try shot("pet-caress")
+        // The large detent.
         app.swipeUp(velocity: .slow)
-        if level.exists { settle(level) } else { Thread.sleep(forTimeInterval: 1.5) }
+        settle(avatar)
         try shot("pet-large")
     }
 

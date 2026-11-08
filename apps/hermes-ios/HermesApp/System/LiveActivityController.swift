@@ -16,9 +16,10 @@ final class LiveActivityController {
         let agent = state.agent ?? AgentState(status: .idle)
         let content = HermesActivityAttributes.ContentState(
             status: agent.status, task: agent.task, chat: agent.chat ?? .main,
-            chatName: (agent.chat ?? .main) == .main ? nil : store.thread(agent.chat!)?.name,
+            // Through ChatTitle: a private sub-chat is "Private chat" on the lock screen too (1.4).
+            chatName: (agent.chat ?? .main) == .main ? nil : ChatTitle.name(agent.chat!, store: store),
             since: agent.since ?? .now, question: state.question.map(ActivityQuestion.init),
-            petMood: PetMood(agent: agent.status, pet: state.pet))
+            petMood: store.petMood)
         let active = agent.status != .idle || !state.questions.isEmpty
 
         if active {
