@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Rows pinned at the bottom of a sidebar (design-rules 11.4: Dashboard and Settings at the
-/// sidebar's foot, in a `safeAreaBar`): the sidebar's own row metrics (44-pt rows, the list's
+/// sidebar's foot, in a `safeAreaBar`): the sidebar's own row metrics (52-pt rows, the list's
 /// insets) and its selection (the neutral fill, the accent label), so they read as its rows.
 public struct SidebarFooter<Content: View>: View {
     let content: Content
@@ -33,12 +33,13 @@ public struct SidebarFooterRow: View {
             // The list's own row layout: an icon column, then the label; monochrome, the accent when
             // selected (as the sidebar's rows above).
             HStack(spacing: Spacing.xs.points) {
-                Image(systemName: systemImage).frame(width: Metric.sidebarIconColumn)
+                // The sidebar's symbol scale (its folder measures ≈ 24 pt wide at the default size).
+                Image(systemName: systemImage).imageScale(.large).frame(width: Metric.sidebarIconColumn)
                 title
             }
             .tone(selected ? .accent : .primary)
             .textRole(.body)
-            .frame(maxWidth: .infinity, minHeight: Metric.hitTarget, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: Metric.sidebarRow, alignment: .leading)
                 .inset(.horizontal, .s)
                 .background(selected ? Surface.fill.style : AnyShapeStyle(Color.clear), in: shape)
                 .contentShape(shape)

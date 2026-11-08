@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // Chrome/ is the functional layer: the only folder where DesignCheck allows Liquid Glass
 // (design-rules 5.5, HIG Materials: "Don't use Liquid Glass in the content layer").
@@ -174,8 +175,11 @@ public struct AttachmentChip: View {
                 Text(verbatim: detail).textRole(.caption).tone(.secondary)
             }
             .inset(.vertical, .xs)
+            // The × keeps its size, in a 44-pt square at the chip's top-trailing corner: its centre
+            // is the corner's centre (22, 22), concentric with the chip (5.1), inside it (5.2).
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill").tone(.secondary)
+                    .dynamicTypeSize(...DynamicTypeSize.large)
                     .frame(width: Metric.hitTarget, height: Metric.hitTarget)
                     .contentShape(Rectangle())
             }
@@ -238,6 +242,81 @@ public extension View {
     /// Bars and their menus stay monochrome (HIG Toolbars): for a sheet's toolbar items and a
     /// title menu's content, whose system controls otherwise take the app's accent.
     func barMonochrome() -> some View { tint(.primary) }
+}
+
+/// A bar item whose tap does one thing and whose long press opens a menu anchored to the item,
+/// as Safari's Back button: UIKit's `UIButton` with a primary action and a `menu`
+/// (`showsMenuAsPrimaryAction = false`), which shows the menu from the button itself — no lifted
+/// preview, no dimming. (SwiftUI's `Menu(primaryAction:)` as a toolbar item doesn't respond to a
+/// tap on iOS 26.2; a `.contextMenu` lifts the label out of the bar.)
+public struct BarMenuButton: View {
+    let image: UIImage
+    let title: String
+    let primaryAction: () -> Void
+    let menuTitle: String
+    let items: [BarMenuItem]
+
+    public init(image: UIImage, title: String, primaryAction: @escaping () -> Void, menuTitle: String, items: [BarMenuItem]) {
+        self.image = image
+        self.title = title
+        self.primaryAction = primaryAction
+        self.menuTitle = menuTitle
+        self.items = items
+    }
+
+    public var body: some View {
+        BarMenuUIButton(image: image, title: title, primaryAction: primaryAction, menuTitle: menuTitle, items: items)
+    }
+}
+
+struct BarMenuUIButton: UIViewRepresentable {
+    let image: UIImage
+    let title: String
+    let primaryAction: () -> Void
+    let menuTitle: String
+    let items: [BarMenuItem]
+
+    func makeUIView(context: Context) -> UIButton {
+        let button = UIButton(type: .system)
+        button.showsMenuAsPrimaryAction = false
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentHuggingPriority(.required, for: .vertical)
+        update(button)
+        return button
+    }
+
+    func updateUIView(_ button: UIButton, context: Context) { update(button) }
+
+    private func update(_ button: UIButton) {
+        var config = UIButton.Configuration.plain()
+        config.image = image.withRenderingMode(.alwaysOriginal)
+        config.contentInsets = .zero
+        button.configuration = config
+        button.removeTarget(nil, action: nil, for: .allEvents)
+        let action = primaryAction
+        button.addAction(UIAction { _ in action() }, for: .primaryActionTriggered)
+        button.menu = UIMenu(title: menuTitle, options: .displayInline, children: items.map { item in
+            UIAction(title: item.title, image: UIImage(systemName: item.systemImage)) { _ in item.action() }
+        })
+        button.accessibilityLabel = title
+    }
+
+    /// The image's width, the bar item's height: the bar pads it sideways into a 36-pt circle.
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIButton, context: Context) -> CGSize? {
+        CGSize(width: image.size.width, height: Metric.barItem)
+    }
+}
+
+public struct BarMenuItem {
+    let title: String
+    let systemImage: String
+    let action: () -> Void
+
+    public init(_ title: String, systemImage: String, action: @escaping () -> Void) {
+        self.title = title
+        self.systemImage = systemImage
+        self.action = action
+    }
 }
 
 public extension BarButton where Icon == Image {

@@ -63,7 +63,7 @@ public enum DesignCheck {
     static let layoutCalls: Set<String> = [
         "padding", "frame", "offset", "position", "scaleEffect", "lineSpacing", "kerning", "tracking",
         "contentMargins", "safeAreaPadding", "inset", "cornerRadius", "aspectRatio",
-        "containerRelativeFrame", "rotationEffect",
+        "containerRelativeFrame", "rotationEffect", "transformEffect", "rotation3DEffect", "projectionEffect",
     ]
     static let shapes: Set<String> = [
         "RoundedRectangle", "Circle", "Capsule", "Rectangle", "Ellipse", "ConcentricRectangle",
@@ -117,6 +117,15 @@ final class Visitor: SyntaxVisitor {
             }
             if member == "glassEffect", kind != .chrome {
                 add(.glass, node, "`.glassEffect` outside HermesUI/Chrome — Liquid Glass is for the functional layer (HIG Materials, design-rules 5.5)")
+            }
+            if member == "minimumScaleFactor" {
+                add(.rawFont, node, "`.minimumScaleFactor` shrinks text below its Dynamic Type size — let it wrap (design-rules 3.4)")
+            }
+            // `.environment(\.font, …)`: a font set without `.font`.
+            if member == "environment", kind == .screen,
+               let first = node.arguments.first?.expression.trimmedDescription, first.hasPrefix("\\."),
+               ["font", "dynamicTypeSize", "legibilityWeight"].contains(where: { first.dropFirst(2).hasPrefix($0) }) {
+                add(.styling, node, "`.environment(\(first), …)` in a screen styles text — use a TextRole (design-rules 9.1)")
             }
             if member == "system", node.arguments.contains(where: { $0.label?.text == "size" }) {
                 add(.rawFont, node, "`.system(size:)` — Dynamic Type text styles only (design-rules 3.1)")
@@ -196,6 +205,22 @@ final class Visitor: SyntaxVisitor {
     }
 
     // MARK: HermesUI's public API (9.2)
+
+    // `public struct X<S: ShapeStyle>`: a colour parameter at the type level.
+    override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
+        if isHermesUI, isPublic(node.modifiers) { checkGenerics(node.genericParameterClause, node.genericWhereClause, in: node.name.text) }
+        return .visitChildren
+    }
+
+    override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+        if isHermesUI, isPublic(node.modifiers) { checkGenerics(node.genericParameterClause, node.genericWhereClause, in: node.name.text) }
+        return .visitChildren
+    }
+
+    override func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind {
+        if isHermesUI, isPublic(node.modifiers) { checkGenerics(node.genericParameterClause, node.genericWhereClause, in: node.name.text) }
+        return .visitChildren
+    }
 
     override func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
         if isPublic(node.modifiers) { publicExtensionDepth += 1 }
