@@ -29,6 +29,7 @@ final class CallSession {
     private let store: HermesStore
     private let topic: TopicID
     private let language: String
+    private let voice = CallVoice.current()
     private var engine: (any VoiceEngine)?
     private let audio = AVAudioEngine()
     private let player = AVAudioPlayerNode()
@@ -210,7 +211,7 @@ final class CallSession {
         phase = .speaking
         speakTask = Task {
             do {
-                for try await chunk in engine.synthesize(sentence, language: language) {
+                for try await chunk in engine.synthesize(sentence, language: language, voice: voice) {
                     if Task.isCancelled { break }
                     schedule(chunk)
                 }

@@ -9,8 +9,8 @@ nonisolated protocol VoiceEngine: AnyObject, Sendable {
     var name: String { get }
     /// 16 kHz mono float samples of one utterance → its text.
     func transcribe(_ samples: [Float], language: String) async throws -> String
-    /// Speech for `text`, as mono float buffers at `outputSampleRate`, streamed as produced.
-    func synthesize(_ text: String, language: String) -> AsyncThrowingStream<[Float], Error>
+    /// Speech for `text` in `voice`, as mono float buffers at `outputSampleRate`, streamed as produced.
+    func synthesize(_ text: String, language: String, voice: CallVoice) -> AsyncThrowingStream<[Float], Error>
     var outputSampleRate: Double { get }
 }
 
@@ -67,10 +67,10 @@ nonisolated final class AppleVoiceEngine: VoiceEngine, @unchecked Sendable {
         }
     }
 
-    func synthesize(_ text: String, language: String) -> AsyncThrowingStream<[Float], Error> {
+    func synthesize(_ text: String, language: String, voice: CallVoice) -> AsyncThrowingStream<[Float], Error> {
         AsyncThrowingStream { continuation in
             let utterance = AVSpeechUtterance(string: text)
-            utterance.voice = AVSpeechSynthesisVoice(language: language) ?? AVSpeechSynthesisVoice(language: "en-US")
+            utterance.voice = Self.voice(voice, language: language)
             utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.05
             let target = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: outputSampleRate, channels: 1, interleaved: false)!
             let box = ConverterBox()
@@ -91,6 +91,19 @@ nonisolated final class AppleVoiceEngine: VoiceEngine, @unchecked Sendable {
                 continuation.yield(Array(UnsafeBufferPointer(start: out.floatChannelData![0], count: Int(out.frameLength))))
             }
         }
+    }
+}
+
+extension AppleVoiceEngine {
+    /// An installed voice of the chosen gender for the language; the language's default voice
+    /// when it has none of that gender (`gender` is `.unspecified` on some voices).
+    static func voice(_ choice: CallVoice, language: String) -> AVSpeechSynthesisVoice? {
+        let installed = AVSpeechSynthesisVoice.speechVoices()
+        let candidates = installed.filter { $0.gender != .unspecified }.map {
+            CallVoice.Candidate(identifier: $0.identifier, language: $0.language, isMale: $0.gender == .male, quality: $0.quality.rawValue)
+        }
+        if let id = choice.pick(from: candidates, language: language), let v = AVSpeechSynthesisVoice(identifier: id) { return v }
+        return AVSpeechSynthesisVoice(language: language) ?? AVSpeechSynthesisVoice(language: "en-US")
     }
 }
 

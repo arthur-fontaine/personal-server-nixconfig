@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var notifications: UNAuthorizationStatus = .notDetermined
     @State private var confirmLogout = false
     @State private var reinstalling = false
+    @AppStorage(CallVoice.defaultsKey) private var voice: CallVoice = .default
 
     var body: some View {
         Form {
@@ -21,6 +22,12 @@ struct SettingsView: View {
 
             Section {
                 VoiceModelRow()
+                Picker(selection: $voice) {
+                    Text("Female").tag(CallVoice.female)
+                    Text("Male").tag(CallVoice.male)
+                } label: {
+                    Label("Voice", systemImage: "person.wave.2")
+                }
             } header: {
                 Text("Call mode")
             } footer: {
