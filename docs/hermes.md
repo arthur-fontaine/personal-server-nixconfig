@@ -213,11 +213,26 @@ Claude Code's severity: stage 1 clears at 25 % or less, stage 2 blocks above
 clear itself. Hermes' `AGENTS.md` is read as Claude Code reads `CLAUDE.md`:
 an explicit authorization there may clear a soft block.
 
-Only Telegram turns (and cron jobs) are yours; a message you send mid-turn
-too. A turn the events daemon or a webhook starts, and a notice the gateway
-posts in your chat itself (a background process, a subagent finishing), reach
-the classifier as notifications, which carry no intent. A subagent's calls
-are judged on its parent's conversation. Hermes' own checks stay underneath:
+Auto mode is never steered by anyone but you. What counts as you:
+
+- a message in the Telegram chats with the bot (Telegram admits only
+  `TELEGRAM_ALLOWED_USERS`), including one sent mid-turn;
+- a cron job's turn (you asked for the job, and its creation was reviewed);
+- your taps on Hermes' buttons (a proposal's option continues the chat as
+  "I picked option …", an approval card's answer).
+
+Everything else reaches the classifier as a notification, which carries no
+intent, or not at all: the events (WhatsApp, iMessage, mail, Discord,
+Instagram, Home Assistant, this Mac's alerts) and any webhook turn; the text
+relayed into your chat as if you had written it (a webhook delivery
+`[Webhook delivery: …]`, a cron delivery `[Cron delivery: …]`, a proposal
+`[Proposal with buttons]`, a relay's `[Recent channel messages]`), even when
+Hermes merges it with your next message; the gateway's own notices (a
+background process, a subagent finishing, an interrupted turn's note, a
+compaction summary); a subagent's task. Tool results (a web page, a mail's
+body) are never shown to it. So a stranger's message asking Hermes to send
+your passwords somewhere is judged as an action nobody asked for. A
+subagent's calls are judged on its parent's conversation. Hermes' own checks stay underneath:
 its pattern-matched dangerous commands and its hardline blocklist.
 
 On a card, a long or tangled shell command comes with a plain-language title
