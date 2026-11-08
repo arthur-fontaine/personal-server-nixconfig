@@ -63,6 +63,16 @@ final class ReplyFlowTests: XCTestCase {
         XCTAssertTrue(original.isHittable, "the original is on screen after the tap")
     }
 
+    /// 16.1 (round 7's T1): above the owner's bubble, the context's bar starts on the bubble's edge.
+    func testContextSitsOnItsBubble() throws {
+        let app = launch()
+        let context = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Reply to Hermes: Good morning")).firstMatch
+        let bubble = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "You: Here's the video")).allElementsBoundByIndex
+        XCTAssertTrue(context.waitForExistence(timeout: 5))
+        let visible = try XCTUnwrap(bubble.map { $0.frame }.min { $0.width < $1.width })
+        XCTAssertEqual(context.frame.minX, visible.minX, accuracy: 0.5, "context \(context.frame) vs bubble \(visible)")
+    }
+
     func testTappingAContextReachesTheOriginal() throws {
         let app = launch()
         let context = app.descendants(matching: .any).matching(identifier: "chat.reply").allElementsBoundByIndex.last { $0.isHittable }

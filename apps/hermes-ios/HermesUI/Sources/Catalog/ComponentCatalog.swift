@@ -105,11 +105,12 @@ public struct ComponentCatalog: View {
             }
         case .chat:
             section("UserBubble (sent, pending, failed)") {
-                VStack(spacing: Rhythm.bubbles.spacing.points) {
+                VStack(alignment: .trailing, spacing: Rhythm.bubbles.spacing.points) {
                     UserBubble("Yes, go ahead")
                     UserBubble("What happened with the backup last night? It was supposed to run at 3.", state: .pending)
                     UserBubble("Remind me to call mum", state: .failed)
                 }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
             section("MessageText + CodeBlock + QuoteBlock") {
                 MessageBlocks {
@@ -189,7 +190,7 @@ public struct ComponentCatalog: View {
                 ActionRow(primary: Action(id: "p", "Allow Once", emphasis: .primary) {})
             }
             section("A light tint behind primary text: selection, the owner's bubble (15.3)") {
-                UserBubble("Yes, go ahead")
+                UserBubble("Yes, go ahead").frame(maxWidth: .infinity, alignment: .trailing)
             }
         default:
             phase2
