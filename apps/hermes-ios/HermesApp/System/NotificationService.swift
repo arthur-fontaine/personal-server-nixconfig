@@ -32,12 +32,24 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         UNUserNotificationCenter.current().setNotificationCategories([message, question])
     }
 
+    /// A private sub-chat's name never appears in a notification (design-rules 1.4): its title is
+    /// "Hermes · Private chat"; otherwise Hermes' own title (which is "Hermes" for private ones too).
+    @MainActor
+    static func title(for n: NotifyPayload) -> String {
+        let store = AppModel.shared.store
+        if n.chat != .main, store.isPrivate(n.chat) {
+            return "Hermes · \(ChatTitle.name(n.chat, store: store))"
+        }
+        return n.title ?? "Hermes"
+    }
+
     func post(_ n: NotifyPayload) {
         // In the foreground, looking at that chat: no banner.
         if UIApplication.shared.applicationState == .active, AppModel.shared.section == .chat,
            AppModel.shared.selectedTopic == n.chat { return }
         let content = UNMutableNotificationContent()
-        content.title = n.title ?? "Hermes"
+        let title = Self.title(for: n)
+        content.title = title
         // The spoken variant reads well on screen too, and is what Announce speaks.
         content.body = n.speechText
         content.sound = .default
@@ -48,7 +60,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         content.categoryIdentifier = isQuestion ? Self.questionCategory : "hermes.message"
         content.interruptionLevel = n.interruption == .timeSensitive ? .timeSensitive : (n.interruption == .passive ? .passive : .active)
         Task {
-            let final = await Self.asCommunication(content, title: n.title ?? "Hermes")
+            let final = await Self.asCommunication(content, title: title)
             let request = UNNotificationRequest(identifier: "notify-\(n.chat)-\(n.messageID ?? 0)", content: final, trigger: nil)
             try? await UNUserNotificationCenter.current().add(request)
         }
