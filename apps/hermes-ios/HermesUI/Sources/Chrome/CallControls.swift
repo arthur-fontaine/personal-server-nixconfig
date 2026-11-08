@@ -64,5 +64,15 @@ public struct CallControls<Content: View>: View {
         GlassEffectContainer(spacing: Spacing.xl.points) {
             HStack(alignment: .top, spacing: 0) { content }
         }
+        // The call is always dark, as the Phone app's: white glyphs on clear glass need it.
+        .environment(\.colorScheme, .dark)
+    }
+}
+
+public extension View {
+    /// The call's backdrop, for showing call controls outside the call (the catalogue).
+    func callBackdrop() -> some View {
+        inset(.all, .m).frame(maxWidth: .infinity)
+            .background(Color.black, in: RoundedRectangle(cornerRadius: Radius.field, style: .continuous))
     }
 }

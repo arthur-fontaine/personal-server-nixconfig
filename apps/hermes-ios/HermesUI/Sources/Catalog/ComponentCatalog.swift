@@ -4,6 +4,7 @@ import SwiftUI
 /// `-catalog <page>`; the screenshot tour renders each in light, dark and at AX5 for the critic.
 public enum CatalogPage: String, CaseIterable, Sendable {
     case type, surfaces, actions, approval, chat, files, composer, accent
+    case buttons, lists, metrics, call, onboarding, bar
 }
 
 public struct ComponentCatalog: View {
@@ -20,6 +21,15 @@ public struct ComponentCatalog: View {
     }
 
     public var body: some View {
+        switch page {
+        case .lists: lists.catalogTitle(page)
+        case .onboarding: onboarding.catalogTitle(page)
+        case .bar: scroll.catalogTitle(page).toolbar { barItems }
+        default: scroll.catalogTitle(page)
+        }
+    }
+
+    private var scroll: some View {
         ScrollView {
             ChatColumn {
                 VStack(alignment: .leading, spacing: Spacing.xl.points) {
@@ -28,8 +38,6 @@ public struct ComponentCatalog: View {
                 .inset(.vertical, .m)
             }
         }
-        .navigationTitle(Text(verbatim: "HermesUI · \(page.rawValue)"))
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     @ViewBuilder private var content: some View {
@@ -146,7 +154,7 @@ public struct ComponentCatalog: View {
                 Toast("Allowed once")
             }
         case .accent:
-            section("Accent on each surface (links, Show Command, selection)") {
+            section("Accent text on each surface: links only (15.2)") {
                 ForEach(Surface.allCases, id: \.self) { s in
                     CardSurface(s) {
                         HStack {
@@ -157,11 +165,157 @@ public struct ComponentCatalog: View {
                     }
                 }
             }
-            section("Label on the accent fill") {
+            section("The pet's colour as a fill, its label black or white (15.1)") {
                 ActionRow(primary: Action(id: "p", "Allow Once", emphasis: .primary) {})
+            }
+            section("A light tint behind primary text: selection, the owner's bubble (15.3)") {
+                UserBubble("Yes, go ahead")
+            }
+        default:
+            phase2
+        }
+    }
+
+    // MARK: Phase 2's components
+
+    @State private var choice = "aside"
+    @State private var sidebarSelection = 0
+    @State private var muted = false
+
+    @ViewBuilder private var phase2: some View {
+        switch page {
+        case .buttons:
+            section("PrimaryButton (default, symbol, busy, full width)") {
+                PrimaryButton("Unlock", systemImage: "faceid") {}
+                PrimaryButton("Unlocking…", isBusy: true) {}
+                PrimaryButton("Continue with Telegram", fullWidth: true) {}
+            }
+            section("SecondaryButton (default, symbol, full width)") {
+                SecondaryButton("Not Now") {}
+                SecondaryButton("Open Telegram", systemImage: "paperplane", fullWidth: true) {}
+            }
+            section("ConfirmButton, DismissButton (.close, .cancel) — in a sheet's bar") {
+                HStack(spacing: Spacing.s.points) {
+                    DismissButton(.close) {}
+                    DismissButton(.cancel) {}
+                    Spacer()
+                    ConfirmButton("Create") {}
+                }
+            }
+            section("Answer buttons (lock screen, Dynamic Island): refusal, the pet's fill") {
+                HStack(spacing: Spacing.xs.points) {
+                    Button {} label: { AnswerLabel("Deny") }.answerButton(destructive: true)
+                    Button {} label: { AnswerLabel("Allow Once") }.answerButton(destructive: false)
+                }
+            }
+        case .metrics:
+            section("Sparkline (.line)") {
+                Sparkline(ChartSeries([3, 4, 3.5, 6, 5, 7, 6.5, 9, 8, 7, 9.5, 11]), label: Text(verbatim: "CPU"))
+            }
+            section("Sparkline (.bars)") {
+                Sparkline(ChartSeries([2, 0, 5, 3, 8, 6, 1, 4, 7, 2, 9, 3]), kind: .bars, label: Text(verbatim: "Calls"))
+            }
+            section("UsageBar (42 %, 95 % critical)") {
+                UsageBar(Self.sampleUpload, label: Text(verbatim: "Storage used"))
+                UsageBar(Self.nearlyFull, label: Text(verbatim: "Storage used"))
+            }
+        case .call:
+            section("CallControls: toggle off, toggle on, End") {
+                CallControls {
+                    CallButton(Text(verbatim: "Mute"), systemImage: "mic.fill", kind: .toggle(isOn: false)) {}
+                    CallButton(Text(verbatim: "Speaker"), systemImage: "speaker.wave.3.fill", kind: .toggle(isOn: true)) {}
+                    CallButton(Text(verbatim: "End"), systemImage: "phone.down.fill", kind: .end) {}
+                }
+                .callBackdrop()
+            }
+            section("Long labels wrap in their column") {
+                CallControls {
+                    CallButton(Text(verbatim: "Couper le micro"), systemImage: "mic.slash.fill", kind: .toggle(isOn: muted)) { muted.toggle() }
+                    CallButton(Text(verbatim: "Haut-parleur"), systemImage: "speaker.fill", kind: .toggle(isOn: false)) {}
+                    CallButton(Text(verbatim: "Raccrocher"), systemImage: "phone.down.fill", kind: .end) {}
+                }
+                .callBackdrop()
+            }
+        case .bar:
+            section("BarButton, BarMenuButton: in this page's bar (the pet, leading; the call, trailing)") {
+                Text(verbatim: "Tap the pet: caress. Long-press: its menu.").textRole(.body).tone(.secondary)
+            }
+        default:
+            EmptyView()
+        }
+    }
+
+    private var lists: some View {
+        List {
+            Section {
+                ListActionRow(Text(verbatim: "Turn On Notifications"), detail: nil, systemImage: "bell") {}
+                ListActionRow(Text(verbatim: "Reasoning Effort"), detail: Text(verbatim: "How hard the model thinks"), systemImage: "brain") {}
+                ListActionRow(Text(verbatim: "Compact"), detail: Text(verbatim: "Fills the composer"), systemImage: "rectangle.compress.vertical", fillsComposer: true) {}
+                ListActionRow(Text(verbatim: "Reinstall Now"), detail: nil, systemImage: "arrow.triangle.2.circlepath", isBusy: true) {}
+                ListActionRow(Text(verbatim: "Forget This Chat"), detail: nil, systemImage: "trash", destructive: true) {}
+            } header: { Text(verbatim: "ListActionRow (plain, detail, fills composer, busy, destructive)") }
+            Section {
+                ForEach([("aside", "Aside", "bubble.left.and.bubble.right"), ("project", "Project", "folder"),
+                         ("temp", "Temp", "timer")], id: \.0) { id, title, symbol in
+                    ChoiceRow(Text(verbatim: title), detail: Text(verbatim: "What this kind of sub-chat keeps."), systemImage: symbol,
+                              isSelected: choice == id) { choice = id }
+                }
+                ChoiceRow(Text(verbatim: "No icon, no detail"), isSelected: choice == "plain") { choice = "plain" }
+            } header: { Text(verbatim: "ChoiceRow") }
+            Section {
+                SidebarRow(Text(verbatim: "Main chat"), systemImage: "bubble.left.and.bubble.right", selected: sidebarSelection == 0,
+                           action: { sidebarSelection = 0 }) { UnreadBadge(nil) }
+                SidebarRow(Text(verbatim: "Lisbon trip"), systemImage: "text.bubble", selected: sidebarSelection == 1,
+                           action: { sidebarSelection = 1 }) { UnreadBadge(Text(verbatim: "3")) }
+            } header: { Text(verbatim: "SidebarRow (selected: the pet's light tint), UnreadBadge") }
+            Section {
+                Label { Text(verbatim: "Demo data: a wide symbol stays in its column") } icon: { Image(systemName: "theatermasks") }
+                Label { Text(verbatim: "Notifications") } icon: { Image(systemName: "bell") }
+                Toggle(isOn: .constant(true)) { Label { Text(verbatim: "A switch keeps the pet's fill") } icon: { Image(systemName: "switch.2") } }
+            } header: { Text(verbatim: "groupedRows(): one icon column, monochrome") }
+        }
+        .groupedRows()
+        .safeAreaBar(edge: .bottom) {
+            SidebarFooter {
+                SidebarFooterRow(Text(verbatim: "Dashboard"), systemImage: "gauge.with.dots.needle.33percent", selected: true) {}
+                SidebarFooterRow(Text(verbatim: "Settings"), systemImage: "gear", selected: false) {}
             }
         }
     }
+
+    private var onboarding: some View {
+        OnboardingPage(title: Text(verbatim: "Your phone number"),
+                       message: Text(verbatim: "Hermes signs in to Telegram as you, to talk with your agent."),
+                       hero: {
+                           if let petFrame {
+                               PetAvatar(.hero) { CenteredPet(frame: petFrame, centering: PetCentering(frames: [petFrame])) }
+                           }
+                       },
+                       fields: { TextField(text: .constant("+33 6 12 34 56 78")) { Text(verbatim: "Phone") }.inputField() },
+                       actions: {
+                           PrimaryButton("Next", fullWidth: true) {}
+                           SecondaryButton("Not Now", fullWidth: true) {}
+                       })
+    }
+
+    @ToolbarContentBuilder private var barItems: some ToolbarContent {
+        if let petFrame {
+            ToolbarItem(placement: .topBarLeading) {
+                BarMenuButton(image: PetAvatar<EmptyView>.toolbarUIImage(petFrame, centering: PetCentering(frames: [petFrame])),
+                              title: "Pip", primaryAction: {}, menuTitle: "Pip",
+                              items: [BarMenuItem("New Pet…", systemImage: "sparkles") {}])
+            }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            BarButton(Text(verbatim: "Call")) {} icon: { Image(systemName: "phone") }
+        }
+    }
+
+    static let nearlyFull: Progress = {
+        let p = Progress(totalUnitCount: 100)
+        p.completedUnitCount = 95
+        return p
+    }()
 
     static let sampleUpload: Progress = {
         let p = Progress(totalUnitCount: 100)
@@ -180,5 +334,11 @@ public struct ComponentCatalog: View {
             Text(verbatim: title).textRole(.footnote).tone(.secondary)
             content()
         }
+    }
+}
+
+private extension View {
+    func catalogTitle(_ page: CatalogPage) -> some View {
+        navigationTitle(Text(verbatim: "HermesUI · \(page.rawValue)")).navigationBarTitleDisplayMode(.inline)
     }
 }
