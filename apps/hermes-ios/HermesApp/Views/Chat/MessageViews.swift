@@ -8,8 +8,6 @@ import SwiftUI
 struct MessageRow: View {
     @Environment(HermesStore.self) private var store
     let message: ChatMessage
-    /// False when the message's question is shown as the approval card instead.
-    var showsButtons = true
     var highlighted = false
     var onReply: () -> Void = {}
     var onShowOriginal: (MessageID) -> Void = { _ in }
@@ -31,13 +29,19 @@ struct MessageRow: View {
                 }
             } else {
                 if let reply { context(reply, above: .hermes) }
-                RichMessageText(segments: MessageSegments.make(message.text))
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel(Text("Hermes: \(message.displayText)"))
+                if message.asksQuestion {
+                    QuestionCard(message: message)
+                } else {
+                    RichMessageText(segments: MessageSegments.make(message.text))
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(Text("Hermes: \(message.displayText)"))
+                }
             }
             ForEach(message.fileLinks, id: \.self) { LinkFileCard(link: $0) }
             if let attachment = message.attachment { AttachmentCard(attachment: attachment) }
-            if showsButtons, !message.buttons.isEmpty, !message.isOutgoing { InlineKeyboard(message: message) }
+            if !message.buttons.isEmpty, !message.isOutgoing {
+                if !message.asksQuestion { InlineKeyboard(message: message) }
+            }
         }
         .frame(maxWidth: .infinity, alignment: message.isOutgoing ? .trailing : .leading)
         .animation(.smooth, value: bubbleState)

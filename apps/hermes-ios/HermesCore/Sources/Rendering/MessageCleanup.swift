@@ -127,7 +127,7 @@ public enum QuestionText {
         return q
     }
 
-    static func numbered(_ line: String) -> (String, String)? {
+    public static func numbered(_ line: String) -> (String, String)? {
         let l = line.trimmingCharacters(in: .whitespaces)
         guard let dot = l.firstIndex(of: "."), !l[..<dot].isEmpty, l[..<dot].allSatisfy(\.isNumber) else { return nil }
         let rest = l[l.index(after: dot)...].trimmingCharacters(in: .whitespaces)
@@ -140,5 +140,29 @@ public enum QuestionText {
         // No-break spaces (French typography) count as spaces.
         let plain = line.replacingOccurrences(of: "\u{00A0}", with: " ").replacingOccurrences(of: "\u{202F}", with: " ")
         return quoted.contains { plain.contains($0) }
+    }
+}
+
+/// What a guard approval card says, read from its Telegram message alone, so the card shows whole
+/// as soon as the message arrives (the state's question follows about a second later). Hermes
+/// lays the card out the same in every language (telegram adapter, `_send_exec_approval_prompt`):
+/// a header, a code box with `<tool> (plugin approval rule)`, then "<label>: <reason>" and the
+/// deadline line; guard's reason is its sentence, a blank line, and the raw action (cut to fit).
+public enum ApprovalText {
+    public static func parse(_ text: FormattedText) -> (sentence: String, action: String?)? {
+        guard let pre = text.entities.first(where: { if case .pre = $0.kind { true } else { false } }) else { return nil }
+        let utf16 = Array(text.text.utf16)
+        guard pre.offset + pre.length <= utf16.count else { return nil }
+        let box = String(decoding: utf16[pre.offset..<(pre.offset + pre.length)], as: UTF16.self)
+        guard box.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix("(plugin approval rule)") else { return nil }
+        let after = String(decoding: utf16[(pre.offset + pre.length)...], as: UTF16.self)
+        var paragraphs = after.components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        // "<label>: <sentence>", the action, the deadline line.
+        guard paragraphs.count >= 2, let colon = paragraphs[0].range(of: ": ") else { return nil }
+        let sentence = String(paragraphs[0][colon.upperBound...]).trimmingCharacters(in: .whitespaces)
+        guard !sentence.isEmpty else { return nil }
+        paragraphs.removeLast()
+        return (sentence, paragraphs.count >= 2 ? paragraphs[1] : nil)
     }
 }

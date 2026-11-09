@@ -28,8 +28,6 @@ struct ChatScreen: View {
     @State private var highlighted: MessageID?
     /// After a jump to an original: don't resume following the bottom until the owner scrolls.
     @State private var jumped = false
-    /// Redraws once a new question's message has waited `questionSettle` for the state.
-    @State private var settleTick = 0
     @State private var draft = ComposerDraft()
     @State private var importing = false
     @State private var selecting: SelectableText?
@@ -140,17 +138,8 @@ struct ChatScreen: View {
     }
 
     private var conversation: some View {
-        let questions = store.questions(in: topic)
-        // One copy of a question (brief item 3): while it is open its Telegram message (text and
-        // buttons) gives way to the card below; once answered, Hermes' edit of it stays as history.
-        // A question's message waits a moment for the state that opens the card (≤ 3 s behind),
-        // so its buttons don't flash first.
-        let asked = Set(questions.compactMap(\.tdlibMessageID))
-        _ = settleTick // read, so its change redraws the transcript
-        let settled = Date.now.addingTimeInterval(-Self.questionSettle)
-        let messages = store.messages(in: topic).filter { m in
-            !asked.contains(m.id) && !(m.asksQuestion && m.date > settled)
-        }
+        // A question is Hermes' own message, its answers under it (QuestionAnswers).
+        let messages = store.messages(in: topic)
         return ScrollViewReader { proxy in
             ScrollView {
                 ChatColumn {
@@ -181,21 +170,9 @@ struct ChatScreen: View {
                             TranscriptRow(.hermes, after: messages.last.map(Self.speaker)) { TypingIndicator() }
                                 .id("typing")
                         }
-                        if let q = questions.first {
-                            TranscriptRow(.hermes, after: (store.drafts[topic] != nil || store.typing.contains(topic)) ? .hermes
-                                          : messages.last.map(Self.speaker)) {
-                                QuestionCard(question: q)
-                            }
-                            .id(q.id)
-                        }
                         ScrollAnchor().id(Self.bottomID)
                     }
                 }
-            }
-            .task(id: store.messages(in: topic).last?.id) {
-                guard store.messages(in: topic).last?.asksQuestion == true else { return }
-                try? await Task.sleep(for: .seconds(Self.questionSettle))
-                settleTick += 1
             }
             // The bottom for where it opens and for a transcript shorter than the screen (it sits
             // on the composer). For size changes only while following: always on, it moved the
@@ -269,9 +246,6 @@ struct ChatScreen: View {
             .onChange(of: replyingTo?.id) {
                 if following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
             }
-            .onChange(of: questions.map(\.id)) {
-                if following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
-            }
             // "Latest" floats over the transcript, on its safe area (so just above the bar, with
             // the keyboard too), not in the bar: there its coming and going changed the bar's
             // height, so the inset, so "at the bottom" — while the keyboard was dragged it
@@ -326,7 +300,6 @@ struct ChatScreen: View {
         }
     }
 
-    static let questionSettle: TimeInterval = 5
     /// How close to the end still counts as "at the bottom".
     static let bottomSlack: CGFloat = 40
     /// A gesture that moved the transcript less than this didn't scroll it.

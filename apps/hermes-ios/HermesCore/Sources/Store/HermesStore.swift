@@ -107,6 +107,16 @@ public final class HermesStore {
     /// The open question a transcript message carries (`id` is TDLib's).
     public func question(forMessage id: MessageID) -> PendingQuestion? { state.questions.first { $0.tdlibMessageID == id } }
 
+    /// The state's question for a message that asks: the one whose answers are its buttons, else
+    /// the one naming its id.
+    public func question(for message: ChatMessage) -> PendingQuestion? {
+        let data = Set(message.buttons.compactMap { b -> Data? in
+            if case .callback(let d) = b.action { return d } else { return nil }
+        })
+        return state.questions.first { q in q.options.contains { $0.data.map(data.contains) == true } }
+            ?? question(forMessage: message.id)
+    }
+
     public var isReady: Bool { auth == .ready && bot != nil }
 
     // MARK: - Events
@@ -462,7 +472,16 @@ public final class HermesStore {
 
     public func press(_ button: InlineButton, on message: ChatMessage) async throws -> String? {
         guard let bot, case .callback(let data) = button.action else { return nil }
-        return try await client.pressButton(chat: bot.chatID, message: message.id, data: data)
+        let toast = try await client.pressButton(chat: bot.chatID, message: message.id, data: data)
+        // An answer: the question leaves the state now (Live Activity, notifications) rather than
+        // at the server's next state.
+        let before = state.questions.count
+        state.questions.removeAll { q in q.tdlibMessageID == message.id || q.options.contains { $0.data == data } }
+        if state.questions.count != before {
+            petReaction = .jumping
+            hooks.stateChanged(state)
+        }
+        return toast
     }
 
     // MARK: - App topic
