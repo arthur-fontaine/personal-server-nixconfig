@@ -592,6 +592,8 @@ def test_plugin() -> None:
     wait_for(lambda: bot.in_topic("state")[-1][1]["questions"], "the question")
     q = bot.in_topic("state")[-1][1]["questions"][0]
     assert q["kind"] == "approval" and q["command"] == "rm -rf /tmp/x"
+    # The keyboard's own message, by its Bot API id, in the chat it landed in.
+    assert q["chat"] == 0 and bot.messages[q["message_id"]]["reply_markup"] is not None
     assert bot.in_topic("state")[-1][1]["agent"]["status"] == "waiting_user"
     wait_for(lambda: any(n[1]["kind"] == "approval" for n in bot.in_topic("notify")), "the approval notify")
     assert [n for n in bot.in_topic("notify") if n[1]["kind"] == "approval"][0][1]["interruption"] == "time-sensitive"

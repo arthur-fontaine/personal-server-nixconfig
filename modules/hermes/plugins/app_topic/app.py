@@ -253,7 +253,12 @@ class App:
             msg = await control(chat_id, text, *args, reply_markup=reply_markup, thread_id=thread_id,
                                 metadata=metadata, **kwargs)
             try:
-                plugin.on_card(chat_id, thread_id, getattr(msg, "message_id", None), text, reply_markup)
+                # Where Telegram put it: the adapter retries without the topic when
+                # it is gone (_send_message_with_thread_fallback).
+                thread = thread_id
+                if hasattr(msg, "is_topic_message"):
+                    thread = getattr(msg, "message_thread_id", None) if msg.is_topic_message else None
+                plugin.on_card(chat_id, thread, getattr(msg, "message_id", None), text, reply_markup)
             except Exception:
                 logger.debug("app_topic: on_card failed", exc_info=True)
             return msg

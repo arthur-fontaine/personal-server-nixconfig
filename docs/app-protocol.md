@@ -132,8 +132,11 @@ be deleted.
   `ea:`), the `clarify` tool (`kind: "clarify"`, `cl:`), `owner_approval`'s
   questions (`kind: "approval"`, `oa:`) and proposals (`kind: "proposal"`,
   `op:`).
-  - `id`: stable while it is open. `message_id`: the message holding the
-    inline keyboard in `chat`.
+  - `id`: stable while it is open. `message_id`: the Bot API id of the
+    message holding the inline keyboard (the card itself, which Hermes edits
+    when it is answered; never a copy), in `chat`: the chat Telegram put it in
+    (0 = main; a sub-chat whose topic is gone gets its cards in the main chat).
+    The callback's `chat_id` is the bot's DM; no topic is passed.
   - **Answering** = pressing the button: TDLib `getCallbackQueryAnswer(chat_id,
     message_id, callbackQueryPayloadData(base64-decode(data_b64)))`. That is
     exactly what a tap in Telegram does, so Hermes resolves it the same way
@@ -492,6 +495,7 @@ recognition and synthesis), and the call is ordinary messages of the chat:
 - v4 (2026-11-09, after Arthur's first real use). Added: §1 "Ids" (every
   message id is the Bot API's, every chat id the Bot API thread id; the app
   converts TDLib's); `questions[].detail` (guard's raw action);
+  `questions[].chat` is where the card landed;
   `questions[].summary` is now guard's plain sentence for any tool, in the
   owner's language, and `spoken` says it as is; a clarify's or proposal's
   `text` is the question alone (no option list, no skip hint); the written
