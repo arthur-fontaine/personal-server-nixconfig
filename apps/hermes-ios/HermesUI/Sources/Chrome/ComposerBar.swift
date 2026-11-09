@@ -38,8 +38,11 @@ public struct ComposerBar<MenuItems: View>: View {
 
     public var body: some View {
         let fieldShape = RoundedRectangle(cornerRadius: Radius.composerField, style: .continuous)
-        GlassEffectContainer(spacing: Spacing.s.points) {
-            HStack(alignment: .bottom, spacing: Spacing.s.points) {
+        // No GlassEffectContainer and no `.glassEffect` on the menu: from iOS 26.1 a `Menu` inside a
+        // glass container, or with interactive glass, opens but never runs its items' actions
+        // (seen on Arthur's iPhone: the item highlights, its action never runs). The system's glass button
+        // style is the supported way to give a menu its glass circle.
+        HStack(alignment: .bottom, spacing: Spacing.s.points) {
                 Menu { menuItems } label: {
                     Image(systemName: "plus")
                         .textRole(.body).imageScale(.large)
@@ -48,9 +51,9 @@ public struct ComposerBar<MenuItems: View>: View {
                         // as the system's bars do: the circle stays a 44-pt circle at AX sizes.
                         .dynamicTypeSize(...DynamicTypeSize.large)
                         .frame(width: Metric.composerControl, height: Metric.composerControl)
-                        .contentShape(Circle())
                 }
-                .glassEffect(.regular.interactive(), in: Circle())
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
                 // Bar controls are monochrome (HIG Toolbars); the accent is Send's.
                 .tint(.primary)
                 .accessibilityLabel(Text("Attach"))
@@ -72,7 +75,6 @@ public struct ComposerBar<MenuItems: View>: View {
                 .glassEffect(.regular.interactive(), in: fieldShape)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("composer.capsule")
-            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("composer")
