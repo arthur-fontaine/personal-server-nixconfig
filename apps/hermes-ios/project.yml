@@ -1,6 +1,6 @@
 # Generated into Hermes.xcodeproj with `xcodegen generate` (the project file is not committed).
-# Every machine-specific value is a build setting from Config/*.xcconfig, or passed to
-# xcodebuild as KEY=value by the server (see README.md).
+# Every machine-specific value is a build setting from Config/*.xcconfig, the environment
+# (the server's sideload service) or xcodebuild's KEY=value arguments (see README.md).
 name: Hermes
 options:
   deploymentTarget:
@@ -31,7 +31,7 @@ targets:
       - path: HermesCore/Sources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).core
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_ID_PREFIX).core
         GENERATE_INFOPLIST_FILE: YES
         SKIP_INSTALL: YES
         APPLICATION_EXTENSION_API_ONLY: YES
@@ -49,7 +49,7 @@ targets:
         script: '"$SRCROOT/scripts/design-check.sh"'
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).ui
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_ID_PREFIX).ui
         GENERATE_INFOPLIST_FILE: YES
         SKIP_INSTALL: YES
         # Linked by the widget extension too (the pet's optical centring).
@@ -84,7 +84,7 @@ targets:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
         UIBackgroundModes: [audio, fetch, processing, remote-notification]
-        BGTaskSchedulerPermittedIdentifiers: [$(HERMES_BUNDLE_ID_PREFIX).app.refresh]
+        BGTaskSchedulerPermittedIdentifiers: [$(HERMES_ID_PREFIX).app.refresh]
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
         NSFaceIDUsageDescription: Hermes uses Face ID to open your private sub-chats.
@@ -98,11 +98,11 @@ targets:
         HermesTelegramApiId: $(HERMES_TG_API_ID)
         HermesTelegramApiHash: $(HERMES_TG_API_HASH)
         HermesAppGroup: $(HERMES_APP_GROUP)
-        HermesPaidTeam: $(HERMES_PAID_TEAM)
+        HermesPaidTeam: $(HERMES_PAID)
         HermesSwissTransferToken: $(HERMES_SWISSTRANSFER_TOKEN)
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).app
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_ID_PREFIX).app
         PRODUCT_NAME: Hermes
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
@@ -147,7 +147,7 @@ targets:
         HermesAppGroup: $(HERMES_APP_GROUP)
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).app.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_ID_PREFIX).app.widgets
         CODE_SIGN_ENTITLEMENTS: HermesWidgets/Widgets.entitlements
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) $(HERMES_PAID_FLAG)
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
@@ -162,7 +162,7 @@ targets:
       - target: HermesCore
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).core.tests
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_ID_PREFIX).core.tests
         GENERATE_INFOPLIST_FILE: YES
   HermesUIComponentTests:
     type: bundle.unit-test
@@ -173,7 +173,7 @@ targets:
       - target: HermesUI
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).ui.tests
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_ID_PREFIX).ui.tests
         GENERATE_INFOPLIST_FILE: YES
   HermesUITests:
     type: bundle.ui-testing
@@ -184,7 +184,7 @@ targets:
       - target: HermesApp
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID_PREFIX).uitests
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_ID_PREFIX).uitests
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: HermesApp
         SWIFT_VERSION: "5.0"

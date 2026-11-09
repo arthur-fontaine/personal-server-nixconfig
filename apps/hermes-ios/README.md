@@ -81,8 +81,12 @@ The French uses *tu* and Apple's own terms (Réglages, Annuler, Plus tard).
 
 ## Configuration (build settings)
 
-All of them can be set in `Config/Local.xcconfig` or passed to xcodebuild as
-`KEY=value`, which is what the server does.
+All of them can be set in `Config/Local.xcconfig`, in the environment (what
+the server does, so the Telegram API hash stays out of the command line), or
+passed to xcodebuild as `KEY=value`. `Config/Base.xcconfig` must never assign
+the `HERMES_*` settings below, not even empty: an xcconfig assignment wins
+over the environment. Their defaults come through derived settings
+(`HERMES_ID_PREFIX`, `HERMES_PAID`) instead.
 
 | Setting | What | Default |
 | --- | --- | --- |
@@ -113,14 +117,15 @@ re-sign it before the 7-day profiles expire:
    install shows the right pet before Telegram connects; afterwards the app
    follows the `state.pet` slot and downloads newer sheets from the App topic.
    The pet in the repository, Pip, is drawn by `scripts/make-default-pet.py`.
-3. **Settings** as above, on the xcodebuild command line:
+3. **Settings** as above, in xcodebuild's environment:
 
 ```sh
 xcodegen generate
-xcodebuild build -project Hermes.xcodeproj -scheme HermesApp -configuration Release \
+HERMES_TEAM_ID=… HERMES_BUNDLE_ID_PREFIX=… HERMES_PAID_TEAM=0 \
+  HERMES_BOT_USERNAME=… HERMES_TG_API_ID=… HERMES_TG_API_HASH=… \
+  xcodebuild build -project Hermes.xcodeproj -scheme HermesApp -configuration Release \
   -destination id=<udid> -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
-  HERMES_TEAM_ID=… HERMES_BUNDLE_ID_PREFIX=… HERMES_PAID_TEAM=0 \
-  HERMES_BOT_USERNAME=… HERMES_TG_API_ID=… HERMES_TG_API_HASH=… CURRENT_PROJECT_VERSION=…
+  CURRENT_PROJECT_VERSION=…
 ```
 
 ## Free vs paid Apple team

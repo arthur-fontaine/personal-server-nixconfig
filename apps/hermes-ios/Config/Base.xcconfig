@@ -1,28 +1,37 @@
-// Defaults for every build. Override in Config/Local.xcconfig (git-ignored) or on the
-// xcodebuild command line (KEY=value), which is what the server does.
+// Defaults for every build. Override in Config/Local.xcconfig (git-ignored),
+// in the environment (what the server's sideload service does: the Telegram
+// API hash must stay out of the command line, which ps shows), or on the
+// xcodebuild command line (KEY=value).
 MARKETING_VERSION = 1.0
 CURRENT_PROJECT_VERSION = 1
 
-HERMES_TEAM_ID =
-HERMES_BUNDLE_ID_PREFIX = dev.hermes.local
-// 0: a free personal team (no push, no communication / time-sensitive notifications).
-// 1: a paid Apple Developer Program team, which lights up APNs-based features.
-HERMES_PAID_TEAM = 0
-HERMES_BOT_USERNAME =
-// From https://my.telegram.org. Without them the app starts on its demo data.
-HERMES_TG_API_ID =
-HERMES_TG_API_HASH =
-// Optional: an Infomaniak API token makes big files go to SwissTransfer instead of Gofile.
-HERMES_SWISSTRANSFER_TOKEN =
+// Read from the environment, so never assigned here: any assignment in an
+// xcconfig, even an empty one, wins over an environment variable, and the
+// server's build then ran without its team, bundle ids and Telegram keys
+// (modules/sideload/tests check this file assigns none of them).
+//   HERMES_TEAM_ID              the Apple team (DEVELOPMENT_TEAM)
+//   HERMES_BUNDLE_ID_PREFIX     bundle ids start with it (default dev.hermes.local)
+//   HERMES_PAID_TEAM            1: a paid Apple Developer Program team, which
+//                               lights up APNs-based features; 0 (default): a
+//                               free personal team
+//   HERMES_BOT_USERNAME         the Hermes bot, without @
+//   HERMES_TG_API_ID, HERMES_TG_API_HASH
+//                               from https://my.telegram.org; without them
+//                               the app starts on its demo data
+//   HERMES_SWISSTRANSFER_TOKEN  optional: an Infomaniak API token makes big
+//                               files go to SwissTransfer instead of Gofile
 
-HERMES_APP_GROUP = group.$(HERMES_BUNDLE_ID_PREFIX).hermes
+// Their defaults, through derived settings the project uses instead.
+HERMES_ID_PREFIX = $(HERMES_BUNDLE_ID_PREFIX:default=dev.hermes.local)
+HERMES_PAID = $(HERMES_PAID_TEAM:default=0)
+HERMES_APP_GROUP = group.$(HERMES_ID_PREFIX).hermes
 
-// HERMES_PAID_TEAM picks the entitlements file and a compilation condition.
+// HERMES_PAID picks the entitlements file and a compilation condition.
 HERMES_ENTITLEMENTS_SUFFIX_0 =
 HERMES_ENTITLEMENTS_SUFFIX_1 = -Paid
-HERMES_ENTITLEMENTS_SUFFIX = $(HERMES_ENTITLEMENTS_SUFFIX_$(HERMES_PAID_TEAM))
+HERMES_ENTITLEMENTS_SUFFIX = $(HERMES_ENTITLEMENTS_SUFFIX_$(HERMES_PAID))
 HERMES_PAID_FLAG_0 =
 HERMES_PAID_FLAG_1 = HERMES_PAID
-HERMES_PAID_FLAG = $(HERMES_PAID_FLAG_$(HERMES_PAID_TEAM))
+HERMES_PAID_FLAG = $(HERMES_PAID_FLAG_$(HERMES_PAID))
 
 #include? "Local.xcconfig"

@@ -45,8 +45,18 @@ in
 
   # sideload (Xcode builds, .ipa re-signing, limits, refresh, removal) and
   # Hermes' sideload plugin against fake xcrun, xcodebuild, xcodegen,
-  # codesign, ditto and security, in Hermes' interpreter.
-  sideload = pkgs.runCommand "sideload-tests" { } ''
+  # codesign, ditto and security, in Hermes' interpreter; and the declared
+  # apps' projects (the Hermes app on) against the build environment sideload
+  # gives them.
+  sideload = let
+    server = (inputs.self.darwinConfigurations.Personal-Server.extendModules {
+      modules = [ { server.hermes.app.delivery.enable = true; } ];
+    }).config.server;
+    apps = pkgs.writeText "sideload-apps.json" (builtins.toJSON (builtins.mapAttrs (_: a: {
+      source = toString a.source;
+      names = builtins.attrValues a.teamEnv ++ builtins.attrNames (a.secretEnv // a.envCommands // a.env);
+    }) server.sideload.apps));
+  in pkgs.runCommand "sideload-tests" { SIDELOAD_APPS = apps; } ''
     mkdir -p modules/hermes
     cp -R ${../modules/sideload} modules/sideload
     cp -R ${../modules/hermes/plugins} modules/hermes/plugins
@@ -54,6 +64,7 @@ in
     cd modules/sideload
     export HOME=$TMPDIR
     ${hermes.hermesVenv}/bin/python3 -I tests/test_sideload.py
+    ${hermes.hermesVenv}/bin/python3 -I tests/test_build_settings.py
     touch $out
   '';
 
