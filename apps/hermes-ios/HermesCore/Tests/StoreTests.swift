@@ -120,6 +120,9 @@ struct StoreTests {
         let chat = FakeTelegramClient.botChat.chatID
         store._apply(.newMessage(chat, Fixtures.appMessage(id: 950, json: #"{"v":1,"type":"notify","chat":0,"message_id":1,"body":"Hi","spoken":"Hi there"}"#)))
         #expect(received.map(\.speechText) == ["Hi there"])
+        // A call's written detail notifies, and is never spoken.
+        store._apply(.newMessage(chat, Fixtures.appMessage(id: 951, json: #"{"v":4,"type":"notify","chat":0,"message_id":2,"body":"📎 https://example.com","spoken":""}"#)))
+        #expect(received.last?.speechText == nil && received.last?.shownText == "https://example.com")
         // …and the notify message is acked so the bot deletes it.
         try await waitUntil { client.sent.contains { $0.contains("\"ack\"") && $0.contains("950") } }
     }

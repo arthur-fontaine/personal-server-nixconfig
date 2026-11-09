@@ -12,6 +12,8 @@ import UserNotifications
 final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationService()
     static let questionCategory = "hermes.question"
+    /// A call's written detail (`📎 `): to read, so Siri never announces it.
+    static let detailCategory = "hermes.detail"
 
     func requestAuthorization() async {
         let options: UNAuthorizationOptions = [.alert, .sound, .badge, .providesAppNotificationSettings]
@@ -29,7 +31,8 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
                                              options: [.allowAnnouncement])
         let question = UNNotificationCategory(identifier: Self.questionCategory, actions: [], intentIdentifiers: [],
                                               options: [.allowAnnouncement])
-        UNUserNotificationCenter.current().setNotificationCategories([message, question])
+        let detail = UNNotificationCategory(identifier: Self.detailCategory, actions: [reply], intentIdentifiers: [], options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([message, question, detail])
     }
 
     /// A private sub-chat's name never appears in a notification (design-rules 1.4): its title is
@@ -60,17 +63,19 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
             case .needsYou: String(localized: "Hermes needs you")
             }
         } else {
-            content.body = n.speechText
+            content.body = n.shownText
         }
         content.sound = .default
         content.threadIdentifier = "topic-\(n.chat)"
         content.targetContentIdentifier = "hermes://chat/\(n.chat)"
         content.userInfo = ["topic": Int(n.chat), "message": n.messageID ?? 0]
         let isQuestion = n.kind == "question" || n.kind == "approval"
-        content.categoryIdentifier = isQuestion ? Self.questionCategory : "hermes.message"
+        content.categoryIdentifier = isQuestion ? Self.questionCategory : (n.isWrittenDetail ? Self.detailCategory : "hermes.message")
         content.interruptionLevel = n.interruption == .timeSensitive ? .timeSensitive : (n.interruption == .passive ? .passive : .active)
+        // Announce reads communication and time-sensitive notifications: a written detail is neither.
+        if n.isWrittenDetail { content.interruptionLevel = .active }
         Task {
-            let final = await Self.asCommunication(content, title: title)
+            let final = n.isWrittenDetail ? content : await Self.asCommunication(content, title: title)
             let request = UNNotificationRequest(identifier: "notify-\(n.chat)-\(n.messageID ?? 0)", content: final, trigger: nil)
             try? await UNUserNotificationCenter.current().add(request)
         }

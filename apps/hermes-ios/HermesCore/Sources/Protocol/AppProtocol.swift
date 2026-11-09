@@ -551,8 +551,26 @@ public struct NotifyPayload: Sendable, Codable, Equatable {
         kind = try? c.decodeIfPresent(String.self, forKey: .kind)
     }
 
-    /// What Siri reads: the speech variant when the backend gives one.
-    public var speechText: String { spoken?.isEmpty == false ? spoken! : body }
+    /// A call's written detail (`📎 `, protocol §6): its `spoken` is "", and it is never spoken.
+    /// The marker counts too, for a server that leaves `spoken` out.
+    public var isWrittenDetail: Bool {
+        spoken?.isEmpty == true || body.trimmingCharacters(in: .whitespaces).hasPrefix(MessageCleanup.detailsMarker)
+    }
+
+    /// What Siri may read: the speech variant when the backend gives one, else the body; nil for a
+    /// written detail.
+    public var speechText: String? {
+        if isWrittenDetail { return nil }
+        return spoken?.isEmpty == false ? spoken! : body
+    }
+
+    /// The notification's text: what Siri reads, or a written detail's body without its marker.
+    public var shownText: String {
+        if let speechText { return speechText }
+        let b = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard b.hasPrefix(MessageCleanup.detailsMarker) else { return b }
+        return String(b.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\u{FE0F}")))
+    }
 }
 
 public struct ReplyPayload: Sendable, Equatable {

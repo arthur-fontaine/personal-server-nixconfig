@@ -261,6 +261,18 @@ struct OtherSlotsTests {
         #expect(q.interruption == .timeSensitive && q.chat == 455 && q.speechText == "Allow?")
     }
 
+    /// A call's written detail (`📎 `, §6): its `spoken` is "", and nothing speaks it.
+    @Test func aWrittenDetailIsNeverSpoken() throws {
+        guard case .notify(let n)? = AppProtocol.decode(#"{"v":4,"type":"notify","chat":0,"message_id":9,"body":"📎 Logs: https://example.com/log","spoken":""}"#) else {
+            Issue.record("no notify"); return
+        }
+        #expect(n.isWrittenDetail && n.speechText == nil)
+        #expect(n.shownText == "Logs: https://example.com/log")
+        // The marker alone is enough (a server that leaves `spoken` out).
+        guard case .notify(let m)? = AppProtocol.decode(#"{"v":4,"type":"notify","chat":0,"body":"📎 a list"}"#) else { return }
+        #expect(m.speechText == nil && m.shownText == "a list")
+    }
+
     @Test func decodesRepliesAndCallState() throws {
         guard case .reply(let ok)? = AppProtocol.decode(#"{"v":2,"type":"reply","re":1302,"ok":true,"data":{"active":true}}"#) else {
             Issue.record("no reply"); return

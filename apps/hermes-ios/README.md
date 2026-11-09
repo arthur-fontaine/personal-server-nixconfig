@@ -159,7 +159,7 @@ has no slice), calls use Apple's speech recognition and synthesis.
 
 Only Hermes' spoken answer is read aloud: what is worth reading (links, code,
 lists) comes as a separate message starting with `📎 `, shown and never
-spoken (protocol §6). The call screen names each step of a turn (Listening,
+spoken, not even by Siri announcing its notification (protocol §6). The call screen names each step of a turn (Listening,
 Hearing you…, Transcribing…, Sending…, Thinking, Speaking), and the app logs
 each call (`CallLog`, the last 400 lines). When a call hears nothing on a
 device, Settings › About › Copy Diagnostics copies the permissions, the voice
