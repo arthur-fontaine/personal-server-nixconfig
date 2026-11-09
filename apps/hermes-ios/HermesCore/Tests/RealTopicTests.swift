@@ -110,8 +110,29 @@ struct TopicResyncTests {
         #expect(store.topicLog.lastError == nil)
         #expect(store.topicLog.slots.keys.sorted() == ["controls", "devices", "state", "stats"])
     }
+
+    /// The bug on Arthur's iPhone (build 202611091159): the slots sit under 100+ newer App-topic
+    /// messages, history never reaches them, no slot id is remembered yet, and the state never
+    /// arrives ("never decoded"). Hello's reply names them, and the app reads them by id.
+    @Test func slotsBuriedInHistoryArriveThroughHello() async throws {
+        let client = FakeTelegramClient(startsLoggedIn: true)
+        client.streamDelay = .milliseconds(1)
+        client.slotsBuried = true
+        let store = HermesStore(client: client, config: .preview)
+        store.slotMemory = SlotMemory(defaults: nil)
+        store.start()
+        let deadline = ContinuousClock.now + .seconds(8)
+        while store.controls.commands.isEmpty || store.stats == nil {
+            guard ContinuousClock.now < deadline else { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(!store.controls.commands.isEmpty)
+        #expect(store.stats != nil)
+        #expect(store.state.agent != nil)
+    }
 }
 
 extension Result {
     var failureValue: Failure? { if case .failure(let f) = self { f } else { nil } }
+
 }

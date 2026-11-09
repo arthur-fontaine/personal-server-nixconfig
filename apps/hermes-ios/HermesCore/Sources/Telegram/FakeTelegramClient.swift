@@ -116,8 +116,19 @@ public final class FakeTelegramClient: TelegramClient {
         }
     }
 
+    /// As on the server on 2026-11-09: the slots are old messages, buried under many newer ones
+    /// (notifies, replies), so the App topic's history pages never reach them.
+    public var slotsBuried = false
+
     public func history(chat: ChatID, topic: TopicID, from fromMessageID: MessageID, limit: Int) async throws -> [ChatMessage] {
-        if topic == Self.appTopic { return appTopicMessages().reversed() }
+        if topic == Self.appTopic {
+            if slotsBuried {
+                return (0..<limit).map { i in
+                    Fixtures.appMessage(id: 5000 + Int64(limit - i), json: #"{"v":4,"type":"notify","chat":0,"message_id":1,"title":"Hermes","body":"…"}"#)
+                }
+            }
+            return appTopicMessages().reversed()
+        }
         let all = store[topic] ?? []
         let older = fromMessageID == 0 ? all : all.filter { $0.id < fromMessageID }
         return Array(older.suffix(limit).reversed())
@@ -288,7 +299,10 @@ public final class FakeTelegramClient: TelegramClient {
         switch type {
         case "call.state":
             replyData = #"{"active":true}"#
-        case "ack", "hello", "stats.refresh": if type != "stats.refresh" { return }
+        case "hello":
+            // As app_topic answers hello: the slot message ids, so the app can read them by id.
+            replyData = #"{"protocol":4,"slots":{"devices":801,"stats":802,"state":803,"controls":804}}"#
+        case "ack": return
         default: break
         }
         nextID += 1

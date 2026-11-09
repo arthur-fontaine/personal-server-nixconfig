@@ -489,11 +489,17 @@ public final class HermesStore {
     /// connection or a history page that missed them, no update ever comes. Reading them by id
     /// loads them into TDLib, so their later edits arrive too.
     public func resyncAppTopic() async {
-        guard let bot, let appTopicID else { return }
+        guard let appTopicID else { return }
         var ids = Set(slotIDs.values)
         for (name, id) in state.slots where name != "sprite" { ids.insert(BotAPIID.tdlib(id)) }
         if ids.isEmpty { ids = Set(slotMemory.load(topic: appTopicID).map(BotAPIID.tdlib)) }
-        for id in ids.sorted() {
+        await readSlots(Array(ids))
+    }
+
+    /// Reads App topic messages by their TDLib ids and applies them.
+    func readSlots(_ ids: [MessageID]) async {
+        guard let bot else { return }
+        for id in Set(ids).sorted() {
             do {
                 let found = try await Self.withTimeout(Self.topicTimeout) { [client] in try await client.message(chat: bot.chatID, id: id) }
                 if let m = found { handleAppMessage(m, replay: true) }
@@ -671,12 +677,21 @@ public final class HermesStore {
     private func sayHello() async {
         let info = Bundle.main.infoDictionary
         do {
-            try await sendRequest(.hello(
+            let reply = try await sendRequest(.hello(
                 appVersion: info?["CFBundleShortVersionString"] as? String ?? "0",
                 build: info?["CFBundleVersion"] as? String ?? "0",
                 device: config.deviceName,
-                petVersion: BundledPet.load()?.manifest.version), awaitReply: false)
-            topicLog.note("hello sent")
+                petVersion: BundledPet.load()?.manifest.version))
+            topicLog.note("hello answered")
+            // The server names its slot messages: they are old and only edited, often more than a
+            // history page back, so read them by id rather than wait to page back to them.
+            if case .object(let data)? = reply?.fields["data"], case .object(let slots)? = data["slots"] {
+                let ids = slots.compactMap { name, value -> MessageID? in
+                    guard name != "sprite", case .number(let n) = value else { return nil }
+                    return BotAPIID.tdlib(MessageID(n))
+                }
+                await readSlots(ids)
+            }
         } catch {
             topicLog.fail("hello: \(error.localizedDescription)")
         }
