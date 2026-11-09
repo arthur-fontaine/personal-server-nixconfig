@@ -56,7 +56,7 @@ in
       source = toString a.source;
       names = builtins.attrValues a.teamEnv ++ builtins.attrNames (a.secretEnv // a.envCommands // a.env);
     }) server.sideload.apps));
-  in pkgs.runCommand "sideload-tests" { SIDELOAD_APPS = apps; } ''
+  in pkgs.runCommand "sideload-tests" { SIDELOAD_APPS = apps; __darwinAllowLocalNetworking = true; } ''
     mkdir -p modules/hermes
     cp -R ${../modules/sideload} modules/sideload
     cp -R ${../modules/hermes/plugins} modules/hermes/plugins

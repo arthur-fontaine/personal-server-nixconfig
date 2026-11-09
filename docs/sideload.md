@@ -56,7 +56,15 @@ from a paid one: `team.paid` does, free by default. With a paid team, setting
 - signs for 7 days: the job rebuilds or re-signs and reinstalls an app when
   its profile expires within 48 hours (`refreshBefore`), after removing
   Xcode's cached profiles of that app only; a failed refresh is tried again an
-  hour later or at the next run, and the app stays installed meanwhile;
+  hour later or at the next run, and the app stays installed meanwhile. With
+  Hermes configured, you are told on Telegram, by Hermes' bot in its chat with
+  you (the token and your id from `/etc/hermes/secrets.env`, as `server-rebuild`
+  does), once per profile: when a re-sign fails (what failed, and until when
+  the app keeps opening), and when a profile is a day from expiring with no
+  re-sign done (a device away counts only then, not at its first missed
+  re-sign). A re-sign that works, and what you or Hermes asked for, send
+  nothing from here. A message that cannot be sent is logged and tried at the
+  next run; it never holds a run up;
 - allows **3 sideloaded apps per device** (apps installed by other means
   count too) and **10 new App IDs per 7 days** (an app's extensions take one
   each; the Hermes app takes two). Both are checked before a build, and a

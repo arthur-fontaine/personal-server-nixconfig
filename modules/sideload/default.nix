@@ -133,6 +133,9 @@ in
             refresh_before_hours = cfg.refreshBefore;
             secrets_file = cfg.secretsFile;
             launchd_label = label;
+            # A failed re-sign is told to the owner with Hermes' bot; without
+            # Hermes, the service stays silent (sideload status, the log).
+            notify = if config.server.hermes.enable then { secrets_file = config.server.hermes.secretsFile; } else null;
             tools.xcodegen = lib.getExe pkgs.xcodegen;
             apps = lib.mapAttrs (_: a: {
               inherit (a) name ref scheme env inputs;

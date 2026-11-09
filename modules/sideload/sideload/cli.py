@@ -32,6 +32,12 @@ Everything runs as the service's account in its GUI session (a launchd
 agent), where its login keychain, holding Xcode's account and signing key, is
 unlocked.
 
+With `notify` set (Hermes configured), a re-sign that fails, and a profile
+expiring within a day that no re-sign renewed, are told to the owner on
+Telegram (once each per profile), through the Bot API with Hermes' bot: the
+app would otherwise stop opening without a word. A re-sign that works says
+nothing.
+
 Settings: a JSON file (SIDELOAD_CONFIG, written by Nix: modules/sideload).
 Standard library only.
 """
@@ -51,6 +57,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
@@ -134,6 +141,8 @@ class Config:
                       "git": "git", "openssl": "openssl", **(data.get("tools") or {})}
         self.install_timeout = int(data.get("install_timeout", 900))
         self.build_timeout = int(data.get("build_timeout", 5400))
+        # {"secrets_file": …, "telegram_api": …}; null without Hermes.
+        self.notify = data.get("notify") or None
 
     @classmethod
     def load(cls) -> "Config":
@@ -397,9 +406,13 @@ def bundle_prefix(definition: dict, team_id: str, app_id: str) -> str:
 
 
 def secrets(cfg: Config) -> dict:
+    return read_env(cfg.secrets_file)
+
+
+def read_env(path: str) -> dict:
     values = {}
     try:
-        for line in Path(cfg.secrets_file).read_text().splitlines():
+        for line in Path(path).read_text().splitlines():
             key, sep, value = line.partition("=")
             if sep:
                 values[key.strip()] = value.strip()
@@ -719,6 +732,124 @@ def install(cfg: Config, app: Path, udid: str, log) -> None:
         raise SideloadError("devicectl install failed: " + errors(log.name))
 
 
+# ── Telling the owner ───────────────────────────────────────────────────────
+
+REFRESH = "profile expires soon"
+WARN_WITHIN = dt.timedelta(hours=24)
+AGAIN = "Ask me to try again."
+
+
+def tell_owner(cfg: Config, text: str) -> bool:
+    """One Telegram message to the owner, in Hermes' chat with them, as
+    server-rebuild tells them of a local overlay change
+    (modules/hermes/system/access/overrides/server-rebuild.sh). Never raises:
+    a run does not wait on Telegram."""
+    if not cfg.notify or not text:
+        return False
+    values = read_env(cfg.notify.get("secrets_file") or "")
+    token = values.get("TELEGRAM_BOT_TOKEN", "")
+    owner = values.get("TELEGRAM_ALLOWED_USERS", "").split(",")[0].strip()
+    if not token or not owner:
+        log_line(cfg, "the owner was not told: no TELEGRAM_BOT_TOKEN or TELEGRAM_ALLOWED_USERS in the secrets file")
+        return False
+    api = (cfg.notify.get("telegram_api") or "https://api.telegram.org").rstrip("/")
+    data = urllib.parse.urlencode({"chat_id": owner, "text": text}).encode()
+    try:
+        with urllib.request.urlopen(urllib.request.Request(f"{api}/bot{token}/sendMessage", data=data), timeout=10) as answer:
+            answer.read()
+        return True
+    except Exception as error:  # noqa: BLE001
+        # Not the error's text: a URL in it would carry the token.
+        log_line(cfg, f"could not tell the owner on Telegram ({type(error).__name__} {getattr(error, 'code', '')})".rstrip())
+        return False
+
+
+def plain(error: str | None) -> str:
+    """What failed, in a short clause for the owner (the details stay in the log)."""
+    error = error or ""
+    for pattern, words in (
+        (r"is not reachable", "the device wasn't reachable (on another network, off, or asleep)"),
+        (r"not paired with this Mac", "the device isn't paired with the Mac any more"),
+        (r"iOS [\d.]+ is not installed", "Xcode's iOS platform isn't downloaded"),
+        (r"no Apple Account in Xcode", "Xcode isn't signed in to an Apple Account any more"),
+        (r"no Apple Development certificate", "Xcode has no development certificate"),
+        (r"requires a development team", "Xcode found no signing team for the build"),
+        (r"free team limit: 10", "the free team's 10 new App IDs for this week are used up"),
+        (r"free team limit: 3", "the free team allows only 3 sideloaded apps per device"),
+        (r"xcodebuild failed|xcodegen failed|made no \.app", "the build failed"),
+        (r"codesign failed|signing stub", "signing failed"),
+        (r"devicectl install failed", "copying it to the device failed"),
+        (r"the job failed", "the job crashed"),
+    ):
+        if re.search(pattern, error, re.I):
+            return words
+    first = re.split(r"(?<=[.:;])\s", error.strip(), maxsplit=1)[0].rstrip(".:;")
+    return (first[:157] + "…") if len(first) > 160 else (first or "something went wrong")
+
+
+def day(moment: str | None) -> str:
+    local = parse_iso(moment)
+    if local is None:
+        return "?"
+    local = local.astimezone()
+    return f"{local.day} {local:%b} at {local:%H:%M}"
+
+
+def app_name(cfg: Config, state: dict, app_id: str) -> str:
+    try:
+        return app_definition(cfg, state, app_id).get("name") or app_id
+    except SideloadError:
+        return app_id
+
+
+def failed_refresh_notice(cfg: Config, state: dict, failed: list[tuple[str, str, str | None]]) -> tuple[list, list]:
+    """Re-signs that just failed, once per profile. An unreachable device is no
+    news yet (away for a day): the warning a day before expiry covers it."""
+    lines, marks = [], []
+    for app_id, udid, error in failed:
+        record = installs(state, app_id).get(udid) or {}
+        expires = record.get("profile_expires")
+        if "not reachable" in (error or "") or (record.get("told") or {}).get("failed") == expires:
+            continue
+        lines.append(f"Couldn't renew the {app_name(cfg, state, app_id)} app's signature on "
+                     f"{device_entry(state, udid).get('name') or udid}: {plain(error)}. It keeps opening until "
+                     f"{day(expires)}.")
+        marks.append((app_id, udid, "failed", expires))
+        if (parse_iso(expires) or now()) <= now() + WARN_WITHIN:
+            marks.append((app_id, udid, "expiring", expires))  # this message is the warning too
+    return lines, marks
+
+
+def expiry_notice(cfg: Config, state: dict) -> tuple[list, list]:
+    """Installs whose profile expires within a day, each told once per profile."""
+    lines, marks = [], []
+    for app_id, entry in sorted(state["apps"].items()):
+        for udid, r in sorted((entry.get("installs") or {}).items()):
+            expires = r.get("profile_expires")
+            moment = parse_iso(expires)
+            if not (r.get("ok") and not r.get("removed") and moment and moment <= now() + WARN_WITHIN):
+                continue
+            if (r.get("told") or {}).get("expiring") == expires:
+                continue
+            why = f" ({plain(r.get('error'))})" if r.get("error") else ""
+            verb = "stopped opening on" if moment <= now() else "stops opening on"
+            lines.append(f"The {app_name(cfg, state, app_id)} app on {device_entry(state, udid).get('name') or udid} "
+                         f"{verb} {day(expires)}: its signature couldn't be renewed{why}.")
+            marks.append((app_id, udid, "expiring", expires))
+    return lines, marks
+
+
+def tell(cfg: Config, state: dict, lines: list, marks: list) -> None:
+    """Sends, and keeps what was told only once it is sent: a later run tries again."""
+    if not lines or not tell_owner(cfg, "\n".join(lines + [AGAIN])):
+        return
+    for app_id, udid, kind, expires in marks:
+        record = installs(state, app_id).get(udid)
+        if record is not None:
+            record.setdefault("told", {})[kind] = expires
+    save_state(cfg, state)
+
+
 # ── The job ─────────────────────────────────────────────────────────────────
 
 def pending(cfg: Config) -> list[dict]:
@@ -843,6 +974,8 @@ def run_once(cfg: Config) -> bool:
                 record_results(state, app_id, {udid: reason}, results[app_id], build.input_version)
                 save_state(cfg, state)
 
+    failed = [(app_id, udid, r.get("error")) for app_id, targets in jobs.items() for udid, reason in targets.items()
+              if reason == REFRESH and (r := results.get(app_id, {}).get(udid)) and not r.get("ok")]
     state["running"] = None
     state["last_log"] = str(log_path)
     if any(r.get("ok") for mine in results.values() for r in mine.values()):
@@ -853,6 +986,7 @@ def run_once(cfg: Config) -> bool:
             log_line(cfg, f"{app_id} on {udid}: " + ("done" if r.get("ok") else f"failed: {r.get('error')}"))
     finish(cfg, requests, results, log_path)
     prune(logs.glob("run-*.log"), KEEP_LOGS)
+    tell(cfg, state, *failed_refresh_notice(cfg, state, failed))
     return True
 
 
@@ -870,7 +1004,7 @@ def record_results(state: dict, app_id: str, targets: dict, results: dict, input
             # A failed refresh leaves the app where it was, still signed until then.
             entry.update(ok=True, error=record.get("error"), profile_expires=before.get("profile_expires"),
                          version=before.get("version"), build=before.get("build"), bundle_id=before.get("bundle_id"),
-                         last_error_at=iso(now()))
+                         last_error_at=iso(now()), told=before.get("told") or {})
         mine[udid] = entry
 
 
@@ -935,6 +1069,8 @@ def cmd_run(cfg: Config) -> int:
         try:
             while run_once(cfg):
                 pass
+            state = load_state(cfg)
+            tell(cfg, state, *expiry_notice(cfg, state))
         except Stopped as stopped:
             # Its requests stay queued: the job's next start (RunAtLoad) does them.
             state = load_state(cfg)

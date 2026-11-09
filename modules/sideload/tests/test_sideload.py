@@ -487,6 +487,127 @@ class Refresh(Base):
         self.assertIn("xcodebuild failed", record["error"])
 
 
+class FakeTelegram:
+    """The Bot API's sendMessage on loopback: each message's form, or 500 when down."""
+
+    def __init__(self):
+        import http.server
+        import threading
+        import urllib.parse
+        self.sent, self.down = [], False
+        fake = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                form = urllib.parse.parse_qs(self.rfile.read(int(self.headers["Content-Length"])).decode())
+                if fake.down:
+                    self.send_response(500)
+                    self.end_headers()
+                    return
+                fake.sent.append({"path": self.path, **{k: v[0] for k, v in form.items()}})
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"ok": true}')
+
+            def log_message(self, *args):
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
+class Notice(Refresh):
+    """A re-sign that fails, or a profile about to expire, is told once on Telegram."""
+
+    def setUp(self):
+        super().setUp()
+        self.telegram = FakeTelegram()
+        self.addCleanup(self.telegram.close)
+        secrets = Path(self.config["secrets_file"])
+        secrets.write_text(secrets.read_text() + "TELEGRAM_BOT_TOKEN=123:abc\nTELEGRAM_ALLOWED_USERS=111,222\n")
+        self.cfg.notify = {"secrets_file": str(secrets), "telegram_api": self.telegram.url}
+
+    def retry_later(self):
+        """An hour on: the failed refresh is due again."""
+        state = cli.load_state(self.cfg)
+        cli.installs(state, "hermes")["UDID-A"].pop("last_error_at", None)
+        cli.save_state(self.cfg, state)
+
+    def test_a_successful_resign_is_silent(self):
+        self.installed(dt.timedelta(hours=30))
+        cli.cmd_run(self.cfg)
+        self.assertEqual(len(self.calls("xcodebuild")), 1)
+        self.assertEqual(self.telegram.sent, [])
+
+    def test_a_failed_resign_is_told_once(self):
+        self.installed(dt.timedelta(hours=30))
+        os.environ["FAKE_BUILD_FAIL"] = "1"
+        cli.cmd_run(self.cfg)
+        self.assertEqual(len(self.telegram.sent), 1)
+        sent = self.telegram.sent[0]
+        self.assertEqual((sent["path"], sent["chat_id"]), ("/bot123:abc/sendMessage", "111"))
+        self.assertIn("Couldn't renew the Hermes app's signature on Arthur's iPhone: the build failed. "
+                      "It keeps opening until ", sent["text"])
+        self.assertTrue(sent["text"].endswith("Ask me to try again."))
+        self.retry_later()
+        cli.cmd_run(self.cfg)
+        self.assertEqual(len(self.calls("xcodebuild")), 2, "tried again")
+        self.assertEqual(len(self.telegram.sent), 1, "not told twice")
+
+    def test_unreachable_waits_for_the_day_before_expiry(self):
+        self.devices([device("UDID-A", "Arthur's iPhone", tunnel="unavailable")])
+        self.installed(dt.timedelta(hours=30))
+        cli.cmd_run(self.cfg)
+        self.assertEqual(self.telegram.sent, [], "away for a day is no news")
+        self.installed(dt.timedelta(hours=20))
+        cli.cmd_run(self.cfg)
+        self.assertEqual(len(self.telegram.sent), 1)
+        self.assertIn("The Hermes app on Arthur's iPhone stops opening on ", self.telegram.sent[0]["text"])
+        self.assertIn("couldn't be renewed (the device wasn't reachable", self.telegram.sent[0]["text"])
+        self.retry_later()
+        cli.cmd_run(self.cfg)
+        self.assertEqual(len(self.telegram.sent), 1, "told once per profile")
+
+    def test_a_failure_within_a_day_is_one_message(self):
+        self.installed(dt.timedelta(hours=10))
+        os.environ["FAKE_BUILD_FAIL"] = "1"
+        cli.cmd_run(self.cfg)
+        self.assertEqual(len(self.telegram.sent), 1)
+        self.assertIn("Couldn't renew", self.telegram.sent[0]["text"])
+
+    def test_an_install_asked_for_is_not_told_here(self):
+        os.environ["FAKE_BUILD_FAIL"] = "1"
+        cli.queue(self.cfg, "hermes", ["UDID-A"], "asked by Hermes")
+        cli.cmd_run(self.cfg)
+        self.assertEqual(self.telegram.sent, [])
+
+    def test_telegram_down_does_not_stop_the_run_and_is_told_later(self):
+        self.installed(dt.timedelta(hours=30))
+        os.environ["FAKE_BUILD_FAIL"] = "1"
+        self.telegram.down = True
+        self.assertEqual(cli.cmd_run(self.cfg), 0)
+        self.assertIn("could not tell the owner on Telegram (HTTPError 500)", self.cfg.log_file.read_text())
+        self.assertNotIn("123:abc", self.cfg.log_file.read_text())
+        self.assertIn("xcodebuild failed", self.state()["apps"]["hermes"]["installs"]["UDID-A"]["error"])
+        self.telegram.down = False
+        self.retry_later()
+        cli.cmd_run(self.cfg)
+        self.assertEqual(len(self.telegram.sent), 1, "not marked told while Telegram was down")
+
+    def test_without_hermes_nothing_is_sent(self):
+        self.cfg.notify = None
+        self.installed(dt.timedelta(hours=10))
+        os.environ["FAKE_BUILD_FAIL"] = "1"
+        cli.cmd_run(self.cfg)
+        self.assertEqual(self.telegram.sent, [])
+
+
 class Ipa(Base):
     def test_add_resign_install(self):
         added = self.add("tool", "ipa", str(self.ipa()))
