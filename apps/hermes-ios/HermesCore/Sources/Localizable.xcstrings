@@ -621,6 +621,16 @@
         }
       }
     },
+    "Reply \"skip\" to skip this question.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Répondez « skip » pour passer cette question."
+          }
+        }
+      }
+    },
     "Resting": {
       "localizations": {
         "fr": {
@@ -677,6 +687,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "En cours : restic backup --retry"
+          }
+        }
+      }
+    },
+    "Running: restic check": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En cours : restic check"
           }
         }
       }
@@ -1091,6 +1111,16 @@
         }
       }
     },
+    "Which hotel should I hold for Lisbon?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quel hôtel je réserve pour Lisbonne ?"
+          }
+        }
+      }
+    },
     "Which model answers in this chat": {
       "localizations": {
         "fr": {
@@ -1157,6 +1187,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "ton code"
+          }
+        }
+      }
+    },
+    "✏️ Other (type answer)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "✏️ Autre (saisir)"
           }
         }
       }

@@ -56,6 +56,12 @@ struct CleanupTests {
         #expect(QuestionText.display(q).text == "Plan:\n1. Build\n2. Deploy\nGo ahead?")
     }
 
+    @Test func theSkipHintIsFoundWithNoBreakSpaces() {
+        #expect(QuestionText.isSkipHint("Répondez «\u{202F}skip\u{202F}» pour passer cette question."))
+        #expect(QuestionText.isSkipHint("Antworte mit „skip“, um diese Frage zu überspringen."))
+        #expect(!QuestionText.isSkipHint("Should I skip the tests?"))
+    }
+
     @Test func pendingTurnsDecode() throws {
         let json = #"{"v":4,"type":"state","pending":[{"chat":0,"message_id":1301,"since":"2026-11-09T10:00:00Z"},{"chat":12}]}"#
         guard case .state(let s)? = AppProtocol.decode(json) else { Issue.record("no state"); return }

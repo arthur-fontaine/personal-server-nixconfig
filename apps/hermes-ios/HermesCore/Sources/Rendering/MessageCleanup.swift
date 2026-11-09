@@ -137,6 +137,8 @@ public enum QuestionText {
     /// Hermes' `gateway.clarify.skip_hint` in any of its languages: the word skip, quoted.
     static func isSkipHint(_ line: String) -> Bool {
         let quoted = ["\"skip\"", "“skip”", "« skip »", "«skip»", "„skip“", "„skip”", "'skip'", "「skip」"]
-        return quoted.contains { line.contains($0) }
+        // No-break spaces (French typography) count as spaces.
+        let plain = line.replacingOccurrences(of: "\u{00A0}", with: " ").replacingOccurrences(of: "\u{202F}", with: " ")
+        return quoted.contains { plain.contains($0) }
     }
 }

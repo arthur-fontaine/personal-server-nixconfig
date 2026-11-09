@@ -38,6 +38,14 @@ public final class FakeTelegramClient: TelegramClient {
         if scene == "review" {
             store[.main] = (store[.main] ?? []).filter { $0.id <= Fixtures.id(1004) }
         }
+        if scene == "pending" {
+            // Review (brief items 4 and 10): the owner's last message waits for the running turn,
+            // and Hermes asks a clarify question in Telegram's own format (choices and skip hint).
+            store[.main] = (store[.main] ?? []).filter { $0.id != Fixtures.id(1005) }
+            appState.pending = [PendingTurn(chat: .main, messageID: 1009)]
+            appState.agent = AgentState(status: .working, task: L("Running: restic check"), since: now, chat: .main)
+            appState.questions = [Fixtures.clarifyQuestion]
+        }
         if !withQuestion {
             appState.questions = []
             appState.agent = AgentState(status: .idle)

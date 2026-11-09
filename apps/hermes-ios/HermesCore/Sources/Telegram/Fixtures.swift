@@ -91,6 +91,14 @@ public enum Fixtures {
             ], askedAt: .now)
     }
 
+    /// A clarify as Hermes' Telegram card writes it: the choices listed in the text, numbered
+    /// buttons, the skip hint (the card must show none of that twice).
+    public static let clarifyQuestion = PendingQuestion(
+        id: "cl:3", kind: .clarify, chat: .main, messageID: nil,
+        text: "❓ " + L("Which hotel should I hold for Lisbon?") + "\n\n1. Casa do Largo\n2. Alfama Patio\n3. Memmo Alfama\n" + L("Reply \"skip\" to skip this question."),
+        options: [QuestionOption(id: "0", label: "1", data: Data("cl:3:0".utf8)), QuestionOption(id: "1", label: "2", data: Data("cl:3:1".utf8)),
+                  QuestionOption(id: "2", label: "3", data: Data("cl:3:2".utf8)), QuestionOption(id: "other", label: L("✏️ Other (type answer)"), data: Data("cl:3:other".utf8))])
+
     public static func state(now: Date) -> AppState {
         AppState(
             agent: AgentState(status: .waitingUser, task: L("Waiting for your approval"), since: now.addingTimeInterval(-90), chat: .main),
@@ -141,6 +149,7 @@ public enum Fixtures {
         o["subchats"] = s.subchats.map { ["topic_id": Int($0.topicID), "name": $0.name ?? "", "preset": $0.preset ?? NSNull(),
                                           "encrypted": $0.encrypted, "unlocked": $0.unlocked, "ttl": $0.ttl ?? NSNull()] }
         o["slots"] = s.slots
+        o["pending"] = s.pending.map { ["chat": Int($0.chat), "message_id": $0.messageID] as [String: Any] }
         let data = try! JSONSerialization.data(withJSONObject: o, options: [.sortedKeys])
         return String(decoding: data, as: UTF8.self)
     }
