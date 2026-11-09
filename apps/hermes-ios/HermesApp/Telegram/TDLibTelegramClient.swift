@@ -216,9 +216,13 @@ final class TDLibTelegramClient: TelegramClient {
     func history(chat: ChatID, topic: TopicID, from fromMessageID: MessageID, limit: Int) async throws -> [ChatMessage] {
         // TDLib may return fewer messages than asked while it fetches from the server: ask until
         // the page is full or nothing more comes.
+        // `from_message_id` with offset 0 includes that message itself, so each next page repeats
+        // the previous page's oldest message: keep new ids only, and stop when a page brings
+        // nothing new.
         var collected: [Message] = []
+        var seen = Set<Int64>()
         var from = fromMessageID
-        for _ in 0..<4 where collected.count < limit {
+        for _ in 0..<10 where collected.count < limit {
             let page: Messages = try await wrap {
                 if topic == .main {
                     try await self.client.getChatHistory(chatId: chat, fromMessageId: from, limit: limit - collected.count, offset: 0, onlyLocal: false)
@@ -227,12 +231,12 @@ final class TDLibTelegramClient: TelegramClient {
                                                                limit: limit - collected.count, offset: 0)
                 }
             }
-            let msgs = (page.messages ?? []).filter { topic != .main || Self.topic($0.topicId) == .main }
-            if page.messages?.isEmpty ?? true { break }
-            collected += msgs
-            from = page.messages!.last!.id
+            let fresh = (page.messages ?? []).filter { seen.insert($0.id).inserted }
+            guard let oldest = fresh.map(\.id).min() else { break }
+            collected += fresh.filter { topic != .main || Self.topic($0.topicId) == .main }
+            from = oldest
         }
-        return collected.map(Self.convert)
+        return collected.sorted { $0.id > $1.id }.prefix(limit).map(Self.convert)
     }
 
     func send(text: String, chat: ChatID, topic: TopicID, replyTo: MessageID?) async throws -> ChatMessage {

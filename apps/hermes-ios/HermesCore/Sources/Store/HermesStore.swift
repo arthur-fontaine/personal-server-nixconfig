@@ -38,6 +38,10 @@ public final class HermesStore {
     public private(set) var controls = ControlsState()
     public private(set) var spriteURL: URL?
     private var slotIDs: [String: MessageID] = [:]
+    /// What the App topic last did, for Settings › About › Diagnostics.
+    public private(set) var topicLog = AppTopicLog()
+    private var resyncTask: Task<Void, Never>?
+    public var slotMemory = SlotMemory()
     private var pendingReplies: [MessageID: CheckedContinuation<ReplyPayload, Error>] = [:]
     private var earlyReplies: [MessageID: ReplyPayload] = [:]
     private var seenQuestions: Set<String> = []
@@ -113,6 +117,8 @@ public final class HermesStore {
             auth = a
             if a == .ready { connectBot() }
         case .connection(let c):
+            // Edits made while offline may never come as updates: read the slots again.
+            if c == .ready, connection != .ready, bot != nil { Task { await resyncAppTopic() } }
             connection = c
         case .newMessage(let chat, let m):
             guard chat == bot?.chatID else { return }
@@ -181,9 +187,13 @@ public final class HermesStore {
                 botError = nil
                 mainThread.name = found.title
                 try await loadTopics()
+                topicLog.note("App topic: \(appTopicID.map(String.init) ?? "none")")
+                // The App topic first and on its own: the slots and hello never wait on the
+                // transcript's history (build 202611091023 never got as far as hello).
+                if let appTopicID { Task { await loadAppTopic(appTopicID) } }
+                Task { await sayHello() }
+                startResyncLoop()
                 await loadHistory(.main)
-                if let appTopicID { await loadAppTopic(appTopicID) }
-                await sayHello()
             } catch {
                 botError = error.localizedDescription
             }
@@ -459,9 +469,68 @@ public final class HermesStore {
 
     private func loadAppTopic(_ topic: TopicID) async {
         guard let bot else { return }
-        guard let page = try? await client.history(chat: bot.chatID, topic: topic, from: 0, limit: 100) else { return }
-        // Newest first: the first message of each slot type wins.
-        for m in page.reversed() { handleAppMessage(m, replay: true) }
+        // Last launch's slot ids first: the state shows even when the history never answers.
+        await resyncAppTopic()
+        do {
+            let page = try await Self.withTimeout(Self.topicTimeout) { [client] in
+                try await client.history(chat: bot.chatID, topic: topic, from: 0, limit: 100)
+            }
+            topicLog.note("history: \(page.count) messages")
+            // Oldest first, so the newest message of each slot type wins.
+            for m in page.sorted(by: { $0.id < $1.id }) { handleAppMessage(m, replay: true) }
+        } catch {
+            topicLog.fail("history: \(error.localizedDescription)")
+        }
+        await resyncAppTopic()
+    }
+
+    /// Reads each slot message by its id. The slots are old messages the server only edits, and
+    /// TDLib sends edit updates only for messages it has loaded: after a relaunch, a lost
+    /// connection or a history page that missed them, no update ever comes. Reading them by id
+    /// loads them into TDLib, so their later edits arrive too.
+    public func resyncAppTopic() async {
+        guard let bot, let appTopicID else { return }
+        var ids = Set(slotIDs.values)
+        for (name, id) in state.slots where name != "sprite" { ids.insert(BotAPIID.tdlib(id)) }
+        if ids.isEmpty { ids = Set(slotMemory.load(topic: appTopicID).map(BotAPIID.tdlib)) }
+        for id in ids.sorted() {
+            do {
+                let found = try await Self.withTimeout(Self.topicTimeout) { [client] in try await client.message(chat: bot.chatID, id: id) }
+                if let m = found { handleAppMessage(m, replay: true) }
+                else { topicLog.fail("slot \(BotAPIID.botAPI(id) ?? id) is gone") }
+            } catch {
+                topicLog.fail("slot \(BotAPIID.botAPI(id) ?? id): \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func startResyncLoop() {
+        guard resyncTask == nil else { return }
+        resyncTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.resyncEvery)
+                guard let self, self.connection == .ready else { continue }
+                await self.resyncAppTopic()
+            }
+        }
+    }
+
+    static let resyncEvery: Duration = .seconds(30)
+    static var topicTimeout: Duration = .seconds(15)
+
+    struct Timeout: LocalizedError {
+        var errorDescription: String? { "no answer from Telegram" }
+    }
+
+    /// TDLib answers every request, but a request it never answers must not hold the App topic
+    /// (or hello) behind it.
+    static func withTimeout<T: Sendable>(_ limit: Duration, _ body: @escaping @MainActor @Sendable () async throws -> T) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await body() }
+            group.addTask { try await Task.sleep(for: limit); throw Timeout() }
+            defer { group.cancelAll() }
+            return try await group.next()!
+        }
     }
 
     func handleAppMessage(_ m: ChatMessage, replay: Bool = false) {
@@ -472,11 +541,22 @@ public final class HermesStore {
             fetchSprite(doc)
             return
         }
-        guard let message = AppProtocol.decode(m.text.text) else { return }
-        switch message {
+        let message: DecodedAppMessage
+        switch AppProtocol.decodeResult(m.text.text) {
+        case .success(let decoded):
+            message = decoded
+        case .failure(let failure):
+            // A message that isn't protocol JSON at all (someone typing in the topic) is no error.
+            if failure != .notJSON { topicLog.fail("message \(BotAPIID.botAPI(m.id) ?? m.id): \(failure)") }
+            return
+        }
+        if let v = message.version, v > AppProtocol.version { topicLog.note("server speaks protocol v\(v), app v\(AppProtocol.version)") }
+        if let kind = message.slotName { topicLog.decoded(kind, id: BotAPIID.botAPI(m.id) ?? m.id) }
+        switch message.payload {
         case .state(let s):
             guard m.id >= (slotIDs["state"] ?? 0) else { return }
             slotIDs["state"] = m.id
+            rememberSlots()
             let oldSprite = state.pet?.spriteMessageID
             if !replay, s.agent != state.agent || s.questions != state.questions { lastBotActivity = .now }
             state = s
@@ -492,15 +572,18 @@ public final class HermesStore {
         case .stats(let s):
             guard m.id >= (slotIDs["stats"] ?? 0) else { return }
             slotIDs["stats"] = m.id
+            rememberSlots()
             stats = s
             hooks.statsChanged(s)
         case .devices(let d):
             guard m.id >= (slotIDs["devices"] ?? 0) else { return }
             slotIDs["devices"] = m.id
+            rememberSlots()
             delivery = d
         case .controls(let c):
             guard m.id >= (slotIDs["controls"] ?? 0) else { return }
             slotIDs["controls"] = m.id
+            rememberSlots()
             controls = c
         case .notify(let n):
             // A replay (launch, or a relaunch by background refresh) shows what arrived while the
@@ -511,6 +594,7 @@ public final class HermesStore {
             ack([m.id])
         case .reply(let r):
             guard let re = r.re else { return }
+            if !r.ok { topicLog.fail("request \(re): \(r.errorCode ?? "?") \(r.errorMessage ?? "")") }
             // `re` is the request's Bot API id; requests are waited on by their TDLib id.
             let request = BotAPIID.tdlib(re)
             if let c = pendingReplies.removeValue(forKey: request) { c.resume(returning: r) }
@@ -519,6 +603,11 @@ public final class HermesStore {
         case .other:
             break
         }
+    }
+
+    private func rememberSlots() {
+        guard let appTopicID else { return }
+        slotMemory.save(topic: appTopicID, ids: slotIDs.values.compactMap(BotAPIID.botAPI))
     }
 
     private func ack(_ ids: [MessageID]) {
@@ -581,11 +670,16 @@ public final class HermesStore {
 
     private func sayHello() async {
         let info = Bundle.main.infoDictionary
-        _ = try? await sendRequest(.hello(
-            appVersion: info?["CFBundleShortVersionString"] as? String ?? "0",
-            build: info?["CFBundleVersion"] as? String ?? "0",
-            device: config.deviceName,
-            petVersion: BundledPet.load()?.manifest.version), awaitReply: false)
+        do {
+            try await sendRequest(.hello(
+                appVersion: info?["CFBundleShortVersionString"] as? String ?? "0",
+                build: info?["CFBundleVersion"] as? String ?? "0",
+                device: config.deviceName,
+                petVersion: BundledPet.load()?.manifest.version), awaitReply: false)
+            topicLog.note("hello sent")
+        } catch {
+            topicLog.fail("hello: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Pet

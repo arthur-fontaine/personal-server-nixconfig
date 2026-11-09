@@ -26,6 +26,9 @@ enum Diagnostics {
                 + (LFMEngineHolder.shared.lastError.map { ", last error: \($0)" } ?? ""),
             "Voice: \(CallVoice.current().rawValue), language \(Locale.preferredLanguages.first ?? "?")",
             "Audio session now: \(session.category.rawValue)/\(session.mode.rawValue), \(CallSession.route(session))",
+        ]
+        out += store.topicLog.summary
+        out += [
             "",
             "Last call log lines:",
         ]

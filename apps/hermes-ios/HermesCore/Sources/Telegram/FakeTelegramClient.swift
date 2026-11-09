@@ -124,7 +124,16 @@ public final class FakeTelegramClient: TelegramClient {
     }
 
     private func appTopicMessages() -> [ChatMessage] {
-        [
+        // `-scene real`: the slots exactly as the server kept them on 2026-11-09, ids included.
+        if scene == "real" {
+            return [
+                Fixtures.appMessage(id: RealSnapshot.statsID, json: RealSnapshot.stats),
+                Fixtures.appMessage(id: RealSnapshot.devicesID, json: RealSnapshot.devices),
+                Fixtures.appMessage(id: RealSnapshot.controlsID, json: RealSnapshot.controls),
+                Fixtures.appMessage(id: RealSnapshot.stateID, json: RealSnapshot.stateWithClarify),
+            ]
+        }
+        return [
             Fixtures.appMessage(id: 801, json: Fixtures.devicesJSON),
             Fixtures.appMessage(id: 802, json: Fixtures.statsJSON),
             Fixtures.appMessage(id: 803, json: encodeState()),
@@ -135,7 +144,7 @@ public final class FakeTelegramClient: TelegramClient {
     private func encodeState() -> String { Fixtures.stateJSON(appState) }
 
     public func message(chat: ChatID, id: MessageID) async throws -> ChatMessage? {
-        store.values.lazy.flatMap { $0 }.first { $0.id == id }
+        store.values.lazy.flatMap { $0 }.first { $0.id == id } ?? appTopicMessages().first { $0.id == id }
     }
 
     public func send(text: String, chat: ChatID, topic: TopicID, replyTo: MessageID?) async throws -> ChatMessage {
@@ -256,6 +265,7 @@ public final class FakeTelegramClient: TelegramClient {
     }
 
     private func pushState() {
+        guard scene != "real" else { return }
         if let status = appState.agent?.status, status != .idle, status != .error {
             let mood = PetMood(agent: status, reported: nil, until: nil)
             appState.pet?.mood = mood

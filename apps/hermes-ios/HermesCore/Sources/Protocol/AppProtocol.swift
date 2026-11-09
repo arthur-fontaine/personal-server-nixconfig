@@ -23,20 +23,34 @@ public enum AppProtocol {
         return Data(trimmed.utf8)
     }
 
-    public static func decode(_ text: String) -> AppMessage? {
-        guard let data = extractJSON(from: text),
-              let object = try? JSONDecoder().decode(JSONValue.self, from: data),
-              case .object(let fields) = object,
-              case .string(let type)? = fields["type"] else { return nil }
+    public static func decode(_ text: String) -> AppMessage? { try? decodeResult(text).get().payload }
+
+    /// Decodes one App-topic message. The version is not checked: a newer server's message is
+    /// read for the fields this app knows, each section on its own, so an unknown or malformed
+    /// field never drops the whole slot.
+    public static func decodeResult(_ text: String) -> Result<DecodedAppMessage, DecodeFailure> {
+        guard let data = extractJSON(from: text) else { return .failure(.notJSON) }
+        let object: JSONValue
+        do { object = try JSONDecoder().decode(JSONValue.self, from: data) } catch { return .failure(.invalidJSON) }
+        guard case .object(let fields) = object else { return .failure(.notAnObject) }
+        guard case .string(let type)? = fields["type"] else { return .failure(.noType) }
+        var version: Int?
+        if case .number(let n)? = fields["v"] { version = Int(n) }
+        let payload: AppMessage
         switch type {
-        case "state": return .state(AppState(fields: fields))
-        case "stats": return fields.decode(StatsState.self).map(AppMessage.stats)
-        case "devices": return .devices(DeliveryState(fields: fields))
-        case "controls": return .controls(ControlsState(fields: fields))
-        case "notify": return fields.decode(NotifyPayload.self).map(AppMessage.notify)
-        case "reply": return .reply(ReplyPayload(fields: fields))
-        default: return .other(type: type, fields: fields)
+        case "state": payload = .state(AppState(fields: fields))
+        case "stats":
+            guard let s = fields.decode(StatsState.self) else { return .failure(.badSection(type)) }
+            payload = .stats(s)
+        case "devices": payload = .devices(DeliveryState(fields: fields))
+        case "controls": payload = .controls(ControlsState(fields: fields))
+        case "notify":
+            guard let n = fields.decode(NotifyPayload.self) else { return .failure(.badSection(type)) }
+            payload = .notify(n)
+        case "reply": payload = .reply(ReplyPayload(fields: fields))
+        default: payload = .other(type: type, fields: fields)
         }
+        return .success(DecodedAppMessage(version: version, type: type, payload: payload))
     }
 
     /// The text of a request message: a ```json block, readable in the official app too.
@@ -48,6 +62,30 @@ public enum AppProtocol {
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let data = (try? encoder.encode(JSONValue.object(fields))) ?? Data("{}".utf8)
         return "```json\n" + String(decoding: data, as: UTF8.self) + "\n```"
+    }
+}
+
+public struct DecodedAppMessage: Sendable {
+    public var version: Int?
+    public var type: String
+    public var payload: AppMessage
+
+    /// The slot this message fills, if it is one.
+    public var slotName: String? { ["state", "stats", "devices", "controls"].contains(type) ? type : nil }
+}
+
+public enum DecodeFailure: Error, Equatable, Sendable, CustomStringConvertible {
+    case notJSON, invalidJSON, notAnObject, noType
+    case badSection(String)
+
+    public var description: String {
+        switch self {
+        case .notJSON: "no JSON"
+        case .invalidJSON: "invalid JSON"
+        case .notAnObject: "not a JSON object"
+        case .noType: "no type"
+        case .badSection(let t): "\(t) did not decode"
+        }
     }
 }
 
