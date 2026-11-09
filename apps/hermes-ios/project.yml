@@ -153,6 +153,18 @@ targets:
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         SWIFT_APPROACHABLE_CONCURRENCY: YES
         LD_RUNPATH_SEARCH_PATHS: $(inherited) @executable_path/Frameworks @executable_path/../../Frameworks
+        # The pet fonts' script reads Pet/ and writes into the bundle: outside the script sandbox.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    postBuildScripts:
+      # The Live Activity's pet fonts, from the pet the app is built with (scripts/make-pet-fonts.swift).
+      - name: Pet fonts
+        basedOnDependencyAnalysis: false
+        script: |
+          dst="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+          # Xcode's environment targets iOS: run the script with a clean one, for the Mac.
+          /usr/bin/env -i HOME="$HOME" PATH="/usr/bin:/bin" DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}" \
+            xcrun --sdk macosx swift "$SRCROOT/scripts/make-pet-fonts.swift" \
+            "$SRCROOT/Pet/spritesheet.webp" "$SRCROOT/Shared/Fonts/HermesFrames.ttf" "$dst"
   HermesCoreTests:
     type: bundle.unit-test
     platform: iOS
