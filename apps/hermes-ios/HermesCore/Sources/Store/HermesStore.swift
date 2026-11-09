@@ -478,6 +478,20 @@ public final class HermesStore {
             topicLog.note("history: \(page.count) messages")
             // Oldest first, so the newest message of each slot type wins.
             for m in page.sorted(by: { $0.id < $1.id }) { handleAppMessage(m, replay: true) }
+            // The slots are old messages the server only edits: often more than a page back.
+            // Page back until each one is found, whatever the server answers to hello.
+            var oldest = page.map(\.id).min()
+            var pages = 1
+            while let from = oldest, pages < 30, !Self.slotNames.isSubset(of: Set(slotIDs.keys)) {
+                let older = try await Self.withTimeout(Self.topicTimeout) { [client] in
+                    try await client.history(chat: bot.chatID, topic: topic, from: from, limit: 100)
+                }.filter { $0.id < from }
+                guard !older.isEmpty else { break }
+                for m in older.sorted(by: { $0.id < $1.id }) { handleAppMessage(m, replay: true) }
+                oldest = older.map(\.id).min()
+                pages += 1
+            }
+            topicLog.note("history: \(pages) page(s), slots found: \(slotIDs.keys.sorted().joined(separator: ", "))")
         } catch {
             topicLog.fail("history: \(error.localizedDescription)")
         }
@@ -521,6 +535,7 @@ public final class HermesStore {
         }
     }
 
+    static let slotNames: Set<String> = ["state", "stats", "devices", "controls"]
     static let resyncEvery: Duration = .seconds(30)
     static var topicTimeout: Duration = .seconds(15)
 
