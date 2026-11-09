@@ -134,9 +134,9 @@ HERMES_TEAM_ID=… HERMES_BUNDLE_ID_PREFIX=… HERMES_PAID_TEAM=0 \
 | --- | --- | --- |
 | Install | 7-day profiles, re-signed by the server | 1-year profiles |
 | App Group (widgets), Background Modes, Keychain, Face ID | yes | yes |
-| Notifications | while the app runs, and at background refreshes (a few a day, iOS decides) | pushed by Hermes through APNs, even when the app is closed |
+| Notifications | live while Hermes works, a question waits or a call is on, and for a window after (10 min, Settings › Notifications): the app stays connected in the background with a silent, mixable audio session; otherwise at background refreshes (a few a day, iOS decides) | pushed by Hermes through APNs, even when the app is closed |
 | Siri announcing notifications on AirPods | no (needs communication or time-sensitive notifications) | yes: communication notifications from "Hermes", questions time-sensitive |
-| Live Activity | started and updated while the app runs; goes stale after 15 min | updated and started by Hermes' pushes |
+| Live Activity | updated live in the same window; shown as stale 2 min after the last update it could get, ended when Hermes is idle | updated and started by Hermes' pushes |
 | Answering from the Live Activity | yes (App Intents run in the app's process) | yes |
 
 Telegram's own push can't reach a third-party bundle id (Telegram would
@@ -156,3 +156,11 @@ utterance is a main-chat message starting with `🎙 `; the app sends
 `call.state` so Hermes answers in a spoken style during the call. Without the
 model (not downloaded, too little memory, or the simulator, where llama.cpp
 has no slice), calls use Apple's speech recognition and synthesis.
+
+Only Hermes' spoken answer is read aloud: what is worth reading (links, code,
+lists) comes as a separate message starting with `📎 `, shown and never
+spoken (protocol §6). The call screen names each step of a turn (Listening,
+Hearing you…, Transcribing…, Sending…, Thinking, Speaking), and the app logs
+each call (`CallLog`, the last 400 lines). When a call hears nothing on a
+device, Settings › About › Copy Diagnostics copies the permissions, the voice
+model's state, the audio session and those lines (no message content).

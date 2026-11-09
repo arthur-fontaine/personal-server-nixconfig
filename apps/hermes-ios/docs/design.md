@@ -121,8 +121,13 @@ Hidden: the "App" topic (machine traffic)
   the chat's name as title (`toolbarTitleMenu`), Call. A subtitle only for the connection
   ("Connecting…"): Hermes' state is the pet, the draft and the approval card. Never the app's name as a title (HIG Toolbars): the main chat is "Main chat".
 - The composer is pinned with `safeAreaBar(edge: .bottom)`, so the scroll edge effect runs under
-  it; Stop replaces Send while Hermes writes. The transcript follows its bottom as it grows until
-  the owner scrolls away.
+  it; Stop replaces Send while Hermes writes. The transcript follows its bottom as it grows only
+  while the owner is there: once he scrolls up nothing moves (drafts, edits, size changes) until a
+  scroll of his comes to rest at the bottom, he taps Latest, or he sends. The keyboard is
+  dismissed by dragging the transcript (`.scrollDismissesKeyboard(.interactively)`, no layout
+  during the drag), and the composer keeps the 20-pt gap above it that it has above the home
+  indicator. A message sent while Hermes works shows a clock at lower emphasis until Hermes takes
+  it into the turn (`state.pending`); Telegram's "Steered into current run" notice isn't shown.
 
 ### iPad and wide windows (regular width)
 
@@ -228,8 +233,11 @@ Hidden: the "App" topic (machine traffic)
   a reply; a centred time when messages are > 20 min apart.
 - Hermes' open question is the transcript's last item: an `ApprovalCard` (content layer, the
   grouped fill, no glass): the summary as `.headline`, *Show Command* as a disclosure, then Allow
-  Once (prominent, trailing), Deny (red label on the neutral fill), "…" for the other answers. The
-  message the question came with doesn't repeat its buttons.
+  Once (prominent, trailing), Deny (red label on the neutral fill), "…" for the other answers. A
+  question appears once: while it is open, the Telegram message it came with (text and buttons)
+  gives way to the card, which drops the choices Telegram's text lists ("1. … 2. …") and its
+  "Reply "skip"" hint; once answered, Hermes' edit of that message stays in the history. A
+  `🔊 …` line is never shown.
 - Inline keyboards: `ActionRow`s of secondary buttons.
 
 ## Motion

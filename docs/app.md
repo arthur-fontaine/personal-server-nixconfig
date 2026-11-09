@@ -209,9 +209,11 @@ installed on your devices over Wi-Fi and re-signed before it expires.
 
 A free team allows 3 sideloaded apps per device: the Hermes app is one, and
 takes two of the 10 App IDs a week (the app and its widgets). No push
-notifications on a free team (`HERMES_PAID_TEAM=0`): the app gets news while
-it runs and at background refreshes (a few a day); with a paid team, Hermes
-pushes them ([Pushes](#pushes)).
+notifications on a free team (`HERMES_PAID_TEAM=0`): the app stays connected
+in the background while Hermes works, a question waits or a call is on, and
+for a window after (10 min by default), with a silent mixable audio session;
+otherwise it gets news at background refreshes (a few a day). With a paid
+team, Hermes pushes them ([Pushes](#pushes)).
 
 Hermes decides when to reinstall: `sideload_install` with `app: "hermes"`
 after a new pet, when you ask, or after a failed install.
