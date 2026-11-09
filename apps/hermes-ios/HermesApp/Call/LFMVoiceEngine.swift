@@ -21,6 +21,7 @@ nonisolated final class LFMEngineHolder: @unchecked Sendable {
             return e
         } catch {
             lastError = error.localizedDescription
+            CallLog.shared.log("lfm: load failed: \(error.localizedDescription)")
             return nil
         }
         #else
@@ -52,6 +53,8 @@ nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
     private let gen: OpaquePointer
     private let queue = DispatchQueue(label: "hermes.lfm", qos: .userInitiated)
     private let nBatch: Int32 = 512
+    /// What the audio projector takes (`mtmd_get_audio_sample_rate`); the call records 16 kHz.
+    private let inputRate: Int32
 
     init(modelPath: String, projectorPath: String) throws {
         llama_backend_init()
@@ -80,6 +83,8 @@ nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
             mtmd_free(mctx); llama_free(ctx); llama_model_free(model)
             throw VoiceEngineError.failed(String(localized: "This llama.cpp build can't run LFM3 speech."))
         }
+        inputRate = mtmd_get_audio_sample_rate(mctx)
+        CallLog.shared.log("lfm: loaded, audio input \(inputRate) Hz, \(cp.n_threads) threads")
         self.model = model
         self.ctx = ctx
         self.mctx = mctx
@@ -106,6 +111,9 @@ nonisolated final class LFMVoiceEngine: VoiceEngine, @unchecked Sendable {
         llama_memory_clear(llama_get_memory(ctx), true)
         let marker = String(cString: mtmd_default_marker())
         let prompt = LFMPrompt.asr(language: language, marker: marker)
+        // The projector's own rate: feeding 16 kHz to a model expecting another one reads as
+        // noise (it answered nothing).
+        let samples = inputRate > 0 && inputRate != 16_000 ? Resample.linear(samples, from: 16_000, to: Double(inputRate)) : samples
         guard let bitmap = samples.withUnsafeBufferPointer({ mtmd_bitmap_init_from_audio($0.count, $0.baseAddress) }) else {
             throw VoiceEngineError.failed(String(localized: "The audio couldn't be prepared."))
         }

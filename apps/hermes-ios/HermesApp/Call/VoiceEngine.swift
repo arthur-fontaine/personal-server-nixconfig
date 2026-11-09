@@ -44,6 +44,7 @@ nonisolated final class AppleVoiceEngine: VoiceEngine, @unchecked Sendable {
         let request = SFSpeechAudioBufferRecognitionRequest()
         // Stays on the device when the language's model is installed.
         request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
+        CallLog.shared.log("apple speech: \(recognizer.locale.identifier), on device \(recognizer.supportsOnDeviceRecognition), \(samples.count) samples")
         request.shouldReportPartialResults = false
         request.addsPunctuation = true
         guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false),
@@ -59,8 +60,10 @@ nonisolated final class AppleVoiceEngine: VoiceEngine, @unchecked Sendable {
             recognizer.recognitionTask(with: request) { @Sendable result, error in
                 if let result, result.isFinal {
                     once.run { c.resume(returning: result.bestTranscription.formattedString) }
-                } else if error != nil {
-                    // "No speech detected" and friends: an empty utterance, the call goes on.
+                } else if let error {
+                    // "No speech detected" and friends: an empty utterance, the call goes on;
+                    // logged, since a recognizer that always fails looks exactly like silence.
+                    CallLog.shared.log("apple speech: \((error as NSError).domain) \((error as NSError).code): \(error.localizedDescription)")
                     once.run { c.resume(returning: "") }
                 }
             }

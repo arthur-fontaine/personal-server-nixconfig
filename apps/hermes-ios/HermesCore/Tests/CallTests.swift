@@ -72,6 +72,36 @@ struct VADTests {
         #expect(abs(db - (-3.01)) < 0.2)
     }
 
+    /// Brief item 8b: with the system's voice processing on, a voice at arm's length reads near
+    /// −45 dBFS over a quiet room's −70: that is speech.
+    @Test func aVoiceProcessedQuietVoiceIsHeard() {
+        var vad = VoiceActivityDetector()
+        var events: [VoiceActivityDetector.Event] = []
+        for (db, d) in frames(-70, seconds: 1) + frames(-45, seconds: 1) + frames(-70, seconds: 1) {
+            if let e = vad.process(levelDB: db, duration: d) { events.append(e) }
+        }
+        #expect(events == [.speechStarted, .speechEnded])
+    }
+
+    @Test func resamplingKeepsDurationAndShape() {
+        let ramp = (0..<16_000).map { Float($0) / 16_000 }
+        let up = Resample.linear(ramp, from: 16_000, to: 24_000)
+        #expect(up.count == 24_000)
+        #expect(abs(up[12_000] - 0.5) < 0.001)
+        #expect(Resample.linear(ramp, from: 16_000, to: 16_000) == ramp)
+    }
+
+    @Test func theCallLogKeepsTheNewestLinesAcrossLaunches() throws {
+        let defaults = try #require(UserDefaults(suiteName: "calllog-test-\(UUID())"))
+        let log = CallLog(defaults: defaults)
+        for i in 0..<(CallLog.limit + 5) { log.log("line \(i)") }
+        log.save()
+        let reopened = CallLog(defaults: defaults)
+        #expect(reopened.recent.count == CallLog.limit)
+        #expect(reopened.recent.last?.hasSuffix("line \(CallLog.limit + 4)") == true)
+        #expect(reopened.recent.first?.hasSuffix("line 5") == true)
+    }
+
     @Test func fillersRotate() {
         #expect(CallFillers.pick(language: "fr-FR", turn: 1) == "Je regarde.")
         #expect(CallFillers.pick(language: "en", turn: 5) == "Mm-hm.")

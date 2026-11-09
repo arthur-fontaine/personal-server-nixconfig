@@ -80,7 +80,7 @@ struct CallView: View {
     private var animation: PetAnimation {
         switch session?.phase {
         case .hearing?: .waiting
-        case .transcribing?, .waiting?: .review
+        case .transcribing?, .sending?, .waiting?: .review
         case .speaking?: .running
         case .ended(let e)? where e != nil: .failed
         default: .idle
@@ -90,9 +90,12 @@ struct CallView: View {
     private var phaseLabel: String {
         switch session?.phase {
         case .starting?, nil: String(localized: "Connecting…")
+        // Each step of a turn says its name (brief item 8b), so a call that hears nothing shows
+        // where it stops: listening, heard speech, transcribing, sending.
         case .listening?: String(localized: "Listening")
-        case .hearing?: String(localized: "Listening…")
-        case .transcribing?: "…"
+        case .hearing?: String(localized: "Hearing you…")
+        case .transcribing?: String(localized: "Transcribing…")
+        case .sending?: String(localized: "Sending…")
         case .waiting?: String(localized: "Thinking")
         case .speaking?: String(localized: "Speaking")
         case .ended(let e)?: e ?? String(localized: "Call ended")

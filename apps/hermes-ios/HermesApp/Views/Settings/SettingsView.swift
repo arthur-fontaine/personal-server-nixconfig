@@ -110,6 +110,16 @@ struct SettingsView: View {
             Section {
                 LabeledContent("Version", value: "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))")
                 LabeledContent("Apple team", value: store.config.paidTeam ? String(localized: "Paid") : String(localized: "Free personal"))
+                ListActionRow(Text("Copy Diagnostics"), detail: Text("For a call that hears nothing: the permissions, the voice model and the last call's log, no messages."),
+                              systemImage: "stethoscope") {
+                    Task {
+                        UIPasteboard.general.string = await Diagnostics.text(store: store)
+                        model.showToast(String(localized: "Diagnostics copied"))
+                    }
+                }
+                .accessibilityIdentifier("settings.diagnostics")
+            } header: {
+                Text("About")
             }
         }
         .readableGroupedList()
