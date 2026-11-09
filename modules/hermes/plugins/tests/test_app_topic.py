@@ -169,6 +169,12 @@ def test_questions() -> None:
         "❓ Quel jour pour le dentiste ?\nRépondez « skip » pour passer cette question.\n\n1. Lundi\n2. Mardi"))
     assert item["kind"] == "clarify" and item["text"].startswith("Quel jour pour le dentiste ?"), item["text"]
     assert item["text"] == "Quel jour pour le dentiste ?" and "Lundi" in item["spoken"], item
+    # Hermes' translations not loaded: the hint arrives as its key.
+    item = qs.from_card(chat=5, message_id=16, markup=clar, text_html="❓ Which day?\ngateway.clarify.skip_hint\n\n1. Lundi\n2. Mardi")
+    assert item["text"] == "Which day?", item["text"]
+    # A question that only mentions the word is kept.
+    assert questions.is_skip_hint("Répondez « skip » pour passer cette question.")
+    assert not questions.is_skip_hint("Should I skip the backup tonight?")
     item = qs.from_card(chat=5, message_id=16, markup=clar, text_html=(
         '❓ Which day?\nReply "skip" to skip this question.\n\n1. Monday\n2. Tuesday'))
     assert item["text"] == "Which day?" and item["spoken"] == "Hermes asks: Which day? Options: Monday, Tuesday.", item

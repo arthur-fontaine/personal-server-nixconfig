@@ -51,6 +51,17 @@ def skip_hints() -> "set[str]":
     return _skip_hints
 
 
+# The skip hint in any language: the word skip, quoted ("…", « … », „…", 「…」). Hermes'
+# translations may not load (t() then answers the key itself), so the exact
+# strings alone miss it.
+_SKIP_QUOTED = re.compile(r"[\"“«„'「]\s*skip\s*[\"”»“'」]", re.I)
+
+
+def is_skip_hint(line: str) -> bool:
+    plain = line.replace("\u00a0", " ").replace("\u202f", " ").strip()
+    return plain == "gateway.clarify.skip_hint" or bool(_SKIP_QUOTED.search(plain))
+
+
 def without_options(text: str, labels: "list[str]") -> str:
     """A question's text without what its buttons already say: the numbered
     list the Telegram adapter writes under a clarify (adapter.py,
@@ -63,7 +74,7 @@ def without_options(text: str, labels: "list[str]") -> str:
         number = re.match(r"^(\d+)\.\s+(.+)$", stripped)
         if number and (number.group(1) in names or number.group(2).strip() in names or stripped in names):
             continue
-        if stripped in hints:
+        if stripped in hints or is_skip_hint(stripped):
             continue
         kept.append(row)
     out = re.sub(r"\n{3,}", "\n\n", "\n".join(kept)).strip()
