@@ -42,10 +42,12 @@ The questions come from the cards themselves: every Hermes card with buttons
 `_send_control_message`, which the plugin wraps, and `owner_approval`
 reports its own. The app answers a question by pressing the card's button
 through Telegram, exactly as a tap would, so Hermes sees no difference.
-An approval guard escalates for a long command carries guard's title for it
-(`question.summary`, "Deletes the build folder"), read aloud as "Hermes wants
-to run a command that deletes the build folder"; Hermes' own pattern cards
-have none.
+An approval guard asks carries one or two plain sentences in the owner's
+language (`question.summary`, "Hermes wants to delete 41 old backup
+snapshots on the external disk. Auto mode asks because deleting can't be
+undone."), which the app shows as the question and reads aloud as is, and the
+raw action (`question.detail`), behind the card's *Show Command*; Hermes' own
+pattern cards have neither, only their command.
 
 ### Native commands
 

@@ -91,8 +91,8 @@ public struct ComponentCatalog: View {
             }
         case .approval:
             section("ApprovalCard") {
-                ApprovalCard(question: "Delete backup snapshots older than 90 days to free about 212 GB on the external disk?",
-                             command: "restic -r /Volumes/Backup/restic forget --keep-within 90d --prune",
+                ApprovalCard(question: "Hermes wants to delete the backup snapshots older than 90 days on the external disk, freeing about 212 GB. Auto mode asks because deleting can't be undone.",
+                             command: "terminal: restic -r /Volumes/Backup/restic forget --keep-within 90d --prune",
                              primary: Action(id: "once", "Allow Once", emphasis: .primary) {},
                              others: [Action(id: "deny", "Deny", emphasis: .destructive) {}],
                              more: [Action(id: "session", "Allow for This Session", emphasis: .secondary) {},

@@ -167,7 +167,8 @@ Hidden: the "App" topic (machine traffic)
   backups older than 90 days" → *Once* / *Deny* buttons, no unlock for Deny,
   Face ID for Allow (App Intent `authenticationPolicy`).
 - **Approve in app**: the approval card is the chat's last item: the summary as
-  a question, *Show Command* reveals the raw command in mono, Allow Once / Deny /
+  a question, *Show Command* reveals the raw action (guard's `detail`, else
+  Hermes' command) in mono, wrapped, Allow Once / Deny /
   "…" below. Answered → the card goes, with a success haptic.
 - **Private sub-chat**: tap 🔒 Taxes → Face ID → the view unblurs; if Hermes
   says it's locked, the app sends `/sub unlock` with the Keychain passphrase
@@ -232,7 +233,8 @@ Hidden: the "App" topic (machine traffic)
 - Rhythm: 24 pt between speakers, 8 pt between the owner's bubbles, 16 pt between the blocks of
   a reply; a centred time when messages are > 20 min apart.
 - Hermes' open question is the transcript's last item: an `ApprovalCard` (content layer, the
-  grouped fill, no glass): the summary as `.headline`, *Show Command* as a disclosure, then Allow
+  grouped fill, no glass): the summary (guard's sentence) as `.headline`, *Show Command* as a
+  disclosure of the raw action (`detail`, else `command`; it wraps, rule 6.2), then Allow
   Once (prominent, trailing), Deny (red label on the neutral fill), "…" for the other answers. A
   question appears once: while it is open, the Telegram message it came with (text and buttons)
   gives way to the card, which drops the choices Telegram's text lists ("1. … 2. …") and its

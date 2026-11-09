@@ -69,20 +69,27 @@ public enum Fixtures {
         let options = [(L("Once"), "ea:once:7"), (L("Session"), "ea:session:7"), (L("Always"), "ea:always:7"), (L("Deny"), "ea:deny:7")]
         return ChatMessage(
             id: id, topic: 0, date: now, isOutgoing: false,
-            text: FormattedText("⚠️ " + L("Dangerous command: restic forget --keep-within 90d --prune")),
+            text: FormattedText(approvalText),
             buttons: options.enumerated().map { i, o in
                 InlineButton(row: i < 3 ? 0 : 1, column: i < 3 ? i : 0, label: o.0, action: .callback(Data(o.1.utf8)))
             })
+    }
+
+    /// A card `guard` asks (protocol v4): its sentence is the question and what Hermes says, the raw
+    /// action is the detail, and Telegram's text also has Hermes' header and label.
+    static let approvalSentence = L("Hermes wants to delete the backup snapshots older than 90 days on the external disk, freeing about 212 GB. Auto mode asks because deleting can't be undone.")
+    static let approvalAction = "terminal: restic -r /Volumes/Backup/restic forget --keep-within 90d --prune"
+    static let approvalLabel = "<terminal> (plugin approval rule)"
+    static var approvalText: String {
+        "⚠️ " + L("Approval needed") + "\n\n" + approvalLabel + "\n\n" + L("Reason:") + " " + approvalSentence + "\n\n" + approvalAction
     }
 
     /// `messageID`: the protocol's (Bot API).
     public static func approvalQuestion(messageID: MessageID) -> PendingQuestion {
         PendingQuestion(
             id: "ea:7", kind: .approval, chat: .main, messageID: messageID,
-            text: L("Dangerous command: restic forget --keep-within 90d --prune"),
-            spoken: L("Hermes asks to delete backups older than ninety days. Allow?"),
-            summary: L("Delete backup snapshots older than 90 days to free about 212 GB on the external disk?"),
-            command: "restic -r /Volumes/Backup/restic forget --keep-within 90d --prune",
+            text: approvalText, spoken: approvalSentence, summary: approvalSentence,
+            command: approvalLabel, detail: approvalAction,
             options: [
                 QuestionOption(id: "once", label: L("Once"), data: Data("ea:once:7".utf8)),
                 QuestionOption(id: "session", label: L("Session"), data: Data("ea:session:7".utf8)),
@@ -137,6 +144,7 @@ public enum Fixtures {
             d["message_id"] = q.messageID
             d["summary"] = q.summary
             d["command"] = q.command
+            d["detail"] = q.detail
             d["spoken"] = q.spoken
             return d
         }

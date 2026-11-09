@@ -19,7 +19,7 @@ struct QuestionCard: View {
 
     var body: some View {
         let (primary, others, more) = layout
-        ApprovalCard(question: question.summary ?? question.text, command: question.command,
+        ApprovalCard(question: question.summary ?? question.text, command: question.disclosed,
                      primary: primary.map(action), others: others.map(action), more: more.map(action))
     }
 

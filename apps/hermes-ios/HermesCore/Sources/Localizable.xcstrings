@@ -101,6 +101,16 @@
         }
       }
     },
+    "Approval needed": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approbation requise"
+          }
+        }
+      }
+    },
     "Ask": {
       "localizations": {
         "fr": {
@@ -177,26 +187,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impossible de trouver @%@ sur Telegram."
-          }
-        }
-      }
-    },
-    "Dangerous command: restic forget --keep-within 90d --prune": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Commande dangereuse : restic forget --keep-within 90d --prune"
-          }
-        }
-      }
-    },
-    "Delete backup snapshots older than 90 days to free about 212 GB on the external disk?": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Supprimer les instantanés de sauvegarde de plus de 90 jours pour libérer environ 212 Go sur le disque externe ?"
           }
         }
       }
@@ -361,22 +351,22 @@
         }
       }
     },
-    "Hermes asks to delete backups older than ninety days. Allow?": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hermes demande à supprimer les sauvegardes de plus de quatre-vingt-dix jours. Tu autorises ?"
-          }
-        }
-      }
-    },
     "Hermes didn't answer in time.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Hermes n’a pas répondu à temps."
+          }
+        }
+      }
+    },
+    "Hermes wants to delete the backup snapshots older than 90 days on the external disk, freeing about 212 GB. Auto mode asks because deleting can't be undone.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes veut supprimer les instantanés de sauvegarde de plus de 90 jours sur le disque externe, ce qui libère environ 212 Go. Le mode auto demande, car une suppression est définitive."
           }
         }
       }
@@ -597,6 +587,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "À lire"
+          }
+        }
+      }
+    },
+    "Reason:": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raison :"
           }
         }
       }

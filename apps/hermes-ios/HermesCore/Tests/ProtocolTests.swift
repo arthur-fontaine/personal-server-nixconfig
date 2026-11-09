@@ -148,6 +148,42 @@ struct StateTests {
         #expect(s.subchats == [SubchatInfo(topicID: 455, name: "Taxes", preset: "secret", encrypted: true)])
     }
 
+    /// v4: guard's card carries a sentence (`summary`, said as is) and the raw action (`detail`).
+    @Test func decodesAGuardCardsDetail() throws {
+        let s = try decodeState(#"""
+        {"v":4,"type":"state","questions":[{"id":"ea:7","kind":"approval","chat":0,"message_id":1201,
+          "text":"⚠️ Approval needed\n\n<terminal> (plugin approval rule)\n\nReason: Hermes wants to rebuild the site.\n\nterminal: rm -rf build",
+          "summary":"Hermes wants to rebuild the site.","spoken":"Hermes wants to rebuild the site.",
+          "detail":"terminal: rm -rf build","command":"<terminal> (plugin approval rule)","options":[]}]}
+        """#)
+        let q = try #require(s.question)
+        #expect(q.chat == .main)
+        #expect(q.summary == "Hermes wants to rebuild the site." && q.spoken == q.summary)
+        #expect(q.detail == "terminal: rm -rf build")
+        #expect(q.disclosed == "terminal: rm -rf build", "the card discloses the action, not Hermes' label")
+    }
+
+    /// `detail` is new in v4: absent, null, blank or not a string all mean none, and the card then
+    /// discloses Hermes' raw command as before.
+    @Test func decodesDetailTolerantly() throws {
+        for value in ["", #","detail":null"#, #","detail":"  ""#, #","detail":42"#, #","detail":{"a":1}"#] {
+            let s = try decodeState(#"{"v":4,"type":"state","questions":[{"id":"q","kind":"approval","chat":0,"text":"?","command":"rm -rf x","options":[]"# + value + "}]}")
+            let q = try #require(s.question)
+            #expect(q.detail == nil && q.disclosed == "rm -rf x" && q.text == "?")
+        }
+    }
+
+    /// The main chat is 0, whatever form it comes in; a sub-chat is its thread id.
+    @Test func chatZeroIsMain() throws {
+        for chat in [#""chat":0,"#, #""chat":"0","#, #""chat":"main","#, ""] {
+            let s = try decodeState(#"{"v":4,"type":"state","questions":[{"id":"q","#  + chat + #""message_id":5,"text":"?","options":[]}],"pending":[{"#  + chat + #""message_id":6}]}"#)
+            #expect(s.question?.chat == .main && s.pending.first?.chat == .main)
+            #expect(s.question?.tdlibMessageID == 5 << 20)
+        }
+        let sub = try decodeState(#"{"v":4,"type":"state","questions":[{"id":"q","chat":455,"message_id":5,"text":"?","options":[]}]}"#)
+        #expect(sub.question?.chat == 455)
+    }
+
     @Test func oneBadSectionDoesNotDropTheRest() throws {
         let s = try decodeState("""
         {"v":1,"type":"state","agent":{"status":"thinking"},"pet":"not an object",

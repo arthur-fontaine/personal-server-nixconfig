@@ -310,16 +310,22 @@ public struct PendingQuestion: Sendable, Codable, Equatable, Identifiable {
     public var messageID: MessageID?
     public var text: String
     public var spoken: String?
-    /// For approvals: the backend's plain-language summary of the command…
+    /// On guard's cards, one or two plain sentences: what the action does and why it asks. The
+    /// card's question.
     public var summary: String?
-    /// …and the raw command, shown collapsed.
+    /// What the card's code box shows in Telegram: the raw command on Hermes' pattern cards, Hermes'
+    /// label `<tool> (plugin approval rule)` on guard's.
     public var command: String?
+    /// On guard's cards, the raw action (`terminal: <command>`, `<tool>: key: value; …`).
+    public var detail: String?
     public var options: [QuestionOption]
     public var askedAt: Date?
 
     public init(id: String, kind: Kind = .question, chat: TopicID = .main, messageID: MessageID? = nil, text: String,
-                spoken: String? = nil, summary: String? = nil, command: String? = nil, options: [QuestionOption], askedAt: Date? = nil) {
+                spoken: String? = nil, summary: String? = nil, command: String? = nil, detail: String? = nil,
+                options: [QuestionOption], askedAt: Date? = nil) {
         self.askedAt = askedAt
+        self.detail = detail
         self.id = id
         self.kind = kind
         self.chat = chat
@@ -335,7 +341,10 @@ public struct PendingQuestion: Sendable, Codable, Equatable, Identifiable {
     /// the protocol's Bot API id).
     public var tdlibMessageID: MessageID? { messageID.map(BotAPIID.tdlib) }
 
-    enum CodingKeys: String, CodingKey { case id, kind, chat, messageID = "message_id", text, spoken, summary, command, options, askedAt = "asked_at" }
+    /// What the card discloses behind *Show Command*: guard's raw action, else Hermes' raw command.
+    public var disclosed: String? { detail ?? command }
+
+    enum CodingKeys: String, CodingKey { case id, kind, chat, messageID = "message_id", text, spoken, summary, command, detail, options, askedAt = "asked_at" }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -347,6 +356,8 @@ public struct PendingQuestion: Sendable, Codable, Equatable, Identifiable {
         spoken = try? c.decodeIfPresent(String.self, forKey: .spoken)
         summary = try? c.decodeIfPresent(String.self, forKey: .summary)
         command = try? c.decodeIfPresent(String.self, forKey: .command)
+        // Added in v4: absent from older servers, and anything but a non-blank string counts as none.
+        detail = (try? c.decodeIfPresent(String.self, forKey: .detail))?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         options = (try? c.decode([QuestionOption].self, forKey: .options)) ?? []
         kind = Kind(rawValue: rawKind) ?? (command != nil ? .approval : .question)
         askedAt = c.decodeFlexibleDate(.askedAt)

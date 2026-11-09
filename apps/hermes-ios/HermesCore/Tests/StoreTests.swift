@@ -77,6 +77,21 @@ struct StoreTests {
         #expect(client.pressed.last?.data == Data("a".utf8))
     }
 
+    /// `chat: 0` is the main chat (protocol §1), not a topic: the card shows there, and with no
+    /// `data_b64` the keyboard is read from the main chat's message, pressed on TDLib's id in the DM.
+    @Test func chatZeroIsTheMainChat() async throws {
+        let (store, client) = try await makeStore()
+        let chat = FakeTelegramClient.botChat.chatID
+        let once = try #require(store.messages(in: .main).first { $0.id == Fixtures.id(1005) }?.buttons.first?.label)
+        store._apply(.newMessage(chat, Fixtures.appMessage(id: 908, json: #"{"v":4,"type":"state","agent":{"status":"waiting_user"},"questions":[{"id":"ea:8","kind":"approval","chat":0,"message_id":1005,"text":"?","options":[{"id":"once","label":"\#(once)"}]}]}"#)))
+        let q = try #require(store.questions.first { $0.id == "ea:8" })
+        #expect(q.chat == .main && store.questions(in: .main).contains(q))
+        #expect(!store.threads.contains { thread in thread.id != .main && store.questions(in: thread.id).contains(q) })
+        _ = try await store.answer(q, with: q.options[0])
+        #expect(client.pressed.last?.message == 1005 << 20 && client.pressed.last?.chat == chat)
+        #expect(client.pressed.last?.data == Data("ea:once:7".utf8))
+    }
+
     @Test func protocolIDsConvertToTDLibs() {
         #expect(BotAPIID.tdlib(1201) == 1_259_339_776)
         #expect(BotAPIID.botAPI(1_259_339_776) == 1201)
@@ -264,7 +279,7 @@ struct ActivityTests {
         #expect(aq.options.map(\.id) == ["a", "b", "c", "d"])
         #expect(aq.detail == nil)
         let approval = ActivityQuestion(Fixtures.approvalQuestion(messageID: 1))
-        #expect(approval.title.hasPrefix("Delete backup snapshots"))
+        #expect(approval.title.hasPrefix("Hermes wants to delete the backup snapshots"))
         #expect(approval.options.last?.destructive == true)
     }
 }

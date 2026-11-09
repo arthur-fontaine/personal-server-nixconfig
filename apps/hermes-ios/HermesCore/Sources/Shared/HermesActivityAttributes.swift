@@ -82,7 +82,7 @@ public struct ActivityQuestion: Codable, Hashable, Sendable {
         id = q.id
         kind = q.kind
         title = q.summary ?? q.text
-        detail = q.kind == .approval ? q.command : nil
+        detail = q.kind == .approval ? q.disclosed : nil
         // A Live Activity fits about four short buttons; a clarify's "Other…" needs the keyboard.
         options = q.options.filter { $0.id != "other" }.prefix(4).map {
             Option(id: $0.id, label: $0.label, destructive: $0.isDestructive)
