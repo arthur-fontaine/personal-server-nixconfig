@@ -411,21 +411,57 @@ public extension View {
     func valuePicker() -> some View { tint(.secondary) }
 }
 
-/// Keeps the composer `Metric.keyboardGap` above the keyboard, as it is above the home indicator.
-/// Driven by the keyboard's show/hide notifications, never its frame: an interactive dismissal
-/// then does no layout while the finger moves, and the gap goes as the keyboard does.
+/// Keeps the composer `Metric.keyboardGap` above the keyboard, as it is above the home indicator,
+/// from the keyboard safe area region the system lays the bar out with: no notification, no
+/// animation of ours. `safeAreaBar` puts the bar on the higher of the keyboard and the home
+/// indicator's inset (the system's union of its `.keyboard` and `.container` regions) and moves it
+/// with the keyboard, frame by frame during an interactive dismissal. A probe below the bar that
+/// ignores only the keyboard region still stops at the home indicator's inset, so how far it
+/// reaches past the bar is how far the keyboard covers beyond that inset: the gap is that distance,
+/// capped at `keyboardGap` — what UIKit writes as `bottom ≤ safeArea.bottom` and
+/// `bottom ≤ keyboardLayoutGuide.top − gap`. It is constant while the keyboard is up or away and
+/// only changes in its last 20 pt, so the drag stays the system's. (A constant padding can't do it:
+/// SwiftUI adds `safeAreaPadding` to the keyboard's inset and clamps negative safe-area padding.)
 struct KeyboardGap: ViewModifier {
-    @State private var keyboard = false
+    @State private var gap: CGFloat = 0
+    /// Unknown until the bar is in a window: no gap before.
+    @State private var home: CGFloat?
 
     func body(content: Content) -> some View {
         content
-            .padding(.bottom, keyboard ? Metric.keyboardGap : 0)
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-                if !keyboard { withAnimation(.smooth) { keyboard = true } }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-                if keyboard { withAnimation(.smooth) { keyboard = false } }
-            }
+            .padding(.bottom, gap)
+            .onGeometryChange(for: CGFloat.self) { [home] proxy in
+                guard let home else { return 0 }
+                let union = proxy.safeAreaInsets.bottom
+                return min(Metric.keyboardGap, max(0, (union - home).rounded()))
+            } action: { gap = $0 }
+            .background { WindowBottomInset { home = $0 } }
+    }
+}
+
+/// The window's bottom inset (the home indicator's): the keyboard is another window, so it never
+/// changes it — unlike SwiftUI's regions, which hand the bottom of the screen to the keyboard in
+/// its last points of travel.
+private struct WindowBottomInset: UIViewRepresentable {
+    let changed: (CGFloat) -> Void
+
+    func makeUIView(context: Context) -> Probe { Probe() }
+
+    func updateUIView(_ view: Probe, context: Context) { view.changed = changed }
+
+    final class Probe: UIView {
+        var changed: (CGFloat) -> Void = { _ in }
+        private var reported: CGFloat?
+
+        override func didMoveToWindow() { super.didMoveToWindow(); report() }
+        override func layoutSubviews() { super.layoutSubviews(); report() }
+
+        private func report() {
+            guard let inset = window?.safeAreaInsets.bottom, inset != reported else { return }
+            reported = inset
+            let changed = changed
+            Task { @MainActor in changed(inset) }
+        }
     }
 }
 
@@ -433,3 +469,4 @@ public extension View {
     /// For the bar holding the composer.
     func keyboardGap() -> some View { modifier(KeyboardGap()) }
 }
+

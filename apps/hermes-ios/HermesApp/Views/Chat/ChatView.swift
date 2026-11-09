@@ -2,6 +2,7 @@ import HermesCore
 import HermesUI
 import SwiftUI
 
+
 /// A conversation (design-rules 1, 2, 6): the system toolbar — the pet leading (iPhone), the
 /// chat's name as the title with the chats in its menu, Call trailing — the transcript in one
 /// `ChatColumn`, Hermes' open question as the last item of the transcript, and the composer pinned
@@ -32,6 +33,8 @@ struct ChatScreen: View {
     @State private var draft = ComposerDraft()
     @State private var importing = false
     @State private var selecting: SelectableText?
+    /// `-scrollProbe`: how the last gesture moved the transcript, for the UI tests.
+    @State private var gestureProbe = ""
 
     var body: some View {
         Group {
@@ -206,6 +209,8 @@ struct ChatScreen: View {
             // app hung). Not following, no anchor: nothing moves under the owner.
             .defaultScrollAnchor(following ? .bottom : nil, for: .sizeChanges)
             .scrollDismissesKeyboard(.interactively)
+            .accessibilityIdentifier("chat.transcript")
+            .accessibilityValue(Text(verbatim: gestureProbe))
             // The distance from the content's end to the visible bottom (the composer bar's
             // inset counted, it grows at accessibility sizes). A number, not a Bool: a Bool's
             // change back to true was dropped while the lazy stack re-estimated its size.
@@ -217,17 +222,27 @@ struct ChatScreen: View {
                 scroll.offset = facts.offset
                 let distance = facts.distance
                 let isAtBottom = distance <= Self.bottomSlack
-                if atBottom != isAtBottom { atBottom = isAtBottom }
+                // At rest only: during a gesture nothing of ours changes. "Latest" coming in (a
+                // re-render and a transition) while the keyboard was dragged split the system's
+                // layout of a frame in two, and the transcript shook.
+                if scroll.phase == .idle, atBottom != isAtBottom { atBottom = isAtBottom }
             }
             // Following the bottom (brief item 1): only the owner turns it off — by scrolling —
             // and only the owner turns it back on: a scroll that comes to rest at the bottom,
             // "Latest", or sending. Growth, edits, drafts and inset changes never change it, so
-            // nothing moves under him once he has scrolled up.
+            // nothing moves under him once he has scrolled up. Nothing scrolls when a gesture ends:
+            // the keyboard's interactive dismissal is the system's (see the bar below).
             .onScrollPhaseChange { old, phase in
                 scroll.phase = phase
                 if old == .idle {
                     scroll.offsetAtStart = scroll.offset
                     scroll.followingAtStart = following
+                    if Self.scrollProbe { scroll.startSampling() }
+                }
+                if phase == .idle, old != .idle {
+                    if Self.scrollProbe { scroll.stopSampling(); gestureProbe = scroll.probeSummary }
+                    let isAtBottom = scroll.distance <= Self.bottomSlack
+                    if atBottom != isAtBottom { atBottom = isAtBottom }
                 }
                 if phase == .interacting { following = false; jumped = false }
                 if phase == .idle, old != .idle, old != .animating, !jumped {
@@ -237,19 +252,18 @@ struct ChatScreen: View {
                     let moved = abs(scroll.offset - scroll.offsetAtStart) > Self.stillSlack
                     if !moved { following = scroll.followingAtStart } else if scroll.distance <= Self.bottomSlack { following = true }
                 }
-                // What changed during a gesture (the bar's inset as the keyboard or a reply chip
-                // came or went, a draft growing) is caught up once it rests, if still following.
-                if phase == .idle, old != .idle, following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
             }
             .onChange(of: messages.last?.id) {
                 if messages.last?.isOutgoing == true { following = true; jumped = false }
                 if following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
             }
-            // The composer bar growing (a reply chip, a file, a longer draft) while following: the
-            // last message stays above it (16.3). Not during a gesture: the keyboard's interactive
-            // dismissal changes this inset every frame, and scrolling then made the drag lag.
-            .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.bottom } action: { _, _ in
-                if following, !scroll.ownerScrolling { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+            // The bar's inset growing at rest while following (the keyboard coming up, a reply
+            // chip, a longer draft): the last message stays above the composer (16.3). The scroll
+            // view's size-change anchor doesn't cover a safe-area inset (measured: the keyboard's
+            // 78 → 379 pt left the offset where it was). Never during a gesture and never as the
+            // inset shrinks: the keyboard's interactive dismissal is the system's alone.
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.bottom } action: { old, new in
+                if new > old, following, scroll.phase == .idle { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }
             .onChange(of: replyingTo?.id) {
                 if following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
@@ -257,22 +271,28 @@ struct ChatScreen: View {
             .onChange(of: questions.map(\.id)) {
                 if following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
             }
+            // "Latest" floats over the transcript, on its safe area (so just above the bar, with
+            // the keyboard too), not in the bar: there its coming and going changed the bar's
+            // height, so the inset, so "at the bottom" — while the keyboard was dragged it
+            // flickered in and out and moved the transcript.
+            .overlay(alignment: .bottom) {
+                if !atBottom {
+                    FloatingButton("Latest", systemImage: "arrow.down") {
+                        jumped = false
+                        following = true
+                        withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                    }
+                    .inset(.bottom, .s)
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .animation(.snappy, value: atBottom)
+            .onChange(of: atBottom) { if Self.scrollProbe, scroll.phase != .idle { scroll.latestChanges += 1 } }
             .safeAreaBar(edge: .bottom) {
                 ChatColumn {
-                    VGroup(alignment: .center, spacing: .s) {
-                        if !atBottom {
-                            FloatingButton("Latest", systemImage: "arrow.down") {
-                                jumped = false
-                                following = true
-                                withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
-                            }
-                            .transition(.scale.combined(with: .opacity))
-                        }
-                        Composer(topic: topic, draft: draft, focused: $composerFocused, replyingTo: $replyingTo,
-                                 onAttachFile: { importing = true })
-                    }
+                    Composer(topic: topic, draft: draft, focused: $composerFocused, replyingTo: $replyingTo,
+                             onAttachFile: { importing = true })
                 }
-                .animation(.snappy, value: atBottom)
                 .keyboardGap()
             }
         }
@@ -312,28 +332,61 @@ struct ChatScreen: View {
     static let stillSlack: CGFloat = 4
     static let bottomID = "bottom"
     static let probing = ProcessInfo.processInfo.arguments.contains("-geometryProbe")
+    static let scrollProbe = ProcessInfo.processInfo.arguments.contains("-scrollProbe")
     static let heartHold = ProcessInfo.processInfo.arguments.contains("-heartHold")
 
     static func speaker(_ m: ChatMessage) -> Speaker { m.isOutgoing ? .owner : .hermes }
 }
 
 /// The transcript's live scroll facts, outside SwiftUI's observation.
-private final class ScrollMemo {
+private final class ScrollMemo: NSObject {
     var distance: CGFloat = 0
     var offset: CGFloat = 0
     var phase: ScrollPhase = .idle
     /// Where the last gesture started, and whether the transcript was following then.
     var offsetAtStart: CGFloat = 0
     var followingAtStart = true
-    /// The owner's finger (or its fling) moves the transcript: nothing else may. The app's own
-    /// animated scroll (`.animating`) can be retargeted.
-    var ownerScrolling: Bool { phase == .tracking || phase == .interacting || phase == .decelerating }
+    /// `-scrollProbe`: the offset each frame of the gesture showed, read by a display link at
+    /// each refresh — what the screen drew, not the steps a frame's layout went through.
+    var offsets: [CGFloat] = []
+    /// `-scrollProbe`: how often "Latest" came or went during the gesture.
+    var latestChanges = 0
+    private var link: CADisplayLink?
+
+    func startSampling() {
+        offsets = [offset]
+        latestChanges = 0
+        link?.invalidate()
+        let link = CADisplayLink(target: self, selector: #selector(tick))
+        link.add(to: .main, forMode: .common)
+        self.link = link
+    }
+
+    func stopSampling() {
+        link?.invalidate()
+        link = nil
+    }
+
+    @objc private func tick() { offsets.append(offset) }
+
+    /// "frames=… reversals=… maxBack=… maxStep=…": a drag moves the offset one way, by steps the
+    /// finger makes; a jump is a step back or a step far longer than the others. Under a point
+    /// is rounding (a third of a point on a 3× screen).
+    var probeSummary: String {
+        let steps = zip(offsets.dropFirst(), offsets).map { $0 - $1 }.filter { abs($0) >= 1 }
+        let direction: CGFloat = steps.reduce(0, +) >= 0 ? 1 : -1
+        let backs = steps.filter { $0 * direction < 0 }.map(abs)
+        let reversals = zip(steps.dropFirst(), steps).filter { ($0 > 0) != ($1 > 0) }.count
+        let maxStep = steps.map(abs).max() ?? 0
+        return "frames=\(offsets.count) reversals=\(reversals) maxBack=\(Int((backs.max() ?? 0).rounded())) maxStep=\(Int(maxStep.rounded())) latest=\(latestChanges)"
+    }
 }
 
 private struct ScrollFacts: Equatable {
     var distance: CGFloat
     var offset: CGFloat
 }
+
 
 /// Select Text's sheet item.
 private struct SelectableText: Identifiable {

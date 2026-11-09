@@ -124,9 +124,13 @@ Hidden: the "App" topic (machine traffic)
   it; Stop replaces Send while Hermes writes. The transcript follows its bottom as it grows only
   while the owner is there: once he scrolls up nothing moves (drafts, edits, size changes) until a
   scroll of his comes to rest at the bottom, he taps Latest, or he sends. The keyboard is
-  dismissed by dragging the transcript (`.scrollDismissesKeyboard(.interactively)`, no layout
-  during the drag), and the composer keeps the 20-pt gap above it that it has above the home
-  indicator. A message sent while Hermes works shows a clock at lower emphasis until Hermes takes
+  dismissed by dragging the transcript (`.scrollDismissesKeyboard(.interactively)`): the system
+  moves the bar with the keyboard and nothing of the app's changes during the gesture ("Latest"
+  floats over the transcript, outside the bar, and updates once the transcript rests). The
+  composer keeps the 20-pt gap above the keyboard that it has above the home indicator, read from
+  the keyboard safe area the bar is laid out with (no keyboard notifications, no animation of
+  its own). What the composer's "+" menu and a message's menu open (the palette, the file
+  importer, Select Text) is presented by the chat screen, set straight from the menu item. A message sent while Hermes works shows a clock at lower emphasis until Hermes takes
   it into the turn (`state.pending`); Telegram's "Steered into current run" notice isn't shown.
 
 ### iPad and wide windows (regular width)

@@ -92,6 +92,86 @@ final class ScrollFollowTests: XCTestCase {
     }
 
     static let suggestionBar: CGFloat = 44
+    static let aboveComposer: CGFloat = 30
+    /// The finger's travel in a frame at the drag's pace, with room for a dropped frame.
+    static let fingerStep = 15
+    static let splitFrame = 5
+
+    /// Arthur's iPhone: dragging the keyboard down made the transcript jump ("Latest" flickering in
+    /// and out) and could leave part of the keyboard on screen. The drag is the system's alone: the
+    /// keyboard leaves entirely, and the transcript's offset, sampled each frame by the app
+    /// (`-scrollProbe`), only moves with the finger.
+    func testDraggingTheKeyboardAwayDoesNotJump() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-noQuestion", "-scrollProbe"]
+        app.launch()
+        let field = app.descendants(matching: .any)["composer.field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let window = app.windows.firstMatch.frame
+        let keyboard = app.keyboards.firstMatch
+        let transcript = app.descendants(matching: .any)["chat.transcript"]
+        for round in 1...3 {
+            field.tap()
+            // Typing brings up the software keyboard even when the simulator has a hardware one.
+            field.typeText("a")
+            var last = CGRect.null
+            let up = Date().addingTimeInterval(8)
+            while Date() < up {
+                let now = keyboard.frame
+                if now.minY < window.maxY - 100, now == last { break }
+                last = now
+                Thread.sleep(forTimeInterval: 0.3)
+            }
+            XCTAssertLessThan(keyboard.frame.minY, window.maxY - 100, "round \(round): the keyboard is up")
+            // As Arthur does: from just above the composer down past the screen's bottom, at a
+            // finger's pace. The transcript barely scrolls before the finger reaches the keyboard,
+            // which then goes with it: the keyboard's own motion is what the transcript sees.
+            let bar = app.descendants(matching: .any)["composer.capsule"].frame
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            let start = origin.withOffset(CGVector(dx: window.midX, dy: bar.minY - Self.aboveComposer))
+            let end = origin.withOffset(CGVector(dx: window.midX, dy: window.maxY - 2))
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.05)
+
+            // Gone, whole: no keyboard frame left on screen.
+            let gone = Date().addingTimeInterval(4)
+            while keyboard.exists, keyboard.frame.minY < window.maxY - 1, Date() < gone { Thread.sleep(forTimeInterval: 0.2) }
+            XCTAssertFalse(keyboard.exists && keyboard.frame.minY < window.maxY - 1,
+                           "round \(round): keyboard left at \(keyboard.frame)")
+
+            // The gesture's frames: the offset went one way, by finger-sized steps.
+            let probe = NSPredicate(format: "value BEGINSWITH %@", "frames=")
+            XCTAssertEqual(XCTWaiter.wait(for: [expectation(for: probe, evaluatedWith: transcript)], timeout: 5), .completed)
+            let facts = Self.facts(transcript.value as? String ?? "")
+            XCTAssertGreaterThan(facts["frames"] ?? 0, 5, "round \(round): sampled \(transcript.value ?? "")")
+            // A frame's layout can reach the screen in two steps a few points apart (the keyboard's
+            // inset, then the offset): the system's, measured on a bare ScrollView too under load.
+            // More than that is something moving the transcript.
+            XCTAssertLessThanOrEqual(facts["maxBack"] ?? .max, Self.splitFrame, "round \(round): the offset turned back: \(transcript.value ?? "")")
+            XCTAssertLessThanOrEqual(facts["maxStep"] ?? .max, Self.fingerStep, "round \(round): the offset jumped: \(transcript.value ?? "")")
+            // "Latest" stays as it was during the drag (it updates once the transcript rests):
+            // in the bar, its coming and going moved the composer and the transcript.
+            XCTAssertEqual(facts["latest"], 0, "round \(round): Latest changed during the drag: \(transcript.value ?? "")")
+
+            // And nothing moves once the finger has left (no catch-up scroll).
+            let message = try XCTUnwrap(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Hermes: "))
+                .allElementsBoundByIndex.first { $0.isHittable }, "a message on screen")
+            let label = message.label
+            let rested = message.frame.minY
+            Thread.sleep(forTimeInterval: 1)
+            let after = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", label)).firstMatch.frame.minY
+            XCTAssertEqual(after, rested, accuracy: 1, "round \(round): moved after the drag")
+            // Back to the bottom for the next round.
+            if app.buttons["Latest"].exists { app.buttons["Latest"].tap() }
+            _ = transcript.waitForExistence(timeout: 1)
+        }
+    }
+
+    private static func facts(_ value: String) -> [String: Int] {
+        Dictionary(uniqueKeysWithValues: value.split(separator: " ").compactMap { pair in
+            let kv = pair.split(separator: "=")
+            return kv.count == 2 ? (String(kv[0]), Int(kv[1]) ?? 0) : nil
+        })
+    }
 
     /// Opening a v4 approval card's command (its sentence makes the card tall) hung the app: the
     /// transcript's height alternated for ever while it followed the bottom. The app must stay

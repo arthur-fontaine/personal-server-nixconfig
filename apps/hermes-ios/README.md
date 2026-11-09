@@ -43,7 +43,8 @@ argument) the app runs on built-in demo data through a fake TDLib layer:
 nothing to log in to, every screen works. Launch arguments used by the
 screenshots: `-section pet|dashboard|settings`, `-topic <id>`, `-noQuestion`,
 `-commands`, `-newSubchat`, `-call`, `-noAudio` (the call screen without the
-audio engine, which the simulator's audio unit can abort on), `-demoLogin`.
+audio engine, which the simulator's audio unit can abort on), `-demoLogin`. The UI tests add
+`-scrollProbe` (the transcript reports how a gesture moved it, frame by frame).
 
 Tests and screenshots:
 
