@@ -184,6 +184,16 @@
         }
       }
     },
+    "About": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À propos"
+          }
+        }
+      }
+    },
     "Above %@": {
       "localizations": {
         "fr": {
@@ -426,16 +436,6 @@
         }
       }
     },
-    "Cancel": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Annuler"
-          }
-        }
-      }
-    },
     "Cancel Reply": {
       "localizations": {
         "fr": {
@@ -566,6 +566,16 @@
         }
       }
     },
+    "Copy Diagnostics": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copier le diagnostic"
+          }
+        }
+      }
+    },
     "Cost": {
       "localizations": {
         "fr": {
@@ -687,16 +697,6 @@
         }
       }
     },
-    "Delete Model": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Supprimer le modèle"
-          }
-        }
-      }
-    },
     "Delete the voice model? Calls will use Apple's speech until you download it again.": {
       "localizations": {
         "fr": {
@@ -737,6 +737,16 @@
         }
       }
     },
+    "Diagnostics copied": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostic copié"
+          }
+        }
+      }
+    },
     "Don't miss Hermes' questions": {
       "localizations": {
         "fr": {
@@ -757,12 +767,22 @@
         }
       }
     },
-    "Download (%@, Wi-Fi)": {
+    "Download": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Télécharger (%@, Wi-Fi)"
+            "value": "Télécharger"
+          }
+        }
+      }
+    },
+    "Download failed: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec du téléchargement : %@"
           }
         }
       }
@@ -834,16 +854,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Erreurs"
-          }
-        }
-      }
-    },
-    "Failed": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Échec"
           }
         }
       }
@@ -926,6 +936,16 @@
         }
       }
     },
+    "For a call that hears nothing: the permissions, the voice model and the last call's log, no messages.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pour un appel qui n’entend rien : les autorisations, le modèle vocal et le journal du dernier appel, sans aucun message."
+          }
+        }
+      }
+    },
     "Forgot Your Password?": {
       "localizations": {
         "fr": {
@@ -983,6 +1003,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Faire éclore"
+          }
+        }
+      }
+    },
+    "Hearing you…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Je t’entends…"
           }
         }
       }
@@ -1199,23 +1229,32 @@
         }
       }
     },
-    "LFM3-Omni voice": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Voix LFM3-Omni"
-          }
-        }
-      }
-    },
     "LFM3-Omni-2B (on device)": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "LFM3-Omni-2B (sur l’appareil)"
+          }
+        }
+      }
+    },
+    "LFM3-Omni-2B · %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LFM3-Omni-2B · %@"
+          }
+        }
+      }
+    },
+    "LFM3-Omni-2B · %@ · Wi-Fi only": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LFM3-Omni-2B · %@ · Wi-Fi uniquement"
           }
         }
       }
@@ -1262,22 +1301,11 @@
       }
     },
     "Listening failed.": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "L’écoute a échoué."
-          }
-        }
-      }
-    },
-    "Listening…": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "À l’écoute…"
           }
         }
       }
@@ -1658,18 +1686,7 @@
         }
       }
     },
-    "Not downloaded": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Non téléchargé"
-          }
-        }
-      }
-    },
     "Not enough memory for the voice model.": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -1715,6 +1732,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Activées"
+          }
+        }
+      }
+    },
+    "On-Device Voice": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voix sur l’appareil"
           }
         }
       }
@@ -2042,6 +2069,16 @@
         }
       }
     },
+    "Retry": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer"
+          }
+        }
+      }
+    },
     "Role": {
       "localizations": {
         "fr": {
@@ -2098,6 +2135,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Recevoir par %@"
+          }
+        }
+      }
+    },
+    "Sending…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Envoi…"
           }
         }
       }
@@ -2219,7 +2266,6 @@
       }
     },
     "Speaking failed.": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2249,12 +2295,32 @@
         }
       }
     },
+    "Stay Connected After": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rester connecté après"
+          }
+        }
+      }
+    },
     "Stop": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Arrêter"
+          }
+        }
+      }
+    },
+    "Stop Download": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêter le téléchargement"
           }
         }
       }
@@ -2362,7 +2428,6 @@
       }
     },
     "The voice model couldn't read the audio (%d).": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2373,7 +2438,6 @@
       }
     },
     "The voice model didn't load.": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2384,7 +2448,6 @@
       }
     },
     "The voice projector didn't load.": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2414,18 +2477,17 @@
         }
       }
     },
-    "This build is signed with a free Apple team: notifications arrive while the app runs or refreshes in the background, not when it's closed. A paid team enables push and Siri announcements.": {
+    "This build is signed with a free Apple team, which can't receive push. Notifications and the Live Activity stay live while Hermes works or waits for you, and for %@ after: the app stays connected in the background, silently. Otherwise they arrive when iOS wakes the app, a few times a day. A paid team makes them instant.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cette version est signée avec une équipe Apple gratuite : les notifications arrivent pendant que l’app tourne ou s’actualise en arrière-plan, pas quand elle est fermée. Une équipe payante active les notifications push et les annonces de Siri."
+            "value": "Cette version est signée avec une équipe Apple gratuite, qui ne reçoit pas de notifications push. Les notifications et l’activité en direct restent à jour tant que Hermes travaille ou attend ta réponse, et %@ après : l’app reste connectée en arrière-plan, en silence. Sinon, elles arrivent quand iOS réveille l’app, quelques fois par jour. Une équipe payante les rend instantanées."
           }
         }
       }
     },
     "This llama.cpp build can't run LFM3 speech.": {
-      "extractionState": "stale",
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -2481,6 +2543,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Jetons en sortie"
+          }
+        }
+      }
+    },
+    "Transcribing…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription…"
           }
         }
       }
@@ -2673,12 +2745,22 @@
         }
       }
     },
-    "Waiting for Wi-Fi…": {
+    "Waiting for Hermes": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "En attente du Wi-Fi…"
+            "value": "En attente de Hermes"
+          }
+        }
+      }
+    },
+    "Waiting for Wi-Fi · %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En attente du Wi-Fi · %@"
           }
         }
       }
