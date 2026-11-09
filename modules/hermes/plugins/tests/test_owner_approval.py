@@ -173,6 +173,12 @@ def main() -> None:
     assert oa.ask("x", "y", choices, timeout=5) == oa.UNAVAILABLE
     os.environ["TELEGRAM_ALLOWED_USERS"] = str(OWNER)
 
+    # A plain message to the owner, from any thread, without waiting.
+    count = len(bot.sent)
+    assert oa.tell("Auto mode can't reach its review model")
+    wait_for(lambda: len(bot.sent) == count + 1, "the message")
+    assert bot.sent[-1]["chat_id"] == OWNER and "reply_markup" not in bot.sent[-1]
+
     # An event's proposal: buttons in the main chat; the owner's tap continues it.
     out = json.loads(tools["propose"]["handler"]({
         "message": "Léa invites you for drinks at 8pm; you are free.",

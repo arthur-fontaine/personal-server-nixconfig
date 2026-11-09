@@ -22,6 +22,8 @@ loaded; ``register`` publishes this module as ``owner_approval``)::
     # From a coroutine, on any event loop:
     choice = await ask_async(title, details, choices, timeout=300)
 
+``tell(text)`` sends the owner a plain message, without buttons or waiting.
+
 The result is one of the given ids, ``"timeout"`` (no tap in time, or the
 gateway stopping) or ``"unavailable"`` (no gateway in this process, Telegram
 not connected, no owner configured, the message could not be sent). Both are
@@ -391,6 +393,24 @@ async def _on_proposal(query, data: str) -> None:
     outcome = (f"→ <b>{html.escape(option)}</b>" if ok
                else "<i>Could not reach the main chat: answer by text.</i>")
     await _edit(proposal, outcome)
+
+
+def tell(text: str) -> bool:
+    """A plain message to the owner's main chat, without waiting (callable from
+    any thread but the gateway loop's own, where it would not be sent before
+    the caller returns): whether it was handed to the bot."""
+    bot, owner, loop = _bot(), owner_id(), _gateway_loop()
+    if bot is None or owner is None or loop is None:
+        return False
+
+    async def send() -> None:
+        try:
+            await bot.send_message(chat_id=owner, text=text[:4000])
+        except Exception as error:
+            logger.warning("owner_approval: message not sent: %s", error)
+
+    asyncio.run_coroutine_threadsafe(send(), loop)
+    return True
 
 
 def telegram_handlers(app, adapter) -> None:
