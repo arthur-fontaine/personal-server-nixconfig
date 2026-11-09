@@ -71,7 +71,22 @@ in
             ${name} rules; the entry "$defaults" keeps them in place. Empty keeps
             the defaults.
           '';
-        });
+        }) // {
+          maxPromptTokens = mkOption {
+            type = types.ints.positive;
+            default = 14000;
+            description = ''
+              The most each request to the review model may take, in tokens
+              counted on the safe side (3.2 bytes a token). The default leaves
+              margin under mammoth-27b's 16,000, past which it refuses (HTTP 422).
+              Claude Code's verbatim prompt (~30k tokens) is used only when it
+              fits with room for the conversation, else a compact rewrite of the
+              same rules (~9k); the conversation is cut from its oldest lines and
+              AGENTS.md from its end, the action and your latest message always
+              kept. An action too long to fit asks you.
+            '';
+          };
+        };
       };
       default = { };
       example = { environment = [ "$defaults" "Trusted repo: github.com/arthur-fontaine/*" ]; };

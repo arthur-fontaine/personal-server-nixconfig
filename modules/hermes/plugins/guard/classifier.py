@@ -10,11 +10,15 @@ with two questions, ``verdict`` (allow/block) and ``category`` (the BLOCK
 rule), and the block probability stands for the severity: stage 1 clears at
 ≤ 0.25 (Claude Code's t1 25 of 100), stage 2 blocks above 0.35 (t2 35).
 Retries are Claude Code's: 4 on transient errors (backoff 0.5 s doubling,
-≤ 8 s), 4 re-asks on an unusable answer; then fail closed.
+≤ 8 s), 4 re-asks on an unusable answer; then fail closed. A request the
+model refuses (any other 4xx: a prompt over its length limit, a wrong key or
+model) is not asked again: it is a configuration error, the same for every
+action, and the owner is asked instead (``config_error``).
 """
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from typing import Callable, Optional
@@ -26,7 +30,7 @@ MAX_RETRIES = 4
 
 @dataclass(frozen=True)
 class Verdict:
-    kind: str  # allow | block | parse_failure | unavailable
+    kind: str  # allow | block | parse_failure | unavailable | config_error | too_long
     reason: str
     stage: str = ""
     block_probability: Optional[float] = None
@@ -36,6 +40,11 @@ class Verdict:
 
 def _transient(error: str) -> bool:
     return "unreachable" in error or any(f"HTTP {c}" in error for c in ("408", "409", "429")) or "HTTP 5" in error
+
+
+def _refused(error: str) -> bool:
+    """A 4xx other than the transient ones: asking again cannot help."""
+    return bool(re.search(r"HTTP 4\d\d", error)) and not _transient(error)
 
 
 def status_of(error: str) -> str:
@@ -75,6 +84,8 @@ def _stage(ask: Callable, state: dict, system: str, suffix: str, sleep: Callable
             return ask(state=state, questions=questions(system, suffix)), ""
         except DecisionError as e:
             error = str(e)
+            if _refused(error):
+                return None, error
             if _transient(error):
                 sleep(min(8.0, 0.5 * 2 ** attempt))
             # anything else: an unusable answer, asked again
@@ -98,6 +109,8 @@ def classify(ask: Callable, state: dict, system: str, sleep: Callable = time.sle
     t = P.thresholds()
     answers, error = _stage(ask, state, system, P.STAGE1, sleep)
     if answers is None:
+        if _refused(error):
+            return Verdict("config_error", config_error_reason(error), error=error)
         if _transient(error) or not error:
             return Verdict("unavailable", "Classifier unavailable - blocking for safety", error=error)
         return Verdict("parse_failure", cannot_evaluate(), error=error)
@@ -105,6 +118,8 @@ def classify(ask: Callable, state: dict, system: str, sleep: Callable = time.sle
     if p1 <= t["t1"]:
         return Verdict("allow", "Allowed by fast classifier", "fast", p1)
     answers, error = _stage(ask, state, system, P.STAGE2, sleep)
+    if answers is None and _refused(error):
+        return Verdict("config_error", config_error_reason(error), "thinking", p1, cat1, error)
     if answers is None:
         # After stage 1, a stage-2 failure blocks on stage 1's assessment (and counts).
         return Verdict("block", "Stage 2 classifier error - blocking based on stage 1 assessment (usually transient \u2014 "
@@ -114,6 +129,10 @@ def classify(ask: Callable, state: dict, system: str, sleep: Callable = time.sle
         return Verdict("allow", "Allowed by classifier", "thinking", p2)
     name = P.rule_names().get(cat2, "")
     return Verdict("block", f"[{name}]" if name else "Blocked by classifier", "thinking", p2, cat2)
+
+
+def config_error_reason(error: str) -> str:
+    return f"Auto mode can't reach its review model: {error}"
 
 
 def cannot_evaluate() -> str:

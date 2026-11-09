@@ -31,7 +31,8 @@ in
       # events' webhook turns are not.
       trusted_platforms = [ "telegram" "cron" ];
       mode = perms.defaultMode;
-      rules = perms.autoMode;
+      rules = removeAttrs perms.autoMode [ "maxPromptTokens" ];
+      max_prompt_tokens = perms.autoMode.maxPromptTokens;
       identity = server.hermes.user;
       cwd = "${server.hermes.home}/workspace";
       context_file = "${agentsMd}";

@@ -238,14 +238,19 @@ sends the same command):
   `mkdir touch rm mv cp sed -i` there). Every other call goes to a
   classifier that reads the conversation (your messages and Hermes' calls,
   never what tools returned) and the call, with Claude Code's own rules
-  (`guard/prompts/`, verbatim) and `server.hermes.permissions.autoMode`
+  (`guard/prompts/`, see below for the length) and `server.hermes.permissions.autoMode`
   (`allow`, `soft_deny`, `hard_deny`, `environment`, with `"$defaults"`, as
   Claude Code's `autoMode`). A risky call is blocked and Hermes is told why
   (`[Data Exfiltration]`, `[Git Destructive]`…) and to find a safer way or
   stop and ask you. After 3 blocks in a row, or 20 in a session, you are
   asked instead, on Hermes' approval card (Once, Session, Always, Deny).
   A classifier that cannot be reached or gives no usable answer blocks the
-  call (fail closed).
+  call (fail closed), its error in `gateway.log`. A classifier that refuses
+  the request (any other 4xx: a prompt too long, a wrong key or model) is a
+  configuration error, not a verdict: logged as an error with the model's
+  reason, you are told once in the main chat ("Auto mode can't reach its
+  review model: …. I'm asking you for each action until it's fixed."), and
+  every reviewed call asks you until a request goes through.
 - **ask**: every call but those that only look asks you; no model call.
 
 The classifier is the review decision model (`server.hermes.decision.approval`,
@@ -256,6 +261,19 @@ Claude Code's severity: stage 1 clears at 25 % or less, stage 2 blocks above
 35 %. Without a review model, auto mode asks you for every call it cannot
 clear itself. Hermes' `AGENTS.md` is read as Claude Code reads `CLAUDE.md`:
 an explicit authorization there may clear a soft block.
+
+A decision model reads a prompt of bounded length (mammoth-27b: 16,000
+tokens, past which it answers HTTP 422), and Claude Code's prompt alone is
+about 30,000. Each request is fitted, by construction, under
+`server.hermes.permissions.autoMode.maxPromptTokens` (default 14,000),
+counted on the safe side (3.2 bytes a token; `guard/budget.py`): Claude
+Code's verbatim prompt when it fits with room for the conversation, else
+`guard/prompts/compact.md` (the same HARD/SOFT BLOCK rules under the same
+names, the same ALLOW exceptions and consent logic, the examples cut; about
+8.5k); then the action and your latest message, always whole (an action too
+long for the model asks you); then the conversation from its newest line,
+the older ones replaced by an `{"omitted": …}` line; then `AGENTS.md`, cut
+at its end. `gateway.log` says which prompt is used.
 
 Auto mode is never steered by anyone but you. What counts as you:
 

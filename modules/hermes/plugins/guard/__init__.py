@@ -9,7 +9,8 @@ Two modes (``permission_mode()``; ``/mode auto|ask`` or
   edits inside the working directory, Claude Code's Bash read-only check and
   acceptEdits file commands); every other call is judged by the classifier
   (classifier.py) on the conversation and the call, with Claude Code's own
-  rules (prompts/, verbatim, plus the owner's ``autoMode``-style lists). A
+  rules (prompts/, verbatim or compact to fit the model, budget.py, plus the
+  owner's ``autoMode``-style lists). A
   risky call is blocked and the model told why; after 3 blocks in a row or 20
   in a session the owner is asked instead, on Hermes' approval card
   (Telegram buttons). The classifier unavailable or unreadable: blocked,
@@ -41,6 +42,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import subprocess
 import threading
 from dataclasses import dataclass, field
@@ -64,6 +66,9 @@ MODE_LABELS = {
 # (plugins/platforms/telegram/adapter.py, _EA_REASON_BUDGET): the action
 # goes in the reason, short enough that the card always fits.
 CARD_ACTION = 300
+# The request's budget (server.hermes.permissions.autoMode.maxPromptTokens),
+# for mammoth-27b's 16k with margin.
+DEFAULT_MAX_PROMPT_TOKENS = 14000
 CARD_SUMMARY = 140
 CARD_ACTION_UNDER_SUMMARY = 240
 # What the card said, keyed by its text: the App topic shows the summary
@@ -179,7 +184,8 @@ def _skip_computer_use_question(args: dict) -> None:
 class Guard:
     def __init__(self, model=None, trusted_platforms=frozenset({"telegram", "cron"}), mode: str = "auto", *,
                  rules: Optional[dict] = None, identity: str = "", cwd: str = "", context_file: str = "",
-                 mode_file: Optional[Path] = None, ask=None, sleep=None) -> None:
+                 mode_file: Optional[Path] = None, ask=None, sleep=None,
+                 max_prompt_tokens: int = DEFAULT_MAX_PROMPT_TOKENS) -> None:
         from . import prompt
 
         self.model = model
@@ -196,6 +202,9 @@ class Guard:
         self._sleep = sleep
         self._system = None
         self._prompt = prompt
+        self.max_prompt_tokens = max_prompt_tokens
+        self._variant = ""
+        self._told = ""  # the configuration error the owner was told about
 
     # --- the mode ---
 
@@ -302,16 +311,17 @@ class Guard:
             lines += history_lines(history, owners(session.platform), owner_texts=session.messages)
         return lines + list(session.calls)
 
-    def _context(self) -> list:
+    def _context(self) -> str:
+        """AGENTS.md, indented and defanged; framed by prompt.context_message."""
         try:
             text = Path(self.context_file).read_text() if self.context_file else ""
         except OSError:
             text = ""
         if not text.strip():
-            return []
+            return ""
         from .transcript import defang, indent
 
-        return [self._prompt.context_message(defang(indent(text), ["user_claude_md"]))]
+        return defang(indent(text), ["user_claude_md"])
 
     def _git_status(self, command: str) -> str:
         from .transcript import destroys_work, meta_line, parse_porcelain
@@ -330,18 +340,55 @@ class Guard:
             self._system = self._prompt.build_system_prompt(self.rules, self.identity)
         return self._system
 
-    def classify(self, lines: list, action: str, meta: str = ""):
-        from . import systemone
-        from .classifier import classify
+    def request(self, lines: list, action: str, meta: str = ""):
+        """The request, fitted to the model's limit (budget.py); TooLong when the action cannot fit."""
+        from . import budget
+        from .classifier import questions
 
-        transcript = "<transcript>\n" + "".join(lines) + meta + action + "</transcript>\n"
-        state = {"transcript": transcript}
-        context = self._context()
-        if context:
-            state["user_configuration"] = context[0]
+        request = budget.build(budget=self.max_prompt_tokens, model=getattr(self.model, "model", ""), lines=lines,
+                               action=action, meta=meta, context=self._context(),
+                               wrap_context=self._prompt.context_message, rules=self.rules, identity=self.identity,
+                               questions=questions)
+        if request.variant != self._variant:
+            self._variant = request.variant
+            logger.info("guard: the classifier reads Claude Code's %s prompt (requests fitted to %d tokens)",
+                        request.variant, self.max_prompt_tokens)
+        return request
+
+    def classify(self, lines: list, action: str, meta: str = ""):
+        from . import budget, systemone
+        from .classifier import Verdict as Classified, classify
+
+        try:
+            request = self.request(lines, action, meta)
+        except budget.TooLong as error:
+            return Classified("too_long", "Too long for auto mode's review model to read", error=str(error))
+        if request.omitted or request.context_cut:
+            logger.info("guard: request fitted to %d tokens (~%d): %d earlier lines left out%s", self.max_prompt_tokens,
+                        request.tokens, request.omitted, ", AGENTS.md cut" if request.context_cut else "")
         ask = self._ask or (lambda **kw: systemone.ask(self.model, **kw))
         kwargs = {"sleep": self._sleep} if self._sleep else {}
-        return classify(ask, state, self.system_prompt(), **kwargs)
+        return classify(ask, request.state, request.system, **kwargs)
+
+    def _no_verdict(self, verdict) -> None:
+        """Log why the classifier gave no verdict; tell the owner, once, of a configuration error."""
+        if verdict.kind in ("allow", "block"):
+            if self._told and not verdict.error:
+                logger.info("guard: the review model answers again")
+                self._told = ""
+            if verdict.error:
+                logger.warning("guard: stage 2 failed (%s); blocked on stage 1", verdict.error)
+            return
+        if verdict.kind == "config_error":
+            logger.error("guard: auto mode's review model refuses its requests: %s", verdict.error)
+            # The same error with other numbers (a token count) is the same error.
+            kind = re.sub(r"\d+", "#", verdict.error)
+            if self._told != kind:
+                self._told = kind
+                tell_owner(f"Auto mode can't reach its review model: {verdict.error}. I'm asking you for each action "
+                           "until it's fixed.")
+            return
+        logger.warning("guard: no verdict (%s): %s", verdict.kind, verdict.error or verdict.reason)
 
     # --- the gate ---
 
@@ -388,6 +435,10 @@ class Guard:
             _skip_computer_use_question(args)
         logger.info("guard: %s %s (%s%s)", tool_name, verdict.kind, verdict.reason,
                     f", p(block)={verdict.block_probability:.2f}" if verdict.block_probability is not None else "")
+        self._no_verdict(verdict)
+        if verdict.kind in ("config_error", "too_long"):
+            # Fail closed by asking: not a judgment, not counted as a block.
+            return self._card(session, tool_name, args, verdict.reason)
         if verdict.kind == "allow":
             session.denials.allowed()
             return None
@@ -459,6 +510,19 @@ def _ask_owner(message: str, rule_key: str):
     return {"action": "block", "message": f"BLOCKED: {reason}. Do not retry it; say so in your result. ({message})"}
 
 
+def tell_owner(text: str) -> None:
+    """A plain message to the owner's main chat, through owner_approval's bot."""
+    try:
+        from owner_approval import tell
+
+        if tell(text):
+            return
+    except Exception:
+        logger.warning("guard: could not tell the owner", exc_info=True)
+        return
+    logger.warning("guard: could not tell the owner (Telegram not connected)")
+
+
 # The loaded Guard, for other plugins and the app: ``import guard``.
 GUARD: Optional[Guard] = None
 
@@ -526,6 +590,7 @@ def review_action(context: dict, tool: str, args: dict, actions=()) -> Verdict:
     lines = [line(key, indent(m) if key == "user" else f"{NOTIFICATION}\n{indent(m)}") for m in context.get("messages") or []]
     lines += [line("action", str(a)) for a in actions]
     verdict = GUARD.classify(lines, call_line(tool, args) or line(tool, args))
+    GUARD._no_verdict(verdict)
     if verdict.kind == "allow":
         return Verdict(True, verdict.reason, "low" if verdict.stage == "fast" else "medium")
     return Verdict(False, verdict.reason, "high")
@@ -548,7 +613,8 @@ def _load(home: Path) -> Guard:
         logger.warning("guard: no review model; auto mode asks the owner for every call it cannot clear itself")
     return Guard(model, config.get("trusted_platforms", ["telegram", "cron"]), config.get("mode", "auto"),
                  rules=config.get("rules") or {}, identity=config.get("identity", ""), cwd=config.get("cwd", ""),
-                 context_file=config.get("context_file", ""), mode_file=home / "guard" / "mode.json")
+                 context_file=config.get("context_file", ""), mode_file=home / "guard" / "mode.json",
+                 max_prompt_tokens=int(config.get("max_prompt_tokens") or DEFAULT_MAX_PROMPT_TOKENS))
 
 
 def register(ctx) -> None:

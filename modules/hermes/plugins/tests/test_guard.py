@@ -26,12 +26,34 @@ from guard.classifier import Denials  # noqa: E402
 REQUESTS: list = []
 # p(block) per stage, in order; the last one repeats.
 ANSWER: dict = {"p": [0.05], "category": "none"}
+# Baseten's mammoth-27b refuses a prompt over 16,000 tokens. The fake counts
+# a token per 3.6 bytes of the whole request: more than the model's tokenizer
+# (about 4.6 characters a token on Claude Code's prompt), less than guard's
+# estimate, so only guard's own fitting keeps a request under it.
+LIMIT = {"tokens": 16000}
+
+
+def tokens_of(raw: bytes) -> int:
+    return int(len(raw) / 3.6)
 
 
 class SystemOne(BaseHTTPRequestHandler):
+    def _json(self, status: int, value) -> None:
+        payload = json.dumps(value).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
     def do_POST(self) -> None:  # noqa: N802
-        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        raw = self.rfile.read(int(self.headers["Content-Length"]))
+        body = json.loads(raw)
         REQUESTS.append(body)
+        if tokens_of(raw) > LIMIT["tokens"]:
+            self._json(422, {"error": f"OneJev prompt has {tokens_of(raw)} tokens, exceeding max_len {LIMIT['tokens']}; "
+                                      "prompts are never truncated"})
+            return
         if ANSWER.get("status"):
             self.send_response(ANSWER["status"])
             self.end_headers()
@@ -405,6 +427,139 @@ def test_subagent_after_its_parent(port: int) -> None:
         sys.modules.pop("owner_approval", None)
         reset_current_session_key(key)
         clear_session_vars(tokens)
+
+
+def long_history(turns: int = 200) -> list:
+    """A long day's conversation: requests, commands, big file writes."""
+    history = []
+    for n in range(turns):
+        history.append({"role": "user", "content": f"Request {n}: " + "fais le ménage dans les notes " * 20})
+        history.append({"role": "assistant", "content": "", "tool_calls": [
+            {"id": f"c{n}", "function": {"name": "terminal", "arguments": json.dumps({"command": f"ls ~/notes/{n}"})}},
+            {"id": f"w{n}", "function": {"name": "write_file", "arguments": json.dumps(
+                {"path": f"/Users/hermes/workspace/n{n}.md", "content": "ligne de notes\n" * 400})}}]})
+    return history
+
+
+def test_budget(port: int) -> None:
+    """Every request fits the model's 16k, whatever the conversation."""
+    import guard.budget as budget
+
+    # Claude Code's prompt alone is past the limit: the compact one is used.
+    assert prompt.estimate_tokens(prompt.build_system_prompt({}, "hermes")) > 16000
+    compact = prompt.build_system_prompt({}, "hermes", compact=True)
+    assert prompt.estimate_tokens(compact) < 9000, prompt.estimate_tokens(compact)
+    for leftover in ["_to_replace>", "<settings_deny_rules>", "(replaced)"]:
+        assert leftover not in compact, leftover
+    assert compact.endswith(prompt.identity_context("hermes")) and f"## Output Format\n\n{prompt.OUTPUT_FORMAT}" in compact
+    # The compact prompt has every rule the verbatim one has, under the same name.
+    real = prompt.templates()["permissions"]
+    for name in prompt.rule_names().values():
+        assert f"- {name} [" in compact or f"- {name}:" in compact, name
+    allow = [m for m in __import__("re").findall(r"^(?:<user_allow_rules_to_replace>)?- ([^:\n]{1,60}):", real[real.index("## ALLOW"):], __import__("re").M)]
+    for name in allow:
+        assert f"- {name}:" in compact, name
+    # The user's own lists fill the compact prompt's slots too.
+    mine = prompt.build_system_prompt({"hard_deny": ["Never touch prod"]}, None, compact=True)
+    assert "- Never touch prod" in mine and "- Data Exfiltration:" not in mine
+
+    big_agents = WORK / "AGENTS-big.md"
+    big_agents.write_text("## Règles de la maison\n" + "Hermes peut ranger ~/workspace sans demander.\n" * 400)
+    g = make(port, context_file=str(big_agents))
+    history = long_history()
+    latest = "Supprime le dossier ~/workspace/old-notes, il ne sert plus"
+    turn(g, "s", latest, history=history)
+    answer(0.05)
+    REQUESTS.clear()
+    assert g.pre_tool_call("terminal", {"command": "rm -rf ~/workspace/old-notes"}, session_id="s") is None
+    assert REQUESTS, "the classifier was asked"
+    for body in REQUESTS:
+        raw = json.dumps(body).encode()
+        assert tokens_of(raw) <= 16000
+        assert prompt.estimate_tokens(json.dumps(body, ensure_ascii=False)) <= g.max_prompt_tokens
+        text = body["state"]["transcript"]
+        # The action last, the owner's latest request kept, the oldest lines gone.
+        assert text.endswith('{"Bash":"rm -rf ~/workspace/old-notes"}\n</transcript>\n'), text[-200:]
+        assert latest in text and '{"omitted":"' in text and "Request 0:" not in text
+        assert "Request 199:" in text
+        assert "the rest is left out for length" in body["state"]["user_configuration"]
+        assert body["questions"]["verdict"]["instructions"].startswith(compact[:200])
+
+    # A short conversation is whole, and so is AGENTS.md.
+    g = make(port)
+    turn(g, "t", "pousse sur main")
+    REQUESTS.clear()
+    g.pre_tool_call("terminal", {"command": "git push origin main"}, session_id="t")
+    state = REQUESTS[0]["state"]
+    assert '{"omitted"' not in state["transcript"] and "Hermes may push" in state["user_configuration"]
+
+    # The owner's message, however long, is kept, its middle cut.
+    huge = "début " + "x" * 80000 + " fin: lance make"
+    g = make(port)
+    turn(g, "u", huge)
+    REQUESTS.clear()
+    g.pre_tool_call("terminal", {"command": "make deploy"}, session_id="u")
+    text = REQUESTS[0]["state"]["transcript"]
+    assert "début" in text and "fin: lance make" in text and budget.CUT in text
+    assert tokens_of(json.dumps(REQUESTS[0]).encode()) <= 16000
+
+    # An action that cannot fit asks the owner, without calling the model.
+    REQUESTS.clear()
+    directive = g.pre_tool_call("terminal", {"command": "echo " + "y" * 60000}, session_id="u")
+    assert directive["action"] == "approve" and "Too long for auto mode's review model" in directive["message"], directive
+    assert not REQUESTS
+
+
+def test_config_error(port: int) -> None:
+    """A refused request is a configuration error: logged with its reason, the owner told once, every action asked."""
+    import logging
+    import types
+
+    told = []
+    owner = types.ModuleType("owner_approval")
+    owner.tell = lambda text: told.append(text) or True
+    sys.modules["owner_approval"] = owner
+
+    class Capture(logging.Handler):
+        records: list = []
+
+        def emit(self, record) -> None:
+            Capture.records.append((record.levelno, record.getMessage()))
+
+    handler = Capture()
+    G.logger.addHandler(handler)
+    try:
+        # A budget past the model's limit: Baseten's 422.
+        g = make(port, max_prompt_tokens=100000)
+        turn(g, "s", "range", history=long_history(60))
+        answer(0.05)
+        REQUESTS.clear()
+        directive = g.pre_tool_call("terminal", {"command": "make clean"}, session_id="s")
+        assert directive["action"] == "approve", directive
+        assert "Auto mode can't reach its review model" in directive["message"]
+        assert len(REQUESTS) == 1, "a refused request is not asked again"
+        assert g.sessions["s"].denials.consecutive == 0, "not counted as a block"
+        errors = [m for level, m in Capture.records if level >= logging.ERROR]
+        assert any("exceeding max_len 16000" in m for m in errors), Capture.records
+        assert len(told) == 1 and told[0].startswith("Auto mode can't reach its review model: the decision model "
+                                                      "answered HTTP 422: OneJev prompt has"), told
+        assert told[0].endswith("I'm asking you for each action until it's fixed.")
+        g.pre_tool_call("terminal", {"command": "make clean"}, session_id="s")
+        assert len(told) == 1, "told once"
+        # Fixed: the model answers again; a later error is told again.
+        g.max_prompt_tokens = 14000
+        assert g.pre_tool_call("terminal", {"command": "make clean"}, session_id="s") is None
+        answer(0.05, status=401)
+        assert g.pre_tool_call("terminal", {"command": "make"}, session_id="s")["action"] == "approve"
+        assert len(told) == 2 and "HTTP 401" in told[1]
+        # Unavailable and unreadable answers log their reason too.
+        Capture.records.clear()
+        answer(0.05, status=503)
+        g.pre_tool_call("terminal", {"command": "make"}, session_id="s")
+        assert any("HTTP 503" in m for level, m in Capture.records if level >= logging.WARNING), Capture.records
+    finally:
+        G.logger.removeHandler(handler)
+        sys.modules.pop("owner_approval", None)
 
 
 def main() -> None:
