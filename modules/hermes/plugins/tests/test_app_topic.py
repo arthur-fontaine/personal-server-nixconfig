@@ -936,6 +936,38 @@ def test_pet_redraw_rows() -> None:
         raise AssertionError("an unknown row was redrawn")
 
 
+def test_pet_native_transparency() -> None:
+    """A model that draws transparency is asked for it (no chroma key in the
+    prompts, a transparent guide) and its sheet is used as drawn; one that
+    turns the knob down is asked again on the chroma key."""
+    from PIL import Image
+
+    from app_topic import hatch
+
+    keyed = synthetic_sheet().convert("RGBA")
+    keyed.putdata([(0, 0, 0, 0) if p[:3] == (255, 0, 255) else p for p in keyed.getdata()])
+    fake = FakeImages(keyed)
+    fake.native_transparency = True
+    prompts = []
+    fake.hook = lambda _f, prompt, **_k: prompts.append(prompt) and None
+    (result, report), work = _hatch(fake)
+    assert report["background"] == "transparent" and fake.calls[0]["background"] == "transparent", fake.calls[0]
+    assert "magenta" not in prompts[0].lower() and "transparent" in prompts[0], prompts[0]
+    assert Image.open(work / "guide.png").getpixel((0, 0))[3] == 0
+    assert len(fake.calls) == 1 and report["path"] == "one-sheet"
+
+    fake = FakeImages(synthetic_sheet())
+    fake.native_transparency = True
+
+    def refuse(f, prompt, **kwargs):
+        if kwargs.get("background") == "transparent":
+            return {"success": False, "error": "background=transparent is not supported for this model"}
+    fake.hook = refuse
+    (_, report), _ = _hatch(fake)
+    assert report["background"] == "chroma key" and len(fake.calls) == 2, fake.calls
+    assert "background" not in fake.calls[1]
+
+
 def test_status_ignores_the_background_review() -> None:
     """After a turn, Hermes' background review reuses its session_id and fires
     pre_api_request and tool hooks, never on_session_end: the status stays idle

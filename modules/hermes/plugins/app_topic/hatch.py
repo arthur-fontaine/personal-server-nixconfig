@@ -225,9 +225,28 @@ def openrouter_knobs(provider) -> None:
     logger.info("app_topic: %s declared from OpenRouter's catalog: %s", model, sorted(params))
 
 
+def native_transparency(provider) -> bool:
+    """Whether the pet's image model draws a transparent background itself
+    (``background=transparent``: gpt-image-1, -2.5 and -2.6 on OpenRouter, not
+    gpt-image-2). Read from the model's declared knobs, the table
+    openrouter_knobs completes from OpenRouter's catalog; a provider may also
+    say so itself (``native_transparency``). Without it, the sheet is drawn on
+    a chroma key and keyed out."""
+    explicit = getattr(provider, "native_transparency", None)
+    if isinstance(explicit, bool):
+        return explicit
+    module = sys.modules.get(type(provider).__module__)
+    table = getattr(module, "_IMAGE_API_MODELS", None)
+    try:
+        model = provider._resolve_model()
+    except Exception:
+        return False
+    return bool(table and model in table and "transparent" in (table[model].get("background") or ()))
+
+
 # ── the sheet ───────────────────────────────────────────────────────────
 
-def layout_guide(size: tuple[int, int] = GUIDE_SIZE):
+def layout_guide(size: tuple[int, int] = GUIDE_SIZE, transparent: bool = False):
     """The sheet's layout: 9 row bands, each split into its row's frame count,
     on the chroma key; outlines, centre crosses and baselines in a darker
     magenta. A copied outline spans its band, so Hermes' extraction erases
@@ -237,7 +256,9 @@ def layout_guide(size: tuple[int, int] = GUIDE_SIZE):
     from agent.pet.generate import atlas
 
     w, h = size
-    image = Image.new("RGB", size, CHROMA)
+    # For a model drawing transparency, the marks on a transparent field: a magenta one would
+    # be read as the background to draw.
+    image = Image.new("RGBA", size, (0, 0, 0, 0)) if transparent else Image.new("RGB", size, CHROMA)
     draw = ImageDraw.Draw(image)
     band = h / len(atlas.ROW_SPECS)
     for index, (_state, _row, count) in enumerate(atlas.ROW_SPECS):
@@ -274,16 +295,34 @@ def action(state: str) -> str:
     return ACTIONS.get(state) or prompts.STATE_ACTIONS[state]
 
 
-def row_prompt(state: str, count: int, concept: str, style: str = "auto") -> str:
+TRANSPARENT_BACKGROUND = (
+    "BACKGROUND: fully transparent (alpha 0) everywhere around and between the poses: no backdrop colour, no "
+    "gradient, scenery, shadow, glow, ground line, frame, border, panel, grid or divider. Every pixel of the "
+    "character is fully opaque, with crisp hard edges (no semi-transparent fringe or halo). No text, no labels, "
+    "no UI.")
+
+
+def row_prompt(state: str, count: int, concept: str, style: str = "auto", transparent: bool = False) -> str:
     """Hermes' row prompt (agent/pet/generate/prompts.py), with our action for
-    the states we word differently: it inserts the action verbatim."""
+    the states we word differently (it inserts the action verbatim) and, for a
+    model that draws transparency, a transparent background instead of its
+    chroma key."""
     from agent.pet.generate import prompts
 
     text = prompts.build_row_prompt(state, count, concept, style=style)
-    return text.replace(prompts.STATE_ACTIONS[state], action(state)) if state in ACTIONS else text
+    if state in ACTIONS:
+        text = text.replace(prompts.STATE_ACTIONS[state], action(state))
+    if transparent:
+        text = text.replace(prompts._BACKGROUND, TRANSPARENT_BACKGROUND)
+        text = text.replace(
+            "Fill the WHOLE strip with the SAME single flat chroma-key color as the attached "
+            "reference image's background (identical hue in every frame, no per-pose color shifts). ",
+            "The WHOLE strip's background is transparent, like the attached reference image's. ")
+        text = text.replace("empty chroma-key background", "empty transparent background")
+    return text
 
 
-def sheet_prompt(concept: str, style: str = "auto") -> str:
+def sheet_prompt(concept: str, style: str = "auto", transparent: bool = False) -> str:
     from agent.pet.generate import atlas, prompts
 
     concept = (concept or "a distinctive mascot creature").strip()
@@ -306,10 +345,11 @@ def sheet_prompt(concept: str, style: str = "auto") -> str:
         "Effects only if attached to the body (no detached sparkles, tears, smoke, stars, punctuation, motion "
         "lines, speed lines, dust, wave marks, shadows, glows, floor or ground lines). running-right faces and "
         "travels right, running-left faces and travels left; running is working in place, not foot-running. "
-        "BACKGROUND: the whole sheet is ONE flat, even, pure hot magenta #FF00FF (pure green #00FF00 only if the "
-        "character has magenta), with no gradient, texture, scenery, border or panel; that color appears nowhere "
-        "on the character. No text, no UI."
-        f"{prompts.style_hint(style)}"
+        + (TRANSPARENT_BACKGROUND if transparent else
+           "BACKGROUND: the whole sheet is ONE flat, even, pure hot magenta #FF00FF (pure green #00FF00 only if "
+           "the character has magenta), with no gradient, texture, scenery, border or panel; that color appears "
+           "nowhere on the character. No text, no UI.")
+        + f"{prompts.style_hint(style)}"
     )
 
 
@@ -415,19 +455,20 @@ def contact_sheet(atlas_image):
     return out
 
 
-def idle_reference(frame, work: Path) -> Path:
+def idle_reference(frame, work: Path, transparent: bool = False) -> Path:
     """The canonical look for redrawn rows: the first idle frame, keyed, on
-    the chroma key, large enough to read."""
+    the chroma key (or transparent, for a model that draws transparency),
+    large enough to read."""
     from PIL import Image
 
     idle = frame.convert("RGBA")
     idle = idle.crop(idle.getbbox() or (0, 0, idle.width, idle.height))
     scale = max(1, 384 // max(idle.size))
     idle = idle.resize((idle.width * scale, idle.height * scale), Image.Resampling.NEAREST)
-    reference = Image.new("RGBA", (idle.width + 128, idle.height + 128), CHROMA + (255,))
+    reference = Image.new("RGBA", (idle.width + 128, idle.height + 128), CHROMA + (0 if transparent else 255,))
     reference.alpha_composite(idle, (64, 64))
     path = work / "idle-reference.png"
-    reference.convert("RGB").save(path)
+    (reference if transparent else reference.convert("RGB")).save(path)
     return path
 
 
@@ -466,11 +507,11 @@ def redraw(sheet, states: list[str], concept: str, *, sprite, work: Path, max_co
         raise HatchFailed(message, report)
 
     frames = atlas_frames(sheet)
-    idle_ref = idle_reference(frames["idle"][0], work)
+    idle_ref = idle_reference(frames["idle"][0], work, run.transparent)
     counts = {s: c for s, _r, c in atlas.ROW_SPECS}
     for state in states:
         try:
-            strip = run.draw(f"row-{state}", row_prompt(state, counts[state], concept, style),
+            strip = run.draw(f"row-{state}", lambda t: row_prompt(state, counts[state], concept, style, t),
                              references=[idle_ref], aspect=("landscape", None), quality=ROW_QUALITY)
         except OverBudget as error:
             fail(f"the {state} row could not be redrawn within the budget: {error}")
@@ -507,11 +548,28 @@ class _Run:
     def __init__(self, sprite, budget: Budget, work: Path) -> None:
         self.sprite, self.budget, self.work = sprite, budget, work
         self.provider = sprite.provider
+        # The model's own transparency, else the chroma key (and its keying).
+        self.transparent = native_transparency(sprite.provider)
 
-    def draw(self, what: str, prompt: str, *, references: list[Path], aspect: tuple[str, str | None],
+    def draw(self, what: str, prompt, *, references: list[Path], aspect: tuple[str, str | None],
              quality: str) -> Path | None:
         """One image call, priced and checked first; the image moved into the
-        work directory. None when nothing usable came back."""
+        work directory. None when nothing usable came back. *prompt* takes
+        whether the background is transparent; a model that turns the knob
+        down is asked again on the chroma key."""
+        from agent.pet.generate import imagegen
+
+        image = self._draw(what, prompt(self.transparent), references=references, aspect=aspect, quality=quality)
+        if image is None and self.transparent and imagegen._rejected_background(self.last_error):
+            logger.info("app_topic: pet %s: the model refused a transparent background; chroma key instead", what)
+            self.transparent = False
+            image = self._draw(what, prompt(False), references=references, aspect=aspect, quality=quality)
+        return image
+
+    last_error = ""
+
+    def _draw(self, what: str, prompt: str, *, references: list[Path], aspect: tuple[str, str | None],
+              quality: str) -> Path | None:
         from agent.pet.generate import imagegen
 
         semantic, exact = aspect
@@ -523,6 +581,8 @@ class _Run:
                   "reference_image_urls": refs}
         if exact:
             kwargs["aspect_ratio_exact"] = exact
+        if self.transparent:
+            kwargs.update(background="transparent", output_format="png")
         t0 = time.monotonic()
         try:
             result = self.provider.generate(prompt, **kwargs)
@@ -532,6 +592,7 @@ class _Run:
         logger.info("app_topic: pet %s: %s in %.0fs (spent $%.2f)", what,
                     "drawn" if result.get("success") else f"failed ({result.get('error')})",
                     time.monotonic() - t0, self.budget.spent)
+        self.last_error = str(result.get("error") or "")
         if not result.get("success") or not result.get("image"):
             return None
         try:
@@ -572,14 +633,15 @@ def hatch(prompt: str, *, sprite, work: Path, max_cost: float = DEFAULT_MAX_COST
         raise HatchFailed(message, report)
 
     guide = work / "guide.png"
-    layout_guide().save(guide)
+    layout_guide(transparent=run.transparent).save(guide)
     try:
-        sheet = run.draw("sheet", sheet_prompt(prompt, style), references=[guide], aspect=SHEET_ASPECT,
+        sheet = run.draw("sheet", lambda t: sheet_prompt(prompt, style, t), references=[guide], aspect=SHEET_ASPECT,
                          quality=sheet_quality)
     except OverBudget as error:
         fail(f"the sheet alone is over budget: {error}")
     if sheet is None:
         fail("the image provider returned no sheet")
+    report["background"] = "transparent" if run.transparent else "chroma key"
 
     frames, errors = slice_sheet(sheet)
     report["row_errors"] = dict(errors)
@@ -596,7 +658,7 @@ def hatch(prompt: str, *, sprite, work: Path, max_cost: float = DEFAULT_MAX_COST
             report["mirrored_left"] = True
 
     settle_left()
-    idle_ref = idle_reference(frames["idle"][0], work)
+    idle_ref = idle_reference(frames["idle"][0], work, run.transparent)
 
     repaired: list[str] = report["repaired_rows"]
     while True:
@@ -631,7 +693,7 @@ def hatch(prompt: str, *, sprite, work: Path, max_cost: float = DEFAULT_MAX_COST
         repaired.append(state)
         report["path"] = "one-sheet + rows"
         try:
-            strip = run.draw(f"row-{state}", row_prompt(state, count, prompt, style),
+            strip = run.draw(f"row-{state}", lambda t: row_prompt(state, count, prompt, style, t),
                              references=[idle_ref], aspect=("landscape", None), quality=ROW_QUALITY)
         except OverBudget as error:
             fail(f"the {state} row could not be redrawn within the budget: {error}")
