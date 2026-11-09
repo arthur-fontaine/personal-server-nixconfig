@@ -55,6 +55,53 @@ extension AgentStatus {
     }
 }
 
+/// The Live Activity's pet: its row from the fonts bundled with the extension
+/// (scripts/make-timer-fonts.py), played by a timer, its first image in Always On (which blanks
+/// timers); the still if the fonts aren't there.
+struct PetLoop: View {
+    let file: String?
+    let animation: PetAnimation
+    let side: CGFloat
+    @Environment(\.isLuminanceReduced) private var dimmed
+
+    var body: some View {
+        let font = "HermesPet-\(animation.rawValue)"
+        if TimerFonts.registerBundled(font) {
+            if dimmed {
+                StillGlyph(font: font, side: side)
+            } else {
+                TimerFrames(font: font, side: side)
+            }
+        } else {
+            PetFrame(file: file, animation: animation, small: true).frame(width: side, height: side)
+        }
+    }
+}
+
+/// What Hermes is doing, beside its words: a spinner while it thinks or works, the status's
+/// symbol otherwise.
+struct StatusMark: View {
+    let state: HermesActivityAttributes.ContentState
+    let side: CGFloat
+    /// Only the compact island spins: elsewhere the moving pet already says Hermes is busy.
+    var spins = false
+    @Environment(\.isLuminanceReduced) private var dimmed
+
+    var body: some View {
+        if state.question == nil, state.status.isBusy, !spins {
+            EmptyView()
+        } else if state.question == nil, state.status.isBusy, dimmed {
+            // Always On blanks timers, and a stopped spinner reads as stuck: the status's symbol.
+            Image(systemName: state.status == .thinking ? "brain" : "ellipsis")
+                .frame(width: side, height: side)
+        } else if state.question == nil, state.status.isBusy {
+            TimerSpinner(side: side)
+        } else {
+            Image(systemName: state.status.widgetSymbol)
+        }
+    }
+}
+
 /// The pet widget's content per family (the extension passes its family; the app's review
 /// gallery renders each).
 struct PetWidgetView: View {
@@ -109,8 +156,11 @@ struct IslandCenter: View {
 
     var body: some View {
         VGroup(spacing: .xxs) {
-            Label(state.question != nil ? String(localized: "Hermes needs you") : state.status.label, systemImage: state.status.widgetSymbol)
-                .textRole(.headline)
+            HGroup(spacing: .xs) {
+                StatusMark(state: state, side: 17)
+                Text(state.question != nil ? String(localized: "Hermes needs you") : state.status.label).lineLimit(1)
+            }
+            .textRole(.headline)
             Text(state.question?.title ?? state.task ?? "").textRole(.caption).lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -125,10 +175,15 @@ struct LockScreenActivity: View {
         let st = state
         VGroup(spacing: .s) {
             HGroup(spacing: .s) {
-                PetFrame(file: attributes.spritesheetFile, animation: st.petMood.animation, small: true).petSquare(.activity)
+                PetLoop(file: attributes.spritesheetFile, animation: PetAnimation.loop(status: st.status, mood: st.petMood),
+                        side: 48)
                 VGroup(spacing: .xxs) {
-                    Label(st.question != nil ? String(localized: "Hermes needs you") : st.status.label, systemImage: st.status.widgetSymbol)
-                        .textRole(.headline)
+                    HGroup(spacing: .xs) {
+                        StatusMark(state: st, side: 17)
+                        Text(st.question != nil ? String(localized: "Hermes needs you") : st.status.label)
+                            .lineLimit(1)
+                    }
+                    .textRole(.headline)
                     Text(st.question?.title ?? st.task ?? (st.status == .idle ? String(localized: "Done") : ""))
                         .textRole(.subheadline).lineLimit(2)
                     // Through ChatTitle on the app side: a private sub-chat arrives as "Private chat".
@@ -136,7 +191,7 @@ struct LockScreenActivity: View {
                 }
                 Spacer(minLength: 0)
                 if st.question == nil, st.status != .idle {
-                    Text(st.since, style: .timer).textRole(.caption).monospacedDigit().tone(.secondary)
+                    ElapsedTimer(since: st.since).textRole(.caption).tone(.secondary)
                 }
             }
             if let q = st.question {

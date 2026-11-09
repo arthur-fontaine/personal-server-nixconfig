@@ -119,6 +119,12 @@ public enum PetAnimation: String, Sendable, CaseIterable, Codable {
 
     /// Plays once then returns to the mood's loop.
     public var isOneShot: Bool { self == .waving || self == .jumping }
+
+    /// The row to loop for Hermes' status, the same in the app and the Live Activity: thinking
+    /// reads (review), as Hermes' own pet does; otherwise the mood's loop.
+    public static func loop(status: AgentStatus?, mood: PetMood) -> PetAnimation {
+        status == .thinking ? .review : mood.animation
+    }
 }
 
 /// What the pet shows: what Hermes is doing (protocol v3, §5), and nothing else. No needs,

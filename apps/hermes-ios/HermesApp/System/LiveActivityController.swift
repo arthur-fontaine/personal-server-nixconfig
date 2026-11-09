@@ -12,6 +12,7 @@ final class LiveActivityController {
     private var endTask: Task<Void, Never>?
     /// When the content was last given a stale date.
     private var renewedAt = Date.distantPast
+    private var lastShown = ""
 
     /// The activity a previous process started (the app was suspended or killed meanwhile) is
     /// this one's: adopt it rather than start a second; end any extra.
@@ -52,10 +53,23 @@ final class LiveActivityController {
                                                 questionPrivate: state.question.map { store.isPrivate($0.chat) } ?? false,
                                                 needsYou: String(localized: "Hermes needs you"))
         let active = agent.status != .idle || !state.questions.isEmpty
+        // Each change of what it shows, for Copy Diagnostics (a status that stays on screen).
+        let shown = "\(content.status.rawValue)\(content.question != nil ? " + question" : "")"
+        if shown != lastShown {
+            CallLog.shared.log("activity: \(shown) (\(activity == nil ? "none" : "running")\(endTask != nil ? ", ending" : ""))")
+            lastShown = shown
+        }
 
         if active {
             endTask?.cancel()
             endTask = nil
+            if let current = activity, current.attributes.spritesheetFile != currentSheet(store) {
+                // A new or redrawn pet: an activity's attributes can't change, so a new one.
+                nonisolated(unsafe) let old = current
+                Task { await old.end(nil, dismissalPolicy: .immediate) }
+                activity = nil
+                CallLog.shared.log("activity: restarted for the new pet")
+            }
             if let activity, activity.activityState == .active || activity.activityState == .stale {
                 // Activity isn't Sendable; it is only ever touched from the main actor here.
                 nonisolated(unsafe) let activity = activity
@@ -74,10 +88,18 @@ final class LiveActivityController {
                 try? await Task.sleep(for: .seconds(8))
                 guard !Task.isCancelled else { return }
                 await activity.end(ActivityContent(state: content, staleDate: nil), dismissalPolicy: .after(.now.addingTimeInterval(60)))
+                CallLog.shared.log("activity: ended")
                 self.activity = nil
                 self.endTask = nil
             }
         }
+    }
+
+    /// The sheet's name in the app group for the current pet, as `start` stores it.
+    private func currentSheet(_ store: HermesStore) -> String? {
+        guard let source = store.spriteURL ?? BundledPet.load()?.spritesheet else { return nil }
+        let ext = source.pathExtension.isEmpty ? "webp" : source.pathExtension
+        return "sprite-\(store.pet?.id ?? "pip")-v\(store.pet?.version ?? 0).\(ext)"
     }
 
     private func start(_ content: HermesActivityAttributes.ContentState, store: HermesStore) {

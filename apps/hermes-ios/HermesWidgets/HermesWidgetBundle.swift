@@ -64,24 +64,30 @@ struct HermesLiveActivity: Widget {
         } dynamicIsland: { context in
             let st = context.state
             return DynamicIsland {
-                DynamicIslandExpandedRegion(.leading) {
-                    PetFrame(file: context.attributes.spritesheetFile, animation: st.petMood.animation, small: true).petSquare(.activity)
-                }
-                DynamicIslandExpandedRegion(.trailing) {
-                    if st.question == nil, st.status != .idle {
-                        Text(st.since, style: .timer).textRole(.caption).monospacedDigit().tone(.secondary)
+                // One row under the sensor: beside it (leading, trailing) and under it (center)
+                // are different heights, so the pet, the words and the timer never lined up.
+                DynamicIslandExpandedRegion(.bottom) {
+                    VGroup(spacing: .s) {
+                        HGroup(spacing: .s) {
+                            PetLoop(file: context.attributes.spritesheetFile,
+                                    animation: PetAnimation.loop(status: st.status, mood: st.petMood), side: 48)
+                            IslandCenter(state: st)
+                            if st.question == nil, st.status != .idle {
+                                ElapsedTimer(since: st.since).textRole(.caption).tone(.secondary)
+                            }
+                        }
+                        if let q = st.question { QuestionButtons(question: q) }
                     }
                 }
-                DynamicIslandExpandedRegion(.center) { IslandCenter(state: st) }
-                DynamicIslandExpandedRegion(.bottom) {
-                    if let q = st.question { QuestionButtons(question: q) }
-                }
             } compactLeading: {
-                PetFrame(file: context.attributes.spritesheetFile, animation: st.petMood.animation, small: true).petSquare(.island)
+                PetLoop(file: context.attributes.spritesheetFile, animation: PetAnimation.loop(status: st.status, mood: st.petMood),
+                        side: 24)
             } compactTrailing: {
-                Image(systemName: st.status.widgetSymbol)
+                StatusMark(state: st, side: 16, spins: true)
             } minimal: {
-                Image(systemName: st.status.widgetSymbol)
+                // Sharing the island with another activity: the pet says who it is.
+                PetLoop(file: context.attributes.spritesheetFile, animation: PetAnimation.loop(status: st.status, mood: st.petMood),
+                        side: 24)
             }
             .widgetURL(URL(string: "hermes://chat/\(st.chat)"))
         }

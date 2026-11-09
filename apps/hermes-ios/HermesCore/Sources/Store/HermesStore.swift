@@ -88,8 +88,7 @@ public final class HermesStore {
     /// The row to play now: a reaction, else the mood's loop (thinking reads, as Hermes' own pet does).
     public var petAnimation: PetAnimation {
         if let petReaction { return petReaction }
-        if state.agent?.status == .thinking { return .review }
-        return petMood.animation
+        return PetAnimation.loop(status: state.agent?.status, mood: petMood)
     }
     public var questions: [PendingQuestion] { state.questions }
 
