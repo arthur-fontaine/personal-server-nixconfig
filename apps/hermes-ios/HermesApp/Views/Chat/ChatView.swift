@@ -15,6 +15,9 @@ struct ChatScreen: View {
     let compact: Bool
     @State private var atBottom = true
     @State private var following = true
+    /// Read by the scroll callbacks, written every frame: not observed, so scrolling doesn't
+    /// re-evaluate the screen.
+    @State private var scroll = ScrollMemo()
     /// The heart a caress leaves on the bar's pet, for a second; none with Reduce Motion.
     @State private var heart = false
     @Environment(\.reducesMotion) private var reduceMotion
@@ -171,7 +174,9 @@ struct ChatScreen: View {
                 try? await Task.sleep(for: .seconds(Self.questionSettle))
                 settleTick += 1
             }
-            .defaultScrollAnchor(.bottom)
+            // The bottom only for where it opens: an anchor for size changes too moved the
+            // content under an owner who had scrolled up, whenever a row resized.
+            .defaultScrollAnchor(.bottom, for: .initialOffset)
             .scrollDismissesKeyboard(.interactively)
             // The distance from the content's end to the visible bottom (the composer bar's
             // inset counted, it grows at accessibility sizes). A number, not a Bool: a Bool's
@@ -179,34 +184,40 @@ struct ChatScreen: View {
             .onScrollGeometryChange(for: CGFloat.self) { geo in
                 geo.contentSize.height - (geo.visibleRect.maxY - geo.contentInsets.bottom)
             } action: { _, distance in
-                let isAtBottom = distance <= 80
-                atBottom = isAtBottom
-                if isAtBottom, !jumped { following = true }
+                scroll.distance = distance
+                let isAtBottom = distance <= Self.bottomSlack
+                if atBottom != isAtBottom { atBottom = isAtBottom }
             }
-            // The transcript follows its bottom as it grows (new messages, a draft, the card) until
-            // the owner scrolls away, and again once they're back at the bottom (as Messages).
-            .onScrollPhaseChange { _, phase in
+            // Following the bottom (brief item 1): only the owner turns it off — by scrolling —
+            // and only the owner turns it back on: a scroll that comes to rest at the bottom,
+            // "Latest", or sending. Growth, edits, drafts and inset changes never change it, so
+            // nothing moves under him once he has scrolled up.
+            .onScrollPhaseChange { old, phase in
+                scroll.phase = phase
                 if phase == .interacting { following = false; jumped = false }
+                if phase == .idle, old != .idle, old != .animating, !jumped, scroll.distance <= Self.bottomSlack {
+                    following = true
+                }
             }
             .onChange(of: messages.last?.id) {
-                if following || messages.last?.isOutgoing == true {
-                    withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
-                }
+                if messages.last?.isOutgoing == true { following = true; jumped = false }
+                if following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
             }
             // Any growth — a draft revealing itself, a card appearing — while following.
             .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, _ in
-                if following { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                if following, scroll.phase == .idle { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }
-            // The composer bar growing (a reply chip, a file, a longer draft) while following:
-            // the last message stays above it, the rhythm's gap apart (16.3; round 6's S4).
+            // The composer bar growing (a reply chip, a file, a longer draft) while following: the
+            // last message stays above it (16.3). Not during a gesture: the keyboard's interactive
+            // dismissal changes this inset every frame, and scrolling then made the drag lag.
             .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.bottom } action: { _, _ in
-                if following { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                if following, scroll.phase == .idle { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }
             .onChange(of: replyingTo?.id) {
                 if following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
             }
             .onChange(of: questions.map(\.id)) {
-                withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                if following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
             }
             .safeAreaBar(edge: .bottom) {
                 ChatColumn {
@@ -214,6 +225,7 @@ struct ChatScreen: View {
                         if !atBottom {
                             FloatingButton("Latest", systemImage: "arrow.down") {
                                 jumped = false
+                                following = true
                                 withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
                             }
                             .transition(.scale.combined(with: .opacity))
@@ -254,9 +266,17 @@ struct ChatScreen: View {
     }
 
     static let questionSettle: TimeInterval = 5
+    /// How close to the end still counts as "at the bottom".
+    static let bottomSlack: CGFloat = 40
     static let bottomID = "bottom"
     static let probing = ProcessInfo.processInfo.arguments.contains("-geometryProbe")
     static let heartHold = ProcessInfo.processInfo.arguments.contains("-heartHold")
 
     static func speaker(_ m: ChatMessage) -> Speaker { m.isOutgoing ? .owner : .hermes }
+}
+
+/// The transcript's live scroll facts, outside SwiftUI's observation.
+private final class ScrollMemo {
+    var distance: CGFloat = 0
+    var phase: ScrollPhase = .idle
 }

@@ -64,6 +64,10 @@ final class AppModel {
         if config.demo {
             client = FakeTelegramClient(startsLoggedIn: !arguments.contains("-demoLogin"), withQuestion: !arguments.contains("-noQuestion"),
                                         scene: Self.value("-scene", in: arguments))
+            // `-streamDelay <ms>`: a slower stream, for tests that act while Hermes writes.
+            if let ms = Self.value("-streamDelay", in: arguments).flatMap(Int.init), let fake = client as? FakeTelegramClient {
+                fake.streamDelay = .milliseconds(ms)
+            }
         } else {
             client = TDLibTelegramClient(config: config)
         }
