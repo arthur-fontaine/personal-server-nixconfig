@@ -103,6 +103,29 @@ the Full Disk Access granted once to their launcher
 (`modules/hermes/system/access/full-disk.nix`); without it, files in those
 folders are neither readable nor frozen.
 
+### Room on the disk
+
+The Mac is small (16 GB of memory, a disk shared with your files), and what
+Hermes leaves behind freezes into yours after 24 hours, so it keeps its room
+tidy; nothing is ever deleted for you:
+
+- its prompt asks it to check `hermes-space` before heavy work, size the work
+  to fit, and delete its scratch as it goes, before the freeze;
+- `hermes-freeze` writes a space report at each scan
+  (`/var/db/hermes-space/report.json`): free disk, what Hermes created and has
+  not frozen yet, by folder (two levels under its home) and size, with when
+  it freezes, and the frozen leftovers still in its home;
+- `hermes-space` (on everyone's PATH) shows that report with the free disk and
+  memory; you can run it too;
+- at its next turn Hermes is told of a folder of its holding at least
+  `server.hermes.access.space.noticeBytes` (1 GiB) whose first file freezes
+  within `noticeWindow` (3 h) (`plugins/space`, context added to the turn, not
+  a turn of its own: you see nothing unless it has something to say);
+- on Monday at 10:00, when the frozen leftovers pass `weeklyThreshold`
+  (20 GiB), you get one Telegram line from its bot naming the biggest folders
+  (`hermes-space-weekly`, in `/var/log/hermes-space.log`). They are yours:
+  delete what you don't need.
+
 
 ### Local overlay
 

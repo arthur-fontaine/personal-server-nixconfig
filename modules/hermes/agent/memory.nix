@@ -39,7 +39,7 @@ in
       plugins = {
         # One list for every plugin: definitions of it in other modules replace,
         # not add. The Home Assistant one: homeassistant.nix.
-        enabled = [ "unii" "owner_approval" "guard" "outbox" "lost_turns" "front_desk" ] # owner-approval.nix, guard.nix, outbox.nix, lost-turns.nix, front-desk.nix
+        enabled = [ "unii" "owner_approval" "guard" "outbox" "lost_turns" "front_desk" "space" ] # owner-approval.nix, guard.nix, outbox.nix, lost-turns.nix, front-desk.nix, space.nix
           ++ lib.optional cfg.integrations.homeassistant.enable "homeassistant"
           ++ lib.optional cfg.cacheWarming.enable "cache_warm" # cache-warm.nix
           ++ lib.optional cfg.sandbox.enable "sandbox" # ../coding-agent

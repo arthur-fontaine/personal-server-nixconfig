@@ -1,0 +1,4 @@
+name: space
+version: 1.0.0
+description: "Tells Hermes, at its next turn, which big folders it created are about to freeze, so it deletes its scratch while it still can."
+author: "personal-server-nixconfig"

@@ -27,7 +27,7 @@ modules/
     options/              server.hermes.*: account, model, memory, sub-chats, access, the app (the sandbox's: coding-agent/)
     system/               what it is to macOS (nix-darwin)
       user.nix            its own account, with home-manager
-      access/             read.nix, freeze.nix (+ freeze.py), rebuild.nix (+ overrides/: the local overlay's checker and server-rebuild), secrets.nix
+      access/             read.nix, freeze.nix (+ freeze.py, and space.py: hermes-space and the weekly leftovers line), rebuild.nix (+ overrides/: the local overlay's checker and server-rebuild), secrets.nix
       applications.nix    the apps it uses, copied into /Applications
       sideload.nix        the Hermes app as a sideload app, hermes-app, Hermes' sideload plugin
     agent/                its home-manager configuration
@@ -43,6 +43,7 @@ modules/
     plugins/lost_turns/   settles your Telegram turn cut off by a gateway crash, so the chat never waits for /discard (Python)
     plugins/cache_warm/   keeps an idle chat's prompt cache warm (the Pi extension cache-warmer), /warm (Python)
     plugins/sideload/     Hermes' access to the sideload service: list, install, remove (Python)
+    plugins/space/        tells Hermes, at its next turn, of its big folders about to freeze (Python)
     plugins/front_desk/   caps a turn of the main chat: past it, only handing the work to a background subagent (Python)
     plugins/app_topic/    the iOS app's side: its hidden Telegram topic, stats, pets, big files, call turns (Python; docs/app.md)
     coding-agent/         Pi sessions in a microVM, their branch reviewed (docs/sandbox.md)
@@ -68,7 +69,7 @@ nix build .#checks.aarch64-darwin.overrides       # the local overlay's checker 
 nix build .#checks.aarch64-darwin.sandbox         # the coding agent's sidecar tests, in its build
 nix build .#checks.aarch64-darwin.sideload        # sideload and Hermes' plugin, against fake Apple tools
 nix build .#checks.aarch64-darwin.events          # the events daemon's tests
-nix build .#checks.aarch64-darwin.freeze          # what hermes-freeze picks
+nix build .#checks.aarch64-darwin.freeze          # what hermes-freeze picks, its space report, hermes-space
 nix build .#checks.aarch64-darwin.instagram       # the Instagram skill's direct.js, against stand-ins for the page
 nix build .#darwinConfigurations.Personal-Server.system   # the whole system, without switching
 nix run .#hermes-turns                            # two real Hermes turns through the memory, on a scripted model
