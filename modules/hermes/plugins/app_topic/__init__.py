@@ -255,6 +255,7 @@ def register(ctx) -> None:
 
     ctx.register_telegram_handler(app.attach)
     ctx.register_hook("pre_gateway_dispatch", lambda event=None, **kw: app.dispatch(event))
+    ctx.register_hook("pre_llm_call", status.begin)
     ctx.register_hook("pre_api_request", status.pre_api_request)
     ctx.register_hook("pre_tool_call", status.pre_tool_call)
     ctx.register_hook("post_tool_call", status.post_tool_call)

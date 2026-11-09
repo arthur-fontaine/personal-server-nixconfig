@@ -936,6 +936,24 @@ def test_pet_redraw_rows() -> None:
         raise AssertionError("an unknown row was redrawn")
 
 
+def test_status_ignores_the_background_review() -> None:
+    """After a turn, Hermes' background review reuses its session_id and fires
+    pre_api_request and tool hooks, never on_session_end: the status stays idle
+    until the next real turn (pre_llm_call)."""
+    status = Status(lambda: None)
+    status.begin(session_id="s")
+    status.pre_api_request(session_id="s")
+    assert status.snapshot(False)["status"] == "thinking"
+    status.end(session_id="s")
+    assert status.snapshot(False)["status"] == "idle"
+    status.pre_api_request(session_id="s")
+    status.pre_tool_call(tool_name="memory", args={}, session_id="s")
+    assert status.snapshot(False)["status"] == "idle", "the review left Hermes busy"
+    status.begin(session_id="s")
+    status.pre_api_request(session_id="s")
+    assert status.snapshot(False)["status"] == "thinking", "the next turn shows"
+
+
 def main() -> None:
     tests = [v for k, v in globals().items() if k.startswith("test_") and callable(v)]
     for test in tests:

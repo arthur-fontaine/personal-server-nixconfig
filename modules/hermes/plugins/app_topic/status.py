@@ -42,6 +42,12 @@ class Status:
         self.since = time.time()
         # (session, "done" | "failed" | "interrupted"), drained by the pet
         self.finished: list[tuple[str, str]] = []
+        # Sessions whose turn ended. Hermes' background review (agent/background_review.py)
+        # runs after the turn under the same session_id, firing pre_api_request and the tool
+        # hooks but never on_session_end (its persistence is off): it would leave the session
+        # "thinking" until STALE. Their hooks are ignored until a real turn begins
+        # (pre_llm_call, which a fork doesn't fire).
+        self.ended: set[str] = set()
 
     def chat_for(self, session_id: str) -> int:
         """The chat a session runs in: 0 for the main chat (and anything not a
@@ -71,6 +77,8 @@ class Status:
         key = session_id or "?"
         now = time.time()
         with self.lock:
+            if key in self.ended:
+                return
             turn = self.turns.get(key)
             if turn is None:
                 turn = {"chat": self.chat_for(key), "started": now, "tools": 0}
@@ -81,6 +89,11 @@ class Status:
         self.on_change()
 
     # hooks
+    def begin(self, session_id: str = "", **_) -> None:
+        """pre_llm_call: a real turn starts (a background review never fires it)."""
+        with self.lock:
+            self.ended.discard(session_id or "?")
+
     def pre_api_request(self, session_id: str = "", **_) -> None:
         self._touch(session_id, "thinking")
 
@@ -100,6 +113,9 @@ class Status:
         now = time.time()
         with self.lock:
             turn = self.turns.pop(session_id or "?", None)
+            self.ended.add(session_id or "?")
+            if len(self.ended) > 500:
+                self.ended.clear()
             if failed and not interrupted:
                 self.error_until = now + ERROR_FOR
                 self.error_chat = (turn or {}).get("chat", 0)
