@@ -19,10 +19,21 @@ final class ScrollFollowTests: XCTestCase {
         XCTAssertTrue(draft.waitForExistence(timeout: 5), "Hermes starts writing")
 
         // Up, past the bottom, as a reader does (the keyboard goes with the drag).
-        // Started on a message: a drag from the bar's area or the keyboard's suggestions didn't scroll.
-        app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Done: a reminder")).firstMatch.swipeDown(velocity: .slow)
+        // Started on a message (the one just sent, on screen on every layout): a drag from the
+        // bar's area or the keyboard's suggestions didn't scroll.
+        let sent = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "You: hello")).firstMatch
+        // The stack re-lays out as the draft grows: wait for a frame to swipe on.
+        let ready = Date().addingTimeInterval(5)
+        while !(sent.exists && sent.isHittable), Date() < ready { Thread.sleep(forTimeInterval: 0.2) }
         let latest = app.buttons["Latest"]
-        XCTAssertTrue(latest.waitForExistence(timeout: 3), "away from the bottom")
+        // A fixed 300-pt drag (an element's swipe is as long as the element); once more if the
+        // first one was taken for a tap.
+        for _ in 0..<2 where !latest.exists {
+            let start = sent.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            start.press(forDuration: 0.01, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 300)), withVelocity: .slow, thenHoldForDuration: 0.05)
+            _ = latest.waitForExistence(timeout: 2)
+        }
+        XCTAssertTrue(latest.exists, "away from the bottom")
         Thread.sleep(forTimeInterval: 0.6) // the swipe's deceleration ends
         // One of Hermes' messages on screen ("Hermes: …", one element per message).
         let anchor = try XCTUnwrap(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Hermes: "))
@@ -51,6 +62,8 @@ final class ScrollFollowTests: XCTestCase {
     /// Brief item 2: the composer keeps above the keyboard the gap it has above the home
     /// indicator (the indicator's top is 13 pt above the edge in the 34-pt safe area: 21 → 20).
     func testComposerDoesNotTouchTheKeyboard() throws {
+        // The iPhone's: an iPad's home indicator area and keyboard differ.
+        guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("iPhone layout") }
         let app = XCUIApplication()
         app.launchArguments = ["-demo", "-noQuestion"]
         app.launch()

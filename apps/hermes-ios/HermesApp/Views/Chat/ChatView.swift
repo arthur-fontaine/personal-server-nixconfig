@@ -174,17 +174,22 @@ struct ChatScreen: View {
                 try? await Task.sleep(for: .seconds(Self.questionSettle))
                 settleTick += 1
             }
-            // The bottom only for where it opens: an anchor for size changes too moved the
-            // content under an owner who had scrolled up, whenever a row resized.
+            // The bottom for where it opens and for a transcript shorter than the screen (it sits
+            // on the composer); not for size changes, which moved the content under an owner who
+            // had scrolled up whenever a row resized.
             .defaultScrollAnchor(.bottom, for: .initialOffset)
+            .defaultScrollAnchor(.bottom, for: .alignment)
             .scrollDismissesKeyboard(.interactively)
             // The distance from the content's end to the visible bottom (the composer bar's
             // inset counted, it grows at accessibility sizes). A number, not a Bool: a Bool's
             // change back to true was dropped while the lazy stack re-estimated its size.
-            .onScrollGeometryChange(for: CGFloat.self) { geo in
-                geo.contentSize.height - (geo.visibleRect.maxY - geo.contentInsets.bottom)
-            } action: { _, distance in
-                scroll.distance = distance
+            .onScrollGeometryChange(for: ScrollFacts.self) { geo in
+                ScrollFacts(distance: geo.contentSize.height - (geo.visibleRect.maxY - geo.contentInsets.bottom),
+                            offset: geo.contentOffset.y)
+            } action: { _, facts in
+                scroll.distance = facts.distance
+                scroll.offset = facts.offset
+                let distance = facts.distance
                 let isAtBottom = distance <= Self.bottomSlack
                 if atBottom != isAtBottom { atBottom = isAtBottom }
             }
@@ -194,10 +199,21 @@ struct ChatScreen: View {
             // nothing moves under him once he has scrolled up.
             .onScrollPhaseChange { old, phase in
                 scroll.phase = phase
-                if phase == .interacting { following = false; jumped = false }
-                if phase == .idle, old != .idle, old != .animating, !jumped, scroll.distance <= Self.bottomSlack {
-                    following = true
+                if old == .idle {
+                    scroll.offsetAtStart = scroll.offset
+                    scroll.followingAtStart = following
                 }
+                if phase == .interacting { following = false; jumped = false }
+                if phase == .idle, old != .idle, old != .animating, !jumped {
+                    // A gesture that didn't move the transcript (a tap, a swipe to reply, a drag
+                    // only dismissing the keyboard) leaves following as it was; one that did
+                    // follows again only if it rests at the bottom.
+                    let moved = abs(scroll.offset - scroll.offsetAtStart) > Self.stillSlack
+                    if !moved { following = scroll.followingAtStart } else if scroll.distance <= Self.bottomSlack { following = true }
+                }
+                // What changed during a gesture (the bar's inset as the keyboard or a reply chip
+                // came or went, a draft growing) is caught up once it rests, if still following.
+                if phase == .idle, old != .idle, following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
             }
             .onChange(of: messages.last?.id) {
                 if messages.last?.isOutgoing == true { following = true; jumped = false }
@@ -205,13 +221,13 @@ struct ChatScreen: View {
             }
             // Any growth — a draft revealing itself, a card appearing — while following.
             .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, _ in
-                if following, scroll.phase == .idle { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                if following, !scroll.ownerScrolling { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }
             // The composer bar growing (a reply chip, a file, a longer draft) while following: the
             // last message stays above it (16.3). Not during a gesture: the keyboard's interactive
             // dismissal changes this inset every frame, and scrolling then made the drag lag.
             .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.bottom } action: { _, _ in
-                if following, scroll.phase == .idle { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                if following, !scroll.ownerScrolling { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }
             .onChange(of: replyingTo?.id) {
                 if following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
@@ -269,6 +285,8 @@ struct ChatScreen: View {
     static let questionSettle: TimeInterval = 5
     /// How close to the end still counts as "at the bottom".
     static let bottomSlack: CGFloat = 40
+    /// A gesture that moved the transcript less than this didn't scroll it.
+    static let stillSlack: CGFloat = 4
     static let bottomID = "bottom"
     static let probing = ProcessInfo.processInfo.arguments.contains("-geometryProbe")
     static let heartHold = ProcessInfo.processInfo.arguments.contains("-heartHold")
@@ -279,5 +297,17 @@ struct ChatScreen: View {
 /// The transcript's live scroll facts, outside SwiftUI's observation.
 private final class ScrollMemo {
     var distance: CGFloat = 0
+    var offset: CGFloat = 0
     var phase: ScrollPhase = .idle
+    /// Where the last gesture started, and whether the transcript was following then.
+    var offsetAtStart: CGFloat = 0
+    var followingAtStart = true
+    /// The owner's finger (or its fling) moves the transcript: nothing else may. The app's own
+    /// animated scroll (`.animating`) can be retargeted.
+    var ownerScrolling: Bool { phase == .tracking || phase == .interacting || phase == .decelerating }
+}
+
+private struct ScrollFacts: Equatable {
+    var distance: CGFloat
+    var offset: CGFloat
 }
