@@ -874,7 +874,11 @@ class App:
             for slot in self.saved["slots"].values():
                 slot["edited"] = 0
             self.dirty.set()
-            return {"server_version": self.config.get("server_version", "1"), "protocol": protocol.VERSION}
+            # The slot messages are old and only edited: buried under the topic's later messages,
+            # a client may never page back to them. It reads them by these ids instead.
+            slots = {name: slot.get("id") for name, slot in self.saved["slots"].items() if slot.get("id")}
+            return {"server_version": self.config.get("server_version", "1"), "protocol": protocol.VERSION,
+                    "slots": slots}
         if kind == "stats.refresh":
             # At most one refresh per STATS_REFRESH_GAP: a later one waits for its turn.
             due = max(time.time(), getattr(self, "last_refresh", 0.0) + STATS_REFRESH_GAP)

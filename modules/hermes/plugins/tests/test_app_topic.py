@@ -538,6 +538,9 @@ def test_plugin() -> None:
     wait_for(lambda: bot.in_topic("reply"), "a reply")
     reply = bot.in_topic("reply")[-1][1]
     assert reply["re"] == 555 and reply["ok"] and reply["data"]["protocol"] == 4 and reply["v"] == 4
+    # Hello names the slot messages, so an app that can't page back to them reads them by id.
+    slots = reply["data"]["slots"]
+    assert set(slots) >= {"state", "stats", "controls", "devices"} and all(isinstance(i, int) for i in slots.values())
     assert ("delete_message", {"chat_id": OWNER, "message_id": 555}) in bot.calls
     plugin.dispatch(event('{"v":2,"type":"call.state","active":true}', mid="560"))
     wait_for(lambda: any(r[1]["re"] == 560 for r in bot.in_topic("reply")), "call.state's reply")
