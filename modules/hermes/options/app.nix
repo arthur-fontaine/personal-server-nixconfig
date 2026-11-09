@@ -36,6 +36,17 @@ in
         example = "https://images.example.com/v1";
         description = "The API's address, for provider \"custom\" (its /images/generations and /images/edits).";
       };
+      maxCostPerPet = mkOption {
+        type = types.numbers.positive;
+        default = 0.60;
+        description = ''
+          The most one hatch may spend, in USD: the sheet and any redrawn
+          rows, priced from the provider's reported cost (OpenRouter's
+          `usage.cost`) or an estimate per call. A call that could cross it
+          is not made. One sheet costs about $0.30 with gpt-image at quality
+          high; a redrawn row about $0.10.
+        '';
+      };
       keyEnv = mkOption {
         type = types.str;
         default = "APP_IMAGES_API_KEY";

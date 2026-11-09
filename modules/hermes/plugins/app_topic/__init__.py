@@ -28,9 +28,9 @@ PET_SCHEMA = {
     "name": "pet_generate",
     "description": (
         "Hatch a new pet for the owner's app: an animated mascot (Codex pet format) drawn by the image "
-        "provider from a description, which becomes the current pet and the app's icon. Takes several "
-        "minutes and costs about ten image generations: in the main chat, hand it to a background "
-        "subagent. Afterwards, decide whether to reinstall the app (sideload_install with app \"hermes\") so the icon "
+        "provider from a description, which becomes the current pet and the app's icon. Takes a few "
+        "minutes and one to four image generations, within a per-pet budget (it answers what it spent): in "
+        "the main chat, hand it to a background subagent. Afterwards, decide whether to reinstall the app (sideload_install with app \"hermes\") so the icon "
         "follows."
     ),
     "parameters": {
@@ -133,7 +133,7 @@ def question_done(chat_id, message_id) -> None:
 
 
 def _pet_generate(args: dict, **_) -> str:
-    from .app import ProviderRefused, generate_pet
+    from .app import ProviderRefused, generate_pet, spent
 
     app = STATE["app"]
     description = str((args or {}).get("description") or "").strip()
@@ -143,17 +143,22 @@ def _pet_generate(args: dict, **_) -> str:
         return json.dumps({"error": "a pet is already being generated"})
     app.pet_busy = True
     try:
-        result = generate_pet(description, (args or {}).get("name"))
+        result = generate_pet(description, (args or {}).get("name"), app.pet_max_cost())
         manifest = app.adopt_pet(result["slug"], Path(result["directory"]))
     except ProviderRefused as error:
-        return json.dumps({"error": str(error), "retry": False,
+        return json.dumps({"error": str(error), "retry": False, "spent": spent(error.report),
                            "note": "Do not call pet_generate again until the owner fixed this: tell them, in their "
                                    "words, what happened and what they can do."})
     except Exception as error:
-        return json.dumps({"error": f"generation failed: {error}"})
+        report = getattr(error, "report", None) or {}
+        return json.dumps({"error": f"generation failed: {error}", "spent": spent(report),
+                           "rows_redrawn": report.get("repaired_rows"),
+                           "note": "Tell the owner what it cost; another try costs as much again."})
     finally:
         app.pet_busy = False
-    return json.dumps({"ok": True, "pet": manifest, "files": str(app.dir / "pet"),
+    report = result.get("report") or {}
+    return json.dumps({"ok": True, "pet": manifest, "files": str(app.dir / "pet"), "spent": spent(report),
+                       "path": report.get("path"), "rows_redrawn": report.get("repaired_rows"),
                        "note": "The app shows it at once; its icon changes only when the app is rebuilt "
                                "(sideload_install with app \"hermes\"), which you may decide to do now or later."})
 

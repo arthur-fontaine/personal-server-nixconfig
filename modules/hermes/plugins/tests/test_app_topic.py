@@ -684,42 +684,217 @@ def test_pet_provider_refusal() -> None:
                             "resets on 2026-12-01)."), plain
     assert "https://openrouter.ai/settings/keys" in plain and "bootstrap" in plain
 
-    from PIL import Image
-
-    base = Path(TMP) / "base.png"
-    Image.new("RGBA", (256, 256), (200, 40, 40, 255)).save(base)
-
-    class Provider:
-        name = "openrouter"
-
-        def __init__(self, base_ok: bool) -> None:
-            self.calls, self.base_ok = 0, base_ok
-            self.lock = threading.Lock()
-
-        def generate(self, prompt, **kwargs):
-            with self.lock:
-                self.calls += 1
-                first = self.calls == 1
-            if first and self.base_ok:
-                return {"success": True, "image": str(base)}
-            time.sleep(0.05)
-            return {"success": False, "error": error, "error_type": "auth_error"}
+    def refusing(after: int):
+        def generate(fake, prompt, **kwargs):
+            if len(fake.calls) > after:
+                return {"success": False, "error": error, "error_type": "auth_error"}
+            return None
+        return generate
 
     real = imagegen.resolve_provider
     try:
-        for base_ok in (False, True):
-            fake = Provider(base_ok)
+        # Refused at the sheet: one call. Refused at a redrawn row: no third.
+        for after, sheet in ((0, synthetic_sheet()), (1, synthetic_sheet(bad=("waving", "failed")))):
+            fake = FakeImages(sheet, hook=refusing(after))
             imagegen.resolve_provider = lambda **_: imagegen.SpriteProvider("openrouter", fake, True)
             try:
                 app_mod.generate_pet("a small red fox")
             except app_mod.ProviderRefused as refused:
                 assert str(refused) == plain, str(refused)
+                assert refused.report["budget"]["calls"][-1]["how"] == "not billed", refused.report
             else:
                 raise AssertionError("no refusal")
-            # The base look alone, or the rows already started (4 at a time), never 3 tries a row.
-            assert fake.calls <= (1 if not base_ok else 5), fake.calls
+            assert len(fake.calls) == after + 1, fake.calls
     finally:
         imagegen.resolve_provider = real
+
+
+# ── one-sheet hatching (hatch.py) against a fake image provider ─────────
+
+def _pose(draw, cx, cy, s, facing=1):
+    draw.ellipse([cx - s, cy - s, cx + s, cy + s * 1.2], fill=(40, 120, 200), outline=(10, 10, 10), width=3)
+    hx = cx + facing * s * 0.4
+    draw.ellipse([hx - s * 0.45, cy - s * 1.6, hx + s * 0.45, cy - s * 0.7], fill=(230, 180, 60),
+                 outline=(10, 10, 10), width=3)
+    xs = sorted([cx + facing * s * 0.5, cx + facing * s * 1.0])
+    draw.rectangle([xs[0], cy - s * 1.25, xs[1], cy - s * 1.05], fill=(240, 120, 20), outline=(10, 10, 10))
+
+
+def synthetic_sheet(bad=(), left_faces_right=False, size=(1152, 1536)):
+    """What the model is asked for: 9 rows of separated poses on magenta; a
+    "bad" row is one smear the extraction cannot split."""
+    from PIL import Image, ImageDraw
+
+    from agent.pet.generate import atlas
+
+    image = Image.new("RGB", size, (255, 0, 255))
+    draw = ImageDraw.Draw(image)
+    w, h = size
+    band = h / 9
+    for i, (state, _row, count) in enumerate(atlas.ROW_SPECS):
+        cy = (i + 0.6) * band
+        if state in bad:
+            draw.rectangle([20, cy - 40, w - 20, cy + 40], fill=(40, 120, 200))
+            continue
+        facing = -1 if state == "running-left" and not left_faces_right else 1
+        for col in range(count):
+            _pose(draw, (col + 0.5) * w / count, cy + (col % 2) * 4, min(w / count, band) * 0.22, facing)
+    return image
+
+
+class FakeImages:
+    """An image provider: the sheet for a portrait call, a clean strip for a
+    row (its frame count read from Hermes' row prompt); reports a cost."""
+
+    name = "openrouter"
+
+    def __init__(self, sheet, sheet_cost=0.30, row_cost=0.06, hook=None, bad_rows=()) -> None:
+        self.sheet, self.sheet_cost, self.row_cost, self.hook, self.bad_rows = sheet, sheet_cost, row_cost, hook, bad_rows
+        self.calls: list[dict] = []
+        self.lock = threading.Lock()
+
+    def generate(self, prompt, **kwargs):
+        from PIL import Image, ImageDraw
+
+        with self.lock:
+            self.calls.append(kwargs)
+        if self.hook and (answer := self.hook(self, prompt, **kwargs)):
+            return answer
+        path = Path(tempfile.mkstemp(suffix=".png", dir=TMP)[1])
+        if kwargs.get("aspect_ratio") == "portrait":
+            self.sheet.save(path)
+            return {"success": True, "image": str(path), "cost_usd": self.sheet_cost}
+        count = int(prompt.split("strip of ")[1].split()[0])
+        strip = Image.new("RGB", (1536, 1024), (255, 0, 255))
+        draw = ImageDraw.Draw(strip)
+        if not any(f"showing {s}" in prompt for s in self.bad_rows):  # a bad strip: nothing drawn
+            for col in range(count):
+                _pose(draw, (col + 0.5) * 1536 / count, 560, 1536 / count * 0.22)
+        strip.save(path)
+        return {"success": True, "image": str(path), "cost_usd": self.row_cost}
+
+
+def _hatch(fake, **kwargs):
+    from agent.pet.generate import imagegen
+
+    from app_topic import hatch
+
+    work = Path(tempfile.mkdtemp(dir=TMP))
+    return hatch.hatch("a blue bird", sprite=imagegen.SpriteProvider("openrouter", fake, True), work=work,
+                       **kwargs), work
+
+
+def test_pet_one_sheet() -> None:
+    """A good sheet: one call, a valid atlas, what it cost."""
+    from agent.pet.generate import atlas
+
+    from app_topic import hatch
+
+    guide = hatch.layout_guide()
+    assert guide.size == hatch.GUIDE_SIZE and guide.getpixel((0, 0)) == hatch.CHROMA
+    fake = FakeImages(synthetic_sheet())
+    (result, report), work = _hatch(fake)
+    assert len(fake.calls) == 1, fake.calls
+    call = fake.calls[0]
+    assert call["aspect_ratio"] == "portrait" and call["aspect_ratio_exact"] == "3:4" and call["quality"] == "high"
+    assert call["reference_images"] == [str(work / "guide.png")]
+    assert result.size == (atlas.ATLAS_WIDTH, atlas.ATLAS_HEIGHT)
+    assert atlas.validate_atlas(result)["ok"] and len(report["filled_states"]) == 9
+    assert report["path"] == "one-sheet" and not report["repaired_rows"] and not report["mirrored_left"]
+    assert report["budget"]["spent"] == 0.30 and report["budget"]["calls"][0]["how"] == "reported"
+    for name in ("sheet.png", "spritesheet.png", "contact-sheet.png", "report.json"):
+        assert (work / name).is_file(), name
+    # The sheet's running-left faces right: mirrored from running-right, free.
+    fake = FakeImages(synthetic_sheet(left_faces_right=True))
+    (_, report), _ = _hatch(fake)
+    assert len(fake.calls) == 1 and report["mirrored_left"] and report["row_errors"]["running-left"] == "faces right"
+
+
+def test_pet_row_fallback() -> None:
+    """A bad row is redrawn alone at quality medium on the idle frame; at
+    most three rows; a redrawn row that fails again stops the hatch."""
+    from app_topic import hatch
+
+    fake = FakeImages(synthetic_sheet(bad=("waving",)))
+    (_, report), work = _hatch(fake)
+    assert len(fake.calls) == 2 and report["repaired_rows"] == ["waving"] and report["path"] == "one-sheet + rows"
+    row = fake.calls[1]
+    assert row["quality"] == "medium" and row["aspect_ratio"] == "landscape"
+    assert row["reference_images"] == [str(work / "idle-reference.png")]
+    assert report["budget"]["spent"] == 0.36, report["budget"]
+
+    # A bad running-right brings running-left along: one redraw, then the mirror.
+    fake = FakeImages(synthetic_sheet(bad=("running-right", "running-left")))
+    (_, report), _ = _hatch(fake)
+    assert report["repaired_rows"] == ["running-right"] and report["mirrored_left"], report
+
+    fake = FakeImages(synthetic_sheet(bad=("waving", "jumping", "failed", "review")))
+    try:
+        _hatch(fake, max_cost=5)
+    except hatch.HatchFailed as failed:
+        assert "after 3 redrawn" in str(failed) and len(fake.calls) == 4, (failed, fake.calls)
+        assert failed.report["repaired_rows"] == ["waving", "jumping", "failed"]
+    else:
+        raise AssertionError("more than three rows redrawn")
+
+    fake = FakeImages(synthetic_sheet(bad=("waving",)), bad_rows=("a friendly greeting",))
+    try:
+        _hatch(fake)
+    except hatch.HatchFailed as failed:
+        assert "still unusable after it was redrawn" in str(failed) and len(fake.calls) == 2, failed
+    else:
+        raise AssertionError("a row redrawn twice")
+
+    fake = FakeImages(synthetic_sheet(bad=("idle",)))
+    try:
+        _hatch(fake)
+    except hatch.HatchFailed as failed:
+        assert "unusable" in str(failed) and len(fake.calls) == 1, failed
+    else:
+        raise AssertionError("an unusable sheet hatched")
+
+
+def test_pet_budget() -> None:
+    """No call starts that could cross the budget; reported costs calibrate
+    the estimates; generate_pet registers the pet and says what it spent."""
+    from app_topic import hatch
+
+    assert hatch.estimate("portrait", "high", 1) > hatch.estimate("landscape", "medium", 1) * 3
+    fake = FakeImages(synthetic_sheet())
+    try:
+        _hatch(fake, max_cost=0.20)
+    except hatch.HatchFailed as failed:
+        assert "over budget" in str(failed) and not fake.calls, failed
+    else:
+        raise AssertionError("the sheet ignored the budget")
+
+    # $0.42 reported for the sheet; a medium row then costs ~$0.15 by the calibrated estimate.
+    fake = FakeImages(synthetic_sheet(bad=("waving",)), sheet_cost=0.42)
+    try:
+        _hatch(fake, max_cost=0.50)
+    except hatch.HatchFailed as failed:
+        assert "within the budget" in str(failed) and len(fake.calls) == 1, failed
+        assert failed.report["budget"]["spent"] == 0.42
+    else:
+        raise AssertionError("a row ignored the budget")
+
+    # No reported cost: the estimate is charged.
+    fake = FakeImages(synthetic_sheet(), sheet_cost=None)
+    (_, report), _ = _hatch(fake)
+    assert report["budget"]["estimated"] == round(hatch.estimate("portrait", "high", 1), 4), report["budget"]
+
+    from agent.pet import store
+    from agent.pet.generate import imagegen
+
+    real = imagegen.resolve_provider
+    fake = FakeImages(synthetic_sheet(bad=("review",)))
+    imagegen.resolve_provider = lambda **_: imagegen.SpriteProvider("openrouter", fake, True)
+    try:
+        result = app_mod.generate_pet("a blue bird", "Blue", max_cost=0.60)
+    finally:
+        imagegen.resolve_provider = real
+    assert store.load_pet(result["slug"]).display_name == "Blue"
+    assert app_mod.spent(result["report"]) == "$0.36 of the $0.60 budget", result["report"]["budget"]
 
 
 def main() -> None:

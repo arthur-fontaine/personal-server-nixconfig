@@ -46,7 +46,7 @@ lib.mkIf cfg.enable {
         default = name == server.hermes.subchats.default;
         inherit (p) memoryRead memoryWrite volume ttl encrypted model tools;
       }) server.hermes.subchats.presets;
-      pets.enable = images.provider != null;
+      pets = { enable = images.provider != null; max_cost = images.maxCostPerPet; };
       big_files.swisstransfer_token_env = cfg.swisstransferTokenEnv;
       apns = {
         inherit (cfg.apns) enable;
