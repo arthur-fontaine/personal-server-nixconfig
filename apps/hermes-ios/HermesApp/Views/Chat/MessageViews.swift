@@ -13,7 +13,8 @@ struct MessageRow: View {
     var highlighted = false
     var onReply: () -> Void = {}
     var onShowOriginal: (MessageID) -> Void = { _ in }
-    @State private var selecting = false
+    /// Select Text's sheet is the chat screen's: a row of the lazy stack can be recycled under it.
+    var onSelectText: (String) -> Void = { _ in }
 
     var body: some View {
         VGroup(alignment: message.isOutgoing ? .trailing : .leading, spacing: .s) {
@@ -46,10 +47,9 @@ struct MessageRow: View {
             Button(action: onReply) { Label("Reply", systemImage: "arrowshape.turn.up.left") }
             Button { UIPasteboard.general.string = message.displayText } label: { Label("Copy", systemImage: "doc.on.doc") }
             if !message.displayText.isEmpty {
-                Button { Presentation.afterMenu { selecting = true } } label: { Label("Select Text", systemImage: "selection.pin.in.out") }
+                Button { onSelectText(message.displayText) } label: { Label("Select Text", systemImage: "selection.pin.in.out") }
             }
         }
-        .sheet(isPresented: $selecting) { SelectTextSheet(message.displayText) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(message.isOutgoing ? "chat.owner" : "chat.hermes")
     }

@@ -4,17 +4,42 @@ import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// What the composer holds, owned by the chat screen so what it presents (the palette, the file
+/// importer) can write into it. A reference: the screen doesn't read it, so typing doesn't
+/// re-evaluate the transcript.
+@Observable @MainActor
+final class ComposerDraft {
+    var text = ""
+    var files: [PendingFile] = []
+
+    /// Copies the file out of the picker's sandbox (the upload may outlive the security scope).
+    func attach(_ url: URL, securityScoped: Bool) -> Bool {
+        let scoped = securityScoped && url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        let dest = FileManager.default.temporaryDirectory.appending(path: "outbox-\(UUID().uuidString.prefix(8))-\(url.lastPathComponent)")
+        do {
+            try FileManager.default.copyItem(at: url, to: dest)
+            let size = Int64((try? dest.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+            files.append(PendingFile(url: dest, size: size))
+            return true
+        } catch {
+            return false
+        }
+    }
+}
+
 /// The composer: `ComposerBar` with the attach menu, files waiting and uploads above it. Files
-/// over Telegram's cap say where they'll go before sending.
+/// over Telegram's cap say where they'll go before sending. What its menu opens is presented by
+/// the chat screen: a sheet attached inside the bar was asked for while the menu left and was
+/// mostly dropped on the iPhone.
 struct Composer: View {
     @Environment(HermesStore.self) private var store
     @Environment(AppModel.self) private var model
     let topic: TopicID
+    @Bindable var draft: ComposerDraft
     var focused: FocusState<Bool>.Binding
     @Binding var replyingTo: ChatMessage?
-    @State private var text = ""
-    @State private var files: [PendingFile] = []
-    @State private var importing = false
+    let onAttachFile: () -> Void
     @State private var photos: [PhotosPickerItem] = []
     @State private var sending = false
     @State private var lastTyping = Date.distantPast
@@ -24,14 +49,14 @@ struct Composer: View {
             ForEach(store.uploads.values.sorted { $0.name < $1.name }, id: \.name) { u in
                 UploadBar(title: Text("Uploading \(u.name) to \(u.service)"), progress: Self.progress(u.fraction))
             }
-            if !files.isEmpty {
+            if !draft.files.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HGroup(spacing: .xs) {
-                        ForEach(files) { f in
+                        ForEach(draft.files) { f in
                             let size = f.size.formatted(.byteCount(style: .file))
                             AttachmentChip(symbol: FileKind.symbol(for: f.url.lastPathComponent), name: f.url.lastPathComponent,
                                            detail: f.size > store.client.uploadLimit ? String(localized: "\(size), via \(store.uploader.serviceName)") : size) {
-                                files.removeAll { $0.id == f.id }
+                                draft.files.removeAll { $0.id == f.id }
                             }
                         }
                     }
@@ -46,30 +71,20 @@ struct Composer: View {
                 .accessibilityIdentifier("composer.reply")
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            ComposerBar(text: $text, placeholder: Text(placeholder), action: composerAction, focus: focused,
+            ComposerBar(text: $draft.text, placeholder: Text(placeholder), action: composerAction, focus: focused,
                         onSend: send, onStop: { store.stopDraft(in: topic) }) {
-                Button { Presentation.afterMenu { model.showCommands = true } } label: { Label("Commands", systemImage: "command") }
+                Button { model.showCommands = true } label: { Label("Commands", systemImage: "command") }
                 Divider()
-                Button { Presentation.afterMenu { importing = true } } label: { Label("File", systemImage: "doc") }
+                Button(action: onAttachFile) { Label("File", systemImage: "doc") }
                 PhotosPicker(selection: $photos, maxSelectionCount: 10, matching: .any(of: [.images, .videos])) {
                     Label("Photos & Videos", systemImage: "photo.on.rectangle")
                 }
             }
-            .onChange(of: text) { old, new in
+            .onChange(of: draft.text) { old, new in
                 // "/" on an empty composer opens the palette instead of Telegram's raw commands.
-                if old.isEmpty, new == "/" { text = ""; model.showCommands = true }
+                if old.isEmpty, new == "/" { draft.text = ""; model.showCommands = true }
                 typingPing()
             }
-        }
-        .sheet(isPresented: Bindable(model).showCommands) {
-            CommandPalette(topic: topic) { inserted in
-                text = inserted
-                focused.wrappedValue = true
-            }
-        }
-        .fileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
-            guard case .success(let urls) = result else { return }
-            for url in urls { addFile(url, securityScoped: true) }
         }
         .onChange(of: photos) { _, items in
             Task {
@@ -90,7 +105,7 @@ struct Composer: View {
     /// Stop replaces Send while Hermes writes here and the draft can be stopped.
     private var composerAction: ComposerAction {
         if sending { return .sending }
-        if text.isEmpty, files.isEmpty, store.drafts[topic]?.canStop == true { return .stop }
+        if draft.text.isEmpty, draft.files.isEmpty, store.drafts[topic]?.canStop == true { return .stop }
         return .send(enabled: canSend)
     }
 
@@ -98,35 +113,25 @@ struct Composer: View {
     private var placeholder: String { String(localized: "Message") }
 
     private var canSend: Bool {
-        !sending && (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !files.isEmpty)
+        !sending && (!draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !draft.files.isEmpty)
     }
 
     private func addFile(_ url: URL, securityScoped: Bool) {
-        // Copy out of the picker's sandbox: the upload may outlive the security scope.
-        let scoped = securityScoped && url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        let dest = FileManager.default.temporaryDirectory.appending(path: "outbox-\(UUID().uuidString.prefix(8))-\(url.lastPathComponent)")
-        do {
-            try FileManager.default.copyItem(at: url, to: dest)
-            let size = Int64((try? dest.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
-            files.append(PendingFile(url: dest, size: size))
-        } catch {
-            model.showToast("Couldn't attach \(url.lastPathComponent)")
-        }
+        if !draft.attach(url, securityScoped: securityScoped) { model.showToast("Couldn't attach \(url.lastPathComponent)") }
     }
 
     private func typingPing() {
-        guard Date().timeIntervalSince(lastTyping) > 4, !text.isEmpty else { return }
+        guard Date().timeIntervalSince(lastTyping) > 4, !draft.text.isEmpty else { return }
         lastTyping = .now
         store.userIsTyping(in: topic)
     }
 
     private func send() {
-        let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let urls = files.map(\.url)
+        let body = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let urls = draft.files.map(\.url)
         let replyTo = replyingTo?.id
-        text = ""
-        files = []
+        draft.text = ""
+        draft.files = []
         replyingTo = nil
         sending = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -138,7 +143,7 @@ struct Composer: View {
             do {
                 try await store.send(body, in: topic, files: urls, replyTo: replyTo)
             } catch {
-                text = body
+                draft.text = body
                 model.showToast(error.localizedDescription)
             }
         }

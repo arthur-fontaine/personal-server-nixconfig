@@ -1,11 +1,11 @@
 import XCTest
 
-/// Brief item 6 (Arthur: "+ › Commands" needed a long press; a tap only closed the menu): one tap
-/// on the item opens the palette, once the menu has gone.
+/// "+ › Commands" on Arthur's iPhone: the menu closed and the palette mostly didn't open (one in
+/// four taps). The palette is now presented by the chat screen, set straight from the menu item.
 final class ComposerMenuTests: XCTestCase {
     override func setUp() { continueAfterFailure = false }
 
-    func testOneTapOnCommandsOpensThePalette() throws {
+    func testOneTapOnCommandsOpensThePaletteEveryTime() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-demo", "-noQuestion"]
         app.launch()
@@ -15,10 +15,28 @@ final class ComposerMenuTests: XCTestCase {
         let field = app.descendants(matching: .any)["composer.field"]
         field.tap()
         field.typeText("a")
-        attach.tap()
-        let commands = app.buttons["Commands"]
-        XCTAssertTrue(commands.waitForExistence(timeout: 3))
-        commands.tap()
-        XCTAssertTrue(app.navigationBars["Commands"].waitForExistence(timeout: 4), "the palette opens on one tap")
+        let palette = app.navigationBars["Commands"]
+        for round in 1...5 {
+            XCTAssertTrue(attach.waitForExistence(timeout: 3) && attach.isHittable, "round \(round): the composer is back")
+            attach.tap()
+            let commands = app.buttons["Commands"]
+            XCTAssertTrue(commands.waitForExistence(timeout: 3), "round \(round): the menu opens")
+            commands.tap() // once, never again
+            XCTAssertTrue(palette.waitForExistence(timeout: 4), "round \(round): the palette opens on one tap")
+            app.buttons["Close"].firstMatch.tap()
+            XCTAssertTrue(palette.waitForNonExistence(timeout: 4), "round \(round): the palette closes")
+        }
+    }
+
+    /// "/" on an empty composer still opens it.
+    func testSlashOpensThePalette() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-noQuestion"]
+        app.launch()
+        let field = app.descendants(matching: .any)["composer.field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText("/")
+        XCTAssertTrue(app.navigationBars["Commands"].waitForExistence(timeout: 4))
     }
 }

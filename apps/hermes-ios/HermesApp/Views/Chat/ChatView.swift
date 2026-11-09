@@ -29,6 +29,9 @@ struct ChatScreen: View {
     @State private var jumped = false
     /// Redraws once a new question's message has waited `questionSettle` for the state.
     @State private var settleTick = 0
+    @State private var draft = ComposerDraft()
+    @State private var importing = false
+    @State private var selecting: SelectableText?
 
     var body: some View {
         Group {
@@ -44,6 +47,22 @@ struct ChatScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .modifier(ChatsTitleMenu(enabled: compact))
         .toolbar { toolbar }
+        // What the composer's "+" menu and a message's context menu open, presented by the stack's
+        // root: a stable owner, unlike a view inside the bar or a row of the lazy stack. SwiftUI
+        // waits for the menu to leave before it presents, so the items just set the state.
+        .sheet(isPresented: Bindable(model).showCommands) {
+            CommandPalette(topic: topic) { inserted in
+                draft.text = inserted
+                composerFocused = true
+            }
+        }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            guard case .success(let urls) = result else { return }
+            for url in urls where !draft.attach(url, securityScoped: true) {
+                model.showToast(String(localized: "Couldn't attach \(url.lastPathComponent)"))
+            }
+        }
+        .sheet(item: $selecting) { SelectTextSheet($0.text) }
         .onChange(of: store.caressedAt) {
             guard !reduceMotion else { return }
             heart = true
@@ -72,7 +91,7 @@ struct ChatScreen: View {
         ToolbarItem(placement: .topBarLeading) {
             BarMenuButton(image: petImage, title: petLabel, primaryAction: { store.caress() },
                           menuTitle: petLabel, items: [
-                              BarMenuItem(String(localized: "New Pet…"), systemImage: "sparkles") { Presentation.afterMenu { model.showNewPet = true } },
+                              BarMenuItem(String(localized: "New Pet…"), systemImage: "sparkles") { model.showNewPet = true },
                           ])
             .sensoryFeedback(.impact(flexibility: .soft), trigger: store.caressedAt)
             .accessibilityHint(Text("Caresses the pet"))
@@ -147,7 +166,8 @@ struct ChatScreen: View {
                                 MessageRow(message: message,
                                            highlighted: highlighted == message.id,
                                            onReply: { reply(to: message) },
-                                           onShowOriginal: { showOriginal($0, proxy: proxy) })
+                                           onShowOriginal: { showOriginal($0, proxy: proxy) },
+                                           onSelectText: { selecting = SelectableText(text: $0) })
                             }
                             .id(message.id)
                         }
@@ -248,7 +268,8 @@ struct ChatScreen: View {
                             }
                             .transition(.scale.combined(with: .opacity))
                         }
-                        Composer(topic: topic, focused: $composerFocused, replyingTo: $replyingTo)
+                        Composer(topic: topic, draft: draft, focused: $composerFocused, replyingTo: $replyingTo,
+                                 onAttachFile: { importing = true })
                     }
                 }
                 .animation(.snappy, value: atBottom)
@@ -312,4 +333,10 @@ private final class ScrollMemo {
 private struct ScrollFacts: Equatable {
     var distance: CGFloat
     var offset: CGFloat
+}
+
+/// Select Text's sheet item.
+private struct SelectableText: Identifiable {
+    let id = UUID()
+    let text: String
 }
