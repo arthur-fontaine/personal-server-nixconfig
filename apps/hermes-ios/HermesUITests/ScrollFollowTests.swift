@@ -92,4 +92,24 @@ final class ScrollFollowTests: XCTestCase {
     }
 
     static let suggestionBar: CGFloat = 44
+
+    /// Opening a v4 approval card's command (its sentence makes the card tall) hung the app: the
+    /// transcript's height alternated for ever while it followed the bottom. The app must stay
+    /// responsive, with the whole command and the answers on screen.
+    func testOpeningTheCommandKeepsFollowing() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-scene", "review"]
+        app.launch()
+        let disclosure = app.descendants(matching: .any)["approval.command"]
+        XCTAssertTrue(disclosure.waitForExistence(timeout: 10))
+        disclosure.buttons.firstMatch.exists ? disclosure.buttons.firstMatch.tap() : disclosure.tap()
+        let code = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "--prune")).firstMatch
+        XCTAssertTrue(code.waitForExistence(timeout: 5), "the command is disclosed, whole")
+        // Each query needs an idle main thread: a hang fails here (XCUITest's 30-s snapshot timeout).
+        let allow = app.descendants(matching: .any)["action.once"]
+        let shown = Date().addingTimeInterval(5)
+        while !(allow.exists && allow.isHittable), Date() < shown { Thread.sleep(forTimeInterval: 0.2) }
+        XCTAssertTrue(allow.isHittable, "the answers stay in view: the transcript followed the card's growth")
+        XCTAssertFalse(app.buttons["Latest"].exists)
+    }
 }

@@ -175,10 +175,16 @@ struct ChatScreen: View {
                 settleTick += 1
             }
             // The bottom for where it opens and for a transcript shorter than the screen (it sits
-            // on the composer); not for size changes, which moved the content under an owner who
-            // had scrolled up whenever a row resized.
+            // on the composer). For size changes only while following: always on, it moved the
+            // content under an owner who had scrolled up whenever a row resized.
             .defaultScrollAnchor(.bottom, for: .initialOffset)
             .defaultScrollAnchor(.bottom, for: .alignment)
+            // Growth (a draft revealing itself, a card appearing or opening) keeps the bottom in
+            // view while following, done by the scroll view in its own layout pass. A `scrollTo` on
+            // each content-height change did it before and could loop: in the lazy stack, opening
+            // a v4 approval card's command made the height alternate 1006 ↔ 1124 pt for ever (the
+            // app hung). Not following, no anchor: nothing moves under the owner.
+            .defaultScrollAnchor(following ? .bottom : nil, for: .sizeChanges)
             .scrollDismissesKeyboard(.interactively)
             // The distance from the content's end to the visible bottom (the composer bar's
             // inset counted, it grows at accessibility sizes). A number, not a Bool: a Bool's
@@ -218,10 +224,6 @@ struct ChatScreen: View {
             .onChange(of: messages.last?.id) {
                 if messages.last?.isOutgoing == true { following = true; jumped = false }
                 if following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
-            }
-            // Any growth — a draft revealing itself, a card appearing — while following.
-            .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, _ in
-                if following, !scroll.ownerScrolling { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }
             // The composer bar growing (a reply chip, a file, a longer draft) while following: the
             // last message stays above it (16.3). Not during a gesture: the keyboard's interactive
