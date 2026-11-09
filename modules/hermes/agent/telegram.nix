@@ -59,5 +59,10 @@
     # (hermes_state_runtime.py, recover_session_inputs: never replayed);
     # lost_turns quotes them in the notice that closes it.
     display.busy_input_mode = "steer";
+    # Without its "⏩ Steered into current run. Your message arrives after the
+    # next tool call." bubble (gateway/run_busy.py, _busy_steer_ack_enabled):
+    # the message still steers; the app shows it pending until the turn takes
+    # it, and Telegram a 👀 reaction on it (plugins/app_topic/pending.py).
+    display.platforms.telegram.busy_steer_ack_enabled = false;
   };
 }

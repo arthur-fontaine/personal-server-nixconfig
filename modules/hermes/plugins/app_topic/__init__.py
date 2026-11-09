@@ -222,6 +222,8 @@ def register(ctx) -> None:
     ctx.register_hook("on_session_end", status.end)
     ctx.register_hook("pre_approval_request", pre_approval_request)
     ctx.register_hook("pre_llm_call", call_turn)
+    ctx.register_hook("pre_llm_call", app.taken)
+    ctx.register_hook("pre_api_request", app.taken)
     ctx.register_hook("post_api_request", app.post_api_request)
     ctx.register_hook("api_request_error", app.api_request_error)
     ctx.register_hook("post_auxiliary_call", app.post_auxiliary_call)

@@ -280,6 +280,25 @@ def test_subchats() -> None:
         sys.__dict__.pop("_hermes_unii_state", None)
 
 
+def test_pending() -> None:
+    from app_topic.pending import TTL, Pending
+
+    changes = []
+    p = Pending(lambda: changes.append(1))
+    p.add(0, 10, "ping the build", now=1000)
+    p.add(0, 10, "ping the build", now=1001)
+    p.add(5, 11, "in a sub-chat", now=1000)
+    p.add(0, 12, "", now=1000)  # a photo
+    assert [i["message_id"] for i in p.public(now=1001)] == [10, 11, 12]
+    p.taken(0, ["something else"])
+    assert len(p.public(now=1001)) == 3
+    p.taken(0, ["[steer] ping   the build"])  # whitespace aside, steered in
+    assert [i["message_id"] for i in p.public(now=1001)] == [11, 12]
+    p.taken(0, ["the photo's own turn"], turn_start=True)
+    assert [i["message_id"] for i in p.public(now=1001)] == [11]
+    assert p.public(now=1000 + TTL) == []
+
+
 def test_notify_title() -> None:
     subs = [{"topic_id": 455, "name": "Taxes", "encrypted": True},
             {"topic_id": 456, "name": "Lisbon trip", "encrypted": False},
@@ -378,6 +397,10 @@ class Bot:
             raise RuntimeError("Bad Request: message is not modified")
         self.messages[kw["message_id"]]["text"] = kw["text"]
         self.calls.append(("edit_message_text", kw))
+        return True
+
+    async def set_message_reaction(self, **kw):
+        self.calls.append(("set_message_reaction", kw))
         return True
 
     async def delete_message(self, **kw):
@@ -542,6 +565,18 @@ def test_plugin() -> None:
     pet = bot.in_topic("state")[-1][1]["pet"]
     assert pet["animation"] == "run" and pet["mood"] == "working" and pet["mood_until"] is None
     assert not {"hunger", "energy", "happiness", "xp", "level", "xp_next", "asleep"} & set(pet)
+
+    # A message while that turn runs: pending in the state, a 👀 on it, until the turn takes it in.
+    assert plugin.dispatch(event("also check the logs", thread=None, mid="901")) is None
+    wait_for(lambda: bot.in_topic("state")[-1][1]["pending"], "the pending message")
+    pending = bot.in_topic("state")[-1][1]["pending"]
+    assert [(p["chat"], p["message_id"]) for p in pending] == [(0, 901)] and pending[0]["since"].endswith("Z")
+    wait_for(lambda: any(n == "set_message_reaction" and kw["message_id"] == 901 for n, kw in bot.calls), "the 👀")
+    plugin.dispatch(event("/status", thread=None, mid="902"))  # a command is never pending
+    plugin.taken(session_id="s1", conversation_history=[
+        {"role": "user", "content": "make it"},
+        {"role": "user", "display_kind": "steer", "content": "<steer>Gateway message origin…\n\nalso check the logs</steer>"}])
+    wait_for(lambda: bot.in_topic("state")[-1][1]["pending"] == [], "the message taken in")
 
     # Hermes' reply in the main chat: a notify with its spoken text, once.
     async def reply_send():

@@ -24,6 +24,7 @@ from typing import Any
 from . import protocol, speech
 from .machine import Machine
 from .pet import PetState, animation, mirror, mood
+from .pending import Pending
 from .questions import Questions
 from .status import Status
 from .usage import Ledger, estimate_cost
@@ -31,6 +32,8 @@ from .usage import Ledger, estimate_cost
 logger = logging.getLogger("app_topic")
 
 TOPIC_NAME = "App"
+# On the owner's message a running turn has yet to take in (pending.py).
+PENDING_REACTION = "\U0001f440"
 SLOT_MIN_GAP = 3.0
 SEND_GAP = 1.0
 STATS_EVERY = 60.0
@@ -104,6 +107,7 @@ class App:
         self.lock = threading.RLock()
         self.questions = Questions(self.changed)
         self.status = Status(self.changed, owner_id)
+        self.pending = Pending(self.changed)
         self.ledger = Ledger(self.dir / "usage.db", config.get("chain") or [])
         self.machine = Machine(self.dir / "machine.json")
         self.pet = PetState(self.dir)
@@ -420,8 +424,8 @@ class App:
         if self.saved["sprite"].get("id"):
             slots["sprite"] = self.saved["sprite"]["id"]
         obj = protocol.message("state", updated_at=protocol.now_iso(), slots=slots, agent=agent,
-                               questions=questions, pet=self.pet_public(agent["status"]),
-                               subchats=self.subchats())
+                               questions=questions, pending=self.pending.public(),
+                               pet=self.pet_public(agent["status"]), subchats=self.subchats())
         return protocol.shrink(obj, [("subchats",), ("questions",)])
 
     def pet_public(self, status: str) -> dict | None:
@@ -787,6 +791,8 @@ class App:
         platform = getattr(getattr(source, "platform", None), "value", getattr(source, "platform", None))
         if platform != "telegram" or not self.is_app_topic(getattr(source, "chat_id", None),
                                                           getattr(source, "thread_id", None)):
+            if platform == "telegram":
+                self.maybe_pending(event)
             if (getattr(event, "text", None) or "").startswith("/"):
                 # A command may change what `controls` shows (/mode, /model, /sub…): look again once handled.
                 timer = threading.Timer(3.0, self.dirty.set)
@@ -799,6 +805,43 @@ class App:
         message_id = getattr(event, "message_id", None) or getattr(source, "message_id", None)
         self.submit(self.handle(text, int(message_id) if message_id else None))
         return {"action": "skip", "reason": "app-topic"}
+
+    def maybe_pending(self, event) -> None:
+        """The owner writing while a turn runs in that chat: the message waits for
+        the turn's next step (steer) or its own turn. Hermes' ack bubble is off
+        (agent/telegram.nix); the app shows it pending, Telegram a reaction."""
+        source = getattr(event, "source", None)
+        if str(getattr(source, "user_id", "")) != str(owner_id()):
+            return
+        chat = self.topic_of(getattr(source, "chat_id", None), getattr(source, "thread_id", None))
+        text = getattr(event, "text", None) or ""
+        message_id = getattr(event, "message_id", None) or getattr(source, "message_id", None)
+        if chat is None or not message_id or text.startswith("/") or not self.status.busy(chat):
+            return
+        self.pending.add(chat, int(message_id), text)
+        self.submit(self.react(getattr(source, "chat_id", None), int(message_id), PENDING_REACTION))
+
+    async def react(self, chat_id, message_id: int, emoji: str) -> None:
+        bot = self.bot()
+        if bot is None:
+            return
+        try:
+            await bot.set_message_reaction(chat_id=chat_id, message_id=message_id, reaction=emoji)
+        except Exception as error:
+            logger.debug("app_topic: no reaction on %s: %s", message_id, error)
+
+    def taken(self, session_id: str = "", conversation_history=None, user_message=None, **_) -> None:
+        """pre_api_request / pre_llm_call: the messages this request carries are no longer pending."""
+        texts = []
+        for m in (conversation_history or [])[-12:]:
+            if isinstance(m, dict) and m.get("role") == "user":
+                content = m.get("content")
+                texts.append(content if isinstance(content, str) else " ".join(
+                    str(p.get("text", "")) for p in content or [] if isinstance(p, dict)))
+        if isinstance(user_message, str):
+            texts.append(user_message)
+        if texts:
+            self.pending.taken(self.status.chat_for(session_id), texts, turn_start=user_message is not None)
 
     async def handle(self, text: str, message_id: int | None) -> None:
         request = protocol.parse(text)

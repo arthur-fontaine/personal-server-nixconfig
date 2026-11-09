@@ -93,10 +93,11 @@ be deleted.
   "questions": [
     {
       "id": "ea:7", "kind": "approval", "chat": 0, "message_id": 1201,
-      "text": "<terminal> (plugin approval rule)\n\nReason: Rebuilds the site from a clean state\n\nask mode: every action asks: terminal: cd ~/workspace/site && rm -rf build && npm ci && npm run build",
-      "summary": "Rebuilds the site from a clean state",
+      "text": "⚠️ Approval needed\n\n<terminal> (plugin approval rule)\n\nReason: Hermes wants to rebuild the site from scratch, deleting its build folder first. Auto mode asks because you chose ask mode.\n\nterminal: cd ~/workspace/site && rm -rf build && npm ci && npm run build",
+      "summary": "Hermes wants to rebuild the site from scratch, deleting its build folder first. Auto mode asks because you chose ask mode.",
+      "detail": "terminal: cd ~/workspace/site && rm -rf build && npm ci && npm run build",
       "command": "<terminal> (plugin approval rule)",
-      "spoken": "Hermes wants to run a command that rebuilds the site from a clean state. Allow?",
+      "spoken": "Hermes wants to rebuild the site from scratch, deleting its build folder first. Auto mode asks because you chose ask mode.",
       "options": [
         {"id": "once", "label": "Once", "data_b64": "ZWE6b25jZTo3"},
         {"id": "session", "label": "Session", "data_b64": "ZWE6c2Vzc2lvbjo3"},
@@ -106,6 +107,7 @@ be deleted.
       "asked_at": "2026-11-07T21:40:01Z"
     }
   ],
+  "pending": [{"chat": 0, "message_id": 1199, "since": "2026-11-07T21:39:58Z"}],
   "pet": {
     "id": "pip", "name": "Pip", "version": 3,
     "manifest": {"id": "pip", "displayName": "Pip", "description": "…",
@@ -165,6 +167,16 @@ be deleted.
     (plugins/platforms/telegram/adapter.py, `send_clarify`) and the turn
     runner the hint, which a plugin cannot change.
   - A question leaves the list when answered, timed out or withdrawn.
+- `pending`: the owner's messages sent while a turn runs in that chat that
+  the turn has not taken in yet, oldest first (empty when none): `chat`,
+  `message_id` (the owner's message, Bot API id), `since` (when it arrived).
+  With Hermes' steer mode such a message reaches the running turn at its next
+  tool call, or becomes the next turn; its entry leaves as soon as a request
+  to the model carries it (the slot is edited within the 3 s throttle), or
+  after 30 min. The app shows those bubbles as pending. Hermes no longer
+  answers them with "⏩ Steered into current run. Your message arrives after
+  the next tool call." (`busy_steer_ack_enabled` off); in Telegram the
+  message gets a 👀 reaction instead.
 - `pet`: see §5. `manifest` is the Codex `pet.json` (plus `version`).
   `sprite_message_id`: a message in the App topic whose document is the
   spritesheet (`spritesheet.webp`, 8 columns × 9 rows of 192×208 frames);
@@ -498,7 +510,9 @@ recognition and synthesis), and the call is ordinary messages of the chat:
   `questions[].chat` is where the card landed;
   `questions[].summary` is now guard's plain sentence for any tool, in the
   owner's language, and `spoken` says it as is; a clarify's or proposal's
-  `text` is the question alone (no option list, no skip hint); the written
+  `text` is the question alone (no option list, no skip hint); `state.pending`
+  (messages a running turn has yet to take in; no more "⏩ Steered…"
+  message); the written
   detail message `📎 ` of a call turn (§6). Removed: the `🔊 <text>` spoken
   override (§3). The bot accepts requests whatever their `v`; the app
   ignores it.

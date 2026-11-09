@@ -24,7 +24,7 @@ It needs BotFather's Threaded Mode, as the sub-chats do.
 | Part | What it does | Where |
 | --- | --- | --- |
 | App topic | a topic named "App" of the DM, hidden by the app, carries JSON both ways; nothing posted there reaches the model | `app.py` |
-| State | four messages the bot edits: `state` (what Hermes is doing, the questions waiting for the owner, the pet, the sub-chats), `stats`, `devices`, `controls` (native commands and their current values) | `app.py`, `status.py`, `questions.py` |
+| State | four messages the bot edits: `state` (what Hermes is doing, the questions waiting for the owner, the messages a running turn has yet to take in, the pet, the sub-chats), `stats`, `devices`, `controls` (native commands and their current values) | `app.py`, `status.py`, `questions.py` |
 | Notifications | for each message that may notify, a `notify` with a short spoken version for Siri | `speech.py` |
 | Stats | model usage per provider and model, fallbacks apart, over 24 h / 7 d / 30 d; CPU, memory, storage, power, battery, uptime | `usage.py`, `machine.py` |
 | Pets | the pet's mood (what Hermes is doing), `pet_generate`, its files for the app's build | `pet.py` |

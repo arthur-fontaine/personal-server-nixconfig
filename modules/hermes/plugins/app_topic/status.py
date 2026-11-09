@@ -110,6 +110,12 @@ class Status:
                 self.finished.append((session_id, outcome))
         self.on_change()
 
+    def busy(self, chat: int) -> bool:
+        """Whether a turn runs in ``chat`` (0 = the main chat)."""
+        now = time.time()
+        with self.lock:
+            return any(t["chat"] == chat and now - t["at"] <= STALE for t in self.turns.values())
+
     def snapshot(self, questions_open: bool) -> dict:
         now = time.time()
         with self.lock:
