@@ -259,9 +259,12 @@ def layout_guide(size: tuple[int, int] = GUIDE_SIZE):
 # Hermes works (an angry pet on the lock screen). Ours keeps the focus and
 # asks for a calm, content face.
 ACTIONS = {
-    "running": ("calm, happy focused work, staying IN PLACE (NOT walking or foot-running): busy hands, as if "
-                "typing or tinkering, a content relaxed face with a small smile; never angry, frowning, "
-                "furrowed or annoyed"),
+    "running": ("calm, happy focused work IN PLACE (NOT walking or foot-running): holding a tiny hammer in one "
+                "hand, raising it and tapping it down in a clear rhythm across the frames (big, readable arm "
+                "motion: hammer up high in some frames, down in others), eyes on the work, a content face with "
+                "a small smile; never angry, frowning, furrowed or annoyed. This row MAY add this one small "
+                "hammer as a prop, held in the hand; no other props. Clearly different from 'waiting' (hands "
+                "still, looking up)"),
 }
 
 

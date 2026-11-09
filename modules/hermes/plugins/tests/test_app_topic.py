@@ -916,7 +916,7 @@ def test_pet_redraw_rows() -> None:
     result, report = hatch.redraw(sheet, ["running"], "a blue bird",
                                   sprite=imagegen.SpriteProvider("openrouter", fake, True), work=work)
     assert len(fake.calls) == 1 and fake.calls[0]["quality"] == hatch.ROW_QUALITY
-    assert "never angry" in prompts[0] and "concentrating" not in prompts[0], prompts[0]
+    assert "tiny hammer" in prompts[0] and "never angry" in prompts[0] and "concentrating" not in prompts[0], prompts[0]
     assert atlas.validate_atlas(result)["ok"] and report["repaired_rows"] == ["running"]
     before, after = hatch.atlas_frames(sheet), hatch.atlas_frames(result)
     for state, _row, count in atlas.ROW_SPECS:
