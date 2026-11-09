@@ -67,8 +67,8 @@ def test_speech() -> None:
     assert speech.spoken("[fichier: https://gofile.io/d/abc]").startswith("a file from gofile.io")
     assert len(speech.body("word " * 200)) <= speech.BODY_MAX
     assert speech.spoken("Use file_a and file_b, *really*.") == "Use file_a and file_b, really."
-    assert speech.question_spoken("approval", "rm -rf build", "Deletes the build folder", []) \
-        == "Hermes wants to run a command that deletes the build folder. Allow?"
+    said = "Hermes veut supprimer le dossier build. Le mode auto demande parce que tu es en mode ask."
+    assert speech.question_spoken("approval", "<terminal> (plugin approval rule)", said, []) == said
     assert speech.question_spoken("approval", "<terminal> (plugin approval rule)", None, []) \
         == "Hermes asks to use terminal. Allow?"
     q = speech.question_spoken("clarify", "Which day?", None, ["Monday", "Tuesday", "Other"])
@@ -146,11 +146,12 @@ def test_questions() -> None:
 
     changes = []
     qs = questions.Questions(lambda: changes.append(1))
-    qs.add_summary("rm -rf ~/tmp/x", "Deletes a temp folder")
+    qs.add_summary("rm -rf ~/tmp/x", "Hermes wants to delete a temp folder.", "terminal: rm -rf ~/tmp/x")
     card = M([[B("Once", callback_data="ea:once:7"), B("Deny", callback_data="ea:deny:7")]])
     item = qs.from_card(chat=0, message_id=10, text_html="⚠️ <b>Dangerous</b>\n<pre>rm -rf ~/tmp/x</pre>", markup=card)
     assert item["id"] == "ea:7" and item["kind"] == "approval" and item["command"] == "rm -rf ~/tmp/x"
-    assert item["summary"] == "Deletes a temp folder" and item["spoken"].endswith("Allow?")
+    assert item["summary"] == "Hermes wants to delete a temp folder." == item["spoken"]
+    assert item["detail"] == "terminal: rm -rf ~/tmp/x"
     assert base64.b64decode(item["options"][0]["data_b64"]).decode() == "ea:once:7"
     clar = M([[B("1", callback_data="cl:ab:0")], [B("2", callback_data="cl:ab:1")], [B("✏️ Other", callback_data="cl:ab:other")]])
     item = qs.from_card(chat=5, message_id=11, text_html="❓ Which?\n\n1. Monday\n2. Tuesday", markup=clar)
@@ -161,17 +162,18 @@ def test_questions() -> None:
     import app_topic as plugin_pkg
 
     sys.modules["guard"] = types.SimpleNamespace(
-        card_summary=lambda d: d.split("\n\n")[0] if "auto-review" in d else None)
+        card_summary=lambda d: d.split("\n\n")[0] if "auto-review" in d else None,
+        card_detail=lambda d: d.split("\n\n")[1] if "auto-review" in d else None)
     fake_app = types.SimpleNamespace(questions=qs)
     plugin_pkg.STATE["app"] = fake_app
     plugin_pkg.pre_approval_request(command="curl -X POST " + "x" * 3000,
                                     description="Send your notes to a server\n\ncurl … (auto-review: risky)")
     long_card = M([[B("Once", callback_data="ea:once:8")]])
     item = qs.from_card(chat=0, message_id=13, text_html="<pre>curl -X POST xxx...</pre>", markup=long_card)
-    assert item["summary"] == "Send your notes to a server", item
+    assert item["summary"] == "Send your notes to a server" and item["detail"].startswith("curl"), item
     plugin_pkg.pre_approval_request(command="rm -rf /", description="recursive delete")
     item = qs.from_card(chat=0, message_id=14, text_html="<pre>rm -rf /</pre>", markup=M([[B("Once", callback_data="ea:once:9")]]))
-    assert item["summary"] is None
+    assert item["summary"] is None and item["detail"] is None
     qs.resolve("ea:8"), qs.resolve("ea:9")
     plugin_pkg.STATE["app"] = None
     del sys.modules["guard"]

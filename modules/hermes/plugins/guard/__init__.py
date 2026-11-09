@@ -62,18 +62,19 @@ MODE_LABELS = {
     "ask": ("Ask", "Every action but reads asks you first."),
 }
 
-# The approval card shows its reason in 500 characters
-# (plugins/platforms/telegram/adapter.py, _EA_REASON_BUDGET): the action
-# goes in the reason, short enough that the card always fits.
+# The approval card shows its reason in 500 escaped characters
+# (plugins/platforms/telegram/adapter.py, _EA_REASON_BUDGET), as plain text
+# under Hermes' own code box ("<tool> (plugin approval rule)") and "Reason:"
+# label, which a plugin cannot change: the reason is the plain sentence, then
+# the raw action, cut to what is left.
+CARD_BUDGET = 480
 CARD_ACTION = 300
 # The request's budget (server.hermes.permissions.autoMode.maxPromptTokens),
 # for mammoth-27b's 16k with margin.
 DEFAULT_MAX_PROMPT_TOKENS = 14000
-CARD_SUMMARY = 140
-CARD_ACTION_UNDER_SUMMARY = 240
-# What the card said, keyed by its text: the App topic shows the summary
-# apart (card_summary).
-SUMMARIES: "dict[str, str]" = {}
+# What the card said, keyed by its text: the App topic shows the sentence and
+# the raw action apart (card_summary, card_detail).
+SUMMARIES: "dict[str, tuple[str, str]]" = {}
 MAX_SUMMARIES = 64
 
 
@@ -113,19 +114,40 @@ def summary(tool_name: str, args: dict, limit: int = CARD_ACTION) -> str:
 
 
 def card_summary(description: str) -> "str | None":
-    """The plain-language summary leading an approval card guard wrote, given
-    the card's description (Hermes' pre_approval_request hook passes it)."""
-    return SUMMARIES.get(description)
+    """The plain sentence leading an approval card guard wrote, given the
+    card's description (Hermes' pre_approval_request hook passes it)."""
+    said = SUMMARIES.get(description)
+    return said[0] if said else None
 
 
-def _with_summary(message: str, text: str) -> str:
-    if not text:
-        return message
-    card = f"{text}\n\n{message}"
-    SUMMARIES[card] = text
+def card_detail(description: str) -> "str | None":
+    """The raw action under that sentence."""
+    said = SUMMARIES.get(description)
+    return said[1] if said else None
+
+
+def card_text(said: str, raw: str) -> str:
+    card = f"{said}\n\n{raw}"
+    SUMMARIES[card] = (said, raw)
     while len(SUMMARIES) > MAX_SUMMARIES:
         SUMMARIES.pop(next(iter(SUMMARIES)))
     return card
+
+
+def card_sentence(tool_name: str, args: dict, why: str, owner_text: str) -> str:
+    """One or two plain sentences, in the owner's language: what the action
+    does and why auto mode asks (titles.py); in English without the model."""
+    from . import titles
+
+    try:
+        said = titles.sentence(tool_name, summary(tool_name, args, 1500), why, owner_text)
+    except Exception:  # noqa: BLE001 - the card goes out with the fallback
+        logger.warning("guard: no sentence for the card", exc_info=True)
+        said = ""
+    if said:
+        return said
+    title = command_summary(str(args["command"])) if tool_name == "terminal" and (args or {}).get("command") else ""
+    return titles.fallback_sentence(tool_name, args, why, title)
 
 
 def command_summary(command: str) -> str:
@@ -413,7 +435,7 @@ class Guard:
             if looks_only(tool_name, args) or tool_name in INTERACTIVE:
                 return None
             seen()
-            return self._card(session, tool_name, args, "ask mode: every action asks")
+            return self._card(session, tool_name, args, WHY["ask"])
 
         why = fast_path(tool_name, args, self.cwd)
         if why:
@@ -424,7 +446,7 @@ class Guard:
             return None
         if self.model is None and self._ask is None:
             seen()
-            return self._card(session, tool_name, args, "no review model configured")
+            return self._card(session, tool_name, args, WHY["no_model"])
         if not shown:
             # Claude Code: a call with no classifier-relevant input is allowed.
             return None
@@ -438,35 +460,45 @@ class Guard:
         self._no_verdict(verdict)
         if verdict.kind in ("config_error", "too_long"):
             # Fail closed by asking: not a judgment, not counted as a block.
-            return self._card(session, tool_name, args, verdict.reason)
+            return self._card(session, tool_name, args, WHY[verdict.kind])
         if verdict.kind == "allow":
             session.denials.allowed()
             return None
         if verdict.kind in ("block", "parse_failure"):
             session.denials.blocked()
             if session.denials.over_limit():
-                return self._card(session, tool_name, args, session.denials.limit_prompt(verdict.reason))
+                return self._card(session, tool_name, args, session.denials.limit_why(verdict.reason))
             if verdict.kind == "block":
                 return {"action": "block", "message": blocked_message(verdict.reason)}
             return {"action": "block", "message": no_verdict_message(verdict.reason)}
         return {"action": "block", "message": unavailable_message(
             getattr(self.model, "model", "The review model"), claude_name(tool_name), status_of(verdict.error))}
 
-    def _card(self, session: Session, tool_name: str, args: dict, reason: str):
+    def _card(self, session: Session, tool_name: str, args: dict, why: str):
         """The owner's buttons, through Hermes' approval gate (a no, or no
-        answer, refuses the call)."""
-        said = ""
-        if tool_name == "terminal" and (args.get("command") or "").strip():
-            said = command_summary(str(args["command"]))
-        action = summary(tool_name, args, CARD_ACTION_UNDER_SUMMARY if said else CARD_ACTION)
-        first, _, rest = reason.partition("\n\n")
-        message = _with_summary(f"{first}: {action}" + (f"\n\n{rest}" if rest else ""), said)
+        answer, refuses the call). ``why``: why auto mode asks, as a clause."""
+        import html
+
+        said = card_sentence(tool_name, args, why, session.messages[-1] if session.messages else "")
+        room = max(80, CARD_BUDGET - len(html.escape(said)) - 2)
+        raw = summary(tool_name, args, min(CARD_ACTION, room - len(tool_name) - 3))
+        message = card_text(said, raw)
         # What "Always" remembers: this exact action, never a whole tool.
         grain = hashlib.sha256(json.dumps(args, sort_keys=True, default=str).encode()).hexdigest()[:16]
         rule_key = f"guard:{tool_name}:{grain}"
         if session.subagent and _no_card():
             return _ask_owner(message, rule_key)
         return {"action": "approve", "message": message, "rule_key": rule_key}
+
+
+# Why auto mode asks, a clause after "Auto mode asks because" (the model
+# translates it into the owner's language).
+WHY = {
+    "ask": "you chose ask mode, where every action but reading asks you first",
+    "no_model": "no review model is set up to check actions like this one",
+    "config_error": "it can't reach its review model right now",
+    "too_long": "the action is too long for its review model to read",
+}
 
 
 def _no_card() -> bool:

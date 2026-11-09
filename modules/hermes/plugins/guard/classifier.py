@@ -171,6 +171,16 @@ class Denials:
         self.consecutive = 0
         return f"{head}\n\nLatest blocked action: {reason}"
 
+    def limit_why(self, reason: str) -> str:
+        """The same, as why auto mode asks the owner (starts both counts over as limit_prompt does)."""
+        if self.total >= LIMITS["total"]:
+            why = f"it already blocked {self.total} actions this session, the latest for {reason}"
+            self.total = 0
+        else:
+            why = f"it blocked this {self.consecutive} times in a row, for {reason}"
+        self.consecutive = 0
+        return why
+
 
 # --- what the model reads when auto mode stops a call (Claude Code's, verbatim
 # but for "Claude Code" and the --debug hint, which Hermes has not) ---

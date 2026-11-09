@@ -303,13 +303,22 @@ your passwords somewhere is judged as an action nobody asked for. A
 subagent's calls are judged on its parent's conversation. Hermes' own checks stay underneath:
 its pattern-matched dangerous commands and its hardline blocklist.
 
-On a card, a long or tangled shell command comes with a plain-language title
-above it ("Builds and installs the project"), as Arthur's Pi extension
-bash-titles names commands: same heuristic, prompt and clean-up, Hermes'
-auxiliary model (task `approval`), titles kept by command in
-`~/.hermes/guard/titles.json`; 8 s at most, the card goes out without one
-otherwise. The app shows it apart (`question.summary`, read with guard's
-`card_summary`). computer_use's own per-click question is replaced by this
+A card guard asks is written for you: one or two plain sentences, in the
+language of your last message, of what the action does and why auto mode
+asks ("Hermes wants to delete 41 old backup snapshots on the external disk
+(frees 212 GB). Auto mode asks because deleting can't be undone."), for any
+tool (a command, code, a file, a subagent, the browser…); then the raw
+action. Hermes' auxiliary model (task `approval`) writes the sentence from
+the action and the reason, sentences kept in
+`~/.hermes/guard/sentences.json`, 8 s at most; without it, an English one
+from the tool (and, for a long shell command, its title, as Arthur's Pi
+extension bash-titles names commands, kept in `titles.json`). In Telegram the
+sentence and the raw action are the card's reason, under Hermes' own header
+and its `<terminal> (plugin approval rule)` box, which a plugin cannot change
+(plugins/platforms/telegram/adapter.py, `_format_exec_approval`); the app
+shows the sentence as the question and the action as a detail
+(`question.summary`, `question.detail`, read with guard's `card_summary` and
+`card_detail`). computer_use's own per-click question is replaced by this
 one: one action, one question at most.
 
 The same review answers what a sandboxed Pi session asks Hermes for (a host

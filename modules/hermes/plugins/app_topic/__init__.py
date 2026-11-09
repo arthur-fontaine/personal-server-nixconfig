@@ -81,19 +81,21 @@ def approval_summary(command: str, summary: str) -> None:
 
 
 def pre_approval_request(command: str = "", description: str = "", **_) -> None:
-    """guard (its bash titles, guard/titles.py) writes a plain-language summary above a
-    command it escalates; Hermes' own pattern cards have none (their
-    description is the pattern's name), and stay without."""
+    """guard (guard/titles.py) leads each card it escalates with a plain
+    sentence, the raw action under it; Hermes' own pattern cards have
+    neither (their description is the pattern's name), and stay without."""
     guard = sys.modules.get("guard")
     summarize = getattr(guard, "card_summary", None)
+    detail_of = getattr(guard, "card_detail", None)
     app = STATE["app"]
     if summarize is None or not command or app is None:
         return
     try:
         summary = summarize(description)
+        detail = detail_of(description) if detail_of else None
     except Exception:
-        summary = None
-    app.questions.add_summary(command, summary)
+        summary = detail = None
+    app.questions.add_summary(command, summary, detail)
 
 
 CALL_MARK = "\U0001f399"

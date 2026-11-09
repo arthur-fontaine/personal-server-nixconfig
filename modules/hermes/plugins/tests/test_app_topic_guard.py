@@ -93,14 +93,16 @@ def main() -> None:
             assert item is not None and item["kind"] == "approval", item
             return item
 
+        # Without the auxiliary model, the sentence is built from the title, in English.
         item = ask(LONG, 1)
-        assert item["summary"] == TITLE, item
-        assert TITLE in item["text"], item["text"]
-        assert item["spoken"] == "Hermes wants to run a command that rebuilds the site from a clean state. Allow?", item
-        # The next card, a short command with no title, does not inherit it.
+        said = ("Hermes wants to run a command that rebuilds the site from a clean state. Auto mode asks because "
+                "you chose ask mode, where every action but reading asks you first.")
+        assert item["summary"] == said == item["spoken"], item
+        assert item["detail"] == f"terminal: {LONG}" and said in item["text"], item
+        # The next card, a short command with no title, has its own sentence.
         item = ask(SHORT, 2)
-        assert item["summary"] is None, item
-        assert item["spoken"] == "Hermes asks to use terminal. Allow?", item
+        assert item["summary"].startswith("Hermes wants to run a command. Auto mode asks because"), item
+        assert item["detail"] == f"terminal: {SHORT}", item
         print("ok app_topic with guard")
     finally:
         shutil.rmtree(home, ignore_errors=True)

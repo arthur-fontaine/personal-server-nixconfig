@@ -8,6 +8,12 @@ asks Claude Haiku through the Claude subscription; Hermes asks its auxiliary
 model (task ``approval``, thinking off), the command alone sent, no
 conversation. After a failure, no request for a minute; the card never waits
 past ``TIMEOUT`` seconds and goes out without a title when there is none.
+
+The card's sentence (``sentence``) is the same idea for any tool: one or two
+plain sentences, in the owner's language, of what the action does and why
+auto mode asks, from the action and that reason (the owner's last message is
+sent only for its language). Without the auxiliary model, ``fallback_sentence``
+names the tool's action in English.
 """
 
 from __future__ import annotations
@@ -156,6 +162,120 @@ class Titles:
             self.cache.set(command, text)
             self._save()
         return text
+
+
+# --- the approval card's sentence: what the action does and why auto mode asks ---
+
+SENTENCE_SYSTEM = " ".join([
+    "You write the question an AI assistant named Hermes asks its owner before an action.",
+    "Reply with one or two short plain sentences: what the action does, in concrete everyday words (what,",
+    "where, how many or how big when the action shows it), then why auto mode asks, from the reason given.",
+    "Example: \"Hermes wants to delete 41 old backup snapshots on the external disk (frees 212 GB). Auto mode",
+    "asks because deleting can't be undone.\" Write in the language of the owner's last message (English if",
+    "none). No markdown, no quotes, no command syntax, no file contents, no secrets; never say whether it is",
+    "safe.",
+])
+SENTENCE_TOKENS = 120
+SENTENCE_MAX = 280
+
+
+def sentence_request(tool: str, action: str, why: str, owner_text: str) -> str:
+    return "\n".join([
+        f"Tool: {tool}",
+        f"Action: {request(action, 1200)}",
+        f"Why auto mode asks: {why}",
+        f"The owner's last message (for its language only): {(owner_text or '').strip()[:300] or '(none)'}",
+    ])
+
+
+def sentence_of(reply: str) -> Optional[str]:
+    text = " ".join((reply or "").split())
+    text = re.sub(r"^[\"'`]+|[\"'`]+$", "", text).strip()
+    if not text or "```" in text:
+        return None
+    if len(text) > SENTENCE_MAX:
+        cut = text[:SENTENCE_MAX]
+        end = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+        text = cut[:end + 1] if end > 40 else cut.rstrip() + "…"
+    return text
+
+
+def _ask_sentence(prompt: str) -> str:
+    from agent.auxiliary_client import call_llm
+
+    response = call_llm(
+        task="approval", temperature=0, max_tokens=SENTENCE_TOKENS, timeout=TIMEOUT,
+        messages=[{"role": "system", "content": SENTENCE_SYSTEM}, {"role": "user", "content": prompt}],
+        reasoning_config={"enabled": False},
+    )
+    return response.choices[0].message.content or ""
+
+
+class Sentences(Titles):
+    """Sentences by request (tool, action, why, language sample), on disk as titles are."""
+
+    def __init__(self, file: Optional[Path] = None, ask: Callable[[str], str] = _ask_sentence,
+                 clock: Callable[[], float] = time.monotonic) -> None:
+        super().__init__(file, ask, clock)
+
+    def sentence(self, tool: str, action: str, why: str, owner_text: str) -> str:
+        prompt = sentence_request(tool, action, why, owner_text)
+        with self.lock:
+            known = self.cache.get(prompt)
+            if known or self.clock() < self.paused_until:
+                return known or ""
+        try:
+            text = sentence_of(self.ask(prompt))
+        except Exception as error:  # noqa: BLE001 - the card goes out with the plain fallback
+            logger.warning("guard: no sentence for the card (%s)", error)
+            with self.lock:
+                self.paused_until = self.clock() + PAUSE
+            return ""
+        if not text:
+            return ""
+        with self.lock:
+            self.cache.set(prompt, text)
+            self._save()
+        return text
+
+
+# Without the auxiliary model: a sentence from the tool alone, in English.
+TOOL_PHRASES = {
+    "terminal": "run a command", "execute_code": "run a piece of code", "delegate_task": "hand a task to a subagent",
+    "write_file": "write the file {path}", "patch": "edit the file {path}", "send_message": "send a message",
+    "computer_use": "act on the Mac's screen", "cronjob": "change a scheduled job", "process": "manage a background process",
+    "browser_fast_act": "act in the browser", "sandbox_run": "start the coding agent",
+}
+
+
+def fallback_sentence(tool: str, args: dict, why: str, title_text: str = "") -> str:
+    if title_text:
+        what = f"run a command that {title_text[0].lower() + title_text[1:]}"
+    elif tool.startswith("browser_"):
+        what = "act in the browser"
+    elif tool.startswith("mcp__"):
+        what = f"use {tool.split('__', 2)[1]}'s {tool.split('__', 2)[-1].replace('_', ' ')}"
+    else:
+        path = str((args or {}).get("path") or "")
+        what = TOOL_PHRASES.get(tool, f"use {tool.replace('_', ' ')}").format(path=path or "a file")
+    return f"Hermes wants to {what}. Auto mode asks because {why}."
+
+
+_SENTENCES: Optional[Sentences] = None
+
+
+def sentence(tool: str, action: str, why: str, owner_text: str) -> str:
+    """The card's plain sentence from the auxiliary model, "" when there is none."""
+    global _SENTENCES
+    if _SENTENCES is None:
+        try:
+            from hermes_constants import get_hermes_home
+
+            file = Path(get_hermes_home()) / "guard" / "sentences.json"
+        except Exception:  # noqa: BLE001
+            file = None
+        _SENTENCES = Sentences(file)
+    return _SENTENCES.sentence(tool, action, why, owner_text)
 
 
 _TITLES: Optional[Titles] = None

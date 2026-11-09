@@ -245,8 +245,9 @@ def test_limits_and_failures(port: int) -> None:
     # The third block in a row asks the owner, on Hermes' card.
     directive = g.pre_tool_call("terminal", {"command": "git push --force origin main"}, session_id="s")
     assert directive["action"] == "approve", directive
-    assert directive["message"].startswith("3 consecutive actions were blocked."), directive["message"]
-    assert "Latest blocked action: [Git Destructive]" in directive["message"]
+    assert "Auto mode asks because it blocked this 3 times in a row, for [Git Destructive]." in directive["message"], \
+        directive["message"]
+    assert directive["message"].endswith("\n\nterminal: git push --force origin main")
     assert directive["rule_key"].startswith("guard:terminal:")
     # An allow starts the run over.
     answer(0.9, category="git_destructive")
@@ -264,7 +265,7 @@ def test_limits_and_failures(port: int) -> None:
     REQUESTS.clear()
     assert g.pre_tool_call("read_file", {"path": "x"}, session_id="s") is None
     directive = g.pre_tool_call("terminal", {"command": "make"}, session_id="s")
-    assert directive["action"] == "approve" and directive["message"].startswith("no review model configured: terminal: make")
+    assert directive["action"] == "approve" and "no review model is set up" in directive["message"] and directive["message"].endswith("terminal: make")
     assert REQUESTS == []
 
 
@@ -346,7 +347,7 @@ def test_modes(port: int) -> None:
     REQUESTS.clear()
     assert g.pre_tool_call("read_file", {"path": "x"}, session_id="s") is None
     directive = g.pre_tool_call("write_file", {"path": "notes/a.md", "content": "x"}, session_id="s")
-    assert directive["action"] == "approve" and directive["message"].startswith("ask mode: every action asks")
+    assert directive["action"] == "approve" and "you chose ask mode" in directive["message"]
     assert REQUESTS == []
     # Kept across a restart.
     assert make(port, mode_file=mode_file).mode == "ask"
@@ -373,19 +374,43 @@ def test_review_action(port: int) -> None:
 
 
 def test_card_summary(port: int) -> None:
+    import html
+
     import guard.titles as titles
 
     g = make(port)
     g.set_mode("ask")
-    real = titles.title
-    titles.title = lambda command: "Deletes the build folder"
+    real_title, real_sentence = titles.title, titles.sentence
+    asked = []
     try:
+        # Without the auxiliary model: a sentence from the command's title, in English.
+        titles.sentence = lambda *a: ""
+        titles.title = lambda command: "Deletes the build folder"
         message = g.pre_tool_call("terminal", {"command": "rm -rf build && make clean"}, session_id="s")["message"]
+        said = ("Hermes wants to run a command that deletes the build folder. Auto mode asks because you chose ask "
+                "mode, where every action but reading asks you first.")
+        assert message == f"{said}\n\nterminal: rm -rf build && make clean", message
+        assert G.card_summary(message) == said and G.card_detail(message) == "terminal: rm -rf build && make clean"
+        # Any tool gets one; the model writes it in the owner's language.
+        titles.sentence = lambda tool, action, why, owner: asked.append((tool, action, why, owner)) or (
+            "Hermes veut écrire tes notes dans un fichier de ton dossier. Le mode auto demande parce que tu es en "
+            "mode ask.")
+        turn(g, "fr", "Mets mes notes de réunion dans un fichier")
+        args = {"path": "/Users/hermes/workspace/notes.md", "content": "réunion " * 400}
+        message = g.pre_tool_call("write_file", args, session_id="fr")["message"]
+        assert message.startswith("Hermes veut écrire tes notes"), message
+        tool, action, why, owner = asked[-1]
+        assert (tool, owner) == ("write_file", "Mets mes notes de réunion dans un fichier") and "ask mode" in why
+        assert G.card_detail(message).startswith("write_file: path: /Users/hermes/workspace/notes.md; content:")
+        assert len(html.escape(message)) <= 500, len(html.escape(message))
+        message = g.pre_tool_call("delegate_task", {"goal": "x" * 3000}, session_id="fr")["message"]
+        assert len(html.escape(message)) <= 500
+        # And without either, from the tool's name.
+        titles.sentence = lambda *a: ""
+        message = g.pre_tool_call("execute_code", {"code": "print(1)"}, session_id="fr")["message"]
+        assert message.startswith("Hermes wants to run a piece of code. Auto mode asks because"), message
     finally:
-        titles.title = real
-    assert message.startswith("Deletes the build folder\n\nask mode: every action asks: terminal: rm -rf build")
-    assert G.card_summary(message) == "Deletes the build folder"
-    assert len(message) <= 500
+        titles.title, titles.sentence = real_title, real_sentence
 
 
 def test_subagent_after_its_parent(port: int) -> None:
@@ -506,7 +531,7 @@ def test_budget(port: int) -> None:
     # An action that cannot fit asks the owner, without calling the model.
     REQUESTS.clear()
     directive = g.pre_tool_call("terminal", {"command": "echo " + "y" * 60000}, session_id="u")
-    assert directive["action"] == "approve" and "Too long for auto mode's review model" in directive["message"], directive
+    assert directive["action"] == "approve" and "too long for its review model" in directive["message"], directive
     assert not REQUESTS
 
 
@@ -536,7 +561,7 @@ def test_config_error(port: int) -> None:
         REQUESTS.clear()
         directive = g.pre_tool_call("terminal", {"command": "make clean"}, session_id="s")
         assert directive["action"] == "approve", directive
-        assert "Auto mode can't reach its review model" in directive["message"]
+        assert "Auto mode asks because it can't reach its review model" in directive["message"], directive["message"]
         assert len(REQUESTS) == 1, "a refused request is not asked again"
         assert g.sessions["s"].denials.consecutive == 0, "not counted as a block"
         errors = [m for level, m in Capture.records if level >= logging.ERROR]

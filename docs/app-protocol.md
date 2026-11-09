@@ -131,13 +131,20 @@ be deleted.
     exactly what a tap in Telegram does, so Hermes resolves it the same way
     and edits the card. The app may also read the keyboard from the message
     itself (same buttons).
-  - `summary`: the title `guard` writes above a long or tangled shell command
-    it asks the owner about (3 to 8 words, third person: `guard/titles.py`);
-    `null` for other cards, Hermes' own pattern cards (their reason is a
-    pattern name, in `text`) and a clarify. `command`: what the card's code
+  - `summary`: on a card `guard` asks, one or two plain sentences in the
+    owner's language: what the action does and why auto mode asks ("Hermes
+    wants to delete 41 old backup snapshots on the external disk (frees
+    212 GB). Auto mode asks because deleting can't be undone.";
+    `guard/titles.py`). The app shows it as the question. `null` for Hermes'
+    own pattern cards (their reason is a pattern name, in `text`) and a
+    clarify. `detail`: on guard's cards, the raw action (`terminal: <the
+    command>`, `<tool>: key: value; …`, credentials masked, cut), for a
+    collapsible detail; `null` otherwise. `command`: what the card's code
     box shows: the raw command on Hermes' pattern cards, Hermes' label
-    `<tool> (plugin approval rule)` on guard's (the action is then in
-    `text`), `null` for a clarify. `text`: the card's text without markup.
+    `<tool> (plugin approval rule)` on guard's, `null` for a clarify.
+    `text`: the card's text without markup (Telegram's: Hermes' header and
+    label, then the sentence and the raw action).
+  - `spoken`: what the app says for it; guard's `summary` as is.
   - A clarify's `options` end with `{"id": "other", …}`: pressing it makes
     Hermes take the next text message in that chat as the answer.
   - A question leaves the list when answered, timed out or withdrawn.

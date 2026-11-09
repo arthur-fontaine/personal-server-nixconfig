@@ -71,10 +71,10 @@ class Questions:
         self.on_change = on_change
         self.lock = threading.Lock()
         self.items: dict[str, dict] = {}
-        self.summaries: dict[str, str] = {}
-        self.last_summary: tuple[str, float] | None = None
+        self.summaries: dict[str, tuple[str, str | None]] = {}
+        self.last_summary: tuple[tuple[str, str | None], float] | None = None
 
-    def add_summary(self, command: str, summary: str | None) -> None:
+    def add_summary(self, command: str, summary: str | None, detail: str | None = None) -> None:
         """The summary of the approval about to be asked for ``command``; None
         for one without, so it cannot inherit an earlier card's: every card
         guard escalates has the same command, Hermes' "<terminal> (plugin
@@ -84,12 +84,12 @@ class Questions:
                 self.summaries.pop(command.strip(), None)
                 self.last_summary = None
                 return
-            self.summaries[command.strip()] = summary
-            self.last_summary = (summary, time.time())
+            self.summaries[command.strip()] = (summary, detail)
+            self.last_summary = ((summary, detail), time.time())
             while len(self.summaries) > 50:
                 self.summaries.pop(next(iter(self.summaries)))
 
-    def _summary_for(self, command: str | None) -> str | None:
+    def _summary_for(self, command: str | None) -> tuple[str, str | None] | None:
         if command and command.strip() in self.summaries:
             return self.summaries.pop(command.strip())
         # The card cuts and masks a long command: the summary reported for the
@@ -110,14 +110,15 @@ class Questions:
         if command is None and prefix == "ea":
             match = _PRE.search(text_html or "")
             command = html.unescape(match.group(1)).strip() if match else None
+        detail = None
         with self.lock:
             if summary is None and prefix == "ea":
-                summary = self._summary_for(command)
+                summary, detail = self._summary_for(command) or (None, None)
                 self.last_summary = None
         labels = [o["label"] for o in options]
         item = {
             "id": qid, "kind": kind, "chat": chat, "message_id": message_id,
-            "text": cut(plain, 1200), "summary": cut(summary, 300),
+            "text": cut(plain, 1200), "summary": cut(summary, 300), "detail": cut(detail, 1200),
             "command": cut(command, 1200) if kind == "approval" else None,
             "spoken": speech.question_spoken(kind, plain if not command else command, summary, labels),
             "options": options, "asked_at": now_iso(), "_t": time.time(),
