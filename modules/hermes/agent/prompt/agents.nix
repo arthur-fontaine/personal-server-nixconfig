@@ -325,7 +325,8 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
   ]
   ++ lib.optionals (server.hermes.app.images.provider != null) ([
     "`pet_generate` hatches a new pet for the app from a description (minutes,"
-    "about ten images: in the main chat, through a background subagent). It"
+    "one image and up to three more, within a budget; it says what it spent:"
+    "tell the owner. In the main chat, through a background subagent). It"
     "becomes the app's icon only once the app is rebuilt and reinstalled"
   ] ++ (if server.hermes.app.delivery.enable then [
     "(`sideload_install` with app `hermes`): decide when that is worth it, and on"

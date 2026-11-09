@@ -102,16 +102,37 @@ averages for a day, and integrated into the last 24 hours' kWh.
 The pet is Hermes' own (`agent/pet`, a Codex/petdex spritesheet of 8 × 9
 frames in `~/.hermes/pets/<slug>/`); Hermes hatches one from a description
 with `pet_generate` (or the app's `pet.generate`), through Hermes' image
-generation: a base look, then one animation row per state, each grounded on
-the base. The provider is the bootstrap's choice
+providers but not its hatch (`app_topic/hatch.py`): one image draws the
+whole sheet, the 9 Codex states as 9 rows (portrait 3:4, quality high),
+grounded on a layout guide the plugin draws (each row's cells, construction
+marks the model must not copy); the first idle frame is the pet's look.
+Hermes' own atlas code then slices each row, normalizes, composes and
+validates the 1536 × 1872 atlas; a running-left that is unusable or faces
+right is mirrored from running-right. A row that still fails is redrawn
+alone (Hermes' row prompt, quality medium, grounded on the idle frame), at
+most three rows; beyond that, or if a redrawn row fails again, the hatch
+stops and says so.
+
+Cost: Hermes' own hatch makes 9 images and more (a base, 8 rows, 4 at a time,
+3 tries each), about $2.40 a pet with gpt-image on OpenRouter. This one makes
+one, about $0.30 (plus about $0.10 a redrawn row), within a budget per
+pet, `server.hermes.app.images.maxCostPerPet` ($0.60 by default). Each call
+is priced before it starts, from what the provider reported for the previous
+ones (OpenRouter's `usage.cost`) or an estimate, and not made if it could
+cross the budget; calls run one at a time, since OpenRouter sets the possible
+cost of every request in flight against the key's limit. `pet_generate`
+answers what it spent. `scripts/pet-probe.sh` (on the server) hatches a test
+pet with the real provider into a temporary home and copies the sheet, the
+atlas and its contact sheet to `~/pet-probe/`.
+
+The provider is the bootstrap's choice
 (`server.hermes.app.images`): OpenRouter, OpenAI, or any OpenAI-compatible
 API by its address and key (Hermes' `openai` image plugin pointed there:
 `image_gen.openai.base_url` and `key_env`). The model must take reference
 images (`/images/edits`).
 
 A refusal no retry changes (a rejected key, no credit, a spent spending
-limit: 401/402/403, quota, key limit) stops the hatch at the first one
-(Hermes' own would try each row three times), and `pet_generate` answers
+limit: 401/402/403, quota, key limit) stops the hatch at the first one, and `pet_generate` answers
 with the provider's reason in plain words and what to do: raise the key's
 limit or add credit (openrouter.ai/settings/keys for OpenRouter), or choose
 another provider in the bootstrap's App step. Hermes tells you and does not
