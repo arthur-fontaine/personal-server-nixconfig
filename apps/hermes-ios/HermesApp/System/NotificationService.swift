@@ -44,9 +44,11 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func post(_ n: NotifyPayload) {
-        // In the foreground, looking at that chat: no banner.
-        if UIApplication.shared.applicationState == .active, AppModel.shared.section == .chat,
-           AppModel.shared.selectedTopic == n.chat { return }
+        // In the foreground the app shows it (brief item 9): no banner. In the background, one
+        // per message, whether it came live or in a replay after a relaunch.
+        if UIApplication.shared.applicationState == .active { return }
+        guard PostedNotifications.shared.claim("\(n.chat)-\(n.messageID ?? 0)-\(n.kind ?? "")") else { return }
+        CallLog.shared.log("notification: posted (\(n.kind ?? "message"), chat \(n.chat))")
         let content = UNMutableNotificationContent()
         let title = Self.title(for: n)
         content.title = title

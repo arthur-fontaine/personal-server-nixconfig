@@ -37,7 +37,7 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             // Private sub-chats lock again when the app leaves the screen.
             if phase == .background { model.unlockedTopics.removeAll() }
-            if phase == .active { model.writeWidgetSnapshot() }
+            model.scenePhaseChanged(phase)
         }
     }
 

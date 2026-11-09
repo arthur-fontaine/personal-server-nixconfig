@@ -58,6 +58,7 @@ public final class FakeTelegramClient: TelegramClient {
     public func start() {
         emit(.auth(startsLoggedIn ? .ready : .waitPhoneNumber))
         emit(.connection(.ready))
+        if scene == "background" { Task { await runBackgroundScene() } }
         if scene == "review" {
             Task {
                 try? await Task.sleep(for: .seconds(1))
@@ -274,6 +275,28 @@ public final class FakeTelegramClient: TelegramClient {
         }
         nextID += 1
         emit(.newMessage(Self.botChat.chatID, Fixtures.appMessage(id: nextID, json: #"{"v":3,"type":"reply","re":\#(serverID),"ok":true,"data":\#(replyData)}"#)))
+    }
+
+    /// `background` (brief item 9, the keep-alive test): from 5 s after launch Hermes works for
+    /// 90 s, posting a message and its `notify` every 10 s, then goes idle — while the test has
+    /// put the app in the background.
+    private func runBackgroundScene() async {
+        let chat = Self.botChat.chatID
+        try? await Task.sleep(for: .seconds(5))
+        appState.agent = AgentState(status: .working, task: L("Running: restic check"), since: .now, chat: .main)
+        pushState()
+        for i in 1...9 {
+            try? await Task.sleep(for: .seconds(10))
+            nextID += 1
+            let m = ChatMessage(id: Fixtures.id(nextID), topic: .main, date: .now, isOutgoing: false,
+                                text: FormattedText("Step \(i) of 9 done."))
+            store[.main, default: []].append(m)
+            emit(.newMessage(chat, m))
+            let messageID = nextID
+            nextID += 1
+            emit(.newMessage(chat, Fixtures.appMessage(id: nextID, json: #"{"v":4,"type":"notify","chat":0,"message_id":\#(messageID),"kind":"message","interruption":"active","title":"Hermes","body":"Step \#(i) of 9 done.","spoken":"Step \#(i) of 9 done."}"#)))
+        }
+        finishTurn()
     }
 
     /// Scripted: a question arrives (Live Activity and banner demos).

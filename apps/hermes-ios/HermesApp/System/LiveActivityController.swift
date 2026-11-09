@@ -10,6 +10,33 @@ final class LiveActivityController {
     static let shared = LiveActivityController()
     private var activity: Activity<HermesActivityAttributes>?
     private var endTask: Task<Void, Never>?
+    /// When the content was last given a stale date.
+    private var renewedAt = Date.distantPast
+
+    /// The activity a previous process started (the app was suspended or killed meanwhile) is
+    /// this one's: adopt it rather than start a second; end any extra.
+    init() {
+        let existing = Activity<HermesActivityAttributes>.activities.filter { $0.activityState == .active || $0.activityState == .stale }
+        activity = existing.first
+        for extra in existing.dropFirst() {
+            nonisolated(unsafe) let extra = extra
+            Task { await extra.end(nil, dismissalPolicy: .immediate) }
+        }
+    }
+
+    /// The content holds `KeepAlivePolicy.liveActivityStale`, then iOS shows it as stale rather
+    /// than a status no one can update any more (brief item 9). Renewed each minute while the
+    /// app runs and Telegram is connected.
+    private static var staleDate: Date { .now.addingTimeInterval(KeepAlivePolicy.liveActivityStale) }
+
+    func renew(connected: Bool) {
+        guard connected, let current = activity, current.activityState == .active || current.activityState == .stale,
+              Date.now.timeIntervalSince(renewedAt) >= 50 else { return }
+        renewedAt = .now
+        nonisolated(unsafe) let activity = current
+        let content = activity.content.state
+        Task { await activity.update(ActivityContent(state: content, staleDate: Self.staleDate)) }
+    }
 
     func update(state: AppState, store: HermesStore) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
@@ -29,10 +56,11 @@ final class LiveActivityController {
         if active {
             endTask?.cancel()
             endTask = nil
-            if let activity, activity.activityState == .active {
+            if let activity, activity.activityState == .active || activity.activityState == .stale {
                 // Activity isn't Sendable; it is only ever touched from the main actor here.
                 nonisolated(unsafe) let activity = activity
-                Task { await activity.update(ActivityContent(state: content, staleDate: .now.addingTimeInterval(15 * 60),
+                renewedAt = .now
+                Task { await activity.update(ActivityContent(state: content, staleDate: Self.staleDate,
                                                              relevanceScore: content.question != nil ? 100 : 50),
                                              alertConfiguration: alert(for: content, previous: activity.content.state)) }
             } else {
@@ -66,7 +94,8 @@ final class LiveActivityController {
         let pushType: PushType? = nil
         #endif
         do {
-            activity = try Activity.request(attributes: attributes, content: ActivityContent(state: content, staleDate: nil), pushType: pushType)
+            activity = try Activity.request(attributes: attributes, content: ActivityContent(state: content, staleDate: Self.staleDate), pushType: pushType)
+            renewedAt = .now
             #if HERMES_PAID
             if let activity {
                 Task {

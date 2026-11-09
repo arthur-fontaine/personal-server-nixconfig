@@ -46,6 +46,8 @@ public final class HermesStore {
     public var petReaction: PetAnimation?
     /// When the owner last caressed the pet: the trigger for its haptic and heart.
     public private(set) var caressedAt: Date?
+    /// When Hermes last wrote or changed state: the start of the background grace window.
+    public private(set) var lastBotActivity: Date?
 
     // MARK: Uploads
     public private(set) var uploads: [UUID: UploadProgress] = [:]
@@ -116,7 +118,7 @@ public final class HermesStore {
             guard chat == bot?.chatID else { return }
             if m.topic == appTopicID { handleAppMessage(m); return }
             // The real message replaces its draft even when the message itself is hidden.
-            if !m.isOutgoing { drafts[m.topic] = nil; typing.remove(m.topic) }
+            if !m.isOutgoing { drafts[m.topic] = nil; typing.remove(m.topic); lastBotActivity = .now }
             guard let m = Self.prepared(m) else { return }
             insert(m)
             // The real message replaces the draft that streamed it.
@@ -149,6 +151,7 @@ public final class HermesStore {
             var d = d
             d.text = MessageCleanup.shown(d.text).text
             drafts[d.topic] = d
+            lastBotActivity = .now
         case .draftStopped(let chat, let topic, let id):
             guard chat == bot?.chatID, drafts[topic]?.draftID == id else { return }
             drafts[topic] = nil
@@ -338,6 +341,7 @@ public final class HermesStore {
     }
 
     static let maxPagesToOriginal = 20
+    static let notifyReplayWindow: TimeInterval = 60 * 60
 
     public func send(_ text: String, in topic: TopicID, files: [URL] = [], replyTo: MessageID? = nil) async throws {
         guard let bot else { throw TelegramError.notReady }
@@ -474,6 +478,7 @@ public final class HermesStore {
             guard m.id >= (slotIDs["state"] ?? 0) else { return }
             slotIDs["state"] = m.id
             let oldSprite = state.pet?.spriteMessageID
+            if !replay, s.agent != state.agent || s.questions != state.questions { lastBotActivity = .now }
             state = s
             // The pet looks toward a question as it arrives: not one replayed at launch, nor one
             // answered here that a lagging state still lists.
@@ -498,8 +503,10 @@ public final class HermesStore {
             slotIDs["controls"] = m.id
             controls = c
         case .notify(let n):
-            // History replays old notifications: only live ones become banners.
-            guard !replay else { return }
+            // A replay (launch, or a relaunch by background refresh) shows what arrived while the
+            // app was gone: notifies still here weren't acked, so not shown. Older than an hour,
+            // the bot is about to delete them and they are news no more. The hook posts each once.
+            guard !replay || m.date > .now.addingTimeInterval(-Self.notifyReplayWindow) else { return }
             hooks.notify(n)
             ack([m.id])
         case .reply(let r):

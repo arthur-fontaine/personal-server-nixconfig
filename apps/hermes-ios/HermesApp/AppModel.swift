@@ -52,7 +52,7 @@ final class AppModel {
     let catalogPage = AppModel.value("-catalog", in: ProcessInfo.processInfo.arguments).flatMap(CatalogPage.init(rawValue:))
     var showNewSubchat = false
     var showCommands = false
-    var callPresented = false
+    var callPresented = false { didSet { BackgroundKeepAlive.shared.evaluate() } }
     /// Private sub-chats opened with Face ID this session; cleared when the app goes to the background.
     var unlockedTopics: Set<TopicID> = []
     var toast: String?
@@ -144,6 +144,18 @@ final class AppModel {
     private func stateChanged(_ state: AppState) {
         LiveActivityController.shared.update(state: state, store: store)
         writeWidgetSnapshot()
+        BackgroundKeepAlive.shared.evaluate()
+    }
+
+    /// Back on screen: the Live Activity and the widget from the state now, at once; away: the
+    /// background window decides whether the app keeps running (brief item 9).
+    func scenePhaseChanged(_ phase: ScenePhase) {
+        if phase == .active {
+            LiveActivityController.shared.update(state: store.state, store: store)
+            writeWidgetSnapshot()
+        }
+        if phase == .background { CallLog.shared.save() }
+        BackgroundKeepAlive.shared.scenePhaseChanged(phase)
     }
 
     private func spriteChanged(pet: PetState, url: URL) {

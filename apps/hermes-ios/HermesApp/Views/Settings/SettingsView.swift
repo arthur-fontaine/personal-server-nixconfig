@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var confirmLogout = false
     @State private var reinstalling = false
     @AppStorage(CallVoice.defaultsKey) private var voice: CallVoice = .default
+    @AppStorage(KeepAlivePolicy.defaultsKey) private var grace: Double = KeepAlivePolicy.defaultGrace
 
     var body: some View {
         Form {
@@ -51,13 +52,23 @@ struct SettingsView: View {
                         UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
                     }
                 }
+                if !store.config.paidTeam {
+                    Picker(selection: $grace) {
+                        ForEach(KeepAlivePolicy.graceChoices, id: \.self) { seconds in
+                            Text(Duration.seconds(seconds), format: .units(allowed: [.minutes], width: .wide)).tag(seconds)
+                        }
+                    } label: {
+                        Label("Stay Connected After", systemImage: "timer")
+                    }
+                    .valuePicker()
+                }
             } header: {
                 Text("Notifications")
             } footer: {
                 if store.config.paidTeam {
                     Text("Hermes pushes notifications and Live Activity updates even when the app is closed. With AirPods, Siri reads them out (Announce Notifications).")
                 } else {
-                    Text("This build is signed with a free Apple team: notifications arrive while the app runs or refreshes in the background, not when it's closed. A paid team enables push and Siri announcements.")
+                    Text("This build is signed with a free Apple team, which can't receive push. Notifications and the Live Activity stay live while Hermes works or waits for you, and for \(Duration.seconds(grace), format: .units(allowed: [.minutes], width: .wide)) after: the app stays connected in the background, silently. Otherwise they arrive when iOS wakes the app, a few times a day. A paid team makes them instant.")
                 }
             }
 
