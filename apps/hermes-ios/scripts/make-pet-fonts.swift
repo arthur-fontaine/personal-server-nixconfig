@@ -12,7 +12,10 @@ import UniformTypeIdentifiers
 
 let rows: [(String, Int)] = [("idle", 6), ("running-right", 8), ("running-left", 8), ("waving", 4), ("jumping", 5),
                              ("failed", 8), ("waiting", 6), ("running", 6), ("review", 6)]
-let pixels = 96
+// One strike per size the pet is drawn at, in pixels (24 and 48 pt at 2x and 3x, and 96):
+// iOS picks the strike for the size, so the pixel art is never resampled (which blurred its
+// outline into light fringes).
+let strikes = [48, 72, 96, 144]
 
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data("make-pet-fonts: \(message)\n".utf8))
@@ -54,15 +57,65 @@ for frame in cells.joined() {
 guard box.maxX > box.minX else { fail("the sheet is empty") }
 let side = max(box.maxX - box.minX, box.maxY - box.minY)
 
-func png(_ frame: CGImage) -> Data {
+func png(_ frame: CGImage, _ pixels: Int) -> Data {
     let ctx = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
                         space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
     ctx.interpolationQuality = .none
     let scale = Double(pixels) / Double(side)
     let crop = frame.cropping(to: CGRect(x: box.minX, y: box.minY, width: box.maxX - box.minX, height: box.maxY - box.minY))!
-    let w = Double(crop.width) * scale, h = Double(crop.height) * scale
-    // Centred, feet on the bottom (Core Graphics' origin is at the bottom left).
-    ctx.draw(crop, in: CGRect(x: (Double(pixels) - w) / 2, y: 0, width: w, height: h))
+    let w = (Double(crop.width) * scale).rounded(), h = (Double(crop.height) * scale).rounded()
+    // Centred on whole pixels, feet on the bottom (Core Graphics' origin is at the bottom left).
+    ctx.draw(crop, in: CGRect(x: ((Double(pixels) - w) / 2).rounded(.down), y: 0, width: w, height: h))
+    // Opaque or clear, as PetStill.hardenAlpha: no grey halo from the background removal.
+    let p = ctx.data!.assumingMemoryBound(to: UInt8.self)
+    let row = ctx.bytesPerRow
+    for i in stride(from: 0, to: row * pixels, by: 4) {
+        let a = Int(p[i + 3])
+        if a < 128 { p[i] = 0; p[i + 1] = 0; p[i + 2] = 0; p[i + 3] = 0 }
+        else if a < 255 { for c in 0..<3 { p[i + c] = UInt8(min(255, Int(p[i + c]) * 255 / a)) }; p[i + 3] = 255 }
+    }
+    // The chroma key's spill (magenta, or green) on the pixels next to the cut-out: the
+    // colour channels above the third brought down to it, a grey stays a grey.
+    let edge = max(1, pixels / 48)
+    for y in 0..<pixels { for x in 0..<pixels {
+        let i = y * row + x * 4
+        guard p[i + 3] == 255 else { continue }
+        var near = false
+        for dy in -edge...edge where !near { for dx in -edge...edge {
+            let nx = x + dx, ny = y + dy
+            if nx < 0 || ny < 0 || nx >= pixels || ny >= pixels || p[ny * row + nx * 4 + 3] == 0 { near = true; break }
+        } }
+        guard near else { continue }
+        let r = p[i], g = p[i + 1], b = p[i + 2]
+        if r > g && b > g { let m = g; p[i] = min(r, m); p[i + 2] = min(b, m) }
+        else if g > r && g > b { p[i + 1] = max(r, b) }
+    } }
+    // The cut-out's rim: a pixel next to the clear area lighter than the darkest opaque pixel
+    // around it is the background removal's grey fringe, not the drawing: it takes that
+    // darkest colour (the outline's). Two passes, for a rim two pixels thick at large sizes.
+    func lum(_ i: Int) -> Int { Int(p[i]) + Int(p[i + 1]) + Int(p[i + 2]) }
+    for _ in 0..<2 {
+        let snapshot = Array(UnsafeBufferPointer(start: p, count: row * pixels))
+        for y in 0..<pixels { for x in 0..<pixels {
+            let i = y * row + x * 4
+            guard snapshot[i + 3] == 255 else { continue }
+            var rim = false, darkest = i, darkestLum = Int.max
+            for dy in -1...1 { for dx in -1...1 where dx != 0 || dy != 0 {
+                let nx = x + dx, ny = y + dy
+                if nx < 0 || ny < 0 || nx >= pixels || ny >= pixels { rim = true; continue }
+                let j = ny * row + nx * 4
+                if snapshot[j + 3] == 0 { rim = true; continue }
+                let l = Int(snapshot[j]) + Int(snapshot[j + 1]) + Int(snapshot[j + 2])
+                if l < darkestLum { darkestLum = l; darkest = j }
+            } }
+            guard rim, darkestLum != .max,
+                  Int(snapshot[i]) + Int(snapshot[i + 1]) + Int(snapshot[i + 2]) > darkestLum + 60 else { continue }
+            // Not the drawing's own light edge: only when the darkest neighbour is dark (an outline).
+            guard darkestLum < 3 * 80 else { continue }
+            for c in 0..<3 { p[i + c] = snapshot[darkest + c] }
+        } }
+        _ = lum
+    }
     let data = NSMutableData()
     let dest = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)!
     CGImageDestinationAddImage(dest, ctx.makeImage()!, nil)
@@ -92,21 +145,30 @@ func tables(_ font: Data) -> [String: Data] {
     return out
 }
 
-func sbix(_ frames: [Data]) -> Data {
+func sbix(_ frames: [[Data]]) -> Data {
+    // frames[strike][frame]; one strike per entry of `strikes`.
     let glyphCount = 13, firstDigit = 3
     let header = 4 + (glyphCount + 1) * 4
-    var glyphs = Data(), offsets: [UInt32] = []
-    for g in 0..<glyphCount {
+    var bodies: [Data] = []
+    for (k, size) in strikes.enumerated() {
+        var glyphs = Data(), offsets: [UInt32] = []
+        for g in 0..<glyphCount {
+            offsets.append(UInt32(header + glyphs.count))
+            guard g >= firstDigit else { continue }
+            glyphs.append(be16(0)); glyphs.append(be16(0)); glyphs.append(Data("png ".utf8))
+            glyphs.append(frames[k][(g - firstDigit) % frames[k].count])
+        }
         offsets.append(UInt32(header + glyphs.count))
-        guard g >= firstDigit else { continue }
-        glyphs.append(be16(0)); glyphs.append(be16(0)); glyphs.append(Data("png ".utf8))
-        glyphs.append(frames[(g - firstDigit) % frames.count])
+        var strike = be16(size) + be16(72)
+        for o in offsets { strike.append(be32(o)) }
+        strike.append(glyphs)
+        bodies.append(strike)
     }
-    offsets.append(UInt32(header + glyphs.count))
-    var strike = be16(pixels) + be16(72)
-    for o in offsets { strike.append(be32(o)) }
-    strike.append(glyphs)
-    return be16(1) + be16(1) + be32(1) + be32(12) + strike
+    var table = be16(1) + be16(1) + be32(UInt32(strikes.count))
+    var offset = 8 + 4 * strikes.count
+    for body in bodies { table.append(be32(UInt32(offset))); offset += body.count }
+    for body in bodies { table.append(body) }
+    return table
 }
 
 func name(_ name: String) -> Data {
@@ -145,7 +207,7 @@ let base = tables(template)
 guard base["sbix"] != nil, base["name"] != nil, base["head"] != nil else { fail("\(args[2]) isn't the template") }
 for (i, row) in rows.enumerated() {
     var t = base
-    t["sbix"] = sbix(cells[i].map(png))
+    t["sbix"] = sbix(strikes.map { size in cells[i].map { png($0, size) } })
     t["name"] = name("HermesPet-\(row.0)")
     try! write(t).write(to: out.appending(path: "HermesPet-\(row.0).ttf"))
 }

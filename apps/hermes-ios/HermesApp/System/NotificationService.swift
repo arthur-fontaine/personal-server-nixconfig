@@ -1,4 +1,5 @@
 import HermesCore
+import HermesUI
 import Intents
 import UIKit
 import UserNotifications
@@ -108,7 +109,8 @@ final class NotificationService: NSObject, @MainActor UNUserNotificationCenterDe
     /// The current pet, as the App topic sent its sheet; the pet baked into the build until then.
     private static func appIconImage() -> INImage? {
         guard let url = AppModel.shared.store.spriteURL ?? BundledPet.load()?.spritesheet, let sheet = SpriteSheet.cached(url: url),
-              let frame = sheet.frame(.idle, 0), let png = UIImage(cgImage: frame).pngData() else { return nil }
+              let frame = sheet.frame(.idle, 0),
+              let png = PetStill.png(frame: frame, centering: PetCentering(frames: [frame]), inCircle: false) else { return nil }
         return INImage(imageData: png)
     }
 

@@ -140,7 +140,28 @@ public enum PetStill {
                                    circle: inCircle ? side : nil)
         // Core Graphics' origin is at the bottom left.
         ctx.draw(frame, in: CGRect(x: r.minX, y: side - r.maxY, width: r.width, height: r.height))
+        hardenAlpha(ctx)
         guard let image = ctx.makeImage() else { return nil }
         return UIImage(cgImage: image).pngData()
+    }
+
+    /// Pixel art is opaque or clear. A generated pet's sheet keeps a faint grey halo from its
+    /// background removal, which reads as a light fringe on the Live Activity's black: each pixel
+    /// becomes opaque (its colour unpremultiplied) or clear, at half alpha.
+    static func hardenAlpha(_ ctx: CGContext) {
+        guard let data = ctx.data?.assumingMemoryBound(to: UInt8.self) else { return }
+        for row in 0..<ctx.height {
+            let line = data + row * ctx.bytesPerRow
+            for x in 0..<ctx.width {
+                let p = line + x * 4
+                let alpha = Int(p[3])
+                if alpha < 128 {
+                    p[0] = 0; p[1] = 0; p[2] = 0; p[3] = 0
+                } else if alpha < 255 {
+                    for c in 0..<3 { p[c] = UInt8(min(255, Int(p[c]) * 255 / alpha)) }
+                    p[3] = 255
+                }
+            }
+        }
     }
 }
