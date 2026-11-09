@@ -11,8 +11,11 @@ import SwiftUI
 struct QuestionCard: View {
     @Environment(HermesStore.self) private var store
     @Environment(AppModel.self) private var model
+    /// Shown without the choices Telegram's text repeats (`QuestionText`).
     let question: PendingQuestion
     @State private var pressing: String?
+
+    init(question: PendingQuestion) { self.question = QuestionText.display(question) }
 
     var body: some View {
         let (primary, others, more) = layout

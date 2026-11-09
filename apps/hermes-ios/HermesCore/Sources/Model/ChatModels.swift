@@ -108,6 +108,8 @@ public struct ChatMessage: Hashable, Sendable, Codable, Identifiable {
     public var buttons: [InlineButton]
     public var sendState: SendState
     public var replyTo: MessageID?
+    /// A call's details message (`📎 `, protocol §6): shown, never spoken.
+    public var isCallDetails = false
 
     public init(id: MessageID, topic: TopicID, date: Date, editDate: Date? = nil, isOutgoing: Bool,
                 text: FormattedText, attachment: FileAttachment? = nil, buttons: [InlineButton] = [],
@@ -127,6 +129,16 @@ public struct ChatMessage: Hashable, Sendable, Codable, Identifiable {
     /// Text without the `[fichier: …]` markers, which render as cards instead.
     public var displayText: String { FileLink.strip(from: text.text) }
     public var fileLinks: [FileLink] { FileLink.parse(text.text) }
+
+    /// Its keyboard asks one of Hermes' questions (approval `ea:`, clarify `cl:`, owner_approval
+    /// `oa:`/`op:`): the app answers those on the question card, not on the message.
+    public var asksQuestion: Bool {
+        !isOutgoing && buttons.contains { b in
+            guard case .callback(let data) = b.action else { return false }
+            let s = String(decoding: data.prefix(3), as: UTF8.self)
+            return ["ea:", "cl:", "oa:", "op:"].contains(s)
+        }
+    }
 }
 
 /// What a reply shows above itself (design-rules 16.1): who wrote the original and its first

@@ -24,6 +24,8 @@ struct ChatScreen: View {
     @State private var highlighted: MessageID?
     /// After a jump to an original: don't resume following the bottom until the owner scrolls.
     @State private var jumped = false
+    /// Redraws once a new question's message has waited `questionSettle` for the state.
+    @State private var settleTick = 0
 
     var body: some View {
         Group {
@@ -113,10 +115,17 @@ struct ChatScreen: View {
     }
 
     private var conversation: some View {
-        let messages = store.messages(in: topic)
         let questions = store.questions(in: topic)
-        // A message whose question is open shows it as the card below, not as buttons too.
+        // One copy of a question (brief item 3): while it is open its Telegram message (text and
+        // buttons) gives way to the card below; once answered, Hermes' edit of it stays as history.
+        // A question's message waits a moment for the state that opens the card (≤ 3 s behind),
+        // so its buttons don't flash first.
         let asked = Set(questions.compactMap(\.tdlibMessageID))
+        _ = settleTick // read, so its change redraws the transcript
+        let settled = Date.now.addingTimeInterval(-Self.questionSettle)
+        let messages = store.messages(in: topic).filter { m in
+            !asked.contains(m.id) && !(m.asksQuestion && m.date > settled)
+        }
         return ScrollViewReader { proxy in
             ScrollView {
                 ChatColumn {
@@ -132,7 +141,7 @@ struct ChatScreen: View {
                                 TranscriptRow(.system, after: i == 0 ? nil : Self.speaker(messages[i - 1])) { TimeLabel(message.date) }
                             }
                             TranscriptRow(Self.speaker(message), after: showTime ? .system : Self.speaker(messages[i - 1])) {
-                                MessageRow(message: message, showsButtons: !asked.contains(message.id),
+                                MessageRow(message: message,
                                            highlighted: highlighted == message.id,
                                            onReply: { reply(to: message) },
                                            onShowOriginal: { showOriginal($0, proxy: proxy) })
@@ -156,6 +165,11 @@ struct ChatScreen: View {
                         ScrollAnchor().id(Self.bottomID)
                     }
                 }
+            }
+            .task(id: store.messages(in: topic).last?.id) {
+                guard store.messages(in: topic).last?.asksQuestion == true else { return }
+                try? await Task.sleep(for: .seconds(Self.questionSettle))
+                settleTick += 1
             }
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
@@ -239,6 +253,7 @@ struct ChatScreen: View {
         }
     }
 
+    static let questionSettle: TimeInterval = 5
     static let bottomID = "bottom"
     static let probing = ProcessInfo.processInfo.arguments.contains("-geometryProbe")
     static let heartHold = ProcessInfo.processInfo.arguments.contains("-heartHold")

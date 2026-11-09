@@ -39,6 +39,7 @@ struct MessageRow: View {
             if showsButtons, !message.buttons.isEmpty, !message.isOutgoing { InlineKeyboard(message: message) }
         }
         .frame(maxWidth: .infinity, alignment: message.isOutgoing ? .trailing : .leading)
+        .animation(.smooth, value: bubbleState)
         .replyHighlight(highlighted)
         .swipeToReply(onReply)
         .contextMenu {
@@ -67,7 +68,7 @@ struct MessageRow: View {
         switch message.sendState {
         case .pending: .pending
         case .failed: .failed
-        default: .sent
+        default: store.isWaiting(message) ? .waiting : .sent
         }
     }
 }

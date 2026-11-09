@@ -177,7 +177,9 @@ public struct UserBubble: View {
     @ScaledMetric(relativeTo: .body) private var radius = Radius.bubble
     @ScaledMetric(relativeTo: .body) private var minHeight = Metric.oneLineBubble
 
-    public enum State: Sendable { case sent, pending, failed }
+    /// `waiting`: sent while Hermes works, not yet taken into its turn (brief item 10, as ChatGPT
+    /// shows a queued message): lower emphasis and a clock, until Hermes takes it.
+    public enum State: Sendable { case sent, pending, waiting, failed }
 
     public init(_ text: String, state: State = .sent) {
         self.text = text
@@ -189,6 +191,11 @@ public struct UserBubble: View {
             if state == .failed {
                 Image(systemName: "exclamationmark.circle.fill").tone(.destructive)
                     .accessibilityLabel(Text("Not Sent"))
+            } else if state == .waiting {
+                Image(systemName: "clock").tone(.secondary)
+                    .accessibilityLabel(Text("Waiting for Hermes"))
+                    .accessibilityIdentifier("chat.bubble.waiting")
+                    .transition(.opacity)
             }
             Text(verbatim: text)
                 .textRole(.body)
@@ -199,7 +206,7 @@ public struct UserBubble: View {
                 .background(AccentTintStyle(), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
                 .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-                .opacity(state == .pending ? Fade.pending : 1)
+                .opacity(state == .pending || state == .waiting ? Fade.pending : 1)
                 .geometryProbe(radius: radius, inset: Bubble.vertical.points)
                 .accessibilityIdentifier("chat.bubble")
         }

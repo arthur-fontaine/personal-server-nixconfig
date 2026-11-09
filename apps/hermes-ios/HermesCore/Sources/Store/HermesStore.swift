@@ -115,6 +115,9 @@ public final class HermesStore {
         case .newMessage(let chat, let m):
             guard chat == bot?.chatID else { return }
             if m.topic == appTopicID { handleAppMessage(m); return }
+            // The real message replaces its draft even when the message itself is hidden.
+            if !m.isOutgoing { drafts[m.topic] = nil; typing.remove(m.topic) }
+            guard let m = Self.prepared(m) else { return }
             insert(m)
             // The real message replaces the draft that streamed it.
             if !m.isOutgoing { drafts[m.topic] = nil; typing.remove(m.topic) }
@@ -122,6 +125,10 @@ public final class HermesStore {
         case .messageChanged(let chat, let m):
             guard chat == bot?.chatID else { return }
             if m.topic == appTopicID { handleAppMessage(m); return }
+            guard let m = Self.prepared(m) else {
+                messages[m.topic]?.removeAll { $0.id == m.id }
+                return
+            }
             replace(m)
         case .messagesDeleted(let chat, let ids):
             guard chat == bot?.chatID else { return }
@@ -139,6 +146,8 @@ public final class HermesStore {
             }
         case .draft(let chat, let d):
             guard chat == bot?.chatID, d.topic != appTopicID else { return }
+            var d = d
+            d.text = MessageCleanup.shown(d.text).text
             drafts[d.topic] = d
         case .draftStopped(let chat, let topic, let id):
             guard chat == bot?.chatID, drafts[topic]?.draftID == id else { return }
@@ -226,6 +235,21 @@ public final class HermesStore {
 
     // MARK: - Messages
 
+    /// Hermes' messages as the app shows them (`MessageCleanup`): no `🔊` line, the `📎` marker
+    /// turned into `isCallDetails`; nil for the steer notice, which the owner's bubble shows instead.
+    static func prepared(_ m: ChatMessage) -> ChatMessage? {
+        guard !m.isOutgoing else { return m }
+        if MessageCleanup.isSteerNotice(m.text.text) { return nil }
+        var m = m
+        (m.text, m.isCallDetails) = MessageCleanup.shown(m.text)
+        return m
+    }
+
+    /// The owner's message is waiting for Hermes to take it into the running turn (`state.pending`).
+    public func isWaiting(_ m: ChatMessage) -> Bool {
+        m.isOutgoing && state.pending.contains { BotAPIID.tdlib($0.messageID) == m.id }
+    }
+
     private func insert(_ m: ChatMessage) {
         var list = messages[m.topic] ?? []
         if let i = list.firstIndex(where: { $0.id == m.id }) { list[i] = m }
@@ -246,11 +270,12 @@ public final class HermesStore {
     public func loadHistory(_ topic: TopicID) async {
         guard let bot else { return }
         do {
-            let page = try await client.history(chat: bot.chatID, topic: topic, from: 0, limit: 50)
+            let raw = try await client.history(chat: bot.chatID, topic: topic, from: 0, limit: 50)
+            let page = raw.compactMap(Self.prepared)
             let existing = messages[topic] ?? []
             let ids = Set(page.map(\.id))
             messages[topic] = (page.reversed() + existing.filter { !ids.contains($0.id) }).sorted { $0.id < $1.id }
-            if page.count < 50 { reachedStart.insert(topic) }
+            if raw.count < 50 { reachedStart.insert(topic) }
             if topic == .main, let last = messages[topic]?.last { mainThread.lastMessage = last }
         } catch {}
     }
@@ -261,7 +286,7 @@ public final class HermesStore {
             let page = try await client.history(chat: bot.chatID, topic: topic, from: oldest.id, limit: 50)
             let fresh = page.filter { $0.id < oldest.id }
             if fresh.isEmpty { reachedStart.insert(topic); return }
-            messages[topic] = fresh.reversed() + (messages[topic] ?? [])
+            messages[topic] = fresh.compactMap(Self.prepared).reversed() + (messages[topic] ?? [])
         } catch {}
     }
 
@@ -293,7 +318,7 @@ public final class HermesStore {
         fetchingOriginals.insert(id)
         defer { fetchingOriginals.remove(id) }
         do {
-            if let o = try await client.message(chat: bot.chatID, id: id) { originals[id] = o } else { goneOriginals.insert(id) }
+            if let o = try await client.message(chat: bot.chatID, id: id).flatMap(Self.prepared) { originals[id] = o } else { goneOriginals.insert(id) }
         } catch {}
     }
 
@@ -409,7 +434,9 @@ public final class HermesStore {
         var data = option.data
         if data == nil {
             let message = messages[question.chat]?.first { $0.id == messageID }
-            if case .callback(let d)? = message?.buttons.first(where: { $0.label == option.label })?.action { data = d }
+            // The keyboard's label, as the state sent it (the card may show a choice's text instead).
+            let label = state.questions.first { $0.id == question.id }?.options.first { $0.id == option.id }?.label ?? option.label
+            if case .callback(let d)? = message?.buttons.first(where: { $0.label == label || $0.label == option.label })?.action { data = d }
         }
         guard let data else { throw TelegramError.server(code: 400, message: L("This button can't be pressed from here.")) }
         let toast = try await client.pressButton(chat: bot.chatID, message: messageID, data: data)

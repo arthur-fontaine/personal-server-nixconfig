@@ -113,10 +113,14 @@ public struct AppState: Sendable, Equatable {
     public var subchats: [SubchatInfo]
     /// Message ids of the other slot messages (`stats`, `devices`, `sprite`).
     public var slots: [String: MessageID]
+    /// The owner's messages Hermes hasn't taken into the running turn yet (v4).
+    public var pending: [PendingTurn]
     public var updatedAt: Date?
 
     public init(agent: AgentState? = nil, questions: [PendingQuestion] = [], pet: PetState? = nil,
-                subchats: [SubchatInfo] = [], slots: [String: MessageID] = [:], updatedAt: Date? = nil) {
+                subchats: [SubchatInfo] = [], slots: [String: MessageID] = [:], pending: [PendingTurn] = [],
+                updatedAt: Date? = nil) {
+        self.pending = pending
         self.agent = agent
         self.questions = questions
         self.pet = pet
@@ -137,11 +141,38 @@ public struct AppState: Sendable, Equatable {
             for (k, v) in o { if case .number(let n) = v { slots[k] = MessageID(n) } }
         }
         self.slots = slots
+        pending = fields.decodeArray(PendingTurn.self, key: "pending")
         updatedAt = fields.decode(FlexibleDate.self, key: "updated_at")?.date
     }
 
     /// The question to surface first (Live Activity, banner): the oldest.
     public var question: PendingQuestion? { questions.first }
+}
+
+/// An owner's message sent while a turn runs, waiting for Hermes to take it in (a steer, or
+/// queued for the next turn): `state.pending`, v4. `messageID` is the Bot API id.
+public struct PendingTurn: Sendable, Codable, Equatable {
+    public var chat: TopicID
+    public var messageID: MessageID
+    public var since: Date?
+
+    public init(chat: TopicID = .main, messageID: MessageID, since: Date? = nil) {
+        self.chat = chat
+        self.messageID = messageID
+        self.since = since
+    }
+
+    enum CodingKeys: String, CodingKey { case chat, messageID = "message_id", since }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        guard let id = c.decodeInt64(.messageID) else {
+            throw DecodingError.keyNotFound(CodingKeys.messageID, .init(codingPath: c.codingPath, debugDescription: "message_id"))
+        }
+        messageID = id
+        chat = c.decodeTopic(.chat) ?? .main
+        since = c.decodeFlexibleDate(.since)
+    }
 }
 
 /// `devices` slot: the sideload service's delivery.json for the app `hermes`, under `delivery`.
