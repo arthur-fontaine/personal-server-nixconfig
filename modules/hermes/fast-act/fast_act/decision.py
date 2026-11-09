@@ -69,6 +69,33 @@ class Choice:
 class DecisionError(RuntimeError):
     """The model could not be asked, or answered something unusable."""
 
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+DETAIL = 300
+
+
+def _detail(response: httpx.Response) -> str:
+    """A 4xx answer's own reason (Baseten: {"error": "OneJev prompt has 30333
+    tokens, exceeding max_len 16000…"}): without it a misconfiguration reads as
+    a bare status. Only a JSON error field, cut short: a body echoing the
+    request could carry what was sent."""
+    if not 400 <= response.status_code < 500:
+        return ""
+    try:
+        data = response.json()
+    except ValueError:
+        return ""
+    value = data.get("error") or data.get("detail") or data.get("message") if isinstance(data, dict) else None
+    if isinstance(value, dict):
+        value = value.get("message")
+    if not isinstance(value, str):
+        return ""
+    value = " ".join(value.split())
+    return value[:DETAIL] + "…" if len(value) > DETAIL else value
+
 
 def _probability(value: Any) -> float:
     number = float(value)
@@ -108,8 +135,9 @@ def ask(
         if own:
             client.close()
     if response.status_code != 200:
-        # The body may echo the request: only the status leaves here.
-        raise DecisionError(f"the decision model answered HTTP {response.status_code}")
+        detail = _detail(response)
+        raise DecisionError(f"the decision model answered HTTP {response.status_code}" + (f": {detail}" if detail else ""),
+                            response.status_code)
     try:
         data = response.json()
         answers = data["answers"]
