@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -988,21 +989,98 @@ def _unii_chat(runtime, key: str):
     return policy_module.Chat.from_key(key)
 
 
+class ProviderRefused(RuntimeError):
+    """The image provider refused for a reason no retry changes (a key, its
+    credit or limit): the message says what the owner can do."""
+
+
+# An account-level refusal: asking again, or for the next row, gets the same
+# answer. Hermes' hatch retries each of ~8 rows 3 times (agent/pet/generate/
+# orchestrate.py, _ROW_GEN_ATTEMPTS) and the OpenRouter provider marks 401/403
+# non-retryable but 402 retryable on its model chain (plugins/image_gen/
+# openrouter, _IMAGE_API_FALLBACK_STATUSES): a spent key cost 15 calls.
+_REFUSED = re.compile(r"\b40[123]\b|key limit|quota|insufficient|credits?\b|billing|payment required|"
+                      r"rejected the api key|unauthori[sz]ed|forbidden", re.I)
+
+
+def refusal(result) -> str:
+    """The provider's own words when ``result`` (an image provider's answer) is
+    an account-level refusal, else ""."""
+    if not isinstance(result, dict) or result.get("success"):
+        return ""
+    error = str(result.get("error") or "")
+    if result.get("error_type") == "auth_error" or _REFUSED.search(error):
+        return " ".join(error.split())
+    return ""
+
+
+def plain_refusal(provider: str, error: str) -> str:
+    """What happened and what the owner can do, in plain words."""
+    who = {"openrouter": "OpenRouter", "openai": "OpenAI"}.get(provider, provider or "The image provider")
+    where = "https://openrouter.ai/settings/keys" if provider == "openrouter" else "the provider's dashboard"
+    limit = re.search(r"\$([\d.]+) of \$([\d.]+) used(?:; resets (\d{4}-\d\d-\d\d))?", error)
+    if "limit" in error.lower() and limit:
+        resets = f", it resets on {limit.group(3)}" if limit.group(3) else ""
+        what = (f"{who} refused: the API key's spending limit is used up (${limit.group(1)} of ${limit.group(2)}"
+                f"{resets}).")
+    elif re.search(r"\b402\b|insufficient|credits?\b|billing|payment required|quota", error, re.I):
+        what = f"{who} refused: the account has no credit left for images."
+    elif re.search(r"\b401\b|rejected the api key|unauthori[sz]ed", error, re.I):
+        what = f"{who} refused the API key."
+    else:
+        what = f"{who} refused the request ({error[:200]})."
+    return (f"{what} Nothing was drawn and it was not retried. To fix it, raise the key's limit or add credit at "
+            f"{where}, or choose another pet image provider in the bootstrap (App \u00b7 Hermes' side \u2192 "
+            "Pets \u00b7 image provider).")
+
+
+class _StopOnRefusal:
+    """The image provider, answering every call after an account-level refusal
+    with that refusal, without asking again."""
+
+    def __init__(self, provider) -> None:
+        self._provider = provider
+        self.refused = ""
+
+    def generate(self, prompt, **kwargs):
+        if self.refused:
+            return {"success": False, "error": self.refused, "error_type": "auth_error"}
+        result = self._provider.generate(prompt, **kwargs)
+        why = refusal(result)
+        if why:
+            logger.error("app_topic: the pets' image provider refused (%s); no more calls for this pet", why)
+            self.refused = why
+        return result
+
+    def __getattr__(self, name):
+        return getattr(self._provider, name)
+
+
 def generate_pet(prompt: str, name=None) -> dict:
     """Hermes' own hatch: one base look, then one row per animation state,
     packed into the Codex atlas and saved to ~/.hermes/pets/<slug>/, then
-    made the active pet."""
+    made the active pet. Stops at the provider's first account-level refusal
+    (ProviderRefused)."""
     from agent.pet import store
-    from agent.pet.generate import orchestrate
-    from agent.pet.generate.imagegen import GenerationError
+    from agent.pet.generate import imagegen, orchestrate
+    from agent.pet.generate.imagegen import GenerationError, SpriteProvider
 
-    drafts = orchestrate.generate_base_drafts(prompt, n=1)
-    if not drafts:
-        raise GenerationError("the image provider returned no base look")
-    display = (str(name).strip() if name else "") or _name_from(prompt)
-    slug = store.unique_slug(display)
-    result = orchestrate.hatch_pet(base_image=drafts[0], slug=slug, display_name=display, description=prompt,
-                                   concept=prompt)
+    sprite = imagegen.resolve_provider(require_references=True)
+    guarded = _StopOnRefusal(sprite.provider)
+    sprite = SpriteProvider(name=sprite.name, provider=guarded, supports_references=sprite.supports_references)
+    stopped = lambda: bool(guarded.refused)  # noqa: E731
+    try:
+        drafts = orchestrate.generate_base_drafts(prompt, n=1, provider=sprite, is_cancelled=stopped)
+        if not drafts:
+            raise GenerationError("the image provider returned no base look")
+        display = (str(name).strip() if name else "") or _name_from(prompt)
+        slug = store.unique_slug(display)
+        result = orchestrate.hatch_pet(base_image=drafts[0], slug=slug, display_name=display, description=prompt,
+                                       concept=prompt, provider=sprite, is_cancelled=stopped)
+    except Exception:
+        if guarded.refused:
+            raise ProviderRefused(plain_refusal(sprite.name, guarded.refused)) from None
+        raise
     try:
         from hermes_cli.config import load_config, save_config
 

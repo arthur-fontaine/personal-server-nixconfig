@@ -581,6 +581,59 @@ def test_plugin() -> None:
     loop.call_soon_threadsafe(loop.stop)
 
 
+def test_pet_provider_refusal() -> None:
+    """A spent key stops a hatch at the first refusal, and says what to do."""
+    from agent.pet.generate import imagegen
+
+    error = ("OpenRouter rejected the API key (403): Key limit exceeded (monthly limit). Manage it using "
+             "https://openrouter.ai/settings/keys $2.35 of $2.00 used; resets 2026-12-01T00:00:00.000Z.")
+    assert app_mod.refusal({"success": False, "error": error, "error_type": "auth_error"})
+    assert app_mod.refusal({"success": False, "error": "HTTP 402 insufficient credits", "error_type": "api_error"})
+    assert not app_mod.refusal({"success": False, "error": "rate limit (429)", "error_type": "api_error"})
+    assert not app_mod.refusal({"success": True, "image": "x.png"})
+    plain = app_mod.plain_refusal("openrouter", error)
+    assert plain.startswith("OpenRouter refused: the API key's spending limit is used up ($2.35 of $2.00, it "
+                            "resets on 2026-12-01)."), plain
+    assert "https://openrouter.ai/settings/keys" in plain and "bootstrap" in plain
+
+    from PIL import Image
+
+    base = Path(TMP) / "base.png"
+    Image.new("RGBA", (256, 256), (200, 40, 40, 255)).save(base)
+
+    class Provider:
+        name = "openrouter"
+
+        def __init__(self, base_ok: bool) -> None:
+            self.calls, self.base_ok = 0, base_ok
+            self.lock = threading.Lock()
+
+        def generate(self, prompt, **kwargs):
+            with self.lock:
+                self.calls += 1
+                first = self.calls == 1
+            if first and self.base_ok:
+                return {"success": True, "image": str(base)}
+            time.sleep(0.05)
+            return {"success": False, "error": error, "error_type": "auth_error"}
+
+    real = imagegen.resolve_provider
+    try:
+        for base_ok in (False, True):
+            fake = Provider(base_ok)
+            imagegen.resolve_provider = lambda **_: imagegen.SpriteProvider("openrouter", fake, True)
+            try:
+                app_mod.generate_pet("a small red fox")
+            except app_mod.ProviderRefused as refused:
+                assert str(refused) == plain, str(refused)
+            else:
+                raise AssertionError("no refusal")
+            # The base look alone, or the rows already started (4 at a time), never 3 tries a row.
+            assert fake.calls <= (1 if not base_ok else 5), fake.calls
+    finally:
+        imagegen.resolve_provider = real
+
+
 def main() -> None:
     tests = [v for k, v in globals().items() if k.startswith("test_") and callable(v)]
     for test in tests:

@@ -129,7 +129,7 @@ def question_done(chat_id, message_id) -> None:
 
 
 def _pet_generate(args: dict, **_) -> str:
-    from .app import generate_pet
+    from .app import ProviderRefused, generate_pet
 
     app = STATE["app"]
     description = str((args or {}).get("description") or "").strip()
@@ -141,6 +141,10 @@ def _pet_generate(args: dict, **_) -> str:
     try:
         result = generate_pet(description, (args or {}).get("name"))
         manifest = app.adopt_pet(result["slug"], Path(result["directory"]))
+    except ProviderRefused as error:
+        return json.dumps({"error": str(error), "retry": False,
+                           "note": "Do not call pet_generate again until the owner fixed this: tell them, in their "
+                                   "words, what happened and what they can do."})
     except Exception as error:
         return json.dumps({"error": f"generation failed: {error}"})
     finally:

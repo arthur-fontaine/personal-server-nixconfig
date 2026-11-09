@@ -106,6 +106,14 @@ API by its address and key (Hermes' `openai` image plugin pointed there:
 `image_gen.openai.base_url` and `key_env`). The model must take reference
 images (`/images/edits`).
 
+A refusal no retry changes (a rejected key, no credit, a spent spending
+limit: 401/402/403, quota, key limit) stops the hatch at the first one
+(Hermes' own would try each row three times), and `pet_generate` answers
+with the provider's reason in plain words and what to do: raise the key's
+limit or add credit (openrouter.ai/settings/keys for OpenRouter), or choose
+another provider in the bootstrap's App step. Hermes tells you and does not
+try again until you have.
+
 The pet is a companion, not a tamagotchi: it has no needs or levels and
 asks for nothing. It mirrors Hermes (app-protocol.md §5): working while
 Hermes works, waiting while a question is open, a short happy beat when a
