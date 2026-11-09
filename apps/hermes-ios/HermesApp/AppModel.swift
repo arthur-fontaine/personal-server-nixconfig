@@ -52,7 +52,9 @@ final class AppModel {
     let catalogPage = AppModel.value("-catalog", in: ProcessInfo.processInfo.arguments).flatMap(CatalogPage.init(rawValue:))
     var showNewSubchat = false
     var showCommands = false
-    var callPresented = false { didSet { BackgroundKeepAlive.shared.evaluate() } }
+    /// The keep-alive reads `AppModel.shared`: asked on the next turn, since `-call` sets this
+    /// during `shared`'s own initialization (re-entering it traps).
+    var callPresented = false { didSet { Task { @MainActor in BackgroundKeepAlive.shared.evaluate() } } }
     /// Private sub-chats opened with Face ID this session; cleared when the app goes to the background.
     var unlockedTopics: Set<TopicID> = []
     var toast: String?
