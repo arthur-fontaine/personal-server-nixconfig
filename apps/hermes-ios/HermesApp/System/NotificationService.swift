@@ -105,8 +105,9 @@ final class NotificationService: NSObject, @MainActor UNUserNotificationCenterDe
         #endif
     }
 
+    /// The current pet, as the App topic sent its sheet; the pet baked into the build until then.
     private static func appIconImage() -> INImage? {
-        guard let url = BundledPet.load()?.spritesheet, let sheet = SpriteSheet.cached(url: url),
+        guard let url = AppModel.shared.store.spriteURL ?? BundledPet.load()?.spritesheet, let sheet = SpriteSheet.cached(url: url),
               let frame = sheet.frame(.idle, 0), let png = UIImage(cgImage: frame).pngData() else { return nil }
         return INImage(imageData: png)
     }
