@@ -109,7 +109,7 @@ func png(_ frame: CGImage, _ pixels: Int) -> Data {
                 if l < darkestLum { darkestLum = l; darkest = j }
             } }
             guard rim, darkestLum != .max,
-                  Int(snapshot[i]) + Int(snapshot[i + 1]) + Int(snapshot[i + 2]) > darkestLum + 60 else { continue }
+                  Int(snapshot[i]) + Int(snapshot[i + 1]) + Int(snapshot[i + 2]) > darkestLum + 12 else { continue }
             // Not the drawing's own light edge: only when the darkest neighbour is dark (an outline).
             guard darkestLum < 3 * 80 else { continue }
             for c in 0..<3 { p[i + c] = snapshot[darkest + c] }

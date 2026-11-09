@@ -68,7 +68,13 @@ struct PetSpriteView: View {
     /// each row's first frame (the bar's still image), cached per pet version and sheet.
     static func centering(store: HermesStore?, stills: Bool) -> PetCentering {
         guard let sheet = sheet(store: store) else { return .identity }
-        let key = "\(store?.pet?.id ?? "pip")-\(store?.pet?.version ?? 0)-\(ObjectIdentifier(sheet).hashValue)-\(stills)"
+        return centering(sheet: sheet, petID: store?.pet?.id ?? "pip", version: store?.pet?.version ?? 0, stills: stills)
+    }
+
+    /// Off the main actor too: the launch screen computes it before showing the pet (decoding the
+    /// sheet and measuring every frame took the launch's first frames, so its animation stuttered).
+    nonisolated static func centering(sheet: SpriteSheet, petID: String, version: Int, stills: Bool) -> PetCentering {
+        let key = "\(petID)-\(version)-\(ObjectIdentifier(sheet).hashValue)-\(stills)"
         return .cached(key) {
             PetAnimation.allCases.flatMap { row in
                 (stills ? [0] : Array(0..<row.frameCount)).compactMap { sheet.frame(row, $0) }

@@ -64,6 +64,8 @@ public final class FakeTelegramClient: TelegramClient {
     public var repliedTo: [MessageID] { replyLog }
 
     public func start() {
+        // `launch`: Telegram never gets ready, so the launch screen stays (its pet's review).
+        if scene == "launch" { return }
         emit(.auth(startsLoggedIn ? .ready : .waitPhoneNumber))
         emit(.connection(.ready))
         if scene == "background" { Task { await runBackgroundScene() } }

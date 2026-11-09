@@ -28,9 +28,29 @@ struct NotificationsPrompt: View {
 }
 
 struct LaunchView: View {
+    @Environment(HermesStore.self) private var store
+    /// The sheet decoded and the pet's centring measured, off the main actor: until then, the
+    /// launch is the system's plain launch background, and the pet appears ready to animate.
+    @State private var prepared = false
+
     var body: some View {
-        PetSpriteView(animation: .idle, size: .stage)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ZStack {
+            if prepared {
+                PetSpriteView(animation: .idle, size: .stage)
+                    .transition(.opacity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(.smooth, value: prepared)
+        .task {
+            let url = store.spriteURL ?? BundledPet.load()?.spritesheet
+            let id = store.pet?.id ?? "pip", version = store.pet?.version ?? 0
+            await Task.detached(priority: .userInitiated) {
+                guard let url, let sheet = SpriteSheet.cached(url: url) else { return }
+                _ = PetSpriteView.centering(sheet: sheet, petID: id, version: version, stills: false)
+            }.value
+            prepared = true
+        }
     }
 }
 

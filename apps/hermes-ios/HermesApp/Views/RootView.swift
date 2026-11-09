@@ -24,8 +24,6 @@ struct RootView: View {
         }
         .petAccent(model.accent)
         .reviewReducedMotion(model.reduceMotion)
-        .animation(.smooth, value: store.auth)
-        .animation(.smooth, value: store.bot)
         .fullScreenCover(isPresented: $model.callPresented) { CallView() }
         .sheet(isPresented: $model.askNotifications) { NotificationsPrompt() }
         .overlay(alignment: .top) {
@@ -41,20 +39,45 @@ struct RootView: View {
         }
     }
 
-    @ViewBuilder private var content: some View {
-        Group {
-            switch store.auth {
-            case .ready:
-                if store.bot != nil {
-                    AppShell()
-                } else {
-                    FindingBotView()
-                }
-            case .starting:
-                LaunchView()
-            case .missingConfiguration(let what):
+    /// The launch screen stays until the chat can show: Telegram ready and the bot found, in one
+    /// fade. "Finding Hermes" only when the search takes a while or fails (it flashed between the
+    /// launch and the chat, a fade in two steps).
+    @State private var findingIsSlow = false
+    static let findingShownAfter: Duration = .seconds(3)
+
+    private enum Screen: Equatable { case launch, finding, app, other }
+
+    private var screen: Screen {
+        switch store.auth {
+        case .starting: .launch
+        case .ready where store.bot != nil: .app
+        case .ready: store.botError != nil || findingIsSlow ? .finding : .launch
+        default: .other
+        }
+    }
+
+    private var content: some View {
+        screenView
+            .transition(.opacity)
+            .id(screen)
+            .animation(.smooth, value: screen)
+            .task(id: store.auth == .ready && store.bot == nil) {
+                guard store.auth == .ready, store.bot == nil else { findingIsSlow = false; return }
+                try? await Task.sleep(for: Self.findingShownAfter)
+                findingIsSlow = !Task.isCancelled
+            }
+    }
+
+    /// One view per screen, the launch's the same one from Telegram starting to the bot found.
+    @ViewBuilder private var screenView: some View {
+        switch screen {
+        case .launch: LaunchView()
+        case .finding: FindingBotView()
+        case .app: AppShell()
+        case .other:
+            if case .missingConfiguration(let what) = store.auth {
                 ContentUnavailableView("Not configured", systemImage: "wrench.and.screwdriver", description: Text(what))
-            default:
+            } else {
                 LoginFlow()
             }
         }
