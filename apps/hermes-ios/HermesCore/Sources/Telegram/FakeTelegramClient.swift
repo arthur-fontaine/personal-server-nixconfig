@@ -13,6 +13,7 @@ public final class FakeTelegramClient: TelegramClient {
     public var startsLoggedIn: Bool
     /// Streaming speed; tests set it to 0.
     public var streamDelay: Duration = .milliseconds(45)
+    /// The server's (Bot API) numbering; messages carry TDLib's (`Fixtures.id`).
     private var nextID: MessageID = 5000
     private var store: [TopicID: [ChatMessage]]
     private var appState: AppState
@@ -20,6 +21,8 @@ public final class FakeTelegramClient: TelegramClient {
     private var mode = "auto"
     private var model = "deepseek-v4.1-flash"
     private var sentLog: [String] = []
+    /// The buttons pressed, with the TDLib ids they were pressed on (tests).
+    public private(set) var pressed: [(chat: ChatID, message: MessageID, data: Data)] = []
     private var replyLog: [MessageID] = []
 
     /// `review`: the main chat ends on the backup question, Hermes' reply still streaming and its
@@ -33,13 +36,13 @@ public final class FakeTelegramClient: TelegramClient {
         store = Fixtures.messages(now: now)
         appState = Fixtures.state(now: now)
         if scene == "review" {
-            store[.main] = (store[.main] ?? []).filter { $0.id <= 1004 }
+            store[.main] = (store[.main] ?? []).filter { $0.id <= Fixtures.id(1004) }
         }
         if !withQuestion {
             appState.questions = []
             appState.agent = AgentState(status: .idle)
             var main = store[.main] ?? []
-            if let i = main.firstIndex(where: { $0.id == 1005 }) {
+            if let i = main.firstIndex(where: { $0.id == Fixtures.id(1005) }) {
                 main[i].buttons = []
                 main[i].text = FormattedText(main[i].text.text + "\n\n✅ " + L("Allowed once"))
             }
@@ -130,10 +133,11 @@ public final class FakeTelegramClient: TelegramClient {
         sentLog.append(text)
         if let replyTo { replyLog.append(replyTo) }
         nextID += 1
-        var local = ChatMessage(id: nextID, topic: topic, date: .now, isOutgoing: true, text: FormattedText(text), replyTo: replyTo)
+        var local = ChatMessage(id: Fixtures.id(nextID), topic: topic, date: .now, isOutgoing: true, text: FormattedText(text), replyTo: replyTo)
         if topic == Self.appTopic {
-            // As TDLib: a sent message is pending until the server gives it its real id.
+            // As TDLib: a sent message is pending, under a local id, until the server gives it its real id.
             local.sendState = .pending
+            local.id += 1
             Task { await handleRequest(text, id: local.id) }
             return local
         }
@@ -147,7 +151,7 @@ public final class FakeTelegramClient: TelegramClient {
     public func sendFile(at url: URL, caption: String, chat: ChatID, topic: TopicID) async throws -> ChatMessage {
         nextID += 1
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
-        let m = ChatMessage(id: nextID, topic: topic, date: .now, isOutgoing: true, text: FormattedText(caption),
+        let m = ChatMessage(id: Fixtures.id(nextID), topic: topic, date: .now, isOutgoing: true, text: FormattedText(caption),
                             attachment: FileAttachment(kind: .document, fileID: Int32(nextID), name: url.lastPathComponent, size: size))
         store[topic, default: []].append(m)
         return m
@@ -159,8 +163,13 @@ public final class FakeTelegramClient: TelegramClient {
     }
 
     public func pressButton(chat: ChatID, message: MessageID, data: Data) async throws -> String? {
+        pressed.append((chat, message, data))
+        // As TDLib: a message it doesn't know isn't there to press.
+        guard store.values.contains(where: { $0.contains { $0.id == message } }) else {
+            throw TelegramError.server(code: 400, message: "Message not found")
+        }
         let answer = String(decoding: data, as: UTF8.self)
-        appState.questions.removeAll { $0.messageID == message }
+        appState.questions.removeAll { $0.tdlibMessageID == message }
         appState.agent = AgentState(status: .working, task: L("Running: restic backup --retry"), since: .now, chat: .main)
         pushState()
         for (topic, list) in store {
@@ -218,7 +227,7 @@ public final class FakeTelegramClient: TelegramClient {
             try? await Task.sleep(for: streamDelay)
         }
         nextID += 1
-        let final = ChatMessage(id: nextID, topic: topic, date: .now, isOutgoing: false, text: Markdownish.parse(shown))
+        let final = ChatMessage(id: Fixtures.id(nextID), topic: topic, date: .now, isOutgoing: false, text: Markdownish.parse(shown))
         store[topic, default: []].append(final)
         emit(.newMessage(chat, final))
         finishTurn()
@@ -254,7 +263,7 @@ public final class FakeTelegramClient: TelegramClient {
         nextID += 1
         let serverID = nextID
         emit(.messageSent(Self.botChat.chatID, oldID: id,
-                          ChatMessage(id: serverID, topic: Self.appTopic, date: .now, isOutgoing: true, text: FormattedText(text))))
+                          ChatMessage(id: Fixtures.id(serverID), topic: Self.appTopic, date: .now, isOutgoing: true, text: FormattedText(text))))
         try? await Task.sleep(for: .milliseconds(300))
         var replyData = "{}"
         switch type {
@@ -271,10 +280,10 @@ public final class FakeTelegramClient: TelegramClient {
     public func simulateApproval() {
         let chat = Self.botChat.chatID
         nextID += 1
-        let m = Fixtures.approvalMessage(id: nextID, now: .now)
+        let m = Fixtures.approvalMessage(id: Fixtures.id(nextID), now: .now)
         store[.main, default: []].append(m)
         emit(.newMessage(chat, m))
-        appState.questions = [Fixtures.approvalQuestion(messageID: m.id)]
+        appState.questions = [Fixtures.approvalQuestion(messageID: nextID)]
         appState.agent = AgentState(status: .waitingUser, task: L("Waiting for your approval"), since: .now, chat: .main)
         pushState()
     }

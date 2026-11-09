@@ -116,7 +116,7 @@ struct ChatScreen: View {
         let messages = store.messages(in: topic)
         let questions = store.questions(in: topic)
         // A message whose question is open shows it as the card below, not as buttons too.
-        let asked = Set(questions.compactMap(\.messageID))
+        let asked = Set(questions.compactMap(\.tdlibMessageID))
         return ScrollViewReader { proxy in
             ScrollView {
                 ChatColumn {

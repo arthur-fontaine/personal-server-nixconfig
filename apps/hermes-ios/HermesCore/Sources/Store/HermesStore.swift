@@ -98,7 +98,8 @@ public final class HermesStore {
 
     public func questions(in topic: TopicID) -> [PendingQuestion] { state.questions.filter { $0.chat == topic } }
 
-    public func question(forMessage id: MessageID) -> PendingQuestion? { state.questions.first { $0.messageID == id } }
+    /// The open question a transcript message carries (`id` is TDLib's).
+    public func question(forMessage id: MessageID) -> PendingQuestion? { state.questions.first { $0.tdlibMessageID == id } }
 
     public var isReady: Bool { auth == .ready && bot != nil }
 
@@ -404,7 +405,7 @@ public final class HermesStore {
     /// button with the same label in the question's message.
     public func answer(_ question: PendingQuestion, with option: QuestionOption) async throws -> String? {
         guard let bot else { throw TelegramError.notReady }
-        guard let messageID = question.messageID else { throw TelegramError.server(code: 400, message: L("This question has no message.")) }
+        guard let messageID = question.tdlibMessageID else { throw TelegramError.server(code: 400, message: L("This question has no message.")) }
         var data = option.data
         if data == nil {
             let message = messages[question.chat]?.first { $0.id == messageID }
@@ -436,7 +437,7 @@ public final class HermesStore {
         if m.isOutgoing {
             return
         }
-        if let doc = m.attachment, m.id == slotIDs["sprite"] ?? state.slots["sprite"] ?? state.pet?.spriteMessageID {
+        if let doc = m.attachment, let sprite = state.slots["sprite"] ?? state.pet?.spriteMessageID, m.id == BotAPIID.tdlib(sprite) {
             fetchSprite(doc)
             return
         }
@@ -476,8 +477,10 @@ public final class HermesStore {
             ack([m.id])
         case .reply(let r):
             guard let re = r.re else { return }
-            if let c = pendingReplies.removeValue(forKey: re) { c.resume(returning: r) }
-            else { earlyReplies[re] = r }
+            // `re` is the request's Bot API id; requests are waited on by their TDLib id.
+            let request = BotAPIID.tdlib(re)
+            if let c = pendingReplies.removeValue(forKey: request) { c.resume(returning: r) }
+            else { earlyReplies[request] = r }
             if !replay { ack([m.id]) }
         case .other:
             break
@@ -485,11 +488,15 @@ public final class HermesStore {
     }
 
     private func ack(_ ids: [MessageID]) {
-        Task { _ = try? await sendRequest(.ack(ids), awaitReply: false) }
+        let serverIDs = ids.compactMap(BotAPIID.botAPI)
+        guard !serverIDs.isEmpty else { return }
+        Task { _ = try? await sendRequest(.ack(serverIDs), awaitReply: false) }
     }
 
-    private func loadSprite(messageID: MessageID) {
+    /// `messageID`: the protocol's (Bot API) id of the message holding the spritesheet.
+    private func loadSprite(messageID botAPIID: MessageID) {
         guard let bot, let appTopicID else { return }
+        let messageID = BotAPIID.tdlib(botAPIID)
         Task {
             guard let page = try? await client.history(chat: bot.chatID, topic: appTopicID, from: messageID + 1, limit: 5),
                   let m = page.first(where: { $0.id == messageID }), let doc = m.attachment else { return }

@@ -32,6 +32,7 @@ struct StoreTests {
         #expect(store.isPrivate(31))
         #expect(!store.isPrivate(12))
         #expect(store.questions.first?.messageID == 1005)
+        #expect(store.question(forMessage: Fixtures.id(1005))?.id == "ea:7")
     }
 
     @Test func streamsADraftThenReplacesItWithTheMessage() async throws {
@@ -60,8 +61,33 @@ struct StoreTests {
         let q = try #require(store.questions.first)
         _ = try await store.answer(q, with: q.options[0])
         #expect(store.questions.isEmpty)
-        try await waitUntil { store.messages(in: .main).first { $0.id == 1005 }?.buttons.isEmpty == true }
+        try await waitUntil { store.messages(in: .main).first { $0.id == Fixtures.id(1005) }?.buttons.isEmpty == true }
         _ = client
+    }
+
+    /// Arthur's "Message not found": the state names the keyboard's message by its Bot API id; the
+    /// button must be pressed on TDLib's id for it (server id << 20), in the bot's DM.
+    @Test func answeringPressesOnTDLibsIDForTheMessage() async throws {
+        let (store, client) = try await makeStore()
+        let chat = FakeTelegramClient.botChat.chatID
+        store._apply(.newMessage(chat, Fixtures.appMessage(id: 907, json: #"{"v":4,"type":"state","agent":{"status":"waiting_user"},"questions":[{"id":"cl:9","kind":"clarify","chat":0,"message_id":1005,"text":"Which?","options":[{"id":"a","label":"A","data_b64":"YQ=="}]}]}"#)))
+        let q = try #require(store.questions.first { $0.id == "cl:9" })
+        _ = try await store.answer(q, with: q.options[0])
+        #expect(client.pressed.last?.message == 1005 << 20 && client.pressed.last?.chat == chat)
+        #expect(client.pressed.last?.data == Data("a".utf8))
+    }
+
+    @Test func protocolIDsConvertToTDLibs() {
+        #expect(BotAPIID.tdlib(1201) == 1_259_339_776)
+        #expect(BotAPIID.botAPI(1_259_339_776) == 1201)
+        #expect(BotAPIID.botAPI(1_259_339_777) == nil, "a local, not yet sent message has no server id")
+    }
+
+    @Test func repliesAreMatchedToRequestsByBotAPIID() async throws {
+        let (store, _) = try await makeStore()
+        // The fake replies with `re` = the request's server id, as the plugin does.
+        let reply = try await store.sendRequest(.callState(active: true), timeout: .seconds(3))
+        #expect(reply?.ok == true)
     }
 
     @Test func answeringFallsBackToTheKeyboardByLabel() async throws {

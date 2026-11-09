@@ -300,6 +300,10 @@ public struct PendingQuestion: Sendable, Codable, Equatable, Identifiable {
         self.options = options
     }
 
+    /// The message carrying the question's inline keyboard, in TDLib's numbering (`messageID` is
+    /// the protocol's Bot API id).
+    public var tdlibMessageID: MessageID? { messageID.map(BotAPIID.tdlib) }
+
     enum CodingKeys: String, CodingKey { case id, kind, chat, messageID = "message_id", text, spoken, summary, command, options, askedAt = "asked_at" }
 
     public init(from decoder: Decoder) throws {

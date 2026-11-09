@@ -2,6 +2,10 @@ import Foundation
 
 /// The demo's content: a plausible week with Hermes. Used by the fake client and the tests.
 public enum Fixtures {
+    /// Fixtures are written with server (Bot API) ids, what the protocol speaks; the messages carry
+    /// TDLib's, as the real client does, so every crossing between the two is exercised.
+    public static func id(_ server: MessageID) -> MessageID { BotAPIID.tdlib(server) }
+
     public static let threads: [ChatThread] = [
         ChatThread(id: 12, name: L("Home server"), iconColor: 0x8EEE98, iconEmoji: "🛠️", order: 3),
         ChatThread(id: 31, name: L("Taxes 2026"), iconColor: 0xFF93B2, iconEmoji: "🔐", order: 2),
@@ -14,10 +18,10 @@ public enum Fixtures {
         func t(_ minutesAgo: Double) -> Date { now.addingTimeInterval(-minutesAgo * 60) }
         // Replies in both directions (design-rules 16.5), one to a deleted message.
         func me(_ id: MessageID, _ topic: TopicID, _ text: String, _ ago: Double, replyTo: MessageID? = nil) -> ChatMessage {
-            ChatMessage(id: id, topic: topic, date: t(ago), isOutgoing: true, text: FormattedText(text), replyTo: replyTo)
+            ChatMessage(id: Self.id(id), topic: topic, date: t(ago), isOutgoing: true, text: FormattedText(text), replyTo: replyTo.map(Self.id))
         }
         func bot(_ id: MessageID, _ topic: TopicID, _ text: String, _ ago: Double, replyTo: MessageID? = nil) -> ChatMessage {
-            ChatMessage(id: id, topic: topic, date: t(ago), isOutgoing: false, text: Markdownish.parse(text), replyTo: replyTo)
+            ChatMessage(id: Self.id(id), topic: topic, date: t(ago), isOutgoing: false, text: Markdownish.parse(text), replyTo: replyTo.map(Self.id))
         }
         return [
             .main: [
@@ -25,9 +29,9 @@ public enum Fixtures {
                 me(1002, 0, L("What happened with the backup?"), 590),
                 bot(1003, 0, L("The external disk was full, so restic stopped before pruning:\n```\nFatal: unable to save snapshot: no space left on device\n```\nPruning snapshots older than 90 days would free about **212 GB**. Want me to do it?"), 588),
                 me(1004, 0, L("Yes, go ahead"), 585, replyTo: 1003),
-                approvalMessage(id: 1005, now: t(584)),
+                approvalMessage(id: Self.id(1005), now: t(584)),
                 me(1006, 0, L("Here's the video from Saturday for Léa"), 120, replyTo: 1001),
-                ChatMessage(id: 1007, topic: 0, date: t(119), isOutgoing: true,
+                ChatMessage(id: Self.id(1007), topic: 0, date: t(119), isOutgoing: true,
                             text: FormattedText(L("Too big for Telegram, so it went through Gofile.") + "\n[fichier: https://gofile.io/d/Qp9w8eR7]")),
                 bot(1008, 0, L("Got it, I sent Léa the link with a note that it expires in 10 days."), 118),
                 me(1009, 0, L("Remind me to call mum tonight"), 30),
@@ -60,6 +64,7 @@ public enum Fixtures {
     /// Hermes' reply caught mid-sentence, for the `review` scene.
     public static let reviewDraft = L("Found 41 snapshots older than 90 days, the oldest from 12 March. Deleting them needs your go-ahead: once pruned, restic can't bring")
 
+    /// `id`: TDLib's.
     public static func approvalMessage(id: MessageID, now: Date) -> ChatMessage {
         let options = [(L("Once"), "ea:once:7"), (L("Session"), "ea:session:7"), (L("Always"), "ea:always:7"), (L("Deny"), "ea:deny:7")]
         return ChatMessage(
@@ -70,6 +75,7 @@ public enum Fixtures {
             })
     }
 
+    /// `messageID`: the protocol's (Bot API).
     public static func approvalQuestion(messageID: MessageID) -> PendingQuestion {
         PendingQuestion(
             id: "ea:7", kind: .approval, chat: .main, messageID: messageID,
@@ -102,8 +108,9 @@ public enum Fixtures {
             slots: ["stats": 802, "devices": 801, "sprite": 790])
     }
 
+    /// An App-topic message whose server (Bot API) id is `id`.
     public static func appMessage(id: MessageID, json: String) -> ChatMessage {
-        ChatMessage(id: id, topic: FakeTelegramClient.appTopic, date: .now, isOutgoing: false,
+        ChatMessage(id: Self.id(id), topic: FakeTelegramClient.appTopic, date: .now, isOutgoing: false,
                     text: FormattedText(json, entities: [TextEntity(offset: 0, length: json.utf16.count, kind: .pre(language: "json"))]))
     }
 
