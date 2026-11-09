@@ -57,6 +57,8 @@ import datetime as dt, plistlib
 args = sys.argv[1:]
 env = {k: v for k, v in os.environ.items() if k.startswith("HERMES_") or k.startswith("APP_")}
 log("xcodebuild", env=env)
+if os.environ.get("FAKE_BUILD_SLEEP"):
+    import time; print("building slowly", flush=True); time.sleep(float(os.environ["FAKE_BUILD_SLEEP"]))
 if os.environ.get("FAKE_BUILD_FAIL"):
     print("/src/App.swift:1: error: cannot find 'Pet' in scope"); sys.exit(65)
 settings = dict(a.split("=", 1) for a in args if "=" in a and not a.startswith("-"))
@@ -149,7 +151,7 @@ class Base(unittest.TestCase):
         self.fake = root / "fake"
         self.fake.mkdir()
         os.environ["FAKE_DIR"] = str(self.fake)
-        for var in ("FAKE_INSTALL_FAIL", "FAKE_BUILD_FAIL"):
+        for var in ("FAKE_INSTALL_FAIL", "FAKE_BUILD_FAIL", "FAKE_BUILD_SLEEP"):
             os.environ.pop(var, None)
         tools = {}
         for name, body in FAKES.items():
@@ -318,6 +320,54 @@ class Failures(Base):
         self.assertIn("the job failed", done["results"]["*"]["error"])
         self.assertIn("the job failed", self.state()["last_error"]["error"])
         self.assertIsNone(self.state()["running"])
+
+    def test_a_stopped_run_says_so_and_keeps_its_request(self):
+        """launchd boots the job out (a rebuild changing its plist): SIGTERM midway."""
+        import signal
+        import subprocess
+        config = self.root / "config.json"
+        config.write_text(json.dumps(self.config))
+        cli.queue(self.cfg, "hermes", ["UDID-A"], "first install")
+        run = subprocess.Popen([sys.executable, "-I", str(HERE.parent / "sideload/cli.py"), "run"],
+                               env={**os.environ, "SIDELOAD_CONFIG": str(config), "FAKE_BUILD_SLEEP": "60"})
+        logs = self.cfg.cache_dir / "logs"
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline and not any("== xcodebuild" in p.read_text() for p in logs.glob("run-*.log")):
+            time.sleep(0.1)
+        run.send_signal(signal.SIGTERM)
+        self.assertEqual(run.wait(timeout=60), 1)
+        state = self.state()
+        self.assertIsNone(state["running"])
+        self.assertIn("the run was stopped (SIGTERM)", state["last_error"]["error"])
+        self.assertIn("the run was stopped", self.cfg.log_file.read_text())
+        self.assertEqual(len(list(self.cfg.requests.glob("*.json"))), 1, "still queued for the next run")
+        self.assertIn("== xcodebuild", next(logs.glob("run-*.log")).read_text(), "the log shows how far it got")
+        cli.cmd_run(self.cfg)
+        self.assertTrue(self.state()["apps"]["hermes"]["installs"]["UDID-A"]["ok"])
+
+    def test_a_killed_run_is_noted_by_the_next(self):
+        state = cli.load_state(self.cfg)
+        state["running"] = {"since": "2026-11-09T00:02:00Z", "apps": ["hermes"]}
+        cli.save_state(self.cfg, state)
+        cli.cmd_run(self.cfg)
+        self.assertIsNone(self.state()["running"])
+        self.assertIn("2026-11-09T00:02:00Z stopped without finishing", self.state()["last_error"]["error"])
+
+    def test_a_failed_kickstart_is_logged(self):
+        self.cfg.label = "org.nix-community.home.sideload"
+        from unittest import mock
+        real, detached = cli.subprocess.Popen, []
+
+        def popen(args, **kwargs):
+            if args[-1:] == ["run"]:
+                detached.append(kwargs)
+                return mock.Mock()
+            return real(args, **kwargs)
+        with mock.patch.object(cli.subprocess, "Popen", side_effect=popen):
+            cli.start(self.cfg)
+        self.assertEqual(len(detached), 1)
+        self.assertTrue(detached[0]["start_new_session"])
+        self.assertIn("launchctl kickstart org.nix-community.home.sideload failed (113", self.cfg.log_file.read_text())
 
     def test_a_success_clears_the_last_error(self):
         cli.note_error(self.cfg, "earlier")

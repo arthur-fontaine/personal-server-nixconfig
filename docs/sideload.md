@@ -109,7 +109,12 @@ team, a crashed run; cleared by the next install that works), `sideload apps`
 (or Hermes' `sideload_apps`) each install's last error, `requests/done/` the
 answer to each request (a crashed run answers them too),
 `~/Library/Logs/sideload.log` one line each, and
-`~/Library/Caches/sideload/logs/` the whole run. "No Apple Account in Xcode":
+`~/Library/Caches/sideload/logs/` the whole run. A run stopped midway (a
+rebuild that changes the job reloads it, which stops a run in progress) says
+so in `last_error` and the log, and its requests stay queued for the job's
+next start; a run killed outright is noted by the next one. When `launchctl
+kickstart` cannot start the job, the log says so and the run starts detached
+from its caller. "No Apple Account in Xcode":
 run `bootstrap-macos.sh sideload-account` at the Mac. "No Apple Development
 certificate yet": make one in Xcode (above). "Not reachable": the device is on another network or asleep; the next
 run tries again.

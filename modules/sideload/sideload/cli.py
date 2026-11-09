@@ -46,6 +46,7 @@ import os
 import plistlib
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -87,6 +88,11 @@ def slug(text: str) -> str:
 
 class SideloadError(Exception):
     pass
+
+
+class Stopped(Exception):
+    """The job was sent SIGTERM: launchd reloading it (a rebuild that changes
+    its plist boots it out), or a logout."""
 
 
 def log_line(cfg: Config, text: str) -> None:
@@ -788,7 +794,8 @@ def run_once(cfg: Config) -> bool:
     logs = cfg.cache_dir / "logs"
     logs.mkdir(parents=True, exist_ok=True)
     log_path = logs / f"run-{now().strftime('%Y%m%dT%H%M%S')}-{uuid.uuid4().hex[:4]}.log"
-    with open(log_path, "w") as log:
+    # Line-buffered: a run killed midway still shows how far it got.
+    with open(log_path, "w", buffering=1) as log:
         for request in removals:
             results[request["app"]] = remove(cfg, state, request["app"], request.get("devices") or [], log)
         try:
@@ -912,9 +919,29 @@ def cmd_run(cfg: Config) -> int:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return 0  # the run in progress picks up what was queued before it ends
+        state = load_state(cfg)
+        if state.get("running"):
+            # Holding the lock, so no run is going: the last one was killed (SIGKILL).
+            note_error(cfg, f"the run started at {state['running'].get('since')} stopped without finishing; "
+                            "its queued requests are retried now")
+            state = load_state(cfg)
+            state["running"] = None
+            save_state(cfg, state)
+
+        def stop(signum, _frame):
+            raise Stopped(signal.Signals(signum).name)
+
+        signal.signal(signal.SIGTERM, stop)
         try:
             while run_once(cfg):
                 pass
+        except Stopped as stopped:
+            # Its requests stay queued: the job's next start (RunAtLoad) does them.
+            state = load_state(cfg)
+            state["running"] = None
+            save_state(cfg, state)
+            note_error(cfg, f"the run was stopped ({stopped}); the next run does what was queued")
+            return 1
         except Exception as error:
             state = load_state(cfg)
             state["running"] = None
@@ -938,8 +965,14 @@ def queue(cfg: Config, app_id: str, devices: list[str], reason: str, action: str
 
 def start(cfg: Config) -> None:
     if cfg.label:
-        if run_tool(cfg, "launchctl", "kickstart", f"gui/{os.getuid()}/{cfg.label}", timeout=30).returncode == 0:
+        started = run_tool(cfg, "launchctl", "kickstart", f"gui/{os.getuid()}/{cfg.label}", timeout=30)
+        if started.returncode == 0:
             return
+        # The run then lives in its caller's launchd job (the bootstrap's
+        # check job, Hermes' gateway): its own session leaves that job's
+        # process group, which launchd kills when the job ends.
+        log_line(cfg, f"launchctl kickstart {cfg.label} failed ({started.returncode}: "
+                      f"{(started.stderr or started.stdout or '').strip()[-200:]}); running detached")
     # No launchd job (a test, or the session's agents not loaded yet): detached.
     cfg.log_file.parent.mkdir(parents=True, exist_ok=True)
     with cfg.log_file.open("a") as out:
