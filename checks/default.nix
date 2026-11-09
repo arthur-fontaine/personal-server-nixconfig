@@ -106,11 +106,15 @@ in
     touch $out
   '';
 
-  # What hermes-freeze picks; the chown and ACLs themselves need root.
-  freeze = pkgs.runCommand "hermes-freeze-tests" { } ''
+  # What hermes-freeze picks and its space report; the chown and ACLs
+  # themselves need root. hermes-space and its weekly line, on a fake Bot API.
+  freeze = pkgs.runCommand "hermes-freeze-tests" { __darwinAllowLocalNetworking = true; } ''
     cp ${../modules/hermes/system/access/freeze.py} freeze.py
     cp ${../modules/hermes/system/access/test_freeze.py} test_freeze.py
+    cp ${../modules/hermes/system/access/space.py} space.py
+    cp ${../modules/hermes/system/access/test_space.py} test_space.py
     ${pkgs.python3}/bin/python3 -I test_freeze.py
+    ${pkgs.python3}/bin/python3 -I test_space.py
     touch $out
   '';
 
