@@ -43,6 +43,23 @@ PET_SCHEMA = {
     },
 }
 
+REDRAW_SCHEMA = {
+    "name": "pet_redraw",
+    "description": (
+        "Redraw some animation rows of the current pet, keeping the rest of its sheet: one image per row, "
+        "within the per-pet budget (it answers what it spent). Rows: idle, running-right, running-left, waving, "
+        "jumping, failed, waiting, running (Hermes working), review (Hermes thinking). Use it when the owner "
+        "dislikes how one animation looks."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "rows": {"type": "array", "items": {"type": "string"}, "description": "The rows to redraw."},
+        },
+        "required": ["rows"],
+    },
+}
+
 FETCH_SCHEMA = {
     "name": "bigfile_fetch",
     "description": (
@@ -163,6 +180,31 @@ def _pet_generate(args: dict, **_) -> str:
                                "(sideload_install with app \"hermes\"), which you may decide to do now or later."})
 
 
+def _pet_redraw(args: dict, **_) -> str:
+    from .app import ProviderRefused, redraw_pet_rows, spent
+
+    app = STATE["app"]
+    rows = [str(r).strip() for r in (args or {}).get("rows") or [] if str(r).strip()]
+    slug = app.pet.data["slug"]
+    if not slug:
+        return json.dumps({"error": "there is no current pet"})
+    if app.pet_busy:
+        return json.dumps({"error": "a pet is already being generated"})
+    app.pet_busy = True
+    try:
+        result = redraw_pet_rows(slug, rows, app.pet_max_cost())
+        manifest = app.adopt_pet(result["slug"], Path(result["directory"]), redrawn=True)
+    except ProviderRefused as error:
+        return json.dumps({"error": str(error), "retry": False, "spent": spent(error.report)})
+    except Exception as error:
+        report = getattr(error, "report", None) or {}
+        return json.dumps({"error": f"redraw failed: {error}", "spent": spent(report)})
+    finally:
+        app.pet_busy = False
+    return json.dumps({"ok": True, "pet": manifest, "rows_redrawn": rows, "spent": spent(result.get("report")),
+                       "note": "The app shows the new rows at once."})
+
+
 def _bigfile_fetch(args: dict, **_) -> str:
     from . import bigfiles
 
@@ -236,6 +278,7 @@ def register(ctx) -> None:
     pets = app.config.get("pets") or {}
     if pets.get("enable", True):
         ctx.register_tool(name="pet_generate", toolset="app", schema=PET_SCHEMA, handler=_pet_generate)
+        ctx.register_tool(name="pet_redraw", toolset="app", schema=REDRAW_SCHEMA, handler=_pet_redraw)
     ctx.register_tool(name="bigfile_fetch", toolset="app", schema=FETCH_SCHEMA, handler=_bigfile_fetch)
     ctx.register_tool(name="bigfile_send", toolset="app", schema=SEND_SCHEMA, handler=_bigfile_send)
 

@@ -900,6 +900,36 @@ def test_pet_budget() -> None:
     assert app_mod.spent(result["report"]) == "$0.36 of the $0.60 budget", result["report"]["budget"]
 
 
+def test_pet_redraw_rows() -> None:
+    """One row of an existing pet redrawn alone, our calm "running" wording,
+    the other rows kept pixel for pixel."""
+    from agent.pet.generate import atlas, imagegen
+
+    from app_topic import hatch
+
+    fake = FakeImages(synthetic_sheet())
+    (sheet, _), _ = _hatch(fake)
+    fake = FakeImages(synthetic_sheet())
+    prompts = []
+    fake.hook = lambda _f, prompt, **_k: prompts.append(prompt) and None
+    work = Path(tempfile.mkdtemp(dir=TMP))
+    result, report = hatch.redraw(sheet, ["running"], "a blue bird",
+                                  sprite=imagegen.SpriteProvider("openrouter", fake, True), work=work)
+    assert len(fake.calls) == 1 and fake.calls[0]["quality"] == hatch.ROW_QUALITY
+    assert "never angry" in prompts[0] and "concentrating" not in prompts[0], prompts[0]
+    assert atlas.validate_atlas(result)["ok"] and report["repaired_rows"] == ["running"]
+    before, after = hatch.atlas_frames(sheet), hatch.atlas_frames(result)
+    for state, _row, count in atlas.ROW_SPECS:
+        same = all(list(before[state][i].getdata()) == list(after[state][i].getdata()) for i in range(count))
+        assert same == (state != "running"), state
+    try:
+        hatch.redraw(sheet, ["dancing"], "x", sprite=imagegen.SpriteProvider("openrouter", fake, True), work=work)
+    except hatch.HatchFailed as failed:
+        assert "dancing" in str(failed)
+    else:
+        raise AssertionError("an unknown row was redrawn")
+
+
 def main() -> None:
     tests = [v for k, v in globals().items() if k.startswith("test_") and callable(v)]
     for test in tests:

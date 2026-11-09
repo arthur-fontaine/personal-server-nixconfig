@@ -254,12 +254,38 @@ def layout_guide(size: tuple[int, int] = GUIDE_SIZE):
     return image
 
 
+# Hermes' "running" row asks for "focused active work … concentrating, busy
+# energy": models draw it as a frown, and the app shows that row whenever
+# Hermes works (an angry pet on the lock screen). Ours keeps the focus and
+# asks for a calm, content face.
+ACTIONS = {
+    "running": ("calm, happy focused work, staying IN PLACE (NOT walking or foot-running): busy hands, as if "
+                "typing or tinkering, a content relaxed face with a small smile; never angry, frowning, "
+                "furrowed or annoyed"),
+}
+
+
+def action(state: str) -> str:
+    from agent.pet.generate import prompts
+
+    return ACTIONS.get(state) or prompts.STATE_ACTIONS[state]
+
+
+def row_prompt(state: str, count: int, concept: str, style: str = "auto") -> str:
+    """Hermes' row prompt (agent/pet/generate/prompts.py), with our action for
+    the states we word differently: it inserts the action verbatim."""
+    from agent.pet.generate import prompts
+
+    text = prompts.build_row_prompt(state, count, concept, style=style)
+    return text.replace(prompts.STATE_ACTIONS[state], action(state)) if state in ACTIONS else text
+
+
 def sheet_prompt(concept: str, style: str = "auto") -> str:
     from agent.pet.generate import atlas, prompts
 
     concept = (concept or "a distinctive mascot creature").strip()
     rows = " ".join(
-        f"Row {i + 1}, {state}: {count} frames of {prompts.STATE_ACTIONS[state]}."
+        f"Row {i + 1}, {state}: {count} frames of {action(state)}."
         for i, (state, _row, count) in enumerate(atlas.ROW_SPECS))
     return (
         f"A sprite sheet of ONE original mascot pet character: {concept}. Honor the requested tone and mood "
@@ -386,6 +412,92 @@ def contact_sheet(atlas_image):
     return out
 
 
+def idle_reference(frame, work: Path) -> Path:
+    """The canonical look for redrawn rows: the first idle frame, keyed, on
+    the chroma key, large enough to read."""
+    from PIL import Image
+
+    idle = frame.convert("RGBA")
+    idle = idle.crop(idle.getbbox() or (0, 0, idle.width, idle.height))
+    scale = max(1, 384 // max(idle.size))
+    idle = idle.resize((idle.width * scale, idle.height * scale), Image.Resampling.NEAREST)
+    reference = Image.new("RGBA", (idle.width + 128, idle.height + 128), CHROMA + (255,))
+    reference.alpha_composite(idle, (64, 64))
+    path = work / "idle-reference.png"
+    reference.convert("RGB").save(path)
+    return path
+
+
+def atlas_frames(sheet) -> dict[str, list]:
+    """An existing atlas cut back into its frames, row by row."""
+    from agent.pet.generate import atlas
+
+    image = atlas._load_rgba(sheet)
+    w, h = atlas.CELL_WIDTH, atlas.CELL_HEIGHT
+    return {state: [image.crop((c * w, row * h, (c + 1) * w, (row + 1) * h)) for c in range(count)]
+            for state, row, count in atlas.ROW_SPECS}
+
+
+def redraw(sheet, states: list[str], concept: str, *, sprite, work: Path, max_cost: float = DEFAULT_MAX_COST,
+           style: str = "auto"):
+    """Redraws *states* of an existing pet's atlas alone (one image each, at
+    the row quality, grounded on its idle frame); the other rows stay as they
+    are. Returns ``(atlas, report)``; raises like ``hatch``."""
+    from agent.pet.generate import atlas
+
+    work.mkdir(parents=True, exist_ok=True)
+    known = [s for s, _r, _c in atlas.ROW_SPECS]
+    unknown = [s for s in states if s not in known]
+    if unknown or not states:
+        raise HatchFailed(f"unknown rows: {', '.join(unknown) or 'none given'} (rows: {', '.join(known)})")
+    guarded = sprite.provider if isinstance(sprite.provider, StopOnRefusal) else StopOnRefusal(sprite.provider)
+    run = _Run(type(sprite)(name=sprite.name, provider=guarded, supports_references=sprite.supports_references),
+               Budget(max_cost), work)
+    report: dict = {"path": "rows", "repaired_rows": list(states)}
+    started = time.monotonic()
+
+    def fail(message: str):
+        report.update(error=message, budget=run.budget.summary(), seconds=round(time.monotonic() - started, 1))
+        if guarded.refused:
+            raise ProviderRefused(plain_refusal(sprite.name, guarded.refused), report)
+        raise HatchFailed(message, report)
+
+    frames = atlas_frames(sheet)
+    idle_ref = idle_reference(frames["idle"][0], work)
+    counts = {s: c for s, _r, c in atlas.ROW_SPECS}
+    for state in states:
+        try:
+            strip = run.draw(f"row-{state}", row_prompt(state, counts[state], concept, style),
+                             references=[idle_ref], aspect=("landscape", None), quality=ROW_QUALITY)
+        except OverBudget as error:
+            fail(f"the {state} row could not be redrawn within the budget: {error}")
+        if strip is None:
+            fail(f"the {state} row could not be redrawn: the provider returned no image")
+        try:
+            frames[state] = atlas.extract_strip_frames(strip, counts[state], method="auto", fit=False)
+        except Exception as error:
+            fail(f"the redrawn {state} row is unusable: {error}")
+        if state == "running-right" and "running-left" not in states:
+            frames["running-left"] = atlas.mirror_frames(frames[state])
+    # Hermes' normalization scales every row by one factor keyed to all of
+    # them: the new rows come out at the pet's size, but the kept rows would
+    # move a little too. Only the redrawn rows are taken from it.
+    normalized, _validation, _named = compose(frames)
+    redrawn = set(states) | ({"running-left"} if "running-right" in states else set())
+    result = atlas._load_rgba(sheet).copy()
+    w, h = atlas.CELL_WIDTH, atlas.CELL_HEIGHT
+    for state, row, _count in atlas.ROW_SPECS:
+        if state in redrawn:
+            box = (0, row * h, atlas.ATLAS_WIDTH, (row + 1) * h)
+            result.paste(normalized.crop(box), box[:2])
+    validation = atlas.validate_atlas(result)
+    if not validation["ok"]:
+        fail("; ".join(validation["errors"]) or "atlas validation failed")
+    result.save(work / "spritesheet.png")
+    report.update(budget=run.budget.summary(), seconds=round(time.monotonic() - started, 1))
+    return result, report
+
+
 # ── the hatch ───────────────────────────────────────────────────────────
 
 class _Run:
@@ -481,18 +593,7 @@ def hatch(prompt: str, *, sprite, work: Path, max_cost: float = DEFAULT_MAX_COST
             report["mirrored_left"] = True
 
     settle_left()
-    # The canonical look for redrawn rows: the first idle frame, keyed, on the
-    # chroma key, large enough to read.
-    from PIL import Image
-
-    idle = frames["idle"][0].convert("RGBA")
-    idle = idle.crop(idle.getbbox() or (0, 0, idle.width, idle.height))
-    scale = max(1, 384 // max(idle.size))
-    idle = idle.resize((idle.width * scale, idle.height * scale), Image.Resampling.NEAREST)
-    reference = Image.new("RGBA", (idle.width + 128, idle.height + 128), CHROMA + (255,))
-    reference.alpha_composite(idle, (64, 64))
-    idle_ref = work / "idle-reference.png"
-    reference.convert("RGB").save(idle_ref)
+    idle_ref = idle_reference(frames["idle"][0], work)
 
     repaired: list[str] = report["repaired_rows"]
     while True:
@@ -527,7 +628,7 @@ def hatch(prompt: str, *, sprite, work: Path, max_cost: float = DEFAULT_MAX_COST
         repaired.append(state)
         report["path"] = "one-sheet + rows"
         try:
-            strip = run.draw(f"row-{state}", prompts.build_row_prompt(state, count, prompt, style=style),
+            strip = run.draw(f"row-{state}", row_prompt(state, count, prompt, style),
                              references=[idle_ref], aspect=("landscape", None), quality=ROW_QUALITY)
         except OverBudget as error:
             fail(f"the {state} row could not be redrawn within the budget: {error}")

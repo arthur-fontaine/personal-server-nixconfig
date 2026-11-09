@@ -67,10 +67,10 @@ class PetState:
     def react(self, beat: str, now: float) -> None:
         self.beat, self.beat_until = beat, now + BEAT
 
-    def adopt(self, slug: str) -> int:
-        """A new active pet: a new version."""
+    def adopt(self, slug: str, redrawn: bool = False) -> int:
+        """A new active pet, or the same one redrawn: a new version."""
         with self.lock:
-            if slug == self.data["slug"]:
+            if slug == self.data["slug"] and not redrawn:
                 return self.data["version"]
             self.data.update(slug=slug, version=self.data["version"] + 1)
             self.save()

@@ -979,9 +979,9 @@ class App:
             return None
         return self.adopt_pet(pet.slug, pet.directory)
 
-    def adopt_pet(self, slug: str, directory: Path) -> dict:
-        changed = slug != self.pet.data["slug"]
-        version = self.pet.adopt(slug)
+    def adopt_pet(self, slug: str, directory: Path, redrawn: bool = False) -> dict:
+        changed = slug != self.pet.data["slug"] or redrawn
+        version = self.pet.adopt(slug, redrawn)
         out = self.dir / "pet"
         manifest_path = out / "pet.json"
         current = None
@@ -1114,6 +1114,31 @@ def generate_pet(prompt: str, name=None, max_cost: float | None = None, work: Pa
     except Exception:
         # Managed mode refuses config edits: the plugin follows the newest generated pet instead.
         logger.debug("app_topic: could not select the pet in config.yaml", exc_info=True)
+    return {"slug": pet.slug, "directory": str(pet.directory), "report": report}
+
+
+def redraw_pet_rows(slug: str, rows: list[str], max_cost: float | None = None, work: Path | None = None) -> dict:
+    """Redraws some rows of an installed pet (hatch.redraw) and saves it in
+    place; the rest of its sheet is kept."""
+    import tempfile
+
+    from agent.pet import store
+    from agent.pet.generate import imagegen
+
+    from . import hatch
+
+    pet = store.load_pet(slug)
+    if pet is None or not pet.exists:
+        raise hatch.HatchFailed(f"no pet '{slug}'")
+    sprite = imagegen.resolve_provider(require_references=True)
+    hatch.openrouter_knobs(sprite.provider)
+    limit = hatch.DEFAULT_MAX_COST if max_cost is None else float(max_cost)
+    concept = pet.description or pet.display_name
+    with tempfile.TemporaryDirectory(prefix="pet-redraw-") as scratch:
+        atlas_image, report = hatch.redraw(pet.spritesheet, rows, concept, sprite=sprite,
+                                           work=work or Path(scratch), max_cost=limit)
+        store.register_local_pet(atlas_image, slug=pet.slug, display_name=pet.display_name,
+                                 description=pet.description)
     return {"slug": pet.slug, "directory": str(pet.directory), "report": report}
 
 
