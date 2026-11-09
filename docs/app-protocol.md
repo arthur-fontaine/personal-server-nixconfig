@@ -147,6 +147,12 @@ be deleted.
   - `spoken`: what the app says for it; guard's `summary` as is.
   - A clarify's `options` end with `{"id": "other", …}`: pressing it makes
     Hermes take the next text message in that chat as the answer.
+  - On a clarify or a proposal, `text` is the question alone: the numbered
+    list of the options (they are the buttons, with their full labels) and
+    Hermes' "Reply "skip" to skip this question." line, in any of its
+    languages, are left out. Telegram keeps both: its adapter writes the list
+    (plugins/platforms/telegram/adapter.py, `send_clarify`) and the turn
+    runner the hint, which a plugin cannot change.
   - A question leaves the list when answered, timed out or withdrawn.
 - `pet`: see §5. `manifest` is the Codex `pet.json` (plus `version`).
   `sprite_message_id`: a message in the App topic whose document is the

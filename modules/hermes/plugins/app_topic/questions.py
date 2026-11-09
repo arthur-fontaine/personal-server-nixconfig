@@ -28,6 +28,48 @@ def html_to_text(text: str) -> str:
     return html.unescape(_TAG.sub("", text or "")).strip()
 
 
+_skip_hints: "set[str] | None" = None
+
+
+def skip_hints() -> "set[str]":
+    """Every locale's 'Reply "skip" to skip this question.', which Hermes'
+    turn runner appends to a clarify's question on messaging platforms
+    (gateway/run_turn_runner.py, gateway.clarify.skip_hint)."""
+    global _skip_hints
+    if _skip_hints is None:
+        hints = {'Reply "skip" to skip this question.'}
+        try:
+            from agent.i18n import SUPPORTED_LANGUAGES, t
+
+            for lang in SUPPORTED_LANGUAGES:
+                hint = t("gateway.clarify.skip_hint", lang=lang)
+                if hint and hint != "gateway.clarify.skip_hint":
+                    hints.add(hint.strip())
+        except Exception:  # noqa: BLE001 - English only
+            pass
+        _skip_hints = hints
+    return _skip_hints
+
+
+def without_options(text: str, labels: "list[str]") -> str:
+    """A question's text without what its buttons already say: the numbered
+    list the Telegram adapter writes under a clarify (adapter.py,
+    send_clarify; owner_approval's proposals too) and the skip hint."""
+    names = {label.strip() for label in labels}
+    hints = skip_hints()
+    kept = []
+    for row in text.split("\n"):
+        stripped = row.strip()
+        number = re.match(r"^(\d+)\.\s+(.+)$", stripped)
+        if number and (number.group(1) in names or number.group(2).strip() in names or stripped in names):
+            continue
+        if stripped in hints:
+            continue
+        kept.append(row)
+    out = re.sub(r"\n{3,}", "\n\n", "\n".join(kept)).strip()
+    return re.sub(r"^\u2753\s*", "", out)
+
+
 def keyboard_options(markup) -> list[dict]:
     rows = getattr(markup, "inline_keyboard", None)
     if rows is None and isinstance(markup, dict):
@@ -123,15 +165,18 @@ class Questions:
             "spoken": speech.question_spoken(kind, plain if not command else command, summary, labels),
             "options": options, "asked_at": now_iso(), "_t": time.time(),
         }
-        if prefix == "cl":
-            # The body lists the choices in full; the buttons only say "1", "2"…
+        if prefix in ("cl", "op"):
+            # The body lists the choices in full; a clarify's buttons only say "1", "2"…
             choices = re.findall(r"^\s*(\d+)\.\s+(.+)$", plain, re.M)
             names = {n: c for n, c in choices}
             for option in item["options"]:
                 if option["label"] in names:
                     option["label"] = names[option["label"]]
-            item["spoken"] = speech.question_spoken(kind, plain.split("\n\n")[0], None,
-                                                    [o["label"] for o in item["options"]])
+            # The buttons are the options: the text is the question alone.
+            question = without_options(plain, labels + [o["label"] for o in item["options"]])
+            item["text"] = cut(question, 1200)
+            item["spoken"] = speech.question_spoken(kind, question, None,
+                                                    [o["label"] for o in item["options"] if o["id"] != "other"])
         with self.lock:
             self.items[qid] = item
         self.on_change()

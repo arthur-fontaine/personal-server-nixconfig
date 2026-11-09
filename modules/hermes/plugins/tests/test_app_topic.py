@@ -156,6 +156,21 @@ def test_questions() -> None:
     clar = M([[B("1", callback_data="cl:ab:0")], [B("2", callback_data="cl:ab:1")], [B("✏️ Other", callback_data="cl:ab:other")]])
     item = qs.from_card(chat=5, message_id=11, text_html="❓ Which?\n\n1. Monday\n2. Tuesday", markup=clar)
     assert item["kind"] == "clarify" and [o["label"] for o in item["options"]][:2] == ["Monday", "Tuesday"]
+    # The question alone: the buttons are the options, the skip hint is Telegram's.
+    assert item["text"] == "Which?", item["text"]
+    item = qs.from_card(chat=5, message_id=15, markup=clar, text_html=(
+        "❓ Quel jour pour le dentiste ?\nRépondez « skip » pour passer cette question.\n\n1. Lundi\n2. Mardi"))
+    assert item["kind"] == "clarify" and item["text"].startswith("Quel jour pour le dentiste ?"), item["text"]
+    assert item["text"] == "Quel jour pour le dentiste ?" and "Lundi" in item["spoken"], item
+    item = qs.from_card(chat=5, message_id=16, markup=clar, text_html=(
+        '❓ Which day?\nReply "skip" to skip this question.\n\n1. Monday\n2. Tuesday'))
+    assert item["text"] == "Which day?" and item["spoken"] == "Hermes asks: Which day? Options: Monday, Tuesday.", item
+    qs.resolve("cl:ab")
+    prop = M([[B("1. Reply to Léa", callback_data="op:k1:0")], [B("2. Ignore", callback_data="op:k1:1")]])
+    item = qs.from_card(chat=0, message_id=17, markup=prop, text_html="Léa invites you.\n\n1. Reply to Léa\n2. Ignore")
+    assert item["kind"] == "proposal" and item["text"] == "Léa invites you.", item
+    qs.resolve("op:k1")
+    item = qs.from_card(chat=5, message_id=11, text_html="❓ Which?\n\n1. Monday\n2. Tuesday", markup=clar)
     assert qs.from_card(chat=0, message_id=12, text_html="pick", markup=M([[B("x", callback_data="mp:foo")]])) is None
     assert len(qs.public()) == 2
     # guard's summary of a command the card cut: the one reported just before.

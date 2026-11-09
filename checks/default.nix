@@ -18,6 +18,8 @@ in
     export HOME=$TMPDIR
     # The sandbox points it at a file it does not have; httpx loads it anyway.
     export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
+    # Hermes' strings in every language, as its wrapped binary sets them.
+    export HERMES_BUNDLED_LOCALES=${hermes}/share/hermes-agent/locales
     for test in tests/test_*.py; do
       echo "== $test"
       ${hermes.hermesVenv}/bin/python3 -I "$test"
