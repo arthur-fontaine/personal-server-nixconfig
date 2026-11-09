@@ -48,9 +48,9 @@ struct Composer: View {
             }
             ComposerBar(text: $text, placeholder: Text(placeholder), action: composerAction, focus: focused,
                         onSend: send, onStop: { store.stopDraft(in: topic) }) {
-                Button { model.showCommands = true } label: { Label("Commands", systemImage: "command") }
+                Button { Presentation.afterMenu { model.showCommands = true } } label: { Label("Commands", systemImage: "command") }
                 Divider()
-                Button { importing = true } label: { Label("File", systemImage: "doc") }
+                Button { Presentation.afterMenu { importing = true } } label: { Label("File", systemImage: "doc") }
                 PhotosPicker(selection: $photos, maxSelectionCount: 10, matching: .any(of: [.images, .videos])) {
                     Label("Photos & Videos", systemImage: "photo.on.rectangle")
                 }

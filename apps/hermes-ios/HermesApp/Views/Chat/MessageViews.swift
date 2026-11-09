@@ -46,7 +46,7 @@ struct MessageRow: View {
             Button(action: onReply) { Label("Reply", systemImage: "arrowshape.turn.up.left") }
             Button { UIPasteboard.general.string = message.displayText } label: { Label("Copy", systemImage: "doc.on.doc") }
             if !message.displayText.isEmpty {
-                Button { selecting = true } label: { Label("Select Text", systemImage: "selection.pin.in.out") }
+                Button { Presentation.afterMenu { selecting = true } } label: { Label("Select Text", systemImage: "selection.pin.in.out") }
             }
         }
         .sheet(isPresented: $selecting) { SelectTextSheet(message.displayText) }

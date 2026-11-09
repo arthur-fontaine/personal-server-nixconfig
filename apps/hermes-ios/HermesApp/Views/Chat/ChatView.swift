@@ -72,7 +72,7 @@ struct ChatScreen: View {
         ToolbarItem(placement: .topBarLeading) {
             BarMenuButton(image: petImage, title: petLabel, primaryAction: { store.caress() },
                           menuTitle: petLabel, items: [
-                              BarMenuItem(String(localized: "New Pet…"), systemImage: "sparkles") { model.showNewPet = true },
+                              BarMenuItem(String(localized: "New Pet…"), systemImage: "sparkles") { Presentation.afterMenu { model.showNewPet = true } },
                           ])
             .sensoryFeedback(.impact(flexibility: .soft), trigger: store.caressedAt)
             .accessibilityHint(Text("Caresses the pet"))

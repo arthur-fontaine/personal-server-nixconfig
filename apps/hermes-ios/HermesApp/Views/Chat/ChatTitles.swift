@@ -51,7 +51,7 @@ struct ChatsMenu: View {
         }
         .pickerStyle(.inline)
         .barMonochrome()
-        Button { model.showNewSubchat = true } label: { Label("New Sub-chat…", systemImage: "plus") }
+        Button { Presentation.afterMenu { model.showNewSubchat = true } } label: { Label("New Sub-chat…", systemImage: "plus") }
             .barMonochrome()
         Divider()
         // Dashboard and Settings live here, after the chats (design-rules 11.4).
