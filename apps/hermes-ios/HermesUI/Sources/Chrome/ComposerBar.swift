@@ -410,3 +410,26 @@ public extension View {
     /// A menu picker in a list row: its value in secondary, as Settings' (15.2: no accent text).
     func valuePicker() -> some View { tint(.secondary) }
 }
+
+/// Keeps the composer `Metric.keyboardGap` above the keyboard, as it is above the home indicator.
+/// Driven by the keyboard's show/hide notifications, never its frame: an interactive dismissal
+/// then does no layout while the finger moves, and the gap goes as the keyboard does.
+struct KeyboardGap: ViewModifier {
+    @State private var keyboard = false
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.bottom, keyboard ? Metric.keyboardGap : 0)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                if !keyboard { withAnimation(.smooth) { keyboard = true } }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                if keyboard { withAnimation(.smooth) { keyboard = false } }
+            }
+    }
+}
+
+public extension View {
+    /// For the bar holding the composer.
+    func keyboardGap() -> some View { modifier(KeyboardGap()) }
+}

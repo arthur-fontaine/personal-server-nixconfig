@@ -47,4 +47,36 @@ final class ScrollFollowTests: XCTestCase {
         latest.tap()
         XCTAssertTrue(latest.waitForNonExistence(timeout: 3))
     }
+
+    /// Brief item 2: the composer keeps above the keyboard the gap it has above the home
+    /// indicator (the indicator's top is 13 pt above the edge in the 34-pt safe area: 21 → 20).
+    func testComposerDoesNotTouchTheKeyboard() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-noQuestion"]
+        app.launch()
+        let composer = app.descendants(matching: .any)["composer.capsule"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        let window = app.windows.firstMatch.frame
+        XCTAssertEqual(window.maxY - composer.frame.maxY, 34, accuracy: 1, "on the home indicator's safe area")
+        let field = app.descendants(matching: .any)["composer.field"]
+        field.tap()
+        field.typeText("a")
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+        // The keyboard and the gap animate in: wait until both rest.
+        var last = CGRect.null
+        let deadline = Date().addingTimeInterval(8)
+        while Date() < deadline {
+            let now = keyboard.frame.union(composer.frame)
+            if keyboard.frame.minY < window.maxY - 100, now == last { break }
+            last = now
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        // The keyboard element's frame starts below its 44-pt suggestion bar (measured on the
+        // screenshot: the bar's top is the keyboard's visible top).
+        XCTAssertEqual(keyboard.frame.minY - Self.suggestionBar - composer.frame.maxY, 20, accuracy: 1,
+                       "composer \(composer.frame) vs keyboard \(keyboard.frame)")
+    }
+
+    static let suggestionBar: CGFloat = 44
 }

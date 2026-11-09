@@ -234,6 +234,7 @@ struct ChatScreen: View {
                     }
                 }
                 .animation(.snappy, value: atBottom)
+                .keyboardGap()
             }
         }
     }

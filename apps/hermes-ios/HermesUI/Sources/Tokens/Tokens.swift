@@ -45,6 +45,10 @@ public enum Rhythm: Sendable {
 enum Metric {
     /// HIG Accessibility: minimum hit target.
     static let hitTarget: CGFloat = 44
+    /// The composer's gap above the keyboard: the one it has above the home indicator (the
+    /// indicator's top is 13 pt above the screen's edge in the 34-pt safe area: 34 − 13 = 21,
+    /// on the grid 20), so it doesn't sit on the keys (brief item 2).
+    static let keyboardGap: CGFloat = Spacing.l.points
     /// `.controlSize(.large)` bordered button height on iOS 26 at the default text size (measured
     /// on the simulator: 52). Only the starting value: `ApprovalCard` measures the real height.
     static let largeControl: CGFloat = 52
