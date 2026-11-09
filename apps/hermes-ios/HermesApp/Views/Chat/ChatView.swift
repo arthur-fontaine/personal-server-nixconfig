@@ -209,8 +209,7 @@ struct ChatScreen: View {
             // app hung). Not following, no anchor: nothing moves under the owner.
             .defaultScrollAnchor(following ? .bottom : nil, for: .sizeChanges)
             .scrollDismissesKeyboard(.interactively)
-            .accessibilityIdentifier("chat.transcript")
-            .accessibilityValue(Text(verbatim: gestureProbe))
+            .modifier(ScrollProbeLabel(enabled: Self.scrollProbe, summary: gestureProbe))
             // The distance from the content's end to the visible bottom (the composer bar's
             // inset counted, it grows at accessibility sizes). A number, not a Bool: a Bool's
             // change back to true was dropped while the lazy stack re-estimated its size.
@@ -260,10 +259,12 @@ struct ChatScreen: View {
             // The bar's inset growing at rest while following (the keyboard coming up, a reply
             // chip, a longer draft): the last message stays above the composer (16.3). The scroll
             // view's size-change anchor doesn't cover a safe-area inset (measured: the keyboard's
-            // 78 → 379 pt left the offset where it was). Never during a gesture and never as the
-            // inset shrinks: the keyboard's interactive dismissal is the system's alone.
+            // 78 → 379 pt left the offset where it was). Never during the owner's gesture or its
+            // fling and never as the inset shrinks: the keyboard's interactive dismissal is the
+            // system's alone. The app's own animated scroll (a reply chip comes in during one) is
+            // retargeted.
             .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.bottom } action: { old, new in
-                if new > old, following, scroll.phase == .idle { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                if new > old, following, !scroll.ownerScrolling { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }
             .onChange(of: replyingTo?.id) {
                 if following { withAnimation(.smooth) { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
@@ -346,6 +347,8 @@ private final class ScrollMemo: NSObject {
     /// Where the last gesture started, and whether the transcript was following then.
     var offsetAtStart: CGFloat = 0
     var followingAtStart = true
+    /// The owner's finger or its fling moves the transcript.
+    var ownerScrolling: Bool { phase == .tracking || phase == .interacting || phase == .decelerating }
     /// `-scrollProbe`: the offset each frame of the gesture showed, read by a display link at
     /// each refresh — what the screen drew, not the steps a frame's layout went through.
     var offsets: [CGFloat] = []
@@ -392,4 +395,18 @@ private struct ScrollFacts: Equatable {
 private struct SelectableText: Identifiable {
     let id = UUID()
     let text: String
+}
+
+/// `-scrollProbe` only: the transcript as one element with the last gesture's summary.
+private struct ScrollProbeLabel: ViewModifier {
+    let enabled: Bool
+    let summary: String
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.accessibilityIdentifier("chat.transcript").accessibilityValue(Text(verbatim: summary))
+        } else {
+            content
+        }
+    }
 }
