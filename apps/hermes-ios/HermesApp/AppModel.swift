@@ -157,6 +157,9 @@ final class AppModel {
             writeWidgetSnapshot()
         }
         if phase == .background { CallLog.shared.save() }
+        if phase == .background, config.demo, let topic = NotificationService.testTopic {
+            NotificationService.shared.postTestNotification(topic)
+        }
         BackgroundKeepAlive.shared.scenePhaseChanged(phase)
     }
 
@@ -266,5 +269,6 @@ final class AppModel {
         if args.contains("-newSubchat") { showNewSubchat = true }
         if args.contains("-commands") { showCommands = true }
         if args.contains("-call") { callPresented = true }
+        if config.demo, NotificationService.testTopic != nil { Task { await NotificationService.shared.requestAuthorization() } }
     }
 }

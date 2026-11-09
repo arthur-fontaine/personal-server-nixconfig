@@ -44,7 +44,9 @@ nothing to log in to, every screen works. Launch arguments used by the
 screenshots: `-section pet|dashboard|settings`, `-topic <id>`, `-noQuestion`,
 `-commands`, `-newSubchat`, `-call`, `-noAudio` (the call screen without the
 audio engine, which the simulator's audio unit can abort on), `-demoLogin`. The UI tests add
-`-scrollProbe` (the transcript reports how a gesture moved it, frame by frame).
+`-scrollProbe` (the transcript reports how a gesture moved it, frame by frame) and
+`-notifyOnBackground <topic>` (a notification from that chat each time the app leaves the
+screen); demo notifications are silent.
 
 Tests and screenshots:
 

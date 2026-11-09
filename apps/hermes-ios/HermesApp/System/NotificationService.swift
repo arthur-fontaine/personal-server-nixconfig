@@ -8,8 +8,14 @@ import UserNotifications
 /// notifications, and both need entitlements a free team doesn't get (DECISIONS.md): on a paid
 /// team the notification is donated as an incoming message from "Hermes" (communication
 /// notification) and questions are time-sensitive.
+///
+/// The delegate is the main actor's (an isolated conformance): UIKit takes a notification's
+/// snapshot and state restoration in the completion handler it passes, and asserts it runs on
+/// the main thread. With `nonisolated … async` delegate methods, the Objective-C thunk called that
+/// completion from the cooperative pool when the async body ended, and tapping a notification
+/// crashed the app (NSAssertion in `_performBlockAfterCATransactionCommitSynchronizes:`).
 @MainActor
-final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
+final class NotificationService: NSObject, @MainActor UNUserNotificationCenterDelegate {
     static let shared = NotificationService()
     static let questionCategory = "hermes.question"
     /// A call's written detail (`📎 `): to read, so Siri never announces it.
@@ -65,7 +71,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         } else {
             content.body = n.shownText
         }
-        content.sound = .default
+        content.sound = Self.silent ? nil : .default
         content.threadIdentifier = "topic-\(n.chat)"
         content.targetContentIdentifier = "hermes://chat/\(n.chat)"
         content.userInfo = ["topic": Int(n.chat), "message": n.messageID ?? 0]
@@ -107,20 +113,44 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
 
     // MARK: Delegate
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+    // The completion-handler variants, called by UserNotifications on the main queue: UIKit's
+    // completion is called here, on the main actor, never from an async thunk's executor.
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler(Self.silent ? [.banner, .list] : [.banner, .list, .sound])
     }
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
         let info = response.notification.request.content.userInfo
         let topic = TopicID((info["topic"] as? Int) ?? 0)
         let reply = (response as? UNTextInputNotificationResponse)?.userText
-        await MainActor.run {
-            if let reply, !reply.isEmpty {
-                Task { try? await AppModel.shared.store.send(reply, in: topic) }
-            } else {
-                AppModel.shared.open(topic: topic)
+        CallLog.shared.log("notification: \(reply == nil ? "opened" : "replied") (chat \(topic))")
+        if let reply, !reply.isEmpty {
+            // Answered from the notification, the app in the background: the system keeps it
+            // running until the completion, so it's called once the message is sent.
+            Task { @MainActor in
+                try? await AppModel.shared.store.send(reply, in: topic)
+                completionHandler()
             }
+        } else {
+            AppModel.shared.open(topic: topic)
+            completionHandler()
         }
+    }
+
+    // MARK: UI tests
+
+    /// `-notifyOnBackground <topic>` (demo only): a notification from that chat each time the app
+    /// leaves the screen, for the UI test that taps it and answers it from the banner.
+    /// Demo data (UI tests, screenshots) never makes a sound: on the simulator it plays on the Mac.
+    static var silent: Bool { AppModel.shared.config.demo }
+
+    static let testTopic: TopicID? = AppModel.value("-notifyOnBackground", in: ProcessInfo.processInfo.arguments).flatMap(TopicID.init)
+    func postTestNotification(_ topic: TopicID) {
+        // A new id each time: posted notifications are remembered across launches.
+        post(NotifyPayload(chat: topic, messageID: MessageID(Date.now.timeIntervalSince1970 * 1000), title: "Hermes",
+                           body: String(localized: "Done: the backup finished."), kind: "message"))
     }
 }
