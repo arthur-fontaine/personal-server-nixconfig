@@ -44,8 +44,9 @@ Disable it as above, then:
 2. Delete the account and its home (memory, sessions):
    `sudo sysadminctl -deleteUser hermes`, then `sudo dscl . -delete /Groups/hermes`.
 3. Delete the rest: `/etc/hermes` (the secrets), `/Library/Hermes` (the
-   launcher), `/var/db/hermes-freeze`, `/var/db/hermes-read-acl`,
-   `/var/log/hermes-freeze.log`.
+   launcher), `/var/db/hermes-freeze`, `/var/db/hermes-space`,
+   `/var/db/hermes-read-acl`, `/var/log/hermes-freeze.log`,
+   `/var/log/hermes-space.log`.
 4. Revoke what it held elsewhere: its GitHub token, the OpenCode Zen and RunPod
    API keys, and the bot (send @BotFather `/revoke` for a new token, or
    `/deletebot`).
