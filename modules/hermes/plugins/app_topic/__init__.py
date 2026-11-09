@@ -103,7 +103,9 @@ CALL_CONTEXT = (
     "[This message was spoken in a call from the user's app, and your answer is read aloud as it streams. "
     "Answer as on the phone: open with one short sentence that answers or says what you will do, then short "
     "spoken sentences; no markdown, lists, tables, links, code or emoji; numbers and symbols as words. "
-    "Before a long step, say so in a sentence first.]"
+    "Before a long step, say so in a sentence first. What is better read than heard (links, code, lists, "
+    "figures to keep) goes after your spoken answer, under a line starting with \U0001f4ce: it is sent as a "
+    "separate written message, never read aloud; never mix the two.]"
 )
 
 

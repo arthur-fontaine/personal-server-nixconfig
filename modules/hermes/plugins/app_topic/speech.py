@@ -2,7 +2,9 @@
 
 Siri reads a notification aloud as written (Announce Notifications), so the
 spoken variant has no markdown, no URL, no code, no emoji, and symbols in
-words. A last line "🔊 <text>" written by Hermes replaces the derived one.
+words. It is always derived: a "🔊 …" line Hermes may still write (an old
+habit) never reaches Telegram (``outgoing``). A message starting with "📎 " is
+written detail, never spoken (docs/app-protocol.md §6).
 """
 
 from __future__ import annotations
@@ -13,7 +15,8 @@ from urllib.parse import urlparse
 
 SPOKEN_MAX = 200
 BODY_MAX = 240
-OVERRIDE = "🔊"
+SPEAKER = "\U0001f50a"
+DETAIL = "\U0001f4ce"
 
 _CODE_BLOCK = re.compile(r"```.*?(?:```|$)", re.S)
 _INLINE_CODE = re.compile(r"`([^`\n]*)`")
@@ -62,13 +65,33 @@ def _no_emoji(text: str) -> str:
     return "".join(out)
 
 
-def split_override(text: str) -> tuple[str, str | None]:
-    """(text without a final "🔊 …" line, that line's text or None)."""
-    lines = (text or "").rstrip().split("\n")
-    if lines and lines[-1].strip().startswith(OVERRIDE):
-        spoken = lines[-1].strip()[len(OVERRIDE):].strip()
-        return "\n".join(lines[:-1]).rstrip(), spoken or None
-    return text or "", None
+def without_speaker(text: str) -> str:
+    """The text without any "🔊 …" line."""
+    if SPEAKER not in (text or ""):
+        return text or ""
+    return "\n".join(row for row in text.split("\n") if not row.strip().startswith(SPEAKER)).rstrip()
+
+
+def is_detail(text: str) -> bool:
+    return (text or "").lstrip().startswith(DETAIL)
+
+
+def outgoing(text: str) -> tuple[str, str | None]:
+    """What goes to Telegram: (the message, a written-detail message to send
+    after it or None). "🔊" lines are dropped; a reply with a line starting
+    with "📎" is cut there, the rest becoming its own "📎 " message, so the
+    spoken answer and what is to be read are never one message."""
+    text = without_speaker(text)
+    if DETAIL not in text or is_detail(text):
+        return text, None
+    rows = text.split("\n")
+    at = next((i for i, row in enumerate(rows) if row.strip().startswith(DETAIL)), None)
+    if at is None:
+        return text, None
+    main = "\n".join(rows[:at]).rstrip()
+    rest = "\n".join(rows[at:]).strip()
+    detail = DETAIL + " " + rest[len(DETAIL):].lstrip()
+    return main, (detail if detail.strip() != DETAIL else None)
 
 
 def plain(text: str) -> str:
@@ -99,16 +122,18 @@ def _cut(text: str, limit: int) -> str:
 
 def body(text: str) -> str:
     """The notification body: the message as plain text, short."""
-    text, _ = split_override(text)
+    text = without_speaker(text)
+    if is_detail(text):
+        text = text.lstrip()[len(DETAIL):]
     return _cut(plain(text).replace("\n", " "), BODY_MAX)
 
 
 def spoken(text: str) -> str:
-    """What Siri reads: at most two sentences, nothing that sounds wrong aloud."""
-    rest, override = split_override(text)
-    if override:
-        return _cut(override, SPOKEN_MAX)
-    sentences = [s for s in _SENTENCE.split(spoken_full(rest)) if s.strip()]
+    """What Siri reads: at most two sentences, nothing that sounds wrong aloud;
+    nothing for written detail."""
+    if is_detail(text):
+        return ""
+    sentences = [s for s in _SENTENCE.split(spoken_full(without_speaker(text))) if s.strip()]
     return _cut(" ".join(sentences[:2]), SPOKEN_MAX)
 
 

@@ -67,9 +67,10 @@ Siri reads a notification as written (Announce Notifications, with AirPods).
 Each message Hermes sends to the owner gets a `notify` once it has settled
 (no edit for 2.5 s, or a stream's final edit), with its plain text and a
 spoken version: no markdown, no links ("a link to github.com"), no code ("a
-code block"), no emoji, symbols in words, two sentences at most. Hermes can
-write that version itself, as a last line `🔊 …`, when its message would
-sound wrong aloud (its prompt says so). Questions and approvals are
+code block"), no emoji, symbols in words, two sentences at most. The plugin
+always makes it: Hermes writes for reading and never adds a spoken version
+(a `🔊 …` line it may still write is removed before Telegram, in the
+adapter's send, edit and draft). Questions and approvals are
 time-sensitive.
 
 ### Model usage
@@ -153,6 +154,13 @@ and the prompt says the same: one short sentence first, then short spoken
 sentences, no markdown, links, code or emoji, and a sentence before a long
 step. The transcript stays in the chat. While the app says a call is on (`call.state`), every
 turn of the owner's gets that style, a follow-up typed without 🎙 too.
+
+As in ChatGPT's voice mode, the answer is what is spoken, and what is better
+read (links, code, lists, figures to keep) is never mixed into it: Hermes
+writes it after the spoken answer under a line starting with 📎, and the
+plugin cuts the reply there (its drafts and edits stop at that line) and
+sends the rest, once the reply is final, as its own message starting with
+`📎 `, which the app shows and never speaks (app-protocol.md §6).
 
 An earlier design had the server transcribe and speak over a WebSocket of its
 own; it was dropped so that everything goes through Telegram and nothing on

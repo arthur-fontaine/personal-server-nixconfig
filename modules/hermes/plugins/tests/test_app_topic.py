@@ -60,8 +60,15 @@ def test_speech() -> None:
     assert "**" not in spoken and "https" not in spoken and "✅" not in spoken
     assert "a link to github.com" in spoken and " to " in spoken
     assert spoken.count(".") <= 3 and "More later" not in spoken  # two sentences at most
-    assert speech.spoken("Long reply\n🔊 Your build passed.") == "Your build passed."
+    # No more spoken override: a "🔊" line is dropped, the spoken text derived.
+    assert speech.spoken("Long reply.\n🔊 Your build passed.") == "Long reply."
     assert "🔊" not in speech.body("Long reply\n🔊 Your build passed.")
+    assert speech.outgoing("Done.\n🔊 Done, said aloud.") == ("Done.", None)
+    # A call's written detail leaves as its own message, never spoken.
+    main, detail = speech.outgoing("It's at 3 pm.\n\n📎 Details\n- https://cal.example.com/e/1\n- Room 4")
+    assert main == "It's at 3 pm." and detail == "📎 Details\n- https://cal.example.com/e/1\n- Room 4"
+    assert speech.outgoing("📎 already a detail") == ("📎 already a detail", None)
+    assert speech.spoken("📎 https://example.com") == "" and speech.body("📎 a link") == "a link"
     assert speech.spoken("CPU at 45%, ~3 GB") == "CPU at 45 percent, about 3 GB."
     assert "a code block" in speech.spoken("Here:\n```\nls -la\n```")
     assert speech.spoken("[fichier: https://gofile.io/d/abc]").startswith("a file from gofile.io")
@@ -399,6 +406,7 @@ class Bot:
 class Adapter:
     def __init__(self, bot):
         self._bot = bot
+        self.edited, self.drafts = [], []
 
     @staticmethod
     def _notification_kwargs(metadata):
@@ -409,9 +417,11 @@ class Adapter:
         return types.SimpleNamespace(success=True, message_id=str(msg.message_id))
 
     async def edit_message(self, chat_id, message_id, content, *, finalize=False, metadata=None):
+        self.edited.append(content)
         return types.SimpleNamespace(success=True, message_id=message_id)
 
     async def send_draft(self, chat_id, draft_id, content, metadata=None):
+        self.drafts.append(content)
         return types.SimpleNamespace(success=True)
 
     async def _send_control_message(self, chat_id, text, *, parse_mode=None, thread_id=None, metadata=None,
@@ -504,7 +514,7 @@ def test_plugin() -> None:
     assert plugin.dispatch(event('{"v":3,"type":"hello","app_version":"1.0"}'))["action"] == "skip"
     wait_for(lambda: bot.in_topic("reply"), "a reply")
     reply = bot.in_topic("reply")[-1][1]
-    assert reply["re"] == 555 and reply["ok"] and reply["data"]["protocol"] == 3 and reply["v"] == 3
+    assert reply["re"] == 555 and reply["ok"] and reply["data"]["protocol"] == 4 and reply["v"] == 4
     assert ("delete_message", {"chat_id": OWNER, "message_id": 555}) in bot.calls
     plugin.dispatch(event('{"v":2,"type":"call.state","active":true}', mid="560"))
     wait_for(lambda: any(r[1]["re"] == 560 for r in bot.in_topic("reply")), "call.state's reply")
@@ -546,6 +556,30 @@ def test_plugin() -> None:
     asyncio.run_coroutine_threadsafe(adapter.send(str(OWNER), "A quiet notice", metadata={"silent": True}), loop).result()
     time.sleep(0.5)
     assert len(bot.in_topic("notify")) == 1
+
+    # A call reply: the spoken part goes as the message, the written detail after it, alone; no "🔊" line.
+    def main_chat(since):
+        return [kw["text"] for name, kw in bot.calls[since:]
+                if name == "send_message" and kw.get("message_thread_id") is None and str(kw.get("chat_id")) == str(OWNER)]
+
+    before = len(bot.calls)
+    asyncio.run_coroutine_threadsafe(adapter.send(
+        str(OWNER), "Your dentist is at 3 pm.\n🔊 Dentist at three.\n📎 Address: 4 rue X\nhttps://maps.example.com/1"),
+        loop).result()
+    texts = main_chat(before)
+    assert texts == ["Your dentist is at 3 pm.", "📎 Address: 4 rue X\nhttps://maps.example.com/1"], texts
+    wait_for(lambda: len(bot.in_topic("notify")) >= 3, "the two notifies")
+    spoken = [n[1]["spoken"] for n in bot.in_topic("notify")[-2:]]
+    assert spoken == ["Your dentist is at 3 pm.", ""], spoken
+    # A streamed reply: edits stop at the detail line; the final edit sends it apart, once.
+    before = len(bot.calls)
+    full = "Two meetings tomorrow.\n📎 9:00 standup\n14:00 review"
+    for finalize in (False, True, True):
+        asyncio.run_coroutine_threadsafe(adapter.edit_message(str(OWNER), "777", full, finalize=finalize), loop).result()
+    assert main_chat(before) == ["📎 9:00 standup\n14:00 review"], main_chat(before)
+    assert adapter.edited[-1] == "Two meetings tomorrow."
+    asyncio.run_coroutine_threadsafe(adapter.send_draft(str(OWNER), 1, full), loop).result()
+    assert adapter.drafts[-1] == "Two meetings tomorrow."
 
     # An approval card: a question in the state, a time-sensitive notify; a tap clears it.
     from telegram import InlineKeyboardButton as B, InlineKeyboardMarkup as M

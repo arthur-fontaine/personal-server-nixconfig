@@ -1,4 +1,4 @@
-# Hermes app ⇄ Hermes protocol, version 3
+# Hermes app ⇄ Hermes protocol, version 4
 
 Owner: `app-backend` (plugin `app_topic`, `modules/hermes/plugins/app_topic`).
 `ios-app` builds against it and asks `app-backend` (hc send) for changes
@@ -29,7 +29,7 @@ and the Bot API (https://core.telegram.org/bots/api).
     entity, not characters). Always `disable_notification=true`.
   - App → bot: the JSON as the message's plain text. A surrounding
     ```` ```json … ``` ```` fence (as characters) is tolerated and stripped.
-  - Required keys: `"v": 3`, `"type": <string>`. Unknown `type`: the bot
+  - Required keys: `"v": 4`, `"type": <string>`. Unknown `type`: the bot
     replies `error` `unknown_type`; the app ignores unknown types.
 - **Size.** Telegram caps a message at 4096 UTF-16 code units once entities
   are parsed. The bot keeps each message under that: long strings are cut
@@ -48,6 +48,14 @@ and the Bot API (https://core.telegram.org/bots/api).
   `reply` and `notify` messages after 1 hour (bots can delete messages in a
   private chat for 48 h). The app may delete a `notify` or `reply` itself as
   soon as it has read it (in a private chat both sides can delete).
+- **Ids.** Every message id in this protocol (`questions[].message_id`,
+  `notify.message_id`, `slots.*`, `pet.sprite_message_id`, `reply.re`,
+  `ack.ids`) is the **Bot API** `message_id`, in both directions. TDLib numbers
+  the same message `message_id << 20` (× 1048576); the app converts at its
+  boundary (`BotAPIID` in HermesCore) and never puts a TDLib id in JSON. Chat
+  ids (`chat`, `busy_chats`, `subchats[].topic_id`) are the Bot API
+  `message_thread_id`, 0 for the main chat; TDLib's `forum_topic_id` is the
+  same number.
 - **Identity.** Only the owner's messages count (the first id of
   `TELEGRAM_ALLOWED_USERS`; the DM has no one else).
 
@@ -75,7 +83,7 @@ be deleted.
 
 ```json
 {
-  "v": 3, "type": "state", "updated_at": "2026-11-07T21:40:03Z",
+  "v": 4, "type": "state", "updated_at": "2026-11-07T21:40:03Z",
   "slots": {"stats": 812, "devices": 813, "sprite": 790},
   "agent": {
     "status": "working", "chat": 0, "task": "Running: nix build …",
@@ -169,7 +177,7 @@ be deleted.
 
 ```json
 {
-  "v": 3, "type": "stats", "updated_at": "2026-11-07T21:40:00Z",
+  "v": 4, "type": "stats", "updated_at": "2026-11-07T21:40:00Z",
   "machine": {
     "cpu_pct": 12.5, "load": [1.2, 1.4, 1.6], "cores": 10,
     "ram_used": 17179869184, "ram_total": 34359738368,
@@ -211,7 +219,7 @@ be deleted.
 service's status of its app `hermes` (`modules/sideload`, `app_status`):
 
 ```json
-{"v": 3, "type": "devices", "updated_at": "…", "delivery": {
+{"v": 4, "type": "devices", "updated_at": "…", "delivery": {
   "v": 1, "updated": "…", "team": {"id": "ABCDE12345", "paid": false},
   "running": null, "next_refresh": "…",
   "devices": [{"id": "<udid>", "name": "iPhone", "model": "iPhone17,1", "os": "26.1",
@@ -229,7 +237,7 @@ the pet's `version` it was built with; `running`: an install in progress.
 ### 2.4 `controls`: native commands
 
 ```json
-{"v": 3, "type": "controls", "updated_at": "…",
+{"v": 4, "type": "controls", "updated_at": "…",
  "permission_mode": {"value": "auto", "set": "/mode {value}",
                      "options": [{"id": "auto", "label": "Auto", "description": "…"},
                                  {"id": "ask", "label": "Ask", "description": "…"}]},
@@ -317,7 +325,7 @@ the App topic once the message has settled (no edit for 2.5 s; at once for a
 stream's final edit, and for a question):
 
 ```json
-{"v": 3, "type": "notify", "chat": 0, "message_id": 1187,
+{"v": 4, "type": "notify", "chat": 0, "message_id": 1187,
  "kind": "message", "interruption": "active",
  "title": "Hermes", "private": false, "body": "The build passed. 3 warnings in the …",
  "spoken": "The build passed, with three warnings."}
@@ -339,9 +347,9 @@ stream's final edit, and for a question):
   (a link becomes "a link to example.com"), no code (a block becomes "a code
   block"), emoji removed, units and symbols written out (`%` → "percent",
   `→` → "to"), at most two sentences / 200 chars. Written by the plugin,
-  deterministically, from the final text; when Hermes ends a message with a
-  line `🔊 <text>`, that text is used instead (and the line is kept out of
-  the notification body).
+  deterministically, from the final text (Hermes never writes a spoken
+  version; a `🔊 …` line it may still write is removed before the message
+  reaches Telegram). Empty for a written-detail message (`📎 `, §6).
 - `interruption`: `time-sensitive` for questions and approvals, `active`
   otherwise.
 - Not sent for: messages in the App topic, drafts, edits of an already
@@ -353,9 +361,9 @@ A request is a JSON message in the App topic; `re` in the reply is the
 request's message id. The bot deletes the request when it has answered.
 
 ```json
-{"v": 3, "type": "stats.refresh"}
-{"v": 3, "type": "reply", "re": 1302, "ok": true, "data": {}}
-{"v": 3, "type": "reply", "re": 1303, "ok": false,
+{"v": 4, "type": "stats.refresh"}
+{"v": 4, "type": "reply", "re": 1302, "ok": true, "data": {}}
+{"v": 4, "type": "reply", "re": 1303, "ok": false,
  "error": {"code": "busy", "message": "A pet is already being generated"}}
 ```
 
@@ -444,7 +452,16 @@ recognition and synthesis), and the call is ordinary messages of the chat:
   links, code or emoji, numbers and symbols in words, and a sentence before
   a long step. A long task still goes to a background subagent (its result
   is a later message, which the app may read too).
-- **`call.state`** (optional): the app posts `{"v": 3, "type": "call.state",
+- **Written detail** is never mixed into the spoken answer. What is better
+  read than heard (links, code, lists, figures to keep) Hermes writes after
+  its spoken answer under a line starting with `📎`; the plugin cuts the
+  reply there before Telegram (drafts and edits stop at that line) and,
+  once the reply is final, sends the rest as a **separate message whose text
+  starts with `📎 `** (U+1F4CE then a space), in the same chat. The app never
+  speaks a message starting with `📎`, stops speaking a streaming draft at a
+  line starting with `📎`, and shows it as a normal message, marker hidden.
+  Its `notify` has an empty `spoken`.
+- **`call.state`** (optional): the app posts `{"v": 4, "type": "call.state",
   "active": true}` when a call starts and `false` when it ends. While a call
   is on, every turn of the owner's in Telegram gets the spoken style, even a
   follow-up typed without 🎙. A call left on (the app killed mid-call) ends by
@@ -471,6 +488,16 @@ recognition and synthesis), and the call is ordinary messages of the chat:
   over 2 GB).
 
 ## Changelog
+
+- v4 (2026-11-09, after Arthur's first real use). Added: §1 "Ids" (every
+  message id is the Bot API's, every chat id the Bot API thread id; the app
+  converts TDLib's); `questions[].detail` (guard's raw action);
+  `questions[].summary` is now guard's plain sentence for any tool, in the
+  owner's language, and `spoken` says it as is; a clarify's or proposal's
+  `text` is the question alone (no option list, no skip hint); the written
+  detail message `📎 ` of a call turn (§6). Removed: the `🔊 <text>` spoken
+  override (§3). The bot accepts requests whatever their `v`; the app
+  ignores it.
 
 - v3 (2026-11-08, Arthur's change: the pet is a companion, not a
   tamagotchi). Removed: the requests `pet.feed`, `pet.play`, `pet.sleep`,

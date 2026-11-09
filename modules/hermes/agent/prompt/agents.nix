@@ -292,9 +292,8 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     "The user also reads this chat in their own iOS app, which hides the topic"
     "named App (machine messages, kept by a plugin: never write there). Your"
     "messages may be read aloud by Siri from a notification, from a short spoken"
-    "version made of your text. When yours would sound wrong aloud (a table, a"
-    "list of commands), end it with a line `🔊 ` and one or two plain spoken"
-    "sentences; it is not shown in the notification."
+    "version the app makes of your text: write for reading, never add a spoken"
+    "version yourself."
     "A file too big for Telegram arrives as a line `[fichier: <url>]`:"
     "`bigfile_fetch` downloads it into ~/.hermes/files. To send one over 50 MB,"
     "`bigfile_send` gives such a line: put it alone at the end of your reply."
@@ -304,6 +303,9 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     "reads your answer aloud as it streams. Answer as on the phone: first one"
     "short sentence that answers or says what you will do, then short spoken"
     "sentences; no markdown, lists, links, code or emoji; say so before a long step."
+    "What is better read than heard (links, code, lists, figures to keep) goes"
+    "after your spoken answer, under a line starting with 📎: it reaches the user"
+    "as a separate written message, never read aloud. Never mix the two."
   ]
   ++ lib.optionals (server.hermes.app.images.provider != null) ([
     "`pet_generate` hatches a new pet for the app from a description (minutes,"

@@ -113,6 +113,7 @@ class App:
         self.tasks: list[asyncio.Task] = []
         self.stop = threading.Event()
         self.pending_notify: dict[tuple[int, int], dict] = {}
+        self.details_sent: list = []  # (chat, message id) of replies whose detail went out
         self.last_stats = 0.0
         self.extra_handlers: dict[str, Any] = {}  # request type → coroutine fn(req, msg_id) -> data
         self.pet_busy = False
@@ -205,16 +206,38 @@ class App:
             except Exception:
                 return False
 
+        async def send_detail(chat_id, detail, metadata, key) -> None:
+            """A reply's written detail, once, as its own message after it."""
+            if not detail or key in plugin.details_sent:
+                return
+            plugin.details_sent.append(key)
+            del plugin.details_sent[:-200]
+            await wrapped_send(chat_id, detail, None, metadata)
+
         async def wrapped_send(chat_id, content, reply_to=None, metadata=None, *args, **kwargs):
+            # Only the owner's DM: other chats get what Hermes wrote.
+            detail = None
+            if isinstance(content, str) and plugin.topic_of(chat_id, (metadata or {}).get("thread_id")
+                                                            if isinstance(metadata, dict) else None) is not None:
+                content, detail = speech.outgoing(content)
+                if not content.strip() and detail:
+                    content, detail = detail, None
             result = await send(chat_id, content, reply_to, metadata, *args, **kwargs)
             try:
                 plugin.on_sent(chat_id, metadata, getattr(result, "message_id", None), content,
                                final=False, ok=getattr(result, "success", False), silent=silent(metadata))
             except Exception:
                 logger.debug("app_topic: on_sent failed", exc_info=True)
+            if detail and getattr(result, "success", False):
+                await send_detail(chat_id, detail, metadata, (str(chat_id), getattr(result, "message_id", None)))
             return result
 
         async def wrapped_edit(chat_id, message_id, content, *args, finalize=False, metadata=None, **kwargs):
+            detail = None
+            if isinstance(content, str) and plugin.topic_of(chat_id, (metadata or {}).get("thread_id")
+                                                            if isinstance(metadata, dict) else None) is not None:
+                # A streaming edit stops at the detail line; the final one sends it apart.
+                content, detail = speech.outgoing(content)
             result = await edit(chat_id, message_id, content, *args, finalize=finalize, metadata=metadata, **kwargs)
             try:
                 target = getattr(result, "message_id", None) or message_id
@@ -222,6 +245,8 @@ class App:
                                edited=True, silent=not finalize or silent(metadata))
             except Exception:
                 logger.debug("app_topic: on_edit failed", exc_info=True)
+            if detail and finalize and getattr(result, "success", False):
+                await send_detail(chat_id, detail, metadata, (str(chat_id), message_id))
             return result
 
         async def wrapped_control(chat_id, text, *args, reply_markup=None, thread_id=None, metadata=None, **kwargs):
@@ -234,6 +259,16 @@ class App:
             return msg
 
         adapter.send, adapter.edit_message, adapter._send_control_message = wrapped_send, wrapped_edit, wrapped_control
+        draft = getattr(adapter, "send_draft", None)
+        if draft is not None:
+            async def wrapped_draft(chat_id, draft_id, content, metadata=None, *args, **kwargs):
+                # The main chat streams as native drafts: they stop at the detail line too.
+                if isinstance(content, str) and plugin.topic_of(chat_id, (metadata or {}).get("thread_id")
+                                                                if isinstance(metadata, dict) else None) is not None:
+                    content = speech.outgoing(content)[0]
+                return await draft(chat_id, draft_id, content, metadata, *args, **kwargs)
+
+            adapter.send_draft = wrapped_draft
         adapter._app_topic_wrapped = True
 
     # ── chats ────────────────────────────────────────────────────────────
@@ -684,7 +719,7 @@ class App:
                 entries = fresh
         for entry in entries:
             text = entry["text"]
-            if not speech.plain(speech.split_override(text)[0]).strip():
+            if not speech.plain(speech.without_speaker(text)).strip():
                 continue
             await self.notify(entry["chat"], entry["message_id"], "message", speech.body(text), speech.spoken(text))
 
