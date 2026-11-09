@@ -49,6 +49,9 @@ enum Metric {
     /// indicator's top is 13 pt above the screen's edge in the 34-pt safe area: 34 − 13 = 21,
     /// on the grid 20), so it doesn't sit on the keys (brief item 2).
     static let keyboardGap: CGFloat = Spacing.l.points
+    /// `DownloadRow`'s ring: the system's circular capacity gauge (drawn for widgets, ≈ 58 pt)
+    /// brought to a 32-pt ring inside the 44-pt hit target, as the App Store's.
+    static let downloadRingScale: CGFloat = 32.0 / 58.0
     /// `.controlSize(.large)` bordered button height on iOS 26 at the default text size (measured
     /// on the simulator: 52). Only the starting value: `ApprovalCard` measures the real height.
     static let largeControl: CGFloat = 52

@@ -269,6 +269,16 @@ public struct ComponentCatalog: View {
     private var lists: some View {
         List {
             Section {
+                let rows: [(String, DownloadRow.State)] = [
+                    ("LFM3-Omni-2B · 1.32 GB · Wi-Fi only", .absent), ("412 MB of 1.32 GB", .downloading(fraction: 0.31)),
+                    ("Waiting for Wi-Fi · 1.32 GB", .waiting(fraction: 0.31)), ("LFM3-Omni-2B · 1.32 GB", .ready),
+                    ("Download failed: The network connection was lost.", .failed)]
+                ForEach(rows, id: \.0) { detail, state in
+                    DownloadRow(Text(verbatim: "On-Device Voice"), detail: Text(verbatim: detail), systemImage: "waveform",
+                                state: state, onDownload: {}, onCancel: {}, onDelete: {})
+                }
+            } header: { Text(verbatim: "DownloadRow (absent, downloading, waiting, ready, failed)") }
+            Section {
                 ListActionRow(Text(verbatim: "Turn On Notifications"), detail: nil, systemImage: "bell") {}
                 ListActionRow(Text(verbatim: "Reasoning Effort"), detail: Text(verbatim: "How hard the model thinks"), systemImage: "brain") {}
                 ListActionRow(Text(verbatim: "Compact"), detail: Text(verbatim: "Fills the composer"), systemImage: "rectangle.compress.vertical", fillsComposer: true) {}

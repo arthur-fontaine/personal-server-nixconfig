@@ -112,6 +112,9 @@ final class VoiceModelStore: NSObject {
         monitor = m
     }
 
+    /// What has arrived of both files, 0…1.
+    var fraction: Double { progress }
+
     private var progress: Double {
         Double(received.values.reduce(0, +)) / Double(Self.totalBytes)
     }

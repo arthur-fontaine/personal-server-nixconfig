@@ -100,43 +100,42 @@ struct CallView: View {
     }
 }
 
-/// Settings row: the on-device voice model, its size, download progress and delete.
+/// Settings row: the on-device voice model — what it is, its size, and Download, the progress or
+/// Delete (brief item 8a, HermesUI `DownloadRow`).
 struct VoiceModelRow: View {
     @State private var models = VoiceModelStore.shared
     @State private var confirmDelete = false
 
     var body: some View {
-        VGroup(spacing: .xs) {
-            LabeledContent { Text(status) } label: { Label("LFM3-Omni voice", systemImage: "waveform") }
-            switch models.state {
-            case .absent, .failed:
-                ListActionRow(Text("Download (\(ByteCountFormatter.string(fromByteCount: VoiceModelStore.totalBytes, countStyle: .file)), Wi-Fi)"),
-                              detail: nil, systemImage: "arrow.down.circle") { models.download() }
-                if case .failed(let e) = models.state { Text(e).textRole(.caption).tone(.destructive) }
-            case .downloading(let p):
-                ProgressView(value: p)
-                ListActionRow(Text("Cancel"), detail: nil, systemImage: "xmark") { models.cancel() }
-            case .waitingForWiFi:
-                Text("Waiting for Wi-Fi…").textRole(.caption).tone(.secondary)
-                ListActionRow(Text("Cancel"), detail: nil, systemImage: "xmark") { models.cancel() }
-            case .ready:
-                Button("Delete Model", role: .destructive) { confirmDelete = true }
+        DownloadRow(Text("On-Device Voice"), detail: detail, systemImage: "waveform", state: rowState,
+                    onDownload: { models.download() }, onCancel: { models.cancel() }, onDelete: { confirmDelete = true })
+            .confirmationDialog("Delete the voice model? Calls will use Apple's speech until you download it again.",
+                                isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button("Delete", role: .destructive) { models.delete() }
             }
-        }
-        .confirmationDialog("Delete the voice model? Calls will use Apple's speech until you download it again.",
-                            isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) { models.delete() }
-        }
-        .onAppear { models.refresh() }
+            .onAppear { models.refresh() }
     }
 
-    private var status: String {
+    private var rowState: DownloadRow.State {
         switch models.state {
-        case .absent: String(localized: "Not downloaded")
-        case .downloading(let p): p.formatted(.percent.precision(.fractionLength(0)))
-        case .waitingForWiFi: String(localized: "Paused")
-        case .ready: ByteCountFormatter.string(fromByteCount: models.onDiskBytes, countStyle: .file)
-        case .failed: String(localized: "Failed")
+        case .absent: .absent
+        case .downloading(let p): .downloading(fraction: p)
+        case .waitingForWiFi: .waiting(fraction: models.fraction)
+        case .ready: .ready
+        case .failed: .failed
+        }
+    }
+
+    private var total: String { VoiceModelStore.totalBytes.formatted(.byteCount(style: .file)) }
+
+    private var detail: Text {
+        switch models.state {
+        case .absent: Text("LFM3-Omni-2B · \(total) · Wi-Fi only")
+        case .downloading(let p):
+            Text("\((Int64(p * Double(VoiceModelStore.totalBytes))).formatted(.byteCount(style: .file))) of \(total)")
+        case .waitingForWiFi: Text("Waiting for Wi-Fi · \(total)")
+        case .ready: Text("LFM3-Omni-2B · \(models.onDiskBytes.formatted(.byteCount(style: .file)))")
+        case .failed(let e): Text("Download failed: \(e)")
         }
     }
 }
