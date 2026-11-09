@@ -275,6 +275,12 @@ long for the model asks you); then the conversation from its newest line,
 the older ones replaced by an `{"omitted": …}` line; then `AGENTS.md`, cut
 at its end. `gateway.log` says which prompt is used.
 
+After a rebuild, `scripts/guard-probe.sh` on the server asks the review
+model about one harmless command as guard would (`sudo` for Hermes'
+secrets; a command and a request as arguments to try others) and prints the
+prompt used, the request's size, the verdict, and the model's error if it
+refuses.
+
 Auto mode is never steered by anyone but you. What counts as you:
 
 - a message in the Telegram chats with the bot (Telegram admits only

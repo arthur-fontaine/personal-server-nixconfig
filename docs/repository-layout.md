@@ -10,7 +10,7 @@ hosts/                    machine definitions (shared.nix, git-ignored local.nix
 pkgs/                     what nixpkgs lacks, as an overlay
 apps/hermes-ios/          the Hermes iPhone and iPad app (SwiftUI, XcodeGen; its README), built here by the sideload service
 checks/                   `nix flake check`: the plugins', the coding agent's, sideload's, the events' and freeze tests; hermes-turns/, end to end
-scripts/                  bootstrap-macos.sh (the setup), hermes-setup.sh (its screen steps, at Hermes' login), uninstall-macos.sh (disable, remove), with gum
+scripts/                  bootstrap-macos.sh (the setup), hermes-setup.sh (its screen steps, at Hermes' login), uninstall-macos.sh (disable, remove), with gum; guard-probe.sh (asks auto mode's review model about one command, after a rebuild)
   bootstrap/              the setup's sections (lib.sh: their helpers), sourced in the order bootstrap-macos.sh lists
     integrations/         one file per integration's setup
   lib/                    set-host.nix (edits hosts/local.nix), hermes-models.py (Hermes' providers and models)
