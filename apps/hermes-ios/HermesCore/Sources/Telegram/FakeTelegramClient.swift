@@ -151,8 +151,8 @@ public final class FakeTelegramClient: TelegramClient {
             Fixtures.appMessage(id: 802, json: Fixtures.statsJSON),
             Fixtures.appMessage(id: 803, json: encodeState()),
             Fixtures.appMessage(id: 804, json: Fixtures.controlsJSON(mode: mode, model: model, reasoning: "medium")),
-            Fixtures.appMessage(id: 805, json: Fixtures.uiJSON(chat: 44, messageID: 4002, spec: Fixtures.hotelsSpec)),
-            Fixtures.appMessage(id: 806, json: Fixtures.uiJSON(chat: 44, messageID: 4004, spec: Fixtures.weatherSpec)),
+            Fixtures.appMessage(id: 805, json: Fixtures.uiJSON(chat: 44, messageID: 4002, text: Fixtures.hotelsText, spec: Fixtures.hotelsSpec)),
+            Fixtures.appMessage(id: 806, json: Fixtures.uiJSON(chat: 44, messageID: 4004, text: Fixtures.weatherText, spec: Fixtures.weatherSpec)),
         ]
     }
 

@@ -47,10 +47,10 @@ public enum Fixtures {
             ],
             44: [
                 me(4001, 44, L("Find a quiet place to stay near Alfama, 3 nights from the 14th"), 4000),
-                bot(4002, 44, L("Three options under €160 a night, all with good reviews for quiet:\n1. **Casa do Largo**: €142, terrace, 4 min from the tram\n2. **Alfama Patio**: €155, breakfast included\n3. **Memmo Alfama**: €159, pool, the most central\nShall I hold one?"), 3990),
+                bot(4002, 44, hotelsText, 3990),
                 // Both answered with a dynamic UI too (§8: `ui` messages 805 and 806 in the App topic).
                 me(4003, 44, L("What will the weather be like on Thursday?"), 60),
-                bot(4004, 44, L("Lisbon on Thursday: **21 °C** and sunny, wind 14 km/h, 5 % chance of rain. The next days: 23, 24, 20 and 19 °C."), 59),
+                bot(4004, 44, weatherText, 59),
             ],
             // A long log of saves: more than a page of history, so a reply to the first one makes
             // the app page back to reach it (design-rules 16.2).

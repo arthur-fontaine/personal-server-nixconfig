@@ -42,10 +42,10 @@ public final class HermesStore {
     public private(set) var topicLog = AppTopicLog()
     private var resyncTask: Task<Void, Never>?
     public var slotMemory = SlotMemory()
-    /// Dynamic UIs (§8) by the TDLib id of the message they draw, from the App topic or kept from
-    /// a previous launch.
-    public private(set) var uiSpecs: [MessageID: UISpec] = [:]
-    private var uiEntries: [MessageID: UISpecMemory.Entry] = [:]
+    /// Dynamic UIs (§8) by their message's chat and key (UIKey), from the App topic or kept from a
+    /// previous launch.
+    public private(set) var uiSpecs: [UISpecMemory.Place: UISpec] = [:]
+    private var uiEntries: [UISpecMemory.Place: UISpecMemory.Entry] = [:]
     public var uiMemory = UISpecMemory()
     private var pendingReplies: [MessageID: CheckedContinuation<ReplyPayload, Error>] = [:]
     private var earlyReplies: [MessageID: ReplyPayload] = [:]
@@ -647,7 +647,8 @@ public final class HermesStore {
             else { earlyReplies[request] = r }
             if !replay { ack([m.id]) }
         case .ui(let e):
-            let target = BotAPIID.tdlib(e.messageID)
+            guard !e.key.isEmpty else { topicLog.fail("ui \(e.messageID): no key"); return }
+            let target = UISpecMemory.Place(chat: e.chat, key: e.key)
             guard m.id >= (uiEntries[target]?.source ?? 0) else { return }
             if let spec = e.spec {
                 setUISpec(spec, for: target, source: m.id)
@@ -665,7 +666,9 @@ public final class HermesStore {
 
     /// The UI to draw for one of Hermes' messages, if it has one.
     public func uiSpec(for message: ChatMessage) -> UISpec? {
-        message.isOutgoing ? nil : uiSpecs[message.id]
+        guard !message.isOutgoing else { return nil }
+        let key = UIKey.of(message.displayText)
+        return key.isEmpty ? nil : uiSpecs[UISpecMemory.Place(chat: message.topic, key: key)]
     }
 
     /// A UI's `reply` action: the text as the owner's reply to the UI's message.
@@ -673,25 +676,25 @@ public final class HermesStore {
         try await send(text, in: message.topic, replyTo: message.id)
     }
 
-    private func setUISpec(_ spec: UISpec, for messageID: MessageID, source: MessageID) {
-        guard source >= (uiEntries[messageID]?.source ?? 0) else { return }
-        uiEntries[messageID] = UISpecMemory.Entry(source: source, spec: spec)
-        uiSpecs[messageID] = spec
+    private func setUISpec(_ spec: UISpec, for place: UISpecMemory.Place, source: MessageID) {
+        guard source >= (uiEntries[place]?.source ?? 0) else { return }
+        uiEntries[place] = UISpecMemory.Entry(source: source, spec: spec)
+        uiSpecs[place] = spec
         uiMemory.save(uiEntries)
     }
 
     /// A spec too big for a message comes as a `ui.json` document (§8).
-    private func fetchUISpec(_ doc: FileAttachment, for messageID: MessageID, source: MessageID) {
+    private func fetchUISpec(_ doc: FileAttachment, for place: UISpecMemory.Place, source: MessageID) {
         Task {
             do {
                 let url = try await client.download(fileID: doc.fileID)
                 guard let spec = UISpec.decode(try Data(contentsOf: url)) else {
-                    topicLog.fail("ui \(BotAPIID.botAPI(messageID) ?? messageID): ui.json is not a spec")
+                    topicLog.fail("ui \(place.key): ui.json is not a spec")
                     return
                 }
-                setUISpec(spec, for: messageID, source: source)
+                setUISpec(spec, for: place, source: source)
             } catch {
-                topicLog.fail("ui \(BotAPIID.botAPI(messageID) ?? messageID): \(error.localizedDescription)")
+                topicLog.fail("ui \(place.key): \(error.localizedDescription)")
             }
         }
     }

@@ -94,8 +94,11 @@ public enum DynamicUIAction: Sendable, Equatable {
 /// The `ui` App-topic message: the spec (inline), or a `ui.json` document to download (`file`).
 public struct UIEnvelope: Sendable, Equatable {
     public var chat: TopicID
-    /// The text message it belongs to, as the protocol numbers it (Bot API).
+    /// The text message it belongs to, as the bot numbers it (Bot API). The owner's client numbers
+    /// a private chat's messages its own way: not usable to find it here (§8, `key`).
     public var messageID: MessageID
+    /// What finds the message here: its text's first letters and digits (`UIKey`).
+    public var key: String
     public var spec: UISpec?
     public var isFile: Bool
 
@@ -103,7 +106,20 @@ public struct UIEnvelope: Sendable, Equatable {
         guard case .number(let id)? = fields["message_id"] else { return nil }
         messageID = MessageID(id)
         if case .number(let c)? = fields["chat"] { chat = TopicID(c) } else { chat = .main }
+        if case .string(let k)? = fields["key"] { key = k } else { key = "" }
         spec = fields["spec"].flatMap(UISpec.init(json:))
         isFile = fields["file"] == .bool(true)
+    }
+}
+
+/// The link between a UI and its message (protocol §8): the message's text, plain, lowercased,
+/// its first 48 letters and digits — what the plugin computes from the text it sent
+/// (app_topic/ui.py, key). Markdown is already gone from a received message's text.
+public enum UIKey {
+    static let length = 48
+
+    public static func of(_ text: String) -> String {
+        String(text.precomposedStringWithCanonicalMapping.lowercased()
+            .unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map(Character.init).prefix(length))
     }
 }

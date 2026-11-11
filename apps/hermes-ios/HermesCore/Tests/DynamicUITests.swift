@@ -183,10 +183,11 @@ struct DynamicUIResolveTests {
     }
 
     @Test func protocolMessage() {
-        guard case .ui(let e)? = AppProtocol.decode(Fixtures.uiJSON(chat: 44, messageID: 4004, spec: Fixtures.weatherSpec)) else {
+        guard case .ui(let e)? = AppProtocol.decode(Fixtures.uiJSON(chat: 44, messageID: 4004, text: Fixtures.weatherText, spec: Fixtures.weatherSpec)) else {
             Issue.record("no ui"); return
         }
         #expect(e.chat == 44 && e.messageID == 4004 && !e.isFile && e.spec == Fixtures.spec(Fixtures.weatherSpec))
+        #expect(e.key == "lisbononthursday21candsunnywind14kmh5chanceofrai")
         guard case .ui(let f)? = AppProtocol.decode(#"{"v":4,"type":"ui","chat":0,"message_id":12,"file":true}"#) else {
             Issue.record("no file ui"); return
         }
@@ -218,8 +219,34 @@ struct DynamicUIStoreTests {
         }
     }
 
+    /// Each test message's own text: a UI finds its message by it (UIKey), not by id.
+    func text(_ id: MessageID) -> String { "Message \(id): Météo Paris, 14 °C" }
+
     func message(_ id: MessageID, topic: TopicID = .main) -> ChatMessage {
-        ChatMessage(id: Fixtures.id(id), topic: topic, date: .now, isOutgoing: false, text: FormattedText("Météo Paris : 14 °C"))
+        ChatMessage(id: Fixtures.id(id), topic: topic, date: .now, isOutgoing: false, text: FormattedText(text(id)))
+    }
+
+    /// Nov 11 on Arthur's iPhone: the bot's message 2962 was another number in his client, so a UI
+    /// found by id never showed. By chat and text it does, whatever the ids, and only in its chat.
+    @Test func aUIFindsItsMessageByItsTextNotItsID() async throws {
+        let (store, _) = try await makeStore()
+        let reply = "**Paris, jeudi 12 novembre** — couvert, sec (0 % de pluie). **5,8 °C** le matin."
+        store._apply(.newMessage(chat, Fixtures.appMessage(id: 21815, json: Fixtures.uiJSON(chat: 0, messageID: 2962, text: reply, spec: Fixtures.weatherSpec))))
+        let shown = ChatMessage(id: 3_105_882_112 + 7 << 20, topic: .main, date: .now, isOutgoing: false,
+                                text: Markdownish.parse(reply))
+        #expect(store.uiSpec(for: shown) == Fixtures.spec(Fixtures.weatherSpec))
+        var elsewhere = shown
+        elsewhere.topic = 44
+        #expect(store.uiSpec(for: elsewhere) == nil)
+        var other = shown
+        other.text = FormattedText("Another message")
+        #expect(store.uiSpec(for: other) == nil)
+    }
+
+    @Test func theKeyIsThePluginsKey() {
+        // app_topic/ui.py key("**Météo Paris** : 14 °C, nuageux.") in the plugin's tests.
+        #expect(UIKey.of(Markdownish.parse("**Météo Paris** : 14 °C, nuageux.").text) == "météoparis14cnuageux")
+        #expect(UIKey.of("Météo") == UIKey.of("Me\u{0301}te\u{0301}o"))
     }
 
     @Test func theDemoShowsItsUIs() async throws {
@@ -233,16 +260,16 @@ struct DynamicUIStoreTests {
     @Test func beforeOrAfterItsMessage() async throws {
         let (store, _) = try await makeStore()
         // The UI first, then its message.
-        store._apply(.newMessage(chat, Fixtures.appMessage(id: 910, json: Fixtures.uiJSON(chat: 0, messageID: 2000, spec: Fixtures.weatherSpec))))
+        store._apply(.newMessage(chat, Fixtures.appMessage(id: 910, json: Fixtures.uiJSON(chat: 0, messageID: 2000, text: text(2000), spec: Fixtures.weatherSpec))))
         store._apply(.newMessage(chat, message(2000)))
         #expect(store.uiSpec(for: message(2000)) != nil)
         // The message first, then its UI.
         store._apply(.newMessage(chat, message(2001)))
         #expect(store.uiSpec(for: message(2001)) == nil)
-        store._apply(.newMessage(chat, Fixtures.appMessage(id: 911, json: Fixtures.uiJSON(chat: 0, messageID: 2001, spec: Fixtures.hotelsSpec))))
+        store._apply(.newMessage(chat, Fixtures.appMessage(id: 911, json: Fixtures.uiJSON(chat: 0, messageID: 2001, text: text(2001), spec: Fixtures.hotelsSpec))))
         #expect(store.uiSpec(for: message(2001)) == Fixtures.spec(Fixtures.hotelsSpec))
         // The newest wins; an older one replayed from history doesn't.
-        store._apply(.newMessage(chat, Fixtures.appMessage(id: 905, json: Fixtures.uiJSON(chat: 0, messageID: 2001, spec: Fixtures.weatherSpec))))
+        store._apply(.newMessage(chat, Fixtures.appMessage(id: 905, json: Fixtures.uiJSON(chat: 0, messageID: 2001, text: text(2001), spec: Fixtures.weatherSpec))))
         #expect(store.uiSpec(for: message(2001)) == Fixtures.spec(Fixtures.hotelsSpec))
         // Never on the owner's own message.
         var mine = message(2001)
@@ -256,7 +283,7 @@ struct DynamicUIStoreTests {
         try JSONSerialization.data(withJSONObject: Fixtures.catalogueSpec).write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
         client.files[4242] = file
-        let caption = #"{"v":4,"type":"ui","chat":0,"message_id":2002,"file":true}"#
+        let caption = #"{"v":4,"type":"ui","chat":0,"message_id":2002,"key":"\#(UIKey.of(text(2002)))","file":true}"#
         var doc = Fixtures.appMessage(id: 912, json: caption)
         doc.attachment = FileAttachment(kind: .document, fileID: 4242, name: "ui.json", mimeType: "application/json", size: 9000)
         store._apply(.newMessage(chat, doc))
@@ -270,7 +297,7 @@ struct DynamicUIStoreTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         do {
             let (store, _) = try await makeStore(memory: dir)
-            store._apply(.newMessage(chat, Fixtures.appMessage(id: 913, json: Fixtures.uiJSON(chat: 0, messageID: 2003, spec: Fixtures.hotelsSpec))))
+            store._apply(.newMessage(chat, Fixtures.appMessage(id: 913, json: Fixtures.uiJSON(chat: 0, messageID: 2003, text: text(2003), spec: Fixtures.hotelsSpec))))
         }
         let again = HermesStore(client: FakeTelegramClient(), config: .preview)
         again.uiMemory = UISpecMemory(directory: dir)

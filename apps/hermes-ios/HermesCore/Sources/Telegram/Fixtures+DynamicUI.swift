@@ -112,8 +112,19 @@ public extension Fixtures {
     }
 
     /// The `ui` App-topic message for a message (Bot API id), as the server posts it.
-    static func uiJSON(chat: TopicID, messageID: MessageID, spec: [String: Any]) -> String {
-        let o: [String: Any] = ["v": 4, "type": "ui", "chat": Int(chat), "message_id": messageID, "spec": spec]
+    /// The two demo messages with a UI: their text is what keys them (UIKey).
+    static var hotelsText: String {
+        L("Three options under €160 a night, all with good reviews for quiet:\n1. **Casa do Largo**: €142, terrace, 4 min from the tram\n2. **Alfama Patio**: €155, breakfast included\n3. **Memmo Alfama**: €159, pool, the most central\nShall I hold one?")
+    }
+    static var weatherText: String {
+        L("Lisbon on Thursday: **21 °C** and sunny, wind 14 km/h, 5 % chance of rain. The next days: 23, 24, 20 and 19 °C.")
+    }
+
+    /// `text`: the message's, for its key (the plugin's own computation, UIKey).
+    static func uiJSON(chat: TopicID, messageID: MessageID, text: String, spec: [String: Any]) -> String {
+        // The plugin keys the text it sends with markdown removed: as the message reads here.
+        let o: [String: Any] = ["v": 4, "type": "ui", "chat": Int(chat), "message_id": messageID,
+                                "key": UIKey.of(Markdownish.parse(text).text), "spec": spec]
         return String(decoding: try! JSONSerialization.data(withJSONObject: o, options: [.sortedKeys]), as: UTF8.self)
     }
 }
