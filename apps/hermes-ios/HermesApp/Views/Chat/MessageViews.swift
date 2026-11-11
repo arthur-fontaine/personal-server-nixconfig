@@ -31,6 +31,8 @@ struct MessageRow: View {
                 if let reply { context(reply, above: .hermes) }
                 if message.asksQuestion {
                     QuestionCard(message: message)
+                } else if let spec = store.uiSpec(for: message), spec.isRenderable {
+                    DynamicMessage(message: message, spec: spec)
                 } else {
                     RichMessageText(segments: MessageSegments.make(message.text))
                         .accessibilityElement(children: .combine)

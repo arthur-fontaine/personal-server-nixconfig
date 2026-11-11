@@ -43,6 +43,10 @@ targets:
     platform: iOS
     sources:
       - path: HermesUI/Sources
+    # Dynamic UI (docs/app-protocol.md §8): its renderer reads HermesCore's resolved spec, since
+    # HermesUI's public API takes no numbers or colours (design-rules 9.2). HermesCore has no UI.
+    dependencies:
+      - target: HermesCore
     preBuildScripts:
       - name: Design check
         basedOnDependencyAnalysis: false

@@ -98,6 +98,16 @@ enum Metric {
     static let chartTicks = 3
     /// Past this, usage is shown in red.
     static let criticalUsage = 0.9
+    /// A dynamic UI's bar or line chart (§8): about a third of an iPhone column, as Weather's
+    /// 10-day graph; tall enough for a trailing axis of four ticks.
+    static let graphHeight: CGFloat = 160
+    static let graphTicks = 4
+    /// A dynamic UI's image: at most about half an iPhone screen of a column, so a card stays a card.
+    static let imageMaxHeight: CGFloat = 240
+    /// A dynamic UI image's placeholder while it loads, or when it has no link.
+    static let imagePlaceholder: CGFloat = 120
+    /// More choices than this read better as a menu than as segments.
+    static let maxSegments = 4
     /// A first-run step's column on wide screens (one field, one button).
     static let onboardingWidth: CGFloat = 440
     /// A first-run step's text field: a large control's height.

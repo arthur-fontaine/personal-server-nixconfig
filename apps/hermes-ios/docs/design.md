@@ -245,6 +245,17 @@ Hidden: the "App" topic (machine traffic)
   "Reply "skip"" hint; once answered, Hermes' edit of that message stays in the history. A
   `🔊 …` line is never shown.
 - Inline keyboards: `ActionRow`s of secondary buttons.
+- Dynamic UI (protocol §8): a message Hermes sent with `render_ui` is drawn as its json-render
+  spec, in place of its text, by `DynamicUIView` (HermesUI) in a card on the grouped fill, as the
+  approval card: nested cards and alerts on the next tier, concentric; headings, figures
+  (`Metric`) and titles in `.headline`, never bigger (3.2); only a trend's arrow in colour;
+  charts (Swift Charts) and progress in the pet's fill; a row of buttons is one `ActionRow`;
+  choices are segments (a menu past four, or at accessibility sizes); a table is a grid when each
+  row fits on one line, else one block per row, so nothing truncates. The text stays the
+  message's: Copy, Reply, notifications, and VoiceOver's summary of the card. A button's `reply`
+  is the owner's reply to that message; `open` opens Safari; the rest stays in the card. An
+  unknown component draws nothing; a spec that doesn't resolve shows the text. The catalogue
+  page `-catalog dynamic` has every component.
 
 ## Motion
 

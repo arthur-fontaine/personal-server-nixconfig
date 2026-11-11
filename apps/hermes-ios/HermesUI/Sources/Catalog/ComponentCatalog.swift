@@ -1,10 +1,11 @@
+import HermesCore
 import SwiftUI
 
 /// One page per HermesUI component, every variant (design-rules 9.6). The app shows a page with
 /// `-catalog <page>`; the screenshot tour renders each in light, dark and at AX5 for the critic.
 public enum CatalogPage: String, CaseIterable, Sendable {
     case type, surfaces, actions, approval, chat, files, composer, accent
-    case buttons, lists, metrics, call, onboarding, bar
+    case buttons, lists, metrics, call, onboarding, bar, dynamic
 }
 
 public struct ComponentCatalog: View {
@@ -239,6 +240,16 @@ public struct ComponentCatalog: View {
             section("UsageBar (42 %, 95 % critical)") {
                 UsageBar(Self.sampleUpload, label: Text(verbatim: "Storage used"))
                 UsageBar(Self.nearlyFull, label: Text(verbatim: "Storage used"))
+            }
+        case .dynamic:
+            section("DynamicUIView: every component (tap Later: setState switches the tab)") {
+                DynamicUIView(spec: Fixtures.spec(Fixtures.catalogueSpec), summary: Text(verbatim: "Server")) { _ in }
+            }
+            section("DynamicUIView: weather (Lisbon trip)") {
+                DynamicUIView(spec: Fixtures.spec(Fixtures.weatherSpec), summary: Text(verbatim: "Weather")) { _ in }
+            }
+            section("DynamicUIView: table, bound choice, templated reply") {
+                DynamicUIView(spec: Fixtures.spec(Fixtures.hotelsSpec), summary: Text(verbatim: "Hotels")) { _ in }
             }
         case .call:
             section("CallControls: toggle off, toggle on, End") {

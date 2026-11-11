@@ -22,7 +22,8 @@ public enum TextRole: CaseIterable, Sendable {
 /// Foreground colours: semantic only (design-rules 4.1). `accent` is the pet's tint.
 public enum Tone: CaseIterable, Sendable {
     /// `warning`: a status that needs attention soon (system orange, design-rules 4: status colours).
-    case primary, secondary, tertiary, accent, destructive, warning
+    /// `success`: a status that went well, or a change for the better (system green).
+    case primary, secondary, tertiary, accent, destructive, warning, success
 
     var style: AnyShapeStyle {
         switch self {
@@ -32,6 +33,7 @@ public enum Tone: CaseIterable, Sendable {
         case .accent: AnyShapeStyle(AccentTextStyle())
         case .destructive: AnyShapeStyle(.red)
         case .warning: AnyShapeStyle(.orange)
+        case .success: AnyShapeStyle(.green)
         }
     }
 }
