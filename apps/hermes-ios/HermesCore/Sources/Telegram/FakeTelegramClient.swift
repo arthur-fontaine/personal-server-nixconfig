@@ -151,6 +151,8 @@ public final class FakeTelegramClient: TelegramClient {
             Fixtures.appMessage(id: 802, json: Fixtures.statsJSON),
             Fixtures.appMessage(id: 803, json: encodeState()),
             Fixtures.appMessage(id: 804, json: Fixtures.controlsJSON(mode: mode, model: model, reasoning: "medium")),
+            Fixtures.appMessage(id: 805, json: Fixtures.uiJSON(chat: 44, messageID: 4002, spec: Fixtures.hotelsSpec)),
+            Fixtures.appMessage(id: 806, json: Fixtures.uiJSON(chat: 44, messageID: 4004, spec: Fixtures.weatherSpec)),
         ]
     }
 
@@ -226,7 +228,11 @@ public final class FakeTelegramClient: TelegramClient {
 
     private var stopped: Set<Int64> = []
 
+    /// Files a test serves by id (a `ui.json` document); the rest is the bundled spritesheet.
+    public var files: [Int32: URL] = [:]
+
     public func download(fileID: Int32) async throws -> URL {
+        if let file = files[fileID] { return file }
         if let pet = BundledPet.load() { return pet.spritesheet }
         throw TelegramError.notReady
     }

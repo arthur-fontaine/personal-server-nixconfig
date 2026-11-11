@@ -48,6 +48,9 @@ public enum AppProtocol {
             guard let n = fields.decode(NotifyPayload.self) else { return .failure(.badSection(type)) }
             payload = .notify(n)
         case "reply": payload = .reply(ReplyPayload(fields: fields))
+        case "ui":
+            guard let e = UIEnvelope(fields: fields), e.spec != nil || e.isFile else { return .failure(.badSection(type)) }
+            payload = .ui(e)
         default: payload = .other(type: type, fields: fields)
         }
         return .success(DecodedAppMessage(version: version, type: type, payload: payload))
@@ -96,6 +99,8 @@ public enum AppMessage: Sendable {
     case controls(ControlsState)
     case notify(NotifyPayload)
     case reply(ReplyPayload)
+    /// A dynamic UI for one of Hermes' messages (§8).
+    case ui(UIEnvelope)
     case other(type: String, fields: [String: JSONValue])
 }
 

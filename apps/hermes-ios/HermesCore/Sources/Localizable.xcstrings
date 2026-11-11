@@ -1,6 +1,16 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "14 km/h": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "14 km/h"
+          }
+        }
+      }
+    },
     "24 h": {
       "localizations": {
         "fr": {
@@ -11,12 +21,32 @@
         }
       }
     },
+    "3 nights from the 14th": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3 nuits à partir du 14"
+          }
+        }
+      }
+    },
     "30 d": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "30 j"
+          }
+        }
+      }
+    },
+    "3° warmer than Wednesday": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3° de plus que mercredi"
           }
         }
       }
@@ -61,12 +91,32 @@
         }
       }
     },
+    "Afternoon": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Après-midi"
+          }
+        }
+      }
+    },
     "All done": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Terminé"
+          }
+        }
+      }
+    },
+    "All three are rated quiet by guests.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les trois sont jugés calmes par les clients."
           }
         }
       }
@@ -321,6 +371,16 @@
         }
       }
     },
+    "Fri": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ven."
+          }
+        }
+      }
+    },
     "Good morning! Three things overnight: the **nightly backup failed** at 03:12, Léa replied about Saturday, and your Lisbon flight is now boarding at gate 34 on Thursday.": {
       "localizations": {
         "fr": {
@@ -381,6 +441,26 @@
         }
       }
     },
+    "Hold ${/hotel}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réserver ${/hotel}"
+          }
+        }
+      }
+    },
+    "Hold ${/hotel} for 3 nights from the 14th": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réserve ${/hotel} pour 3 nuits à partir du 14"
+          }
+        }
+      }
+    },
     "Home server": {
       "localizations": {
         "fr": {
@@ -391,12 +471,42 @@
         }
       }
     },
+    "Hotel": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hôtel"
+          }
+        }
+      }
+    },
+    "Hour by Hour": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heure par heure"
+          }
+        }
+      }
+    },
     "How hard the model thinks": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "L’effort de réflexion du modèle"
+          }
+        }
+      }
+    },
+    "IPMA": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "IPMA"
           }
         }
       }
@@ -431,6 +541,16 @@
         }
       }
     },
+    "Lisbon on Thursday: **21 °C** and sunny, wind 14 km/h, 5 % chance of rain. The next days: 23, 24, 20 and 19 °C.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lisbonne jeudi : **21 °C** et du soleil, vent à 14 km/h, 5 % de risque de pluie. Les jours suivants : 23, 24, 20 et 19 °C."
+          }
+        }
+      }
+    },
     "Lisbon on Thursday: **21°C** and sunny, a light breeze off the river in the evening. Pack a thin jacket.": {
       "localizations": {
         "fr": {
@@ -447,6 +567,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Voyage à Lisbonne"
+          }
+        }
+      }
+    },
+    "Lisbon, Thursday": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lisbonne, jeudi"
           }
         }
       }
@@ -501,6 +631,16 @@
         }
       }
     },
+    "Mon": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lun."
+          }
+        }
+      }
+    },
     "Needs you": {
       "localizations": {
         "fr": {
@@ -517,6 +657,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nouvelle sous-discussion"
+          }
+        }
+      }
+    },
+    "Next 5 days, °C": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 prochains jours, °C"
+          }
+        }
+      }
+    },
+    "Night": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuit"
           }
         }
       }
@@ -577,6 +737,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mode d’autorisation : **%@**."
+          }
+        }
+      }
+    },
+    "Quiet stays near Alfama": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Séjours au calme près d’Alfama"
+          }
+        }
+      }
+    },
+    "Rain": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pluie"
+          }
+        }
+      }
+    },
+    "Rating": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note"
           }
         }
       }
@@ -711,6 +901,16 @@
         }
       }
     },
+    "Sat": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sam."
+          }
+        }
+      }
+    },
     "Saved: “%@”.": {
       "localizations": {
         "fr": {
@@ -757,6 +957,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "État de la session"
+          }
+        }
+      }
+    },
+    "Show me Thursday hour by hour": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Montre-moi jeudi heure par heure"
           }
         }
       }
@@ -817,6 +1027,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Règles de la sous-discussion"
+          }
+        }
+      }
+    },
+    "Sun": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dim."
+          }
+        }
+      }
+    },
+    "Sunny, a light breeze off the river in the evening": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ensoleillé, une petite brise du fleuve le soir"
           }
         }
       }
@@ -981,6 +1211,16 @@
         }
       }
     },
+    "Thu": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "jeu."
+          }
+        }
+      }
+    },
     "Token usage and rate limits": {
       "localizations": {
         "fr": {
@@ -1007,6 +1247,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trop de tentatives. Patiente un peu et réessaie."
+          }
+        }
+      }
+    },
+    "UV index": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indice UV"
           }
         }
       }
@@ -1101,6 +1351,16 @@
         }
       }
     },
+    "What will the weather be like on Thursday?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quel temps fera-t-il jeudi ?"
+          }
+        }
+      }
+    },
     "Which edition did you pick?": {
       "localizations": {
         "fr": {
@@ -1127,6 +1387,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Le modèle qui répond dans cette discussion"
+          }
+        }
+      }
+    },
+    "Wind": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vent"
           }
         }
       }
