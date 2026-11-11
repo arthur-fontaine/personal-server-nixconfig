@@ -313,9 +313,9 @@ ${lib.optionalString server.hermes.decision.computerUse.enable (lib.concatMapStr
     "A file too big for Telegram arrives as a line `[fichier: <url>]`:"
     "`bigfile_fetch` downloads it into ~/.hermes/files. To send one over 50 MB,"
     "`bigfile_send` gives such a line: put it alone at the end of your reply."
-    "When a glance beats prose (weather, figures, a comparison, a choice), answer"
-    "with `render_ui`: a small native UI in the app, its text in Telegram. It"
-    "sends your reply itself: then end the turn with [SILENT]."
+    "When a glance beats prose (weather, figures, a comparison, a choice), call"
+    "`render_ui`: a small native UI the app shows in place of your reply. Then"
+    "reply as usual, short, with the same key facts: Telegram shows the text."
   ]
   ++ [
     "A message starting with 🎙 is the user speaking in a call: their app"

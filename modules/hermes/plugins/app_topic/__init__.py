@@ -241,20 +241,14 @@ def _bigfile_send(args: dict, **_) -> str:
 
 
 def _render_ui(args: dict, **_) -> str:
-    """render_ui (docs/app-protocol.md §8): the text as the turn's reply, the spec for the app."""
+    """render_ui (docs/app-protocol.md §8): the spec waits for the turn's reply, which carries it."""
     from . import ui
 
     app = STATE["app"]
-    args = args or {}
-    text = str(args.get("text") or "").strip()
-    spec = ui.parse_spec(args.get("spec"))
+    spec = ui.parse_spec((args or {}).get("spec"))
     problems = ui.validate(spec)
-    if not text:
-        problems.insert(0, "text is required: the message Telegram shows, for a reader without the app")
-    elif len(text) > ui.MAX_TEXT:
-        problems.insert(0, f"text is {len(text)} characters: at most {ui.MAX_TEXT}")
     if problems:
-        return json.dumps({"error": "the UI was not sent", "problems": problems[:12],
+        return json.dumps({"error": "the UI was not kept", "problems": problems[:12],
                            "note": "Fix these and call render_ui again."}, ensure_ascii=False)
     try:
         from gateway.session_context import get_session_env
@@ -264,19 +258,27 @@ def _render_ui(args: dict, **_) -> str:
         thread = get_session_env("HERMES_SESSION_THREAD_ID")
     except Exception:
         platform = chat_id = thread = ""
-    if platform != "telegram" or app.topic_of(chat_id, thread) is None or app.is_app_topic(chat_id, thread):
+    topic = app.topic_of(chat_id, thread) if platform == "telegram" else None
+    if topic is None or app.is_app_topic(chat_id, thread):
         return json.dumps({"error": "render_ui only works in the owner's Telegram chat (the main chat or a "
                                     "sub-chat): answer in text here."})
-    future = app.submit(app.send_ui(chat_id, thread or None, text, spec))
-    if future is None:
-        return json.dumps({"error": "Telegram is not connected: answer in text."})
+    app.stage_ui(topic, spec)
+    return json.dumps({"ok": True,
+                       "note": "The UI waits for your reply: write it now as usual, short, with the same key facts "
+                               "(Telegram shows your text, the app the UI). Don't describe the UI; never [SILENT]."})
+
+
+def _render_ui_visible() -> None:
+    """render_ui visible, not behind tool_search: through tool_call the model nested the spec in
+    another JSON and broke it (Nov 11). Hermes keeps its core tools eager and reads the list at
+    each assembly (tools/tool_search.py, _core_tool_names); it has no setting for a plugin tool."""
     try:
-        result = future.result(timeout=60)
-    except Exception as error:
-        return json.dumps({"error": f"not sent: {error}", "note": "Answer in text instead."})
-    return json.dumps({"ok": True, **result,
-                       "note": "Sent: this message is your reply. End your turn with exactly [SILENT] unless "
-                               "you have something new to add; never repeat its content."})
+        import toolsets
+
+        if "render_ui" not in toolsets._HERMES_CORE_TOOLS:
+            toolsets._HERMES_CORE_TOOLS.append("render_ui")
+    except Exception:
+        logger.warning("app_topic: render_ui stays behind tool_search", exc_info=True)
 
 
 def register(ctx) -> None:
@@ -324,6 +326,7 @@ def register(ctx) -> None:
     from .ui import SCHEMA as UI_SCHEMA
 
     ctx.register_tool(name="render_ui", toolset="app", schema=UI_SCHEMA, handler=_render_ui)
+    _render_ui_visible()
 
     from .push import Push
 

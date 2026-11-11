@@ -45,10 +45,10 @@ CATALOG: dict[str, tuple[str, bool]] = {
 }
 
 DESCRIPTION = (
-    "Answer with a small native UI in the owner's app (a card, metrics, a table, a chart, buttons) on top of a "
-    "text message. Telegram shows `text`; the app draws `spec` in place of it. Use it when a glance beats prose "
-    "(weather, figures, comparisons, a choice to make), not for ordinary answers. Keep it small: one card or a "
-    "few. This call sends the message itself: it is your reply.\n"
+    "Attach a small native UI (a card, metrics, a table, a chart, buttons) to your reply in the owner's app. "
+    "Use it when a glance beats prose (weather, figures, comparisons, a choice to make), not for ordinary "
+    "answers. Keep it small: one card or a few. Call it, then write your reply as usual: Telegram shows your "
+    "text, the app draws this UI in its place.\n"
     "spec is json-render's flat format: {\"root\": key, \"elements\": {key: {\"type\", \"props\", \"children\": "
     "[keys], \"visible\"?, \"on\"?, \"repeat\"?}}, \"state\"?: {…}}. Components (props, ? = optional):\n"
     + "".join(f"- {name}: {props}{' (children)' if children else ''}\n" for name, (props, children) in CATALOG.items())
@@ -60,9 +60,8 @@ DESCRIPTION = (
     "Actions (on: {\"press\"|\"change\": {\"action\", \"params\"}}): reply {text} sends that text to you as "
     "the owner's reply to this message (you get a normal turn, and may answer with a new UI); open {url} "
     "opens a link; setState {statePath, value} changes local state (tabs, toggles). Nothing else.\n"
-    "text is what a reader without the app needs (plain or markdown, the same facts, short). The tool answers "
-    "with errors to fix, else the message's id: then end your turn with exactly [SILENT] (nothing more is "
-    "sent) unless you have something new to add; never repeat the UI's content in another message."
+    "The tool answers with errors to fix, else that the UI waits for your reply. Then reply as usual, short, "
+    "with the same key facts (what a reader without the app sees); don't describe the UI, never answer [SILENT]."
 )
 
 SCHEMA = {
@@ -71,13 +70,26 @@ SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
-            "text": {"type": "string",
-                     "description": "The message Telegram shows: the UI's content as text, for a reader without the app."},
             "spec": {"type": "object", "description": "The json-render spec: {root, elements, state?}."},
         },
-        "required": ["text", "spec"],
+        "required": ["spec"],
     },
 }
+
+
+KEY_LENGTH = 48
+
+
+def key(text: str) -> str:
+    """What links a UI to its message in the app (protocol §8): the reply's first letters and digits,
+    lowercased. The bot and the owner number a private chat's messages each their own way, so the
+    message's id can't."""
+    import unicodedata
+
+    from .speech import plain
+
+    text = unicodedata.normalize("NFC", plain(text or "").lower())
+    return "".join(c for c in text if c.isalnum())[:KEY_LENGTH]
 
 
 def parse_spec(raw):

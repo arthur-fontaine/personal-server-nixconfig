@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from . import protocol, speech
+from . import protocol, speech, ui
 from .hatch import HatchFailed, ProviderRefused, plain_refusal, refusal  # noqa: F401  (callers import them from here)
 from .machine import Machine
 from .pet import PetState, animation, mirror, mood
@@ -47,6 +47,7 @@ CALL_MAX = 2 * 3600.0
 # Dynamic UIs remembered (their App-topic message and spec), and re-posted into a new App topic.
 UI_KEPT = 300
 UI_REPOST = 30
+UI_STAGED_FOR = 900.0  # a render_ui whose reply never came is dropped
 
 
 def owner_id() -> int | None:
@@ -123,6 +124,7 @@ class App:
         self.stop = threading.Event()
         self.pending_notify: dict[tuple[int, int], dict] = {}
         self.details_sent: list = []  # (chat, message id) of replies whose detail went out
+        self.staged_ui: dict[int, tuple[dict, float]] = {}  # topic → (spec, when): render_ui's, for the reply
         self.last_stats = 0.0
         self.extra_handlers: dict[str, Any] = {}  # request type → coroutine fn(req, msg_id) -> data
         self.pet_busy = False
@@ -238,6 +240,7 @@ class App:
                                final=False, ok=getattr(result, "success", False), silent=silent(metadata))
             except Exception:
                 logger.debug("app_topic: on_sent failed", exc_info=True)
+            await plugin.attach_ui(chat_id, metadata, result, content)
             if detail and getattr(result, "success", False):
                 await send_detail(chat_id, detail, metadata, (str(chat_id), getattr(result, "message_id", None)))
             return result
@@ -255,6 +258,8 @@ class App:
                                edited=True, silent=not finalize or silent(metadata))
             except Exception:
                 logger.debug("app_topic: on_edit failed", exc_info=True)
+            if finalize:
+                await plugin.attach_ui(chat_id, metadata, result, content, message_id)
             if detail and finalize and getattr(result, "success", False):
                 await send_detail(chat_id, detail, metadata, (str(chat_id), message_id))
             return result
@@ -419,25 +424,35 @@ class App:
 
     # ── dynamic UI (§8) ──────────────────────────────────────────────────
 
-    async def send_ui(self, chat_id, thread, text: str, spec: dict) -> dict:
-        """render_ui: the text as Hermes' own message in the turn's chat (through the adapter, so
-        it notifies and the app hears of it as any reply), then the spec in the App topic."""
-        adapter = self.adapter
-        if adapter is None:
-            raise RuntimeError("Telegram is not connected")
-        result = await adapter.send(chat_id, text, None, {"thread_id": thread} if thread else None)
-        if not getattr(result, "success", False) or not getattr(result, "message_id", None):
-            raise RuntimeError(getattr(result, "error", None) or "the message was not sent")
-        message_id = int(result.message_id)
-        topic = self.topic_of(chat_id, thread)
-        app_id = await self.post_ui(topic, message_id, spec)
-        return {"message_id": message_id, "app_message_id": app_id}
+    def stage_ui(self, topic: int, spec: dict) -> None:
+        """render_ui: the spec waits for the turn's next message in that chat (its reply)."""
+        with self.lock:
+            self.staged_ui[topic] = (spec, time.time())
 
-    async def post_ui(self, chat: int, message_id: int, spec: dict, *, remember: bool = True) -> int | None:
+    async def attach_ui(self, chat_id, metadata, result, content, message_id=None) -> None:
+        """A message Hermes sent: the UI render_ui staged in its chat, if any, goes with it."""
+        try:
+            if not getattr(result, "success", False) or not isinstance(content, str) or not content.strip():
+                return
+            thread = metadata.get("thread_id") if isinstance(metadata, dict) else None
+            topic = self.topic_of(chat_id, thread)
+            if topic is None or self.is_app_topic(chat_id, thread):
+                return
+            with self.lock:
+                staged = self.staged_ui.pop(topic, None)
+            if staged is None or time.time() - staged[1] > UI_STAGED_FOR:
+                return
+            target = getattr(result, "message_id", None) or message_id
+            await self.post_ui(topic, int(target), staged[0], key=ui.key(content))
+        except Exception:
+            logger.warning("app_topic: the UI was not attached", exc_info=True)
+
+    async def post_ui(self, chat: int, message_id: int, spec: dict, *, key: str = "",
+                      remember: bool = True) -> int | None:
         """The `ui` envelope in the App topic: inline when it fits a message, else the spec as a
         ui.json document under the envelope without it. Kept (no expiry): the app finds it again
         in the topic's history."""
-        obj = protocol.message("ui", chat=chat, message_id=message_id, spec=spec)
+        obj = protocol.message("ui", chat=chat, message_id=message_id, key=key, spec=spec)
         as_file = not protocol.fits(obj)
         if not as_file:
             app_id = await self.post(obj, ephemeral=False)
@@ -445,7 +460,7 @@ class App:
             thread = await self.ensure_topic()
             if thread is None:
                 return None
-            caption = protocol.message("ui", chat=chat, message_id=message_id, file=True)
+            caption = protocol.message("ui", chat=chat, message_id=message_id, key=key, file=True)
             try:
                 msg = await self.call("send_document", chat_id=self.saved["chat"], message_thread_id=thread,
                                       document=io.BytesIO(protocol.dumps(spec).encode()), filename="ui.json",
@@ -456,13 +471,14 @@ class App:
                 logger.info("app_topic: ui document not sent: %s", error)
                 app_id = None
         if remember:
-            self._remember_ui(chat, message_id, spec, app_id, as_file)
+            self._remember_ui(chat, message_id, spec, app_id, as_file, key)
         return app_id
 
     def _ui_path(self, chat: int, message_id: int) -> Path:
         return self.dir / "ui" / f"{chat}_{message_id}.json"
 
-    def _remember_ui(self, chat: int, message_id: int, spec: dict, app_id: int | None, as_file: bool) -> None:
+    def _remember_ui(self, chat: int, message_id: int, spec: dict, app_id: int | None, as_file: bool,
+                     key: str = "") -> None:
         """(chat, message) → its App-topic message, and the spec on disk, so a new App topic
         (after a restart that lost it) gets them again."""
         path = self._ui_path(chat, message_id)
@@ -470,7 +486,7 @@ class App:
         path.write_text(protocol.dumps(spec))
         with self.lock:
             entries = [e for e in self.saved["ui"] if (e["chat"], e["message_id"]) != (chat, message_id)]
-            entries.append({"chat": chat, "message_id": message_id, "id": app_id, "file": as_file})
+            entries.append({"chat": chat, "message_id": message_id, "id": app_id, "file": as_file, "key": key})
             dropped, self.saved["ui"] = entries[:-UI_KEPT], entries[-UI_KEPT:]
             self.save()
         for e in dropped:
@@ -483,7 +499,7 @@ class App:
                 spec = json.loads(self._ui_path(entry["chat"], entry["message_id"]).read_text())
             except (OSError, ValueError):
                 continue
-            await self.post_ui(entry["chat"], entry["message_id"], spec)
+            await self.post_ui(entry["chat"], entry["message_id"], spec, key=entry.get("key", ""))
 
     async def delete(self, message_id: int) -> None:
         try:

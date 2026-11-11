@@ -25,6 +25,9 @@ ALLOWLIST = frozenset({
     "zoom", "date",
     # The sandbox's grants, the app's devices and installed apps, listed.
     "sandbox_grants", "sideload_devices", "sideload_apps",
+    # A UI for the owner's app, attached to Hermes' reply: it only shows (its buttons send
+    # the owner's own reply).
+    "render_ui",
 })
 # Tools that put their own question to the owner, as AskUserQuestion does.
 INTERACTIVE = frozenset({"clarify", "propose"})

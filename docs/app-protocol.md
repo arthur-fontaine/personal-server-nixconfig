@@ -536,30 +536,39 @@ text for copy, reply, notifications and VoiceOver's summary.
   opens the link; `setState` `{statePath, value}` changes the UI's local state
   (tabs, toggles; never sent). Anything else does nothing (the app logs it).
 
-**`render_ui`** (the `app` toolset) takes `text` (what Telegram shows: the
-same facts for a reader without the app) and `spec`. It checks the spec
-(the root and every child exist, no cycle, only catalog types, known actions,
-≤ 200 elements, ≤ 60 KB) and answers what to fix. Then it sends `text` in the
-chat the turn runs in, through the gateway's adapter like Hermes' own replies
-(so it notifies, gets its `notify`, and reads in the transcript), and posts
-the spec to the App topic:
+**`render_ui`** (the `app` toolset) takes `spec`. It checks it (the root and
+every child exist, no cycle, only catalog types, known actions, ≤ 200
+elements, ≤ 60 KB) and answers what to fix; else it keeps the spec for the
+turn's reply in that chat. Hermes then writes its reply as usual (short, the
+same key facts: what Telegram shows), and the plugin posts the spec to the App
+topic once that message is sent (its final edit, for a streamed one):
 
 ```json
-{"v": 4, "type": "ui", "chat": 0, "message_id": 1312, "spec": {"root": "card", "elements": {…}}}
+{"v": 4, "type": "ui", "chat": 0, "message_id": 1312, "key": "parisjeudi12novembrecouvertsec0depluie58c", "spec": {"root": "card", "elements": {…}}}
 ```
 
-- `chat`/`message_id`: the text message (Bot API id) the UI belongs to.
+- `chat`: the chat the message is in. `message_id`: the bot's id of it (Bot
+  API), for the record.
+- `key`: what finds the message in the app. The bot and the owner's client
+  number a private chat's messages each their own way (Nov 11: the bot's 2962
+  was another id on the iPhone), so the app can't use `message_id`. The key is
+  the message's text, markdown removed (the bot's plain text), Unicode NFC,
+  lowercased, its first 48 letters and digits (`app_topic/ui.py`, `key`;
+  `UIKey` in the app). The app draws the UI for the message of that chat whose
+  text has that key.
 - A spec too big for one message is sent as a document `ui.json` holding the
   spec alone; its caption is the envelope without `spec`, plus `"file": true`.
 - The `ui` arrives after its message; the app accepts it before too (history
-  read out of order). The newest `ui` for a message wins.
+  read out of order). The newest `ui` for a key wins.
 - Kept, never deleted. The plugin remembers (chat, message) → App-topic
-  message and the spec (`~/.hermes/app/ui/`, the last 300) and posts the last
+  message, key and spec (`~/.hermes/app/ui/`, the last 300) and posts the last
   30 again into a new App topic.
-- **The turn's reply.** The tool's message *is* Hermes' reply: the tool tells
-  the model to end its turn with exactly `[SILENT]` (Hermes' own silence
-  marker, `gateway/response_filters.py`: nothing more is sent) unless it has
-  something new to add, and never to repeat the UI's content.
+- **The turn's reply carries the UI.** Not `[SILENT]`: Hermes refuses a silence
+  marker on a turn the owner started, and sends an error message in its place.
+  A spec no reply took within 15 minutes is dropped.
+- `render_ui` is never behind `tool_search` (through `tool_call` the model
+  nested the spec in another JSON and broke it), and guard lets it run: it
+  only shows something to the owner.
 - Only in the owner's DM (the main chat or a sub-chat), never in the App
   topic. A private sub-chat's UI is in the App topic like its text is in its
   topic; its notification stays generic (§3).
@@ -567,6 +576,8 @@ the spec to the App topic:
 ## Changelog
 
 - v4, additive (2026-11-11, k13): the `ui` message and `render_ui` (§8).
+  Same day: `ui.key` finds the message (not `message_id`), and the turn's
+  reply carries the UI (no `[SILENT]`).
 
 - v4 (2026-11-09, after Arthur's first real use). Added: §1 "Ids" (every
   message id is the Bot API's, every chat id the Bot API thread id; the app
