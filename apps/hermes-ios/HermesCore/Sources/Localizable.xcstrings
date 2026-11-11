@@ -1,6 +1,16 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "03:12, restic: no space left on device. Hermes checked the disk: 1.9 of 2 TB used.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "03:12, restic : plus d’espace sur le disque. Hermes vérifie : 1,9 To utilisés sur 2."
+          }
+        }
+      }
+    },
     "14 km/h": {
       "localizations": {
         "fr": {
@@ -91,6 +101,16 @@
         }
       }
     },
+    "Added a donation receipt.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reçu de don ajouté."
+          }
+        }
+      }
+    },
     "Afternoon": {
       "localizations": {
         "fr": {
@@ -151,12 +171,62 @@
         }
       }
     },
+    "Answered a question about the heating schedule.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réponse à une question sur le programme du chauffage."
+          }
+        }
+      }
+    },
     "Approval needed": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Approbation requise"
+          }
+        }
+      }
+    },
+    "Arthur asked about the backup; Hermes quoted restic's error.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arthur pose une question sur la sauvegarde ; Hermes cite l’erreur de restic."
+          }
+        }
+      }
+    },
+    "Arthur asked for the server's uptime; Hermes reported 41 days.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arthur demande depuis quand le serveur tourne ; Hermes répond 41 jours."
+          }
+        }
+      }
+    },
+    "Arthur asked what happened with the backup; Hermes showed restic's error and asked before pruning.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arthur demande ce qui est arrivé à la sauvegarde ; Hermes montre l’erreur de restic et demande avant de supprimer."
+          }
+        }
+      }
+    },
+    "Arthur: go ahead and prune, but keep the March snapshots.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arthur : vas-y, supprime, mais garde les instantanés de mars."
           }
         }
       }
@@ -201,6 +271,26 @@
         }
       }
     },
+    "Booked it, shared the address with Léa, added the passport reminder for February.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réservé, adresse partagée avec Léa, rappel du passeport ajouté pour février."
+          }
+        }
+      }
+    },
+    "Booked the Alfama flat (€420 for three nights). Léa confirmed Saturday dinner. Arthur asked for a reminder to renew his passport before March.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appartement d’Alfama réservé (420 € pour trois nuits). Léa confirme le dîner de samedi. Arthur demande un rappel pour renouveler son passeport avant mars."
+          }
+        }
+      }
+    },
     "Both restarts were launchd bringing it back after a crash in the Telegram adapter, at 14:02 and 17:45. The second log line says `RetryAfter: 29`; it hit a flood limit while editing a long draft. I've opened a fix on a branch: `fix/telegram-flood-wait`.": {
       "localizations": {
         "fr": {
@@ -221,12 +311,72 @@
         }
       }
     },
+    "Can you look at this? %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu peux regarder ça ? %@"
+          }
+        }
+      }
+    },
     "Change a rule": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Modifier une règle"
+          }
+        }
+      }
+    },
+    "Checked a deduction's rules.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Règles d’une déduction vérifiées."
+          }
+        }
+      }
+    },
+    "Checked the backup logs and the disk's free space.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Journaux de sauvegarde et espace libre du disque vérifiés."
+          }
+        }
+      }
+    },
+    "Checked the flight's gate.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Porte d’embarquement vérifiée."
+          }
+        }
+      }
+    },
+    "Checked the media share's free space.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Espace libre du partage multimédia vérifié."
+          }
+        }
+      }
+    },
+    "Compared train and flight times for a weekend away.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Horaires de train et d’avion comparés pour un week-end."
           }
         }
       }
@@ -271,12 +421,32 @@
         }
       }
     },
+    "Done. %@ Nothing else needs your attention.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fait. %@ Rien d’autre ne demande ton attention."
+          }
+        }
+      }
+    },
     "Done: a reminder at 19:30 today, in Reminders on your iPhone.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "C’est fait : un rappel à 19:30 aujourd’hui, dans Rappels sur ton iPhone."
+          }
+        }
+      }
+    },
+    "Drafted a line of the form.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une ligne du formulaire rédigée."
           }
         }
       }
@@ -351,6 +521,26 @@
         }
       }
     },
+    "First week: installed nix-darwin and Hermes, paired the Telegram bot, chose the models, and tested the memory on a few old notes.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Première semaine : nix-darwin et Hermes installés, bot Telegram associé, modèles choisis, mémoire testée sur quelques vieilles notes."
+          }
+        }
+      }
+    },
+    "Fixed a failing Home Assistant automation after a firmware update.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatisation Home Assistant réparée après une mise à jour de firmware."
+          }
+        }
+      }
+    },
     "Forget this sub-chat's key until unlocked": {
       "localizations": {
         "fr": {
@@ -371,12 +561,32 @@
         }
       }
     },
+    "Found a restaurant for Saturday.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurant trouvé pour samedi."
+          }
+        }
+      }
+    },
     "Fri": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "ven."
+          }
+        }
+      }
+    },
+    "Go ahead and prune, but keep the March snapshots.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vas-y, supprime, mais garde les instantanés de mars."
           }
         }
       }
@@ -411,12 +621,32 @@
         }
       }
     },
+    "Hermes couldn't read its memory.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes n’a pas pu lire sa mémoire."
+          }
+        }
+      }
+    },
     "Hermes didn't answer in time.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Hermes n’a pas répondu à temps."
+          }
+        }
+      }
+    },
+    "Hermes offered to prune the old snapshots and asked for a go-ahead.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes propose de supprimer les vieux instantanés et demande le feu vert."
           }
         }
       }
@@ -431,12 +661,32 @@
         }
       }
     },
+    "Hermes worked out that pruning past 90 days frees 212 GB, and waited for Arthur.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hermes calcule que supprimer au-delà de 90 jours libère 212 Go, et attend Arthur."
+          }
+        }
+      }
+    },
     "Hermes works on it across turns until reached": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Hermes y travaille de tour en tour jusqu’à l’atteindre"
+          }
+        }
+      }
+    },
+    "Hermes' memory isn't available on the server.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La mémoire d’Hermes n’est pas disponible sur le serveur."
           }
         }
       }
@@ -461,6 +711,16 @@
         }
       }
     },
+    "Home Assistant moved to the Mac; Hermes learned the house's devices and the evening routine.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Home Assistant passe sur le Mac ; Hermes apprend les appareils de la maison et la routine du soir."
+          }
+        }
+      }
+    },
     "Home server": {
       "localizations": {
         "fr": {
@@ -477,6 +737,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hôtel"
+          }
+        }
+      }
+    },
+    "Hotels compared near Alfama; Arthur chose the one with the terrace.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hôtels comparés près d’Alfama ; Arthur choisit celui avec la terrasse."
           }
         }
       }
@@ -581,12 +851,72 @@
         }
       }
     },
+    "Lisbon: flights compared, Thursday 10:40 from Orly chosen; Léa joins on Friday.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lisbonne : vols comparés, jeudi 10:40 depuis Orly choisi ; Léa arrive vendredi."
+          }
+        }
+      }
+    },
+    "Listed the documents for the 2026 return: payslips, the rent receipts, two donation receipts.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Documents de la déclaration 2026 listés : bulletins de paie, quittances de loyer, deux reçus de dons."
+          }
+        }
+      }
+    },
+    "Listed what to pack.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liste des affaires à emporter faite."
+          }
+        }
+      }
+    },
     "Lock": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Verrouiller"
+          }
+        }
+      }
+    },
+    "Looked at flats in Alfama and Graça; the Alfama one has a terrace and a quiet street.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appartements regardés à Alfama et Graça ; celui d’Alfama a une terrasse et une rue calme."
+          }
+        }
+      }
+    },
+    "Looked at the router's logs.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Journaux du routeur consultés."
+          }
+        }
+      }
+    },
+    "Looked up the tram to the castle.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tram jusqu’au château cherché."
           }
         }
       }
@@ -637,6 +967,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "lun."
+          }
+        }
+      }
+    },
+    "Moved Home Assistant to the Mac, fixed the Wi-Fi plug in the living room, wrote the morning summary. Started planning Lisbon with Léa, Thursday to Sunday.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Home Assistant déplacé sur le Mac, prise Wi-Fi du salon réparée, résumé du matin écrit. Début de l’organisation de Lisbonne avec Léa, du jeudi au dimanche."
+          }
+        }
+      }
+    },
+    "Moved the media share to the new disk and checked its permissions.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partage multimédia déplacé sur le nouveau disque, permissions vérifiées."
           }
         }
       }
@@ -697,6 +1047,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Je m’en occupe. J’ai vérifié le serveur : le processeur est à **12 %**, la mémoire à 50 %, et le disque de sauvegarde a maintenant 212 Go libres après le nettoyage de cette nuit. Rien d’autre ne requiert ton attention pour l’instant ; je te préviens si la sauvegarde nocturne échoue encore."
+          }
+        }
+      }
+    },
+    "On it: pruning everything older than 90 days except March's 4 snapshots. I'll tell you when it's done.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "C’est parti : je supprime tout ce qui a plus de 90 jours sauf les 4 instantanés de mars. Je te dis quand c’est fini."
           }
         }
       }
@@ -771,12 +1131,42 @@
         }
       }
     },
+    "Read a payslip.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bulletin de paie lu."
+          }
+        }
+      }
+    },
+    "Read an article Arthur sent and kept its three main points.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Article envoyé par Arthur lu, ses trois idées principales gardées."
+          }
+        }
+      }
+    },
     "Reading list": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "À lire"
+          }
+        }
+      }
+    },
+    "Reading list started with 12 essays; two backup warnings about the disk filling up.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liste de lecture commencée avec 12 essais ; deux alertes de sauvegarde sur le disque qui se remplit."
           }
         }
       }
@@ -811,12 +1201,32 @@
         }
       }
     },
+    "Renamed two devices in Home Assistant.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deux appareils renommés dans Home Assistant."
+          }
+        }
+      }
+    },
     "Reply \"skip\" to skip this question.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Répondez « skip » pour passer cette question."
+          }
+        }
+      }
+    },
+    "Restarted Home Assistant after an update.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Home Assistant redémarré après une mise à jour."
           }
         }
       }
@@ -931,6 +1341,16 @@
         }
       }
     },
+    "Second week: backups with restic, the guard's approval rules, the morning summary, and the first sub-chats.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deuxième semaine : sauvegardes restic, règles d’approbation du garde, résumé du matin et premières sous-discussions."
+          }
+        }
+      }
+    },
     "Send your last message again": {
       "localizations": {
         "fr": {
@@ -957,6 +1377,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "État de la session"
+          }
+        }
+      }
+    },
+    "Set up the server and Hermes in October: nix-darwin, the Telegram bot, the memory, nightly restic backups to the external disk. Arthur likes short answers, and French after 9 pm.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installation du serveur et d’Hermes en octobre : nix-darwin, le bot Telegram, la mémoire, les sauvegardes restic nocturnes sur le disque externe. Arthur aime les réponses courtes, et le français après 21 h."
           }
         }
       }
@@ -1031,6 +1461,16 @@
         }
       }
     },
+    "Summarized the morning: weather, calendar, two emails worth reading.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Résumé du matin : météo, agenda, deux e-mails à lire."
+          }
+        }
+      }
+    },
     "Sun": {
       "localizations": {
         "fr": {
@@ -1051,12 +1491,42 @@
         }
       }
     },
+    "Talked through the week's plan and moved two reminders.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Programme de la semaine revu, deux rappels déplacés."
+          }
+        }
+      }
+    },
     "Taxes 2026": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Impôts 2026"
+          }
+        }
+      }
+    },
+    "Taxes moved to a private sub-chat. The reading list began. The nightly backup warned twice about free space on the external disk.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les impôts passent dans une sous-discussion privée. La liste de lecture commence. La sauvegarde nocturne alerte deux fois sur l’espace libre du disque externe."
+          }
+        }
+      }
+    },
+    "Taxes paperwork listed and moved to a private sub-chat; Hermes keeps nothing of it here.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Papiers des impôts listés et passés dans une sous-discussion privée ; Hermes n’en garde rien ici."
           }
         }
       }
@@ -1101,6 +1571,16 @@
         }
       }
     },
+    "The Mac mini's setup: Home Assistant, the media share, the router's DHCP reservations.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La configuration du Mac mini : Home Assistant, le partage multimédia, les réservations DHCP du routeur."
+          }
+        }
+      }
+    },
     "The agents and tasks running now": {
       "localizations": {
         "fr": {
@@ -1111,12 +1591,42 @@
         }
       }
     },
+    "The backup failed at 03:12: the external disk was full. Hermes proposed pruning snapshots older than 90 days, about 212 GB.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La sauvegarde a échoué à 03:12 : le disque externe était plein. Hermes propose de supprimer les instantanés de plus de 90 jours, environ 212 Go."
+          }
+        }
+      }
+    },
+    "The deduction for the home office applies; Hermes filled in the form's draft.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La déduction pour le bureau à domicile s’applique ; Hermes remplit le brouillon du formulaire."
+          }
+        }
+      }
+    },
     "The external disk was full, so restic stopped before pruning:\n```\nFatal: unable to save snapshot: no space left on device\n```\nPruning snapshots older than 90 days would free about **212 GB**. Want me to do it?": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Le disque externe était plein, donc restic s’est arrêté avant le nettoyage :\n```\nFatal: unable to save snapshot: no space left on device\n```\nSupprimer les instantanés de plus de 90 jours libérerait environ **212 Go**. Je le fais ?"
+          }
+        }
+      }
+    },
+    "The living room plug kept dropping off Wi-Fi: moved it to the 2.4 GHz network.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La prise du salon perdait le Wi-Fi : passée sur le réseau 2,4 GHz."
           }
         }
       }
@@ -1157,6 +1667,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ce fichier est trop volumineux pour Telegram."
+          }
+        }
+      }
+    },
+    "This memory is locked.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette mémoire est verrouillée."
+          }
+        }
+      }
+    },
+    "This memory no longer exists.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette mémoire n’existe plus."
           }
         }
       }
@@ -1281,6 +1811,16 @@
         }
       }
     },
+    "Updated the server and rebuilt it; nothing broke.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serveur mis à jour et reconstruit ; rien n’a cassé."
+          }
+        }
+      }
+    },
     "Upload failed: %@": {
       "localizations": {
         "fr": {
@@ -1327,6 +1867,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Attend ton accord"
+          }
+        }
+      }
+    },
+    "Weather for the weekend: sunny, 22 °C on Saturday.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Météo du week-end : ensoleillé, 22 °C samedi."
           }
         }
       }

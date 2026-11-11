@@ -215,6 +215,7 @@ Hidden: the "App" topic (machine traffic)
 | Pet | the bar's leading item: tap to caress, hold for New Pet… (no sheet) | the same, in the detail's bar |
 | Dashboard | an inset-grouped list as Settings › Battery: window segmented, value rows, sparklines under their rows, a model's details pushed | the same in the readable column |
 | Settings | inset grouped list (pushed, inline title) | the same in the readable column |
+| Settings › Memory | Hermes' memory, read-only (protocol §4.1): the memories (a private one "Private chat" behind Face ID, a locked one not openable), then a memory's view as Hermes sees it, each row its range ("Messages 2048–3071") over its summary, opening on its two halves down to a message (from, date, text); the system's ProgressView and ContentUnavailableView | the same in the readable column |
 | Call | the Phone app's layout: name and duration, the pet, a caption, one row of round glass controls | the same |
 | Private gate | the system's empty state: lock, "Private chat", why, Unlock | the same |
 | Commands | a list: values in force as value rows, pickers with the system's checkmark, commands in the label colour (red when they confirm) | a form sheet |

@@ -9,6 +9,8 @@ struct SettingsView: View {
     @State private var notifications: UNAuthorizationStatus = .notDetermined
     @State private var confirmLogout = false
     @State private var reinstalling = false
+    /// `-memory …` (screenshots): straight to Settings › Memory.
+    @State private var memoryLinked = MemoryLink.launch != nil
     @AppStorage(CallVoice.defaultsKey) private var voice: CallVoice = .default
     @AppStorage(KeepAlivePolicy.defaultsKey) private var grace: Double = KeepAlivePolicy.defaultGrace
 
@@ -20,6 +22,12 @@ struct SettingsView: View {
                 if store.config.demo {
                     Label("Demo data: this build has no Telegram API id.", systemImage: "theatermasks").tone(.secondary)
                 }
+            }
+
+            Section {
+                MemoryRow()
+            } footer: {
+                Text("What Hermes remembers of each chat, as it sees it. Read-only.")
             }
 
             Section {
@@ -138,6 +146,7 @@ struct SettingsView: View {
         // A page pushed from the chat's menu: inline, as Settings' own sub-pages.
         .navigationBarTitleDisplayMode(.inline)
         .task { await refresh() }
+        .navigationDestination(isPresented: $memoryLinked) { MemoryVolumesView(link: MemoryLink.launch) }
         .confirmationDialog("Log out of Telegram on this device?", isPresented: $confirmLogout, titleVisibility: .visible) {
             Button("Log Out", role: .destructive) { Task { await store.logOut() } }
         }

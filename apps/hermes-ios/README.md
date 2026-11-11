@@ -42,7 +42,8 @@ Without `HERMES_TG_API_ID`/`HERMES_TG_API_HASH` (or with the `-demo` launch
 argument) the app runs on built-in demo data through a fake TDLib layer:
 nothing to log in to, every screen works. Launch arguments used by the
 screenshots: `-section pet|dashboard|settings`, `-topic <id>`, `-noQuestion`,
-`-commands`, `-newSubchat`, `-call`, `-noAudio` (the call screen without the
+`-commands`, `-newSubchat`, `-memory <chat>[/<first>+<n>…]` (Settings › Memory, then that chat's
+memory and the lines under it, e.g. `-memory 0/3584+64/3600`), `-call`, `-noAudio` (the call screen without the
 audio engine, which the simulator's audio unit can abort on), `-demoLogin`. The UI tests add
 `-scrollProbe` (the transcript reports how a gesture moved it, frame by frame) and
 `-notifyOnBackground <topic>` (a notification from that chat each time the app leaves the

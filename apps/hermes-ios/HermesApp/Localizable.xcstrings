@@ -606,6 +606,16 @@
         }
       }
     },
+    "Couldn't Read the Memory": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de lire la mémoire"
+          }
+        }
+      }
+    },
     "Couldn't attach %@": {
       "localizations": {
         "fr": {
@@ -672,6 +682,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tableau de bord"
+          }
+        }
+      }
+    },
+    "Date": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date"
           }
         }
       }
@@ -1003,6 +1023,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Personnelle gratuite"
+          }
+        }
+      }
+    },
+    "From": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De"
           }
         }
       }
@@ -1350,6 +1380,26 @@
         }
       }
     },
+    "Load More": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Charger la suite"
+          }
+        }
+      }
+    },
+    "Loading more…": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chargement de la suite…"
+          }
+        }
+      }
+    },
     "Local": {
       "comment": "Model role",
       "localizations": {
@@ -1367,6 +1417,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Écran verrouillé"
+          }
+        }
+      }
+    },
+    "Locked: unlock its chat to read it": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verrouillée : déverrouille sa discussion pour la lire"
           }
         }
       }
@@ -1484,6 +1544,16 @@
         }
       }
     },
+    "Message %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message %@"
+          }
+        }
+      }
+    },
     "Message Hermes": {
       "localizations": {
         "fr": {
@@ -1500,6 +1570,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Message supprimé"
+          }
+        }
+      }
+    },
+    "Messages %@ to %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Messages %@ à %@"
+          }
+        }
+      }
+    },
+    "Messages %@–%@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Messages %@–%@"
           }
         }
       }
@@ -1736,6 +1826,16 @@
         }
       }
     },
+    "Not summarized yet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas encore résumé"
+          }
+        }
+      }
+    },
     "Note": {
       "localizations": {
         "fr": {
@@ -1782,6 +1882,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Voix sur l’appareil"
+          }
+        }
+      }
+    },
+    "Only the beginning of this long message is shown.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seul le début de ce long message est affiché."
           }
         }
       }
@@ -2437,6 +2547,16 @@
         }
       }
     },
+    "Text": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Texte"
+          }
+        }
+      }
+    },
     "The audio couldn't be prepared.": {
       "localizations": {
         "fr": {
@@ -2593,6 +2713,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Jetons en sortie"
+          }
+        }
+      }
+    },
+    "Tool call": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appel d’outil"
+          }
+        }
+      }
+    },
+    "Tool result": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Résultat d’outil"
           }
         }
       }
@@ -2845,6 +2985,36 @@
         }
       }
     },
+    "What Hermes remembers of each chat, as it sees it. Read-only.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce dont Hermes se souvient de chaque discussion, tel qu’il le voit. En lecture seule."
+          }
+        }
+      }
+    },
+    "What Hermes remembers of each chat. Older messages are summarized more coarsely; open a line to read what it covers. Nothing here changes the memory.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce dont Hermes se souvient de chaque discussion. Les messages anciens sont résumés plus grossièrement ; ouvre une ligne pour lire ce qu’elle couvre. Rien ici ne modifie la mémoire."
+          }
+        }
+      }
+    },
+    "What Hermes sees of this chat now, oldest first.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce qu’Hermes voit de cette discussion maintenant, du plus ancien au plus récent."
+          }
+        }
+      }
+    },
     "When the session ends": {
       "localizations": {
         "fr": {
@@ -2861,6 +3031,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Période"
+          }
+        }
+      }
+    },
+    "Work": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Travail"
           }
         }
       }
@@ -2911,6 +3091,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ton numéro de téléphone"
+          }
+        }
+      }
+    },
+    "^[%lld message](inflect: true)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "^[%lld message](inflect: true)"
           }
         }
       }
