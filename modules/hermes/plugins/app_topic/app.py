@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from . import protocol, speech, ui
+from . import memory, protocol, speech, ui
 from .hatch import HatchFailed, ProviderRefused, plain_refusal, refusal  # noqa: F401  (callers import them from here)
 from .machine import Machine
 from .pet import PetState, animation, mirror, mood
@@ -989,6 +989,8 @@ class App:
             return {"active": self.call_active()}
         if kind == "app.reinstall":
             return await asyncio.to_thread(self.reinstall, request.get("devices") or [])
+        if kind in ("memory.volumes", "memory.lines"):
+            return await asyncio.to_thread(self.memory, kind, request)
         if kind == "ack":
             ids = [int(i) for i in request.get("ids") or [] if str(i).isdigit()]
             mine = {e[0] for e in self.saved["ephemeral"]}
@@ -1005,6 +1007,14 @@ class App:
         if kind in ("push.register", "push.unregister"):
             raise RequestError("unavailable", f"{kind} is off on this server")
         raise RequestError("unknown_type", f"unknown request type {kind!r}")
+
+    def memory(self, kind: str, request: dict) -> dict:
+        try:
+            if kind == "memory.volumes":
+                return memory.volumes(owner_id(), self.saved.get("thread"))
+            return memory.lines(owner_id(), self.saved.get("thread"), request)
+        except memory.Refused as error:
+            raise RequestError(error.code, str(error)) from None
 
     def call_active(self) -> bool:
         return time.time() < self.call_until

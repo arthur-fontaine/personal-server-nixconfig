@@ -393,9 +393,12 @@ request's message id. The bot deletes the request when it has answered.
 | `push.register` | `token_hex`, `kind` (`alert` \| `liveactivity` \| `pushtostart`), `sandbox`, `bundle_id`, `activity_id` (liveactivity) | `{"stored": true, "apns": <bool: the server can send>}` |
 | `push.unregister` | `token_hex` | `{}` |
 | `ack` | `ids` (message ids of `notify`/`reply`) | none: the bot deletes them |
+| `memory.volumes` | — | `{"volumes": [{"chat": 0, "name": "Main chat", "volume": "main", "messages": 3712, "locked": false, "private": false}, …]}`: the main chat, then each sub-chat of the DM with a memory of its own, by topic id (§4.1) |
+| `memory.lines` | `chat`; then nothing (Hermes' view), `after` (the view from that message on), or `first` + `n` (a line) | `{"lines": [{"first", "n", "text", "built"}], "truncated"?, "next"?}`; for `n` = 1 `{"message": {"i", "kind", "date", "text", "cut"?}}` (§4.1) |
 
 Error codes: `bad_request`, `unknown_type`, `busy`, `unavailable` (the
-feature is off on this server), `failed`.
+feature is off on this server), `not_found` (no such chat memory or line),
+`locked` (an encrypted memory without its key), `failed`.
 
 A sub-chat is unlocked by the app itself: it sends `/sub unlock <passphrase>`
 in that topic, then deletes it (unii intercepts it before anything stores it).
@@ -407,6 +410,39 @@ in that topic, then deletes it (unii intercepts it before anything stores it).
 "update"`, `content-state` = `{"status", "task", "chat", "question"}`) to
 `liveactivity` tokens; `pushtostart` starts one when a turn starts. Without
 a key, tokens are stored and `apns: false`.
+
+### 4.1 Memory (read-only)
+
+Hermes' memory is unii's (`modules/hermes/plugins/unii/README.md`): each chat
+writes into a volume, a log of messages and a binary tree of one-line
+summaries. A **line** is a node: `first` (its first message, from 0) and `n`
+(how many it covers, a power of 2, `first` a multiple of `n`), unii's
+`"<first>+<n>"`. `text` is its summary, `null` with `"built": false` while
+unii has not summarized it yet (it can still be opened).
+
+- `memory.volumes`: `chat` 0 is the main chat (`name` "Main chat", the app
+  shows its own wording); then each sub-chat of the owner's DM whose own
+  volume exists, by topic id, `name` its topic name or `null`. A sub-chat
+  writing into `main` is not listed again. `private`: the volume is
+  encrypted (the app asks Face ID as for that chat). `locked`: encrypted and
+  its key not in memory; `messages` is then `null`, and nothing else of it is
+  readable (the app never asks the passphrase here: `/sub unlock` in the
+  chat does).
+- `memory.lines` without `first`/`n`: the view, exactly the lines Hermes sees
+  now for that volume, oldest first (coarse for old messages, fine for the
+  recent ones). When it doesn't fit one message, the reply holds the first
+  lines with `"truncated": true` and `next`: ask again with `after: <next>`.
+- `memory.lines` with `first` + `n` > 1: the two lines it merges (`n/2`
+  each). With `n` = 1: the message, `kind` one of `user`, `hermes`, `tool`,
+  `echo`, `work`, `note`, `date` ISO 8601; a text too long for one reply is
+  cut with `…` and `"cut": true`.
+- Read-only: nothing here changes the memory or starts a summary. An unknown
+  chat, a sub-chat without memory, or a line past the last message is
+  `not_found`; a malformed line is `bad_request`; an encrypted volume without
+  its key is `locked`.
+- A reply holds memory in clear in the App topic: the app `ack`s it as soon
+  as it has read it, and never puts a private memory's text in a
+  notification.
 
 ## 5. Pet
 
@@ -574,6 +610,9 @@ topic once that message is sent (its final edit, for a streamed one):
   topic; its notification stays generic (§3).
 
 ## Changelog
+
+- v4, additive (2026-11-11, k4): `memory.volumes` and `memory.lines`
+  (§4.1), Hermes' memory read-only; error codes `not_found` and `locked`.
 
 - v4, additive (2026-11-11, k13): the `ui` message and `render_ui` (§8).
   Same day: `ui.key` finds the message (not `message_id`), and the turn's

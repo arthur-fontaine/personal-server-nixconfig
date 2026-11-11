@@ -286,6 +286,146 @@ def test_subchats() -> None:
         sys.__dict__.pop("_hermes_unii_state", None)
 
 
+def _files(root: Path) -> dict:
+    return {str(p): (p.stat().st_size, p.stat().st_mtime_ns) for p in root.rglob("*")}
+
+
+def test_memory() -> None:
+    from unii.policy import Chat, own_volume
+    from unii.runtime import Runtime
+    from unii.volume import Volume, unlock_key
+
+    home = Path(tempfile.mkdtemp(dir=TMP))
+    rt = Runtime(str(home), {"presets": {"aside": {}, "secret": {"encrypted": True}},
+                             "default_preset": "aside"}, complete=lambda messages: "never called")
+    plain, secret, empty = (Chat("telegram", "dm", str(OWNER), t) for t in ("455", "456", "457"))
+    rt.policies.set_preset(plain, "aside")
+    rt.policies.set_name(plain, "Home server")
+    rt.policies.set_preset(secret, "secret")
+    rt.policies.set_name(secret, "Taxes")
+    rt.policies.set_preset(empty, "aside")  # no volume yet: not listed
+    rt.policies.set_preset(Chat("telegram", "dm", str(OWNER), "77"), "aside")  # the App topic
+    rt.policies.set_preset(Chat("telegram", "group", "-100", ""), "aside")  # not the owner's DM
+
+    # main: 8 messages, every line but the newest built, a view coarse then fine.
+    main = Volume(rt.volumes_dir, "main")
+    for k in range(8):
+        main.append("user" if k % 2 == 0 else "hermes", f"message {k}" + (" long" * 2000 if k == 3 else ""))
+    for k in range(7):
+        main.set_node(0, k, f"line {k}")
+    main.set_node(1, 0, "pair 0-1")
+    main.set_node(1, 1, "pair 2-3")
+    main.set_node(1, 2, "pair 4-5")
+    main.set_node(2, 0, "first four")
+    main.view = [(2, 0), (1, 2), (0, 6), (0, 7)]
+    main._save_view()
+    side = Volume(rt.volumes_dir, own_volume(plain))
+    for k in range(40):
+        side.append("user", f"side {k}")
+        side.set_node(0, k, f"{k:02d} " + "é" * 480)  # 40 lines of ~500 chars: several pages
+    key = unlock_key(os.path.join(rt.volumes_dir, own_volume(secret)), own_volume(secret), "pass")
+    hidden = Volume(rt.volumes_dir, own_volume(secret), encrypted=True, key=key)
+    hidden.append("user", "my tax number")
+    hidden.set_node(0, 0, "the tax number")
+    del main, side, hidden
+
+    plugin = types.SimpleNamespace(saved={"thread": 77})
+
+    def ask(kind, **request):
+        data = app_mod.App.memory(plugin, kind, {"type": kind, **request})
+        assert protocol.fits(protocol.message("reply", re=2**31, ok=True, data=data)), data
+        return data
+
+    def refused(kind, **request):
+        try:
+            app_mod.App.memory(plugin, kind, {"type": kind, **request})
+        except app_mod.RequestError as error:
+            return error.code
+        raise AssertionError(f"{kind} {request} answered")
+
+    sys.__dict__["_hermes_unii_state"] = {"runtime": rt}
+    before = _files(home)
+    try:
+        vols = ask("memory.volumes")["volumes"]
+        assert [v["chat"] for v in vols] == [0, 455, 456], vols
+        assert vols[0] == {"chat": 0, "name": "Main chat", "volume": "main", "messages": 8,
+                           "locked": False, "private": False}
+        assert vols[1]["name"] == "Home server" and vols[1]["messages"] == 40 and not vols[1]["private"]
+        assert vols[2]["locked"] and vols[2]["private"] and vols[2]["messages"] is None
+
+        # The view: what Hermes sees, oldest first; the newest line not built yet.
+        view = ask("memory.lines", chat=0)
+        assert [(x["first"], x["n"]) for x in view["lines"]] == [(0, 4), (4, 2), (6, 1), (7, 1)]
+        assert view["lines"][0]["text"] == "first four" and view["lines"][0]["built"]
+        assert view["lines"][3] == {"first": 7, "n": 1, "text": None, "built": False}
+        assert "truncated" not in view
+        # A line opens on its two children, down to a message.
+        assert ask("memory.lines", chat=0, first=0, n=4)["lines"] == [
+            {"first": 0, "n": 2, "text": "pair 0-1", "built": True},
+            {"first": 2, "n": 2, "text": "pair 2-3", "built": True}]
+        assert [x["text"] for x in ask("memory.lines", chat=0, first=0, n=2)["lines"]] == ["line 0", "line 1"]
+        message = ask("memory.lines", chat=0, first=2, n=1)["message"]
+        assert message["i"] == 2 and message["kind"] == "user" and message["text"] == "message 2"
+        assert message["date"].startswith("20") and "cut" not in message
+        long = ask("memory.lines", chat=0, first=3, n=1)["message"]
+        assert long["cut"] and long["text"].endswith("…") and long["text"].startswith("message 3 long")
+        assert len(long["text"]) > 3000, len(long["text"])
+
+        # Paging: a view too long for one message comes in pages, each under Telegram's cap.
+        seen, after, pages = [], None, 0
+        while True:
+            page = ask("memory.lines", chat=455, **({"after": after} if after is not None else {}))
+            pages += 1
+            seen += [x["first"] for x in page["lines"]]
+            if not page.get("truncated"):
+                break
+            assert page["next"] == seen[-1] + 1
+            after = page["next"]
+        assert seen == list(range(40)) and pages > 2, (pages, seen)
+
+        # A locked memory says so and nothing more; unlocked, it reads.
+        assert refused("memory.lines", chat=456) == "locked"
+        assert refused("memory.lines", chat=456, first=0, n=1) == "locked"
+        rt.keys[own_volume(secret)] = key
+        assert ask("memory.volumes")["volumes"][2]["messages"] == 1
+        assert ask("memory.lines", chat=456)["lines"][0]["text"] == "the tax number"
+        assert ask("memory.lines", chat=456, first=0, n=1)["message"]["text"] == "my tax number"
+
+        # Unknown chats and lines that do not exist.
+        assert refused("memory.lines", chat=999) == "not_found"
+        assert refused("memory.lines", chat=457) == "not_found"  # a sub-chat without a volume
+        assert refused("memory.lines", chat=77) == "not_found"  # the App topic
+        assert refused("memory.lines", chat="x") == "bad_request"
+        assert refused("memory.lines", chat=0, first=1, n=2) == "bad_request"
+        assert refused("memory.lines", chat=0, first=0, n=3) == "bad_request"
+        assert refused("memory.lines", chat=0, first=8, n=1) == "not_found"
+        assert refused("memory.lines", chat=0, first=0, n=16) == "not_found"
+
+        assert _files(home) == before, "reading wrote"
+
+        # A volume the runtime has open is read live; a new message shows at once.
+        live = Volume(rt.volumes_dir, "main")
+        rt._volumes["main"] = live
+        before = _files(home)
+        live.append("user", "just now")
+        assert ask("memory.volumes")["volumes"][0]["messages"] == 9
+        assert ask("memory.lines", chat=0)["lines"][-1] == {"first": 8, "n": 1, "text": None, "built": False}
+        rt._volumes.pop("main")
+        before = _files(home)
+        assert ask("memory.lines", chat=0, first=8, n=1)["message"]["text"] == "just now"
+
+        # Reading wrote nothing and started no compactor.
+        assert _files(home) == before
+        assert not rt._compactors and not rt._volumes
+    finally:
+        sys.__dict__.pop("_hermes_unii_state", None)
+    sys.__dict__["_hermes_unii_state"] = {}
+    try:
+        assert refused("memory.volumes") == "unavailable"
+    finally:
+        sys.__dict__.pop("_hermes_unii_state", None)
+
+
 def test_pending() -> None:
     from app_topic.pending import TTL, Pending
 
