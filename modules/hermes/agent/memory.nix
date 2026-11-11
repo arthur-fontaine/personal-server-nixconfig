@@ -51,10 +51,13 @@ in
           allow_model_override = true;
         };
       };
-      # Hermes' post-turn review, which writes skills, on the background model.
-      auxiliary.background_review = lib.optionalAttrs (background != null) {
-        inherit (background) provider model;
-      };
+      # Hermes' post-turn review, which writes skills, on the background model;
+      # without one, "auto": the chat's own model. Never an empty block: the
+      # config is merged over the existing config.yaml, so {} kept the
+      # provider an older generation wrote (opencode-zen, out of funds).
+      auxiliary.background_review =
+        if background != null then { inherit (background) provider model; }
+        else { provider = "auto"; model = ""; };
       memory = {
         memory_enabled = false;
         user_profile_enabled = false;
