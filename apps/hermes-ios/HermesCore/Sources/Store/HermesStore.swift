@@ -47,6 +47,8 @@ public final class HermesStore {
     public private(set) var uiSpecs: [UISpecMemory.Place: UISpec] = [:]
     private var uiEntries: [UISpecMemory.Place: UISpecMemory.Entry] = [:]
     public var uiMemory = UISpecMemory()
+    /// What was read of Hermes' memory this session (HermesStore+Memory).
+    @ObservationIgnored public internal(set) var memoryCache = MemoryCache()
     private var pendingReplies: [MessageID: CheckedContinuation<ReplyPayload, Error>] = [:]
     private var earlyReplies: [MessageID: ReplyPayload] = [:]
     private var seenQuestions: Set<String> = []
@@ -819,6 +821,7 @@ public final class HermesStore {
         uiSpecs = [:]
         uiEntries = [:]
         uiMemory.save([:])
+        forgetMemory()
     }
 
     // MARK: - Login

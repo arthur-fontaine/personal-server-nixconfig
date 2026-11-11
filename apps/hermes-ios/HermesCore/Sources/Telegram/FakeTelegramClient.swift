@@ -177,7 +177,15 @@ public final class FakeTelegramClient: TelegramClient {
         store[topic, default: []].append(local)
         if text.hasPrefix("/mode ") { mode = String(text.dropFirst(6)); pushControls() }
         if text.hasPrefix("/model ") { model = String(text.split(separator: " ")[1]); pushControls() }
-        if !text.hasPrefix("/sub unlock") { Task { await reply(to: text, in: topic) } }
+        if text.hasPrefix("/sub unlock") {
+            // As unii: the key is in memory now, so the sub-chat and its memory read.
+            if let i = appState.subchats.firstIndex(where: { $0.topicID == topic }) {
+                appState.subchats[i].unlocked = true
+                pushState()
+            }
+        } else {
+            Task { await reply(to: text, in: topic) }
+        }
         return local
     }
 
@@ -304,7 +312,19 @@ public final class FakeTelegramClient: TelegramClient {
                           ChatMessage(id: Fixtures.id(serverID), topic: Self.appTopic, date: .now, isOutgoing: true, text: FormattedText(text))))
         try? await Task.sleep(for: .milliseconds(300))
         var replyData = "{}"
+        let taxesUnlocked: Bool = appState.subchats.first(where: { $0.topicID == 31 })?.unlocked == true
         switch type {
+        case "memory.volumes":
+            replyData = Self.json(MemoryFixtures.volumesData(taxesUnlocked: taxesUnlocked))
+        case "memory.lines":
+            switch MemoryFixtures.linesData(obj, taxesUnlocked: taxesUnlocked) {
+            case .success(let data): replyData = Self.json(data)
+            case .failure(let code):
+                nextID += 1
+                emit(.newMessage(Self.botChat.chatID, Fixtures.appMessage(id: nextID, json:
+                    #"{"v":4,"type":"reply","re":\#(serverID),"ok":false,"error":{"code":"\#(code.rawValue)","message":"\#(code.rawValue)"}}"#)))
+                return
+            }
         case "call.state":
             replyData = #"{"active":true}"#
         case "hello":
@@ -315,6 +335,10 @@ public final class FakeTelegramClient: TelegramClient {
         }
         nextID += 1
         emit(.newMessage(Self.botChat.chatID, Fixtures.appMessage(id: nextID, json: #"{"v":3,"type":"reply","re":\#(serverID),"ok":true,"data":\#(replyData)}"#)))
+    }
+
+    private static func json(_ object: [String: Any]) -> String {
+        (try? JSONSerialization.data(withJSONObject: object)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
     }
 
     /// `background` (brief item 9, the keep-alive test): from 5 s after launch Hermes works for
