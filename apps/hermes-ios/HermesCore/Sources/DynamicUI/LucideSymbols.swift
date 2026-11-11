@@ -5,6 +5,9 @@ import Foundation
 /// neutral one. `SymbolTests` checks every symbol here exists.
 public enum LucideSymbols {
     public static let fallback = "circle.dashed"
+    /// Symbols whose multicolour reads on the card's fill in light and dark (a white cloud would
+    /// vanish on the light card): drawn in their own colours, the rest in the text colour.
+    public static let multicolor: Set<String> = ["sun.max.fill"]
 
     public static func symbol(for name: String) -> String {
         table[normalized(name)] ?? fallback
@@ -36,7 +39,7 @@ public enum LucideSymbols {
 
     static let table: [String: String] = [
         // Weather
-        "sun": "sun.max", "moon": "moon", "cloud": "cloud", "cloudy": "cloud", "cloudrain": "cloud.rain",
+        "sun": "sun.max.fill", "moon": "moon", "cloud": "cloud", "cloudy": "cloud", "cloudrain": "cloud.rain",
         "cloudsnow": "cloud.snow", "clouddrizzle": "cloud.drizzle", "cloudlightning": "cloud.bolt",
         "cloudfog": "cloud.fog", "cloudsun": "cloud.sun", "cloudmoon": "cloud.moon", "cloudhail": "cloud.hail",
         "snowflake": "snowflake", "wind": "wind", "tornado": "tornado", "droplet": "drop", "droplets": "humidity",

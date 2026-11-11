@@ -266,12 +266,17 @@ struct NodeView: View {
         let image = Image(systemName: symbol).textRole(role)
         Group {
             switch color {
-            // Weather and the like in their own colours, as the Weather app draws them.
-            case .default: image.symbolRenderingMode(.multicolor)
+            // The sun in its own colours, as Weather draws it; the rest in the text's.
+            case .default:
+                if LucideSymbols.multicolor.contains(symbol) {
+                    image.symbolRenderingMode(.multicolor)
+                } else {
+                    image.symbolRenderingMode(.hierarchical).tone(.primary)
+                }
             case .muted: image.symbolRenderingMode(.hierarchical).tone(.secondary)
             case .primary: image.symbolRenderingMode(.hierarchical).tone(.accent)
             case .success: image.symbolRenderingMode(.hierarchical).tone(.success)
-            case .warning: image.symbolRenderingMode(.multicolor).tone(.warning)
+            case .warning: image.symbolRenderingMode(.hierarchical).tone(.warning)
             case .danger: image.symbolRenderingMode(.hierarchical).tone(.destructive)
             }
         }
@@ -317,8 +322,9 @@ struct NodeView: View {
             Text(verbatim: m.value).textRole(.headline)
             if let change = m.change {
                 HGroup(alignment: .firstTextBaseline, spacing: .xxs) {
-                    // Only the arrow takes the trend's colour: the words stay legible (4.3).
-                    Image(systemName: m.changeType == .positive ? "arrow.up.right" : m.changeType == .negative ? "arrow.down.right" : "arrow.right")
+                    // The arrow points the way the figure moved and takes the change's colour (a cost
+                    // going up is red); only the arrow, so the words stay legible (4.3).
+                    Image(systemName: Self.arrow(change, m.changeType))
                         .tone(m.changeType == .positive ? .success : m.changeType == .negative ? .destructive : .secondary)
                     Text(verbatim: change).tone(.secondary)
                 }
@@ -329,6 +335,14 @@ struct NodeView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: m.label))
         .accessibilityValue(Text(verbatim: [m.value, m.change].compactMap { $0 }.joined(separator: ", ")))
+    }
+
+    static func arrow(_ change: String, _ type: UIChange) -> String {
+        switch change.trimmingCharacters(in: .whitespaces).first {
+        case "+": "arrow.up.right"
+        case "-", "\u{2212}": "arrow.down.right"
+        default: type == .positive ? "arrow.up.right" : type == .negative ? "arrow.down.right" : "arrow.right"
+        }
     }
 
     private func progress(fraction: Double, label: String?) -> some View {
@@ -385,7 +399,8 @@ struct NodeView: View {
                 } else {
                     LineMark(x: .value("Label", p.label), y: .value("Value", p.value))
                         .foregroundStyle(AccentFillStyle())
-                        .interpolationMethod(.catmullRom)
+                        // Monotone: the curve never overshoots the data (Catmull-Rom drew a peak above it).
+                        .interpolationMethod(.monotone)
                         .accessibilityLabel(Text(verbatim: p.label))
                         .accessibilityValue(Text(p.value, format: .number))
                     PointMark(x: .value("Label", p.label), y: .value("Value", p.value))
@@ -396,6 +411,9 @@ struct NodeView: View {
             .chartYScale(domain: .automatic(includesZero: bars))
             .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: Metric.graphTicks)) }
             .frame(height: Metric.graphHeight)
+            // Axis labels stop growing at the largest non-accessibility size, as Weather's graphs
+            // do: five days still fit; VoiceOver reads every point (and plays the audio graph).
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .accessibilityLabel(title.map { Text(verbatim: $0) } ?? Text("Chart"))
         }
     }
@@ -453,17 +471,28 @@ struct NodeView: View {
         }
     }
 
+    /// A menu of choices on the neutral bordered button (as `ActionRow`'s "…"), its label the
+    /// choice in the text colour: accent text is for links only (15.2).
     private func menuPicker(_ options: [UIOption], binding: Binding<String>, label: String) -> some View {
-        Picker(selection: binding) {
-            if !options.contains(where: { $0.value == binding.wrappedValue }) {
-                Text("Choose").tag("")
+        let current = options.first { $0.value == binding.wrappedValue }
+        return Menu {
+            Picker(selection: binding) {
+                ForEach(options) { Text(verbatim: $0.label).tag($0.value) }
+            } label: {
+                Text(verbatim: label)
             }
-            ForEach(options) { Text(verbatim: $0.label).tag($0.value) }
         } label: {
-            Text(verbatim: label)
+            HGroup(spacing: .xs) {
+                if let current { Text(verbatim: current.label) } else { Text("Choose") }
+                Image(systemName: "chevron.up.chevron.down").textRole(.footnote).tone(.secondary)
+            }
+            .foregroundStyle(Color(uiColor: .label))
         }
-        .pickerStyle(.menu)
-        .accentFillTint()
+        .menuStyle(.button)
+        .buttonStyle(.bordered)
+        .tint(.gray)
+        .accessibilityLabel(Text(verbatim: label))
+        .accessibilityValue(current.map { Text(verbatim: $0.label) } ?? Text("Choose"))
     }
 }
 

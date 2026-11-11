@@ -17,7 +17,7 @@ struct DynamicUIResolveTests {
         #expect(root.children.map(\.key) == ["now", "details", "chart", "actions"])
         let now = root.children[0]
         #expect(now.kind == .stack(axis: .horizontal, gap: .medium, align: .center, justify: .start))
-        #expect(now.children[0].kind == .icon(name: "Sun", symbol: "sun.max", size: .large, color: .default))
+        #expect(now.children[0].kind == .icon(name: "Sun", symbol: "sun.max.fill", size: .large, color: .default))
         // A number where a string goes: 21, not "21.0".
         guard case .metric(let m) = now.children[1].kind else { Issue.record("not a metric"); return }
         #expect(m.value == "21 °C" && m.changeType == .positive)
