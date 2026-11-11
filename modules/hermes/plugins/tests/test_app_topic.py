@@ -986,6 +986,149 @@ def test_status_ignores_the_background_review() -> None:
     assert status.snapshot(False)["status"] == "thinking", "the next turn shows"
 
 
+# ── dynamic UI (§8) ──────────────────────────────────────────────────────────
+
+WEATHER = {
+    "root": "card",
+    "state": {"days": [{"day": "Thu", "t": 16}, {"day": "Fri", "t": 13}]},
+    "elements": {
+        "card": {"type": "Card", "props": {"title": "Paris"}, "children": ["now", "chart", "more"]},
+        "now": {"type": "Metric", "props": {"label": "Now", "value": "14", "suffix": "°C"}},
+        "chart": {"type": "LineGraph", "props": {"data": [{"label": "Thu", "value": 16}]}},
+        "more": {"type": "Button", "props": {"label": "Next week"},
+                 "on": {"press": {"action": "reply", "params": {"text": "And next week?"}}}},
+    },
+}
+
+
+def test_ui_validate() -> None:
+    from app_topic import ui
+
+    assert ui.validate(WEATHER) == []
+    assert ui.parse_spec(json.dumps(WEATHER)) == WEATHER
+    assert ui.validate("nope") == ["spec must be an object {root, elements, state?}"]
+    problems = ui.validate({"root": "a", "elements": {"a": {"type": "Card", "children": ["b", "ghost"]},
+                                                     "b": {"type": "Marquee"}}})
+    assert any("'ghost' is not an element" in p for p in problems)
+    assert any("unknown type 'Marquee'" in p for p in problems)
+    assert any("root" in p for p in ui.validate({"root": "x", "elements": {"a": {"type": "Text"}}}))
+    cycle = ui.validate({"root": "a", "elements": {"a": {"type": "Card", "children": ["b"]},
+                                                  "b": {"type": "Stack", "children": ["a"]}}})
+    assert cycle == ["children form a cycle: a → b → a"], cycle
+    many = {"root": "s", "elements": {"s": {"type": "Stack", "children": [f"t{i}" for i in range(210)]},
+                                      **{f"t{i}": {"type": "Text", "props": {"text": "x"}} for i in range(210)}}}
+    assert any("at most 200" in p for p in ui.validate(many))
+    huge = {"root": "t", "elements": {"t": {"type": "Text", "props": {"text": "x" * 70_000}}}}
+    assert any("KB" in p for p in ui.validate(huge))
+    bad = {"root": "b", "elements": {"b": {"type": "Button", "props": {"label": "Go"}, "children": ["b2"],
+                                            "on": {"press": {"action": "delete_everything"}}},
+                                      "b2": {"type": "Text", "props": {"text": "x"}}}}
+    problems = ui.validate(bad)
+    assert any("unknown action 'delete_everything'" in p for p in problems)
+    assert any("a Button has no children" in p for p in problems)
+    reply = {"root": "b", "elements": {"b": {"type": "Button", "props": {"label": "Go"},
+                                              "on": {"press": {"action": "reply", "params": {}}}}}}
+    assert any("reply needs params.text" in p for p in ui.validate(reply))
+    link = {"root": "b", "elements": {"b": {"type": "Button", "props": {"label": "Go"},
+                                             "on": {"press": {"action": "open", "params": {"url": "file:///etc"}}}}}}
+    assert any("http(s)" in p for p in ui.validate(link))
+    # Every component of the catalog is in the tool's description, with the actions.
+    assert all(name in ui.DESCRIPTION for name in ui.CATALOG) and "[SILENT]" in ui.DESCRIPTION
+
+
+def test_render_ui() -> None:
+    import app_topic
+
+    home = Path(tempfile.mkdtemp(prefix="app-topic-ui-"))
+    loop = asyncio.new_event_loop()
+    threading.Thread(target=loop.run_forever, daemon=True).start()
+    bot = Bot()
+    adapter = Adapter(bot)
+    plugin = app_mod.App(home, {})
+    plugin.loop = loop
+    loop.call_soon_threadsafe(plugin.attach, PTBApp(bot), adapter)
+    wait_for(lambda: plugin.saved.get("thread") == 77, "the App topic")
+    app_topic.STATE["app"] = plugin
+    session = {"HERMES_SESSION_PLATFORM": "telegram", "HERMES_SESSION_CHAT_ID": str(OWNER),
+               "HERMES_SESSION_THREAD_ID": ""}
+    saved_module = sys.modules.get("gateway.session_context")
+    sys.modules["gateway.session_context"] = types.SimpleNamespace(
+        get_session_env=lambda name, default="": session.get(name, default))
+    try:
+        def render(text, spec):
+            return json.loads(app_topic._render_ui({"text": text, "spec": spec}))
+
+        # Errors the model can fix; nothing sent.
+        sent_before = len(bot.calls)
+        out = render("", {"root": "a", "elements": {"a": {"type": "Blink"}}})
+        assert out["error"] and any("text is required" in p for p in out["problems"])
+        assert any("unknown type 'Blink'" in p for p in out["problems"])
+        assert len(bot.calls) == sent_before
+
+        # The message first, as Hermes' own reply (a notify follows), then the spec linked to it.
+        out = render("Météo Paris : 14 °C, nuageux.", json.dumps(WEATHER))
+        assert out["ok"] and "[SILENT]" in out["note"], out
+        text_id = out["message_id"]
+        assert bot.messages[text_id]["text"] == "Météo Paris : 14 °C, nuageux."
+        assert "message_thread_id" not in bot.messages[text_id]
+        app_id, envelope = bot.in_topic("ui")[-1]
+        assert app_id == out["app_message_id"] and app_id > text_id
+        assert envelope == {"v": 4, "type": "ui", "chat": 0, "message_id": text_id, "spec": WEATHER}
+        assert bot.messages[app_id]["disable_notification"]
+        wait_for(lambda: any(n[1]["message_id"] == text_id for n in bot.in_topic("notify")), "the reply's notify")
+        # Kept: not among the messages deleted after an hour, and remembered with its spec.
+        assert app_id not in [e[0] for e in plugin.saved["ephemeral"]]
+        assert plugin.saved["ui"][-1] == {"chat": 0, "message_id": text_id, "id": app_id, "file": False}
+        assert json.loads((home / "app" / "ui" / f"0_{text_id}.json").read_text()) == WEATHER
+
+        # In a sub-chat: the spec names that chat.
+        session["HERMES_SESSION_THREAD_ID"] = "455"
+        out = render("Done.", {"root": "t", "elements": {"t": {"type": "Text", "props": {"text": "Done"}}}})
+        assert bot.in_topic("ui")[-1][1]["chat"] == 455 and bot.in_topic("ui")[-1][1]["message_id"] == out["message_id"]
+
+        # Too big for one message: a ui.json document under the envelope without the spec.
+        session["HERMES_SESSION_THREAD_ID"] = ""
+        rows = [[f"Row {i}", "x" * 40, str(i)] for i in range(120)]
+        table = {"root": "t", "elements": {"t": {"type": "Table", "props": {"columns": ["A", "B", "C"], "rows": rows}}}}
+        out = render("The table is in the app.", table)
+        assert out["ok"], out
+        name, doc = next((n, kw) for n, kw in reversed(bot.calls) if n == "send_document")
+        assert doc["filename"] == "ui.json" and doc["message_thread_id"] == 77 and doc["disable_notification"]
+        assert json.loads(doc["caption"]) == {"v": 4, "type": "ui", "chat": 0, "message_id": out["message_id"],
+                                              "file": True}
+        assert json.loads(doc["data"]) == table
+        assert plugin.saved["ui"][-1]["file"] and plugin.saved["ui"][-1]["id"] == out["app_message_id"]
+
+        # Only the owner's chat.
+        session["HERMES_SESSION_CHAT_ID"] = "999"
+        assert "only works" in render("x", WEATHER)["error"]
+        session["HERMES_SESSION_CHAT_ID"], session["HERMES_SESSION_THREAD_ID"] = str(OWNER), "77"
+        assert "only works" in render("x", WEATHER)["error"]
+
+        # A new App topic (the old one deleted): the UIs go there again.
+        before = len(bot.in_topic("ui"))
+        plugin._topic_gone(RuntimeError("Bad Request: message thread not found"))
+        wait_for(lambda: bot.topics == 2, "a new topic")
+        wait_for(lambda: len(bot.in_topic("ui")) >= before + 2, "the UIs re-posted")
+        wait_for(lambda: sum(1 for n, kw in bot.calls if n == "send_document" and kw["filename"] == "ui.json") == 2,
+                 "the big one re-posted")
+        assert plugin.saved["ui"][0]["id"] != app_id
+    finally:
+        if saved_module is not None:
+            sys.modules["gateway.session_context"] = saved_module
+        else:
+            sys.modules.pop("gateway.session_context", None)
+        app_topic.STATE["app"] = None
+        plugin.stop.set()
+
+        async def shutdown():
+            for task in plugin.tasks:
+                task.cancel()
+            await asyncio.gather(*plugin.tasks, return_exceptions=True)
+        asyncio.run_coroutine_threadsafe(shutdown(), loop).result(10)
+        loop.call_soon_threadsafe(loop.stop)
+
+
 def main() -> None:
     tests = [v for k, v in globals().items() if k.startswith("test_") and callable(v)]
     for test in tests:

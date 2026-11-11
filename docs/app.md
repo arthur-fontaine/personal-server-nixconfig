@@ -29,6 +29,7 @@ It needs BotFather's Threaded Mode, as the sub-chats do.
 | Stats | model usage per provider and model, fallbacks apart, over 24 h / 7 d / 30 d; CPU, memory, storage, power, battery, uptime | `usage.py`, `machine.py` |
 | Pets | the pet's mood (what Hermes is doing), `pet_generate`, its files for the app's build | `pet.py` |
 | Big files | `[fichier: <url>]` links: `bigfile_fetch`, `bigfile_send` | `bigfiles.py` |
+| Dynamic UI | `render_ui`: a json-render spec the app draws natively over a text message Telegram shows (protocol §8) | `ui.py`, `app.py` |
 | Call turns | a message starting with 🎙 is answered as on the phone | `__init__.py` (`call_turn`) |
 | Pushes | APNs, with a paid Apple Developer team | `push.py` |
 

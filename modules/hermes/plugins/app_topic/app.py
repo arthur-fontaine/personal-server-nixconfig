@@ -10,6 +10,7 @@ run_coroutine_threadsafe. One sender task paces every App-topic message
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 import os
@@ -43,6 +44,9 @@ EPHEMERAL_FOR = 3600.0
 SLOT_MAX_AGE = 47 * 3600.0
 SETTLE = 2.5
 CALL_MAX = 2 * 3600.0
+# Dynamic UIs remembered (their App-topic message and spec), and re-posted into a new App topic.
+UI_KEPT = 300
+UI_REPOST = 30
 
 
 def owner_id() -> int | None:
@@ -139,6 +143,7 @@ class App:
         data.setdefault("slots", {})
         data.setdefault("ephemeral", [])
         data.setdefault("sprite", {})
+        data.setdefault("ui", [])
         return data
 
     def save(self) -> None:
@@ -336,6 +341,8 @@ class App:
             self.save()
         logger.info("app_topic: App topic %s", self.saved["thread"])
         self.dirty.set()
+        if self.saved["ui"]:
+            asyncio.get_running_loop().create_task(self.repost_ui())
         return self.saved["thread"]
 
     def changed(self) -> None:
@@ -409,6 +416,74 @@ class App:
             self.dirty.set()
             return True
         return False
+
+    # ── dynamic UI (§8) ──────────────────────────────────────────────────
+
+    async def send_ui(self, chat_id, thread, text: str, spec: dict) -> dict:
+        """render_ui: the text as Hermes' own message in the turn's chat (through the adapter, so
+        it notifies and the app hears of it as any reply), then the spec in the App topic."""
+        adapter = self.adapter
+        if adapter is None:
+            raise RuntimeError("Telegram is not connected")
+        result = await adapter.send(chat_id, text, None, {"thread_id": thread} if thread else None)
+        if not getattr(result, "success", False) or not getattr(result, "message_id", None):
+            raise RuntimeError(getattr(result, "error", None) or "the message was not sent")
+        message_id = int(result.message_id)
+        topic = self.topic_of(chat_id, thread)
+        app_id = await self.post_ui(topic, message_id, spec)
+        return {"message_id": message_id, "app_message_id": app_id}
+
+    async def post_ui(self, chat: int, message_id: int, spec: dict, *, remember: bool = True) -> int | None:
+        """The `ui` envelope in the App topic: inline when it fits a message, else the spec as a
+        ui.json document under the envelope without it. Kept (no expiry): the app finds it again
+        in the topic's history."""
+        obj = protocol.message("ui", chat=chat, message_id=message_id, spec=spec)
+        as_file = not protocol.fits(obj)
+        if not as_file:
+            app_id = await self.post(obj, ephemeral=False)
+        else:
+            thread = await self.ensure_topic()
+            if thread is None:
+                return None
+            caption = protocol.message("ui", chat=chat, message_id=message_id, file=True)
+            try:
+                msg = await self.call("send_document", chat_id=self.saved["chat"], message_thread_id=thread,
+                                      document=io.BytesIO(protocol.dumps(spec).encode()), filename="ui.json",
+                                      caption=protocol.dumps(caption), disable_notification=True)
+                app_id = int(msg.message_id)
+            except Exception as error:
+                self._topic_gone(error)
+                logger.info("app_topic: ui document not sent: %s", error)
+                app_id = None
+        if remember:
+            self._remember_ui(chat, message_id, spec, app_id, as_file)
+        return app_id
+
+    def _ui_path(self, chat: int, message_id: int) -> Path:
+        return self.dir / "ui" / f"{chat}_{message_id}.json"
+
+    def _remember_ui(self, chat: int, message_id: int, spec: dict, app_id: int | None, as_file: bool) -> None:
+        """(chat, message) → its App-topic message, and the spec on disk, so a new App topic
+        (after a restart that lost it) gets them again."""
+        path = self._ui_path(chat, message_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(protocol.dumps(spec))
+        with self.lock:
+            entries = [e for e in self.saved["ui"] if (e["chat"], e["message_id"]) != (chat, message_id)]
+            entries.append({"chat": chat, "message_id": message_id, "id": app_id, "file": as_file})
+            dropped, self.saved["ui"] = entries[:-UI_KEPT], entries[-UI_KEPT:]
+            self.save()
+        for e in dropped:
+            self._ui_path(e["chat"], e["message_id"]).unlink(missing_ok=True)
+
+    async def repost_ui(self) -> None:
+        """A new App topic starts empty: the latest UIs go there again, oldest first."""
+        for entry in list(self.saved["ui"])[-UI_REPOST:]:
+            try:
+                spec = json.loads(self._ui_path(entry["chat"], entry["message_id"]).read_text())
+            except (OSError, ValueError):
+                continue
+            await self.post_ui(entry["chat"], entry["message_id"], spec)
 
     async def delete(self, message_id: int) -> None:
         try:

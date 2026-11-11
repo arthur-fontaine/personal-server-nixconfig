@@ -240,6 +240,45 @@ def _bigfile_send(args: dict, **_) -> str:
                        "note": "Put the line alone at the end of your reply."})
 
 
+def _render_ui(args: dict, **_) -> str:
+    """render_ui (docs/app-protocol.md §8): the text as the turn's reply, the spec for the app."""
+    from . import ui
+
+    app = STATE["app"]
+    args = args or {}
+    text = str(args.get("text") or "").strip()
+    spec = ui.parse_spec(args.get("spec"))
+    problems = ui.validate(spec)
+    if not text:
+        problems.insert(0, "text is required: the message Telegram shows, for a reader without the app")
+    elif len(text) > ui.MAX_TEXT:
+        problems.insert(0, f"text is {len(text)} characters: at most {ui.MAX_TEXT}")
+    if problems:
+        return json.dumps({"error": "the UI was not sent", "problems": problems[:12],
+                           "note": "Fix these and call render_ui again."}, ensure_ascii=False)
+    try:
+        from gateway.session_context import get_session_env
+
+        platform = get_session_env("HERMES_SESSION_PLATFORM")
+        chat_id = get_session_env("HERMES_SESSION_CHAT_ID")
+        thread = get_session_env("HERMES_SESSION_THREAD_ID")
+    except Exception:
+        platform = chat_id = thread = ""
+    if platform != "telegram" or app.topic_of(chat_id, thread) is None or app.is_app_topic(chat_id, thread):
+        return json.dumps({"error": "render_ui only works in the owner's Telegram chat (the main chat or a "
+                                    "sub-chat): answer in text here."})
+    future = app.submit(app.send_ui(chat_id, thread or None, text, spec))
+    if future is None:
+        return json.dumps({"error": "Telegram is not connected: answer in text."})
+    try:
+        result = future.result(timeout=60)
+    except Exception as error:
+        return json.dumps({"error": f"not sent: {error}", "note": "Answer in text instead."})
+    return json.dumps({"ok": True, **result,
+                       "note": "Sent: this message is your reply. End your turn with exactly [SILENT] unless "
+                               "you have something new to add; never repeat its content."})
+
+
 def register(ctx) -> None:
     from hermes_constants import get_hermes_home
 
@@ -282,6 +321,9 @@ def register(ctx) -> None:
         ctx.register_tool(name="pet_redraw", toolset="app", schema=REDRAW_SCHEMA, handler=_pet_redraw)
     ctx.register_tool(name="bigfile_fetch", toolset="app", schema=FETCH_SCHEMA, handler=_bigfile_fetch)
     ctx.register_tool(name="bigfile_send", toolset="app", schema=SEND_SCHEMA, handler=_bigfile_send)
+    from .ui import SCHEMA as UI_SCHEMA
+
+    ctx.register_tool(name="render_ui", toolset="app", schema=UI_SCHEMA, handler=_render_ui)
 
     from .push import Push
 

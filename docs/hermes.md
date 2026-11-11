@@ -399,7 +399,8 @@ With `server.hermes.app.enable`, the owner's iOS app reads this chat as a
 Telegram client, and Hermes serves it through a topic of the DM named App,
 which the app hides: what Hermes is doing, the questions waiting for an
 answer, a spoken version of each notification, model and machine stats, the
-pet. Hermes also gets `pet_generate`, `bigfile_fetch` and `bigfile_send`; in a
+pet. Hermes also gets `pet_generate`, `bigfile_fetch`, `bigfile_send` and
+`render_ui` (a small native UI in the app over a text message); in a
 call from the app, what the owner says arrives as messages starting with 🎙,
 which Hermes answers as on the phone.
 [app.md](app.md) has the details, [app-protocol.md](app-protocol.md) the

@@ -47,7 +47,8 @@ and the Bot API (https://core.telegram.org/bots/api).
 - **Cleanup.** The bot deletes each request once handled. It deletes its own
   `reply` and `notify` messages after 1 hour (bots can delete messages in a
   private chat for 48 h). The app may delete a `notify` or `reply` itself as
-  soon as it has read it (in a private chat both sides can delete).
+  soon as it has read it (in a private chat both sides can delete). A `ui`
+  (§8) is kept: the app finds it again in the topic's history.
 - **Ids.** Every message id in this protocol (`questions[].message_id`,
   `notify.message_id`, `slots.*`, `pet.sprite_message_id`, `reply.re`,
   `ack.ids`) is the **Bot API** `message_id`, in both directions. TDLib numbers
@@ -502,7 +503,70 @@ recognition and synthesis), and the call is ordinary messages of the chat:
   and posts `[fichier: <url>]` (Telegram's 50 MB bot limit; also anything
   over 2 GB).
 
+## 8. Dynamic UI
+
+Hermes may answer with a small native UI (a weather card with a 5-day chart,
+a table, a few metrics, buttons) on top of a text message. Telegram shows the
+text; the app draws the UI in place of that message's text, and keeps the
+text for copy, reply, notifications and VoiceOver's summary.
+
+- **Format**: json-render's flat spec (https://json-render.dev,
+  vercel-labs/json-render `packages/core/src/types.ts`):
+  `{"root": key, "elements": {key: {"type", "props", "children"?, "visible"?,
+  "on"?, "repeat"?}}, "state"?: {…}}`. Props may hold `{"$state": "/pointer"}`,
+  `{"$template": "… ${/path} …"}`, `{"$cond": c, "$then": a, "$else": b}`, and
+  inside a `repeat` (`{"statePath": "/list"}`: the element's children once per
+  item) `{"$item": "field"}` and `{"$index": true}`. `visible` is json-render's
+  VisibilityCondition: a boolean, `{"$state": p}` (truthy) with an optional
+  `eq`/`neq`/`gt`/`gte`/`lt`/`lte` and `not: true`, an array (all), `{"$and":
+  […]}`, `{"$or": […]}` (the app also reads `and`/`or`/`not` without `$`).
+- **Components** (names and props of `@json-render/shadcn`'s catalog,
+  `packages/shadcn/src/catalog.ts`, and the json-render playground's `Metric`,
+  `Icon`, `BarGraph`, `LineGraph`): `Card`, `Stack`, `Grid`, `Separator`,
+  `Heading`, `Text`, `Badge`, `Icon` (Lucide names), `Image`, `Metric`,
+  `Progress`, `Alert`, `Table`, `BarGraph`, `LineGraph` (`data: [{label,
+  value}]`), `Button`, `ButtonGroup`, `Select`, `Tabs`. The list and props are
+  `CATALOG` in `app_topic/ui.py`. The app draws an unknown type as nothing,
+  ignores unknown props, and shows the message's text when a spec does not
+  decode.
+- **Actions** (`on: {"press" | "change": {"action", "params"}}`): `reply`
+  `{text}` sends that text as the owner's reply to the UI's message (the
+  normal send with `replyTo`: Hermes gets a turn and may answer with a new UI;
+  on a `ButtonGroup`/`Select` without `text`, the chosen label); `open` `{url}`
+  opens the link; `setState` `{statePath, value}` changes the UI's local state
+  (tabs, toggles; never sent). Anything else does nothing (the app logs it).
+
+**`render_ui`** (the `app` toolset) takes `text` (what Telegram shows: the
+same facts for a reader without the app) and `spec`. It checks the spec
+(the root and every child exist, no cycle, only catalog types, known actions,
+≤ 200 elements, ≤ 60 KB) and answers what to fix. Then it sends `text` in the
+chat the turn runs in, through the gateway's adapter like Hermes' own replies
+(so it notifies, gets its `notify`, and reads in the transcript), and posts
+the spec to the App topic:
+
+```json
+{"v": 4, "type": "ui", "chat": 0, "message_id": 1312, "spec": {"root": "card", "elements": {…}}}
+```
+
+- `chat`/`message_id`: the text message (Bot API id) the UI belongs to.
+- A spec too big for one message is sent as a document `ui.json` holding the
+  spec alone; its caption is the envelope without `spec`, plus `"file": true`.
+- The `ui` arrives after its message; the app accepts it before too (history
+  read out of order). The newest `ui` for a message wins.
+- Kept, never deleted. The plugin remembers (chat, message) → App-topic
+  message and the spec (`~/.hermes/app/ui/`, the last 300) and posts the last
+  30 again into a new App topic.
+- **The turn's reply.** The tool's message *is* Hermes' reply: the tool tells
+  the model to end its turn with exactly `[SILENT]` (Hermes' own silence
+  marker, `gateway/response_filters.py`: nothing more is sent) unless it has
+  something new to add, and never to repeat the UI's content.
+- Only in the owner's DM (the main chat or a sub-chat), never in the App
+  topic. A private sub-chat's UI is in the App topic like its text is in its
+  topic; its notification stays generic (§3).
+
 ## Changelog
+
+- v4, additive (2026-11-11, k13): the `ui` message and `render_ui` (§8).
 
 - v4 (2026-11-09, after Arthur's first real use). Added: §1 "Ids" (every
   message id is the Bot API's, every chat id the Bot API thread id; the app
