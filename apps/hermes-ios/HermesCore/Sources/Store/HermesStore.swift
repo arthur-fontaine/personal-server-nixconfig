@@ -49,8 +49,8 @@ public final class HermesStore {
     public var uiMemory = UISpecMemory()
     /// What was read of Hermes' memory this session (HermesStore+Memory).
     @ObservationIgnored public internal(set) var memoryCache = MemoryCache()
-    private var pendingReplies: [MessageID: CheckedContinuation<ReplyPayload, Error>] = [:]
-    private var earlyReplies: [MessageID: ReplyPayload] = [:]
+    private var pendingReplies: [String: CheckedContinuation<ReplyPayload, Error>] = [:]
+    private var earlyReplies: [String: ReplyPayload] = [:]
     private var seenQuestions: Set<String> = []
     /// A one-shot row the pet plays over its mood, then the view clears it: `.jumping` for a
     /// caress or an answered question (the nod), `.waving` toward a question that just arrived.
@@ -162,7 +162,7 @@ public final class HermesStore {
             for key in messages.keys { messages[key]?.removeAll { set.contains($0.id) } }
         case .messageSent(let chat, let oldID, let m):
             guard chat == bot?.chatID else { return }
-            if m.topic == appTopicID { resolveSentRequest(oldID: oldID, newID: m.id); return }
+            if m.topic == appTopicID { return }
             if let i = messages[m.topic]?.firstIndex(where: { $0.id == oldID }) { messages[m.topic]?[i] = m }
             else { insert(m) }
         case .messageFailed(let chat, let oldID, let error):
@@ -641,12 +641,11 @@ public final class HermesStore {
             hooks.notify(n)
             ack([m.id])
         case .reply(let r):
-            guard let re = r.re else { return }
-            if !r.ok { topicLog.fail("request \(re): \(r.errorCode ?? "?") \(r.errorMessage ?? "")") }
-            // `re` is the request's Bot API id; requests are waited on by their TDLib id.
-            let request = BotAPIID.tdlib(re)
-            if let c = pendingReplies.removeValue(forKey: request) { c.resume(returning: r) }
-            else { earlyReplies[request] = r }
+            // Matched by the app's own id (`rid`): the bot's `re` numbers the request its own way.
+            guard let rid = r.rid else { return }
+            if !r.ok { topicLog.fail("request \(rid.prefix(8)): \(r.errorCode ?? "?") \(r.errorMessage ?? "")") }
+            if let c = pendingReplies.removeValue(forKey: rid) { c.resume(returning: r) }
+            else if !replay { earlyReplies[rid] = r }
             if !replay { ack([m.id]) }
         case .ui(let e):
             guard !e.key.isEmpty else { topicLog.fail("ui \(e.messageID): no key"); return }
@@ -731,37 +730,26 @@ public final class HermesStore {
         }
     }
 
-    private var requestIDs: [MessageID: MessageID] = [:]
 
     /// Sends a request in the App topic and waits for its `reply` (by the request's message id).
     @discardableResult
     public func sendRequest(_ request: AppRequest, awaitReply: Bool = true, timeout: Duration = .seconds(30)) async throws -> ReplyPayload? {
         guard let bot, let appTopicID else { throw TelegramError.notReady }
-        let sent = try await client.send(text: AppProtocol.encode(request), chat: bot.chatID, topic: appTopicID, replyTo: nil)
+        // The app's own id for it, echoed in the reply (§4): message ids differ between the bot
+        // and this client, so the reply's `re` can't find it.
+        var request = request
+        let rid = UUID().uuidString
+        request.payload["rid"] = .string(rid)
+        _ = try await client.send(text: AppProtocol.encode(request), chat: bot.chatID, topic: appTopicID, replyTo: nil)
         guard awaitReply else { return nil }
-        // A local message's id changes once Telegram accepts it: wait for the server id.
-        let serverID = try await serverMessageID(for: sent.id, pending: sent.sendState == .pending)
-        if let early = earlyReplies.removeValue(forKey: serverID) { return early }
+        if let early = earlyReplies.removeValue(forKey: rid) { return early }
         let timer = Task { [weak self] in
             try await Task.sleep(for: timeout)
-            self?.pendingReplies.removeValue(forKey: serverID)?
+            self?.pendingReplies.removeValue(forKey: rid)?
                 .resume(throwing: TelegramError.server(code: 408, message: L("Hermes didn't answer in time.")))
         }
         defer { timer.cancel() }
-        return try await withCheckedThrowingContinuation { c in pendingReplies[serverID] = c }
-    }
-
-    private var sentWaiters: [MessageID: CheckedContinuation<MessageID, Never>] = [:]
-
-    private func serverMessageID(for localID: MessageID, pending: Bool) async throws -> MessageID {
-        guard pending else { return localID }
-        if let resolved = requestIDs.removeValue(forKey: localID) { return resolved }
-        return await withCheckedContinuation { c in sentWaiters[localID] = c }
-    }
-
-    private func resolveSentRequest(oldID: MessageID, newID: MessageID) {
-        if let c = sentWaiters.removeValue(forKey: oldID) { c.resume(returning: newID) }
-        else { requestIDs[oldID] = newID }
+        return try await withCheckedThrowingContinuation { c in pendingReplies[rid] = c }
     }
 
     private func sayHello() async {

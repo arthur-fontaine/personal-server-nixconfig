@@ -617,6 +617,9 @@ public struct NotifyPayload: Sendable, Codable, Equatable {
 }
 
 public struct ReplyPayload: Sendable, Equatable {
+    /// The app's own id for the request, echoed (§4): what finds the request here.
+    public var rid: String?
+    /// The bot's id of the request message: not the owner's client's, so unusable to match.
     public var re: MessageID?
     public var ok: Bool
     public var errorCode: String?
@@ -630,6 +633,7 @@ public struct ReplyPayload: Sendable, Equatable {
             errorCode = e["code"]?.stringValue
             errorMessage = e["message"]?.stringValue
         }
+        if case .string(let r)? = fields["rid"] { rid = r }
         if case .number(let n)? = fields["re"] { re = MessageID(n) }
         else if case .string(let s)? = fields["re"] { re = MessageID(s) }
         else { re = nil }

@@ -278,6 +278,10 @@ struct OtherSlotsTests {
             Issue.record("no reply"); return
         }
         #expect(ok.re == 1302 && ok.ok)
+        guard case .reply(let mine)? = AppProtocol.decode(#"{"v":4,"type":"reply","re":2973,"rid":"A1B2","ok":true,"data":{}}"#) else {
+            Issue.record("no reply with rid"); return
+        }
+        #expect(mine.rid == "A1B2")
         let req = AppProtocol.encode(.callState(active: true))
         #expect(req.contains("\"type\":\"call.state\"") && req.contains("\"active\":true"))
         #expect(CallTurn.message(for: " what's next? ") == "🎙 what's next?")

@@ -306,6 +306,8 @@ public final class FakeTelegramClient: TelegramClient {
         guard let data = AppProtocol.extractJSON(from: text),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let type = obj["type"] as? String else { return }
+        // As app_topic: the app's own request id comes back in the reply (§4).
+        let rid = (obj["rid"] as? String).map { #","rid":"\#($0)""# } ?? ""
         nextID += 1
         let serverID = nextID
         emit(.messageSent(Self.botChat.chatID, oldID: id,
@@ -322,7 +324,7 @@ public final class FakeTelegramClient: TelegramClient {
             case .failure(let code):
                 nextID += 1
                 emit(.newMessage(Self.botChat.chatID, Fixtures.appMessage(id: nextID, json:
-                    #"{"v":4,"type":"reply","re":\#(serverID),"ok":false,"error":{"code":"\#(code.rawValue)","message":"\#(code.rawValue)"}}"#)))
+                    #"{"v":4,"type":"reply","re":\#(serverID)\#(rid),"ok":false,"error":{"code":"\#(code.rawValue)","message":"\#(code.rawValue)"}}"#)))
                 return
             }
         case "call.state":
@@ -334,7 +336,7 @@ public final class FakeTelegramClient: TelegramClient {
         default: break
         }
         nextID += 1
-        emit(.newMessage(Self.botChat.chatID, Fixtures.appMessage(id: nextID, json: #"{"v":3,"type":"reply","re":\#(serverID),"ok":true,"data":\#(replyData)}"#)))
+        emit(.newMessage(Self.botChat.chatID, Fixtures.appMessage(id: nextID, json: #"{"v":3,"type":"reply","re":\#(serverID)\#(rid),"ok":true,"data":\#(replyData)}"#)))
     }
 
     private static func json(_ object: [String: Any]) -> String {
