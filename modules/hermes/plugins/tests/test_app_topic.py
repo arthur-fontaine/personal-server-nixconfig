@@ -680,10 +680,12 @@ def test_plugin() -> None:
         return types.SimpleNamespace(source=src, text=text, message_id=mid)
 
     assert plugin.dispatch(event("hi", thread=None)) is None
-    assert plugin.dispatch(event('{"v":3,"type":"hello","app_version":"1.0"}'))["action"] == "skip"
+    assert plugin.dispatch(event('{"v":3,"type":"hello","app_version":"1.0","rid":"R-1"}'))["action"] == "skip"
     wait_for(lambda: bot.in_topic("reply"), "a reply")
     reply = bot.in_topic("reply")[-1][1]
     assert reply["re"] == 555 and reply["ok"] and reply["data"]["protocol"] == 4 and reply["v"] == 4
+    # The app's own id comes back: the owner's client numbers the request differently (§4).
+    assert reply["rid"] == "R-1"
     # Hello names the slot messages, so an app that can't page back to them reads them by id.
     slots = reply["data"]["slots"]
     assert set(slots) >= {"state", "stats", "controls", "devices"} and all(isinstance(i, int) for i in slots.values())

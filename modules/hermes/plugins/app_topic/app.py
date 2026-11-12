@@ -941,15 +941,20 @@ class App:
             # Not ours (someone typing in the topic): leave it, say nothing.
             return
         kind = request.get("type", "")
+        # `rid`: the app's own id for the request. The bot and the owner's client number the
+        # topic's messages each their own way, so `re` (the bot's) can't find it there (§4).
+        rid = {"rid": str(request["rid"])} if request.get("rid") else {}
         try:
             data = await self.answer(kind, request, message_id)
-            reply = None if data is _NO_REPLY else protocol.message("reply", re=message_id, ok=True, data=data or {})
+            reply = None if data is _NO_REPLY else protocol.message("reply", re=message_id, **rid, ok=True,
+                                                                    data=data or {})
         except RequestError as error:
-            reply = protocol.message("reply", re=message_id, ok=False,
+            reply = protocol.message("reply", re=message_id, **rid, ok=False,
                                      error={"code": error.code, "message": str(error)})
         except Exception as error:
             logger.warning("app_topic: request %s failed", kind, exc_info=True)
-            reply = protocol.message("reply", re=message_id, ok=False, error={"code": "failed", "message": str(error)})
+            reply = protocol.message("reply", re=message_id, **rid, ok=False,
+                                     error={"code": "failed", "message": str(error)})
         if reply is not None:
             await self.post(reply)
         if message_id:

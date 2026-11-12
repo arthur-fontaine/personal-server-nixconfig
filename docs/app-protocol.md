@@ -373,13 +373,17 @@ stream's final edit, and for a question):
 
 ## 4. Requests (app → bot) and replies
 
-A request is a JSON message in the App topic; `re` in the reply is the
-request's message id. The bot deletes the request when it has answered.
+A request is a JSON message in the App topic, with `rid`: the app's own id
+for it (any string). The reply carries `rid` back, and `re`, the request's
+message id as the bot numbers it. The app matches replies by `rid` only: the
+bot and the owner's client number a private chat's messages each their own way
+(Nov 12: every reply missed, memory requests timed out). The bot deletes the
+request when it has answered.
 
 ```json
-{"v": 4, "type": "stats.refresh"}
-{"v": 4, "type": "reply", "re": 1302, "ok": true, "data": {}}
-{"v": 4, "type": "reply", "re": 1303, "ok": false,
+{"v": 4, "type": "stats.refresh", "rid": "9C1F…"}
+{"v": 4, "type": "reply", "re": 1302, "rid": "9C1F…", "ok": true, "data": {}}
+{"v": 4, "type": "reply", "re": 1303, "rid": "A40B…", "ok": false,
  "error": {"code": "busy", "message": "A pet is already being generated"}}
 ```
 
@@ -614,6 +618,8 @@ topic once that message is sent (its final edit, for a streamed one):
 - v4, additive (2026-11-11, k4): `memory.volumes` and `memory.lines`
   (§4.1), Hermes' memory read-only; error codes `not_found` and `locked`.
 
+- v4, additive (2026-11-12): requests carry `rid`, replies echo it (§4); the
+  app matches replies by `rid`, not `re`.
 - v4, additive (2026-11-11, k13): the `ui` message and `render_ui` (§8).
   Same day: `ui.key` finds the message (not `message_id`), and the turn's
   reply carries the UI (no `[SILENT]`).
