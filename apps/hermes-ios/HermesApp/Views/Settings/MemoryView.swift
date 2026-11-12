@@ -92,7 +92,9 @@ private struct LoadState<Value, Content: View>: View {
     var body: some View {
         switch state {
         case .loading:
-            ProgressView()
+            // Circular: a bare ProgressView in a list's place draws as a bar on iOS 27.
+            ProgressView().progressViewStyle(.circular)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .failed(let message):
             ContentUnavailableView {
                 Label("Couldn't Read the Memory", systemImage: "exclamationmark.triangle")
@@ -242,11 +244,11 @@ struct MemoryLevelView: View {
                 Task { await loadMore() }
             }
         } else {
-            HGroup(spacing: .xs) {
-                ProgressView()
-                Text("Loading more…").tone(.secondary)
-            }
-            .task { await loadMore() }
+            // The system's own spinner, centred, no words: a list's next page as Mail shows it.
+            ProgressView().progressViewStyle(.circular)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel(Text("Loading more…"))
+                .task { await loadMore() }
         }
     }
 
